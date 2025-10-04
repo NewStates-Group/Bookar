@@ -1,3 +1,4 @@
 django
 langchain
 django-ninja
+django-cors-headers
