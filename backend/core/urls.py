@@ -4,6 +4,7 @@ from courses.api import router as courses_router
 
 api = NinjaAPI(
     title="Bookar API",
+    description="A melhor plataforma de aprendizado baseado em IA",
     csrf=False,
 )
 

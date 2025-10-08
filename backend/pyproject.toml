@@ -6,7 +6,7 @@ authors = [
     {name = "angelo-francisco",email = "ics20080729@gmail.com "}
 ]
 readme = "README.md"
-requires-python = ">=3.13,<4.0"
+requires-python = ">=3.12,<4.0"
 dependencies = [
     "langchain (>=0.3.27,<0.4.0)",
     "django (>=5.2.7,<6.0.0)",
