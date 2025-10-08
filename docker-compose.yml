@@ -1,20 +1,19 @@
 services:
   database:
-    image: postgresql:17-alpine
+    image: postgres:17-alpine
     environment:
       POSTGRES_PASSWORD: password
       POSTGRES_DB: BookarDB 
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d BookarDB"]
       interval: 10s
       retries: 3
       timeout: 5s
   backend:
     build: ./backend
-    command: sh -c python manage.py migrate && \
-      python manage.py runservice 0.0.0.0:8000
+    command: sh -c "python manage.py migrate && python manage.py runserver 0.0.0.0:8000"
     ports:
       - "8000:8000"
     environment:

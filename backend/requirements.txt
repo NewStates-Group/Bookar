@@ -5,6 +5,7 @@ certifi==2025.8.3
 charset-normalizer==3.4.3
 Django==5.2.7
 django-cors-headers==4.9.0
+django-environ==0.12.0
 django-ninja==1.4.3
 greenlet==3.2.4
 h11==0.16.0
@@ -19,6 +20,7 @@ langchain-text-splitters==0.3.11
 langsmith==0.4.32
 orjson==3.11.3
 packaging==25.0
+psycopg2-binary==2.9.10
 pydantic==2.11.10
 pydantic_core==2.33.2
 PyYAML==6.0.3
