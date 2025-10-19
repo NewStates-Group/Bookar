@@ -1,30 +1,34 @@
+import os
 import requests
-import json
-from config import OPENROUTER_API_KEY, OPENROUTER_BASE_URL
+from dotenv import load_dotenv
 
-def test_connection():
-    headers = {
-        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-        "Content-Type": "application/json",
-    }
+# Carregar variáveis de ambiente
+load_dotenv()
 
-    data = {
-        "model": "openai/gpt-4o-mini",  # modelo disponível no OpenRouter
-        "messages": [
-            {"role": "system", "content": "You are a helpful assistant."},
-            {"role": "user", "content": "Hello, can you confirm if the Bukar project is connected?"},
-        ],
-    }
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 
-    response = requests.post(OPENROUTER_BASE_URL, headers=headers, data=json.dumps(data))
+if not OPENROUTER_API_KEY:
+    print("❌ API key não encontrada. Verifica o arquivo .env.")
+    exit()
 
-    if response.status_code == 200:
-        result = response.json()
-        print("✅ Conexão bem sucedida!")
-        print("Resposta da IA:", result["choices"][0]["message"]["content"])
-    else:
-        print("❌ Erro:", response.status_code, response.text)
+# Endpoint do OpenRouter
+OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1/chat/completions"
 
+headers = {
+    "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+    "Content-Type": "application/json",
+    "HTTP-Referer": "http://localhost:3000",  # ou teu domínio futuramente
+    "X-Title": "Bookar AI Base Test"
+}
 
-if __name__ == "__main__":
-    test_connection()
+data = {
+    "model": "gpt-3.5-turbo",
+    "messages": [
+        {"role": "user", "content": "Olá, estás a funcionar?"}
+    ]
+}
+
+response = requests.post(OPENROUTER_BASE_URL, headers=headers, json=data)
+
+print("Status:", response.status_code)
+print("Resposta:", response.text)
