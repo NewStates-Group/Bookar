@@ -1,20 +1,204 @@
-@import "tailwindcss";
-
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+:root{
+  --sidebar-width: 70px;
+  --sidebar-expanded: 200px;
+  --accent: #5a3ef5;
+  --bg: #f8f9fa;
+  --card-shadow: 0 4px 10px rgba(0,0,0,0.06);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+/* Reset leve */
+* { box-sizing: border-box; }
+html,body,#__next { height: 100%; }
+
+body {
+  font-family: 'Poppins', sans-serif;
+  margin: 0;
+  background: var(--bg);
+  color: #333;
+  display: block; /* body não precisa ser flex aqui */
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* Sidebar */
+.sidebar {
+  width: var(--sidebar-width);
+  background-color: var(--accent);
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 1rem;
+  transition: width 0.22s ease;
+  position: fixed;
+  left: 0;
+  top: 0;
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.06);
+  z-index: 20;
 }
+
+.sidebar:hover { width: var(--sidebar-expanded); }
+
+.sidebar .logo {
+  color: white;
+  font-size: 1.4rem;
+  font-weight: 700;
+  margin-bottom: 1.2rem;
+  width: 100%;
+  text-align: center;
+}
+
+.sidebar ul { list-style: none; padding: 0; width: 100%; margin: 0; }
+
+.sidebar ul li {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 14px; cursor: pointer; transition: background 0.15s ease;
+  color: white; border-radius: 8px; margin: 6px 8px;
+}
+
+.sidebar ul li:hover { background-color: rgba(255,255,255,0.06); }
+
+.sidebar ul li .icon { width: 28px; text-align: center; font-size: 18px; }
+.sidebar ul li span { opacity: 0; visibility: hidden; transition: opacity 0.18s, transform 0.18s; white-space: nowrap; transform: translateX(-6px); }
+
+.sidebar:hover ul li span { opacity: 1; visibility: visible; transform: translateX(0); }
+
+/* Topbar: calcula a posição com a variável da sidebar para evitar desalinhamento */
+.topbar {
+  position: fixed; top: 0; left: var(--sidebar-width); right: 0; height: 60px;
+  background-color: #fff; display:flex; justify-content:flex-end; align-items:center; padding:0 1.5rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08); z-index: 15; transition: left 0.22s ease;
+}
+
+.sidebar:hover ~ .topbar,
+.sidebar:hover + .topbar { left: var(--sidebar-expanded); }
+
+.profile { display:flex; align-items:center; gap:10px; }
+.profile img { width:35px; height:35px; border-radius:50%; border:2px solid var(--accent); object-fit:cover }
+
+/* Main: também usa as mesmas variáveis para manter alinhamento exato */
+main {
+  margin-top: 80px;
+  margin-left: calc(var(--sidebar-width) + 20px); /* + padding para ficar parecido com o original */
+  padding: 1rem;
+  transition: margin-left 0.22s ease, width 0.22s ease;
+  width: calc(100% - (var(--sidebar-width) + 40px));
+  max-width: 1200px;
+}
+
+.sidebar:hover ~ main,
+.sidebar:hover + main {
+  margin-left: calc(var(--sidebar-expanded) + 20px);
+  width: calc(100% - (var(--sidebar-expanded) + 40px));
+}
+
+/* Botão gerar */
+.generate-btn {
+  background-color: var(--accent);
+  color: white;
+  border: none;
+  padding: 0.9rem 1.6rem;
+  font-size: 1.05rem;
+  border-radius: 10px;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(90,62,245,0.12);
+  transition: transform .12s ease, background .12s ease;
+}
+.generate-btn:hover { background-color: #432fd1; transform: translateY(-2px); }
+
+/* Courses grid */
+.courses {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1.25rem;
+  margin-top: 1.25rem;
+}
+
+/* Card melhorado: altura uniforme, conteúdo bem distribuído */
+.course-card {
+  background: white;
+  border-radius: 12px;
+  padding: 0;
+  box-shadow: var(--card-shadow);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 320px; /* altura consistente */
+  transition: transform .12s ease, box-shadow .12s ease;
+}
+
+.course-card:hover { transform: translateY(-6px); box-shadow: 0 10px 30px rgba(0,0,0,0.09); }
+
+.course-card .thumb {
+  width: 100%;
+  height: 100px; /* menor e mais proporcional */
+  overflow: hidden;
+  flex-shrink: 0;
+  background: #eee;
+}
+
+.course-card .thumb img {
+  width: 100%;
+  height: 5%;
+  object-fit: cover; /* mantém bonito */
+  display: block;
+}
+
+/* Conteúdo: espaçamento e alinhamento claro */
+.course-body {
+  padding: 1rem;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.course-info { margin-top: 0; }
+.course-info h3 {
+  margin: 0 0 0.45rem 0;
+  font-size: 1.05rem;
+  line-height: 1.25;
+}
+
+.course-meta {
+  font-size: 0.9rem;
+  color: #666;
+  margin-bottom: 0.8rem;
+}
+
+/* Ações: deixar os botões alinhados à direita e com espaçamento */
+.course-actions {
+  display: flex;
+  gap: 0.6rem;
+  justify-content: flex-end;
+  align-items: center;
+  margin-top: 0.6rem;
+}
+
+.course-actions button {
+  border: none;
+  padding: 0.45rem 0.9rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.edit-btn { background: #ffc107; color: #222; }
+.delete-btn { background: #dc3545; color: #fff; }
+.enter-btn { background: #198754; color: #fff; }
+
+/* Pequenas melhorias de acessibilidade */
+.course-actions button:focus { outline: 3px solid rgba(90,62,245,0.18); transform: translateY(-1px); }
+
+/* Responsividade */
+@media (max-width: 880px) {
+  .sidebar { display: none; }
+  .topbar{ left: 0 !important; width: 100%; }
+  main { margin-left: 0; width: 100%; padding: 1rem; }
+  :root { --sidebar-width: 0; --sidebar-expanded: 0; } /* evita efeitos residuais */
+  .course-card { min-height: unset; }
+}
+
+/* Ajuste final para garantir que a topbar e main sejam selecionáveis como irmãos do elemento .sidebar:
+   Dependendo de como o layout do Next foi escrito (se .sidebar não for um irmão direto), podes usar classes
+   no layout para que a regra ".sidebar:hover ~ .topbar" funcione. Se não funcionar, usa JS para alternar uma
+   classe 'sidebar-expanded' no body quando o mouse entrar/saír da sidebar. */

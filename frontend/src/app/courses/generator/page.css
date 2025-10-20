@@ -1,0 +1,27 @@
+:root{--bg:#0f1724;--card:#0b1220;--accent:#7c3aed;--muted:#9aa4b2;--glass:rgba(255,255,255,0.03)}
+*{box-sizing:border-box;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial}
+body{margin:0;background:linear-gradient(180deg,#071028 0%, #071823 100%);color:#e6eef6;min-height:100vh;padding:28px}
+.generator-root{max-width:1100px;margin:0 auto;padding:28px 0}
+.gen-header{display:flex;align-items:center;gap:16px;margin-bottom:18px}
+.logo{width:52px;height:52px;border-radius:12px;background:linear-gradient(135deg,var(--accent),#5b21b6);display:grid;place-items:center;font-weight:700}
+h1{font-size:20px;margin:0}
+.lead{margin:0;color:var(--muted)}
+.gen-grid{display:grid;grid-template-columns:420px 1fr;gap:18px;margin-top:18px}
+.card{background:var(--card);padding:18px;border-radius:12px;box-shadow:0 6px 24px rgba(2,6,23,0.6);border:1px solid rgba(255,255,255,0.03)}
+label{display:block;font-size:13px;color:var(--muted);margin-bottom:8px}
+input[type=text],select,textarea,input[type=number]{width:100%;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit}
+textarea{min-height:90px;resize:vertical}
+.row{display:flex;gap:10px}
+.small{flex:1}
+.muted{color:var(--muted);font-size:13px}
+.actions{display:flex;gap:10px;align-items:center;margin-top:12px}
+button{background:var(--accent);border:none;padding:10px 14px;color:white;border-radius:10px;cursor:pointer;font-weight:600}
+button.ghost{background:transparent;border:1px solid rgba(255,255,255,0.06)}
+.preview{overflow:auto;max-height:72vh;padding:12px}
+.outline{background:var(--glass);padding:12px;border-radius:10px;border:1px dashed rgba(255,255,255,0.03)}
+.module{padding:10px;border-radius:8px;background:linear-gradient(180deg,rgba(255,255,255,0.02),transparent);margin-bottom:10px}
+.meta{font-size:13px;color:var(--muted);margin-bottom:8px}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{background:rgba(255,255,255,0.03);padding:6px 8px;border-radius:999px;font-size:13px}
+footer{margin-top:16px;color:var(--muted);font-size:13px}
+@media(max-width:880px){.gen-grid{grid-template-columns:1fr}.generator-root{padding:12px}}
