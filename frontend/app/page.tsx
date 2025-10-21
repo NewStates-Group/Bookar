@@ -1,14 +1,15 @@
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { CourseCard } from "@/components/course-card"
-import { Search, Sparkles, Brain, Zap, TrendingUp } from "lucide-react"
-import Link from "next/link"
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { CourseCard } from "@/components/course-card";
+import { Search, Sparkles, Brain, Zap, TrendingUp } from "lucide-react";
+import Link from "next/link";
 
 const courses = [
   {
     id: 1,
     title: "Introduction to Machine Learning",
-    description: "Master the fundamentals of ML algorithms, from linear regression to neural networks.",
+    description:
+      "Master the fundamentals of ML algorithms, from linear regression to neural networks.",
     instructor: "Dr. Sarah Chen",
     duration: "8 weeks",
     level: "Beginner",
@@ -20,7 +21,8 @@ const courses = [
   {
     id: 2,
     title: "Deep Learning Specialization",
-    description: "Build and train deep neural networks for computer vision and NLP applications.",
+    description:
+      "Build and train deep neural networks for computer vision and NLP applications.",
     instructor: "Prof. Michael Zhang",
     duration: "12 weeks",
     level: "Advanced",
@@ -32,7 +34,8 @@ const courses = [
   {
     id: 3,
     title: "Natural Language Processing",
-    description: "Learn to build chatbots, sentiment analysis, and language models with transformers.",
+    description:
+      "Learn to build chatbots, sentiment analysis, and language models with transformers.",
     instructor: "Dr. Emily Rodriguez",
     duration: "10 weeks",
     level: "Intermediate",
@@ -44,7 +47,8 @@ const courses = [
   {
     id: 4,
     title: "Computer Vision Fundamentals",
-    description: "Explore image processing, object detection, and facial recognition techniques.",
+    description:
+      "Explore image processing, object detection, and facial recognition techniques.",
     instructor: "Dr. James Park",
     duration: "9 weeks",
     level: "Intermediate",
@@ -56,7 +60,8 @@ const courses = [
   {
     id: 5,
     title: "Reinforcement Learning",
-    description: "Train AI agents to make decisions and master complex environments.",
+    description:
+      "Train AI agents to make decisions and master complex environments.",
     instructor: "Prof. Lisa Wang",
     duration: "11 weeks",
     level: "Advanced",
@@ -68,7 +73,8 @@ const courses = [
   {
     id: 6,
     title: "AI Ethics & Responsible AI",
-    description: "Understand the ethical implications and best practices for deploying AI systems.",
+    description:
+      "Understand the ethical implications and best practices for deploying AI systems.",
     instructor: "Dr. Marcus Johnson",
     duration: "6 weeks",
     level: "Beginner",
@@ -77,14 +83,14 @@ const courses = [
     image: "/ai-ethics-responsible-artificial-intelligence.jpg",
     category: "Ethics",
   },
-]
+];
 
 const categories = [
   { name: "All Courses", icon: Sparkles },
   { name: "Machine Learning", icon: Brain },
   { name: "Deep Learning", icon: Zap },
   { name: "NLP", icon: TrendingUp },
-]
+];
 
 export default function HomePage() {
   return (
@@ -100,7 +106,10 @@ export default function HomePage() {
           </Link>
 
           <nav className="hidden md:flex items-center gap-6">
-            <Link href="/" className="text-sm font-medium hover:text-primary transition-colors">
+            <Link
+              href="/"
+              className="text-sm font-medium hover:text-primary transition-colors"
+            >
               Courses
             </Link>
             <Link
@@ -138,18 +147,24 @@ export default function HomePage() {
             <span>Learn AI from Industry Experts</span>
           </div>
 
-          <h1 className="text-5xl md:text-6xl font-bold mb-6 text-balance">Master Artificial Intelligence</h1>
+          <h1 className="text-5xl md:text-6xl font-bold mb-6 text-balance">
+            Master Artificial Intelligence
+          </h1>
 
           <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto text-pretty">
-            Build cutting-edge AI applications with hands-on courses in machine learning, deep learning, and neural
-            networks.
+            Build cutting-edge AI applications with hands-on courses in machine
+            learning, deep learning, and neural networks.
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-12">
             <Button size="lg" className="w-full sm:w-auto">
               Explore Courses
             </Button>
-            <Button size="lg" variant="outline" className="w-full sm:w-auto bg-transparent">
+            <Button
+              size="lg"
+              variant="outline"
+              className="w-full sm:w-auto bg-transparent"
+            >
               View Learning Paths
             </Button>
           </div>
@@ -157,7 +172,10 @@ export default function HomePage() {
           {/* Search Bar */}
           <div className="max-w-2xl mx-auto relative">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-            <Input placeholder="Search for courses, topics, or instructors..." className="pl-12 h-12 text-base" />
+            <Input
+              placeholder="Search for courses, topics, or instructors..."
+              className="pl-12 h-12 text-base"
+            />
           </div>
         </div>
       </section>
@@ -168,11 +186,15 @@ export default function HomePage() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 max-w-4xl mx-auto">
             <div className="text-center">
               <div className="text-3xl font-bold mb-1">50K+</div>
-              <div className="text-sm text-muted-foreground">Active Students</div>
+              <div className="text-sm text-muted-foreground">
+                Active Students
+              </div>
             </div>
             <div className="text-center">
               <div className="text-3xl font-bold mb-1">200+</div>
-              <div className="text-sm text-muted-foreground">Expert Instructors</div>
+              <div className="text-sm text-muted-foreground">
+                Expert Instructors
+              </div>
             </div>
             <div className="text-center">
               <div className="text-3xl font-bold mb-1">500+</div>
@@ -180,7 +202,9 @@ export default function HomePage() {
             </div>
             <div className="text-center">
               <div className="text-3xl font-bold mb-1">4.8★</div>
-              <div className="text-sm text-muted-foreground">Average Rating</div>
+              <div className="text-sm text-muted-foreground">
+                Average Rating
+              </div>
             </div>
           </div>
         </div>
@@ -191,7 +215,7 @@ export default function HomePage() {
         <div className="container mx-auto max-w-6xl">
           <div className="flex items-center gap-3 overflow-x-auto pb-2">
             {categories.map((category) => {
-              const Icon = category.icon
+              const Icon = category.icon;
               return (
                 <Button
                   key={category.name}
@@ -201,7 +225,7 @@ export default function HomePage() {
                   <Icon className="w-4 h-4" />
                   {category.name}
                 </Button>
-              )
+              );
             })}
           </div>
         </div>
@@ -213,7 +237,9 @@ export default function HomePage() {
           <div className="flex items-center justify-between mb-8">
             <div>
               <h2 className="text-3xl font-bold mb-2">Popular Courses</h2>
-              <p className="text-muted-foreground">Start your AI journey with our most loved courses</p>
+              <p className="text-muted-foreground">
+                Start your AI journey with our most loved courses
+              </p>
             </div>
           </div>
 
@@ -233,17 +259,26 @@ export default function HomePage() {
               <h3 className="font-semibold mb-3">Platform</h3>
               <ul className="space-y-2 text-sm text-muted-foreground">
                 <li>
-                  <Link href="/courses" className="hover:text-foreground transition-colors">
+                  <Link
+                    href="/courses"
+                    className="hover:text-foreground transition-colors"
+                  >
                     Browse Courses
                   </Link>
                 </li>
                 <li>
-                  <Link href="/paths" className="hover:text-foreground transition-colors">
+                  <Link
+                    href="/paths"
+                    className="hover:text-foreground transition-colors"
+                  >
                     Learning Paths
                   </Link>
                 </li>
                 <li>
-                  <Link href="/instructors" className="hover:text-foreground transition-colors">
+                  <Link
+                    href="/instructors"
+                    className="hover:text-foreground transition-colors"
+                  >
                     Instructors
                   </Link>
                 </li>
@@ -253,17 +288,26 @@ export default function HomePage() {
               <h3 className="font-semibold mb-3">Company</h3>
               <ul className="space-y-2 text-sm text-muted-foreground">
                 <li>
-                  <Link href="/about" className="hover:text-foreground transition-colors">
+                  <Link
+                    href="/about"
+                    className="hover:text-foreground transition-colors"
+                  >
                     About Us
                   </Link>
                 </li>
                 <li>
-                  <Link href="/careers" className="hover:text-foreground transition-colors">
+                  <Link
+                    href="/careers"
+                    className="hover:text-foreground transition-colors"
+                  >
                     Careers
                   </Link>
                 </li>
                 <li>
-                  <Link href="/blog" className="hover:text-foreground transition-colors">
+                  <Link
+                    href="/blog"
+                    className="hover:text-foreground transition-colors"
+                  >
                     Blog
                   </Link>
                 </li>
@@ -273,17 +317,26 @@ export default function HomePage() {
               <h3 className="font-semibold mb-3">Support</h3>
               <ul className="space-y-2 text-sm text-muted-foreground">
                 <li>
-                  <Link href="/help" className="hover:text-foreground transition-colors">
+                  <Link
+                    href="/help"
+                    className="hover:text-foreground transition-colors"
+                  >
                     Help Center
                   </Link>
                 </li>
                 <li>
-                  <Link href="/contact" className="hover:text-foreground transition-colors">
+                  <Link
+                    href="/contact"
+                    className="hover:text-foreground transition-colors"
+                  >
                     Contact
                   </Link>
                 </li>
                 <li>
-                  <Link href="/faq" className="hover:text-foreground transition-colors">
+                  <Link
+                    href="/faq"
+                    className="hover:text-foreground transition-colors"
+                  >
                     FAQ
                   </Link>
                 </li>
@@ -293,12 +346,18 @@ export default function HomePage() {
               <h3 className="font-semibold mb-3">Legal</h3>
               <ul className="space-y-2 text-sm text-muted-foreground">
                 <li>
-                  <Link href="/privacy" className="hover:text-foreground transition-colors">
+                  <Link
+                    href="/privacy"
+                    className="hover:text-foreground transition-colors"
+                  >
                     Privacy Policy
                   </Link>
                 </li>
                 <li>
-                  <Link href="/terms" className="hover:text-foreground transition-colors">
+                  <Link
+                    href="/terms"
+                    className="hover:text-foreground transition-colors"
+                  >
                     Terms of Service
                   </Link>
                 </li>
@@ -311,5 +370,5 @@ export default function HomePage() {
         </div>
       </footer>
     </div>
-  )
+  );
 }
