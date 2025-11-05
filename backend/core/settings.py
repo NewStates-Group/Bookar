@@ -1,6 +1,7 @@
-import environ
 import os
 from pathlib import Path
+
+import environ
 
 env = environ.Env()
 environ.Env.read_env()
@@ -21,6 +22,7 @@ DEBUG = True
 ALLOWED_HOSTS = ["*"]
 
 INSTALLED_APPS = [
+    "daphne",
     "ninja",
     "corsheaders",
     "django.contrib.auth",
@@ -49,14 +51,18 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = "core.wsgi.application"
+ASGI_APPLICATION = "core.asgi.application"
 
 
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-DATABASES = {"default": env.db_url_config(os.getenv("DATABASE_URL"))}
-
+DATABASES = {
+    "default": {
+        "ENGINE": "django.db.backends.sqlite3",
+        "NAME": BASE_DIR / "db.sqlite3",
+    }
+}
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
@@ -102,3 +108,5 @@ if DEBUG:
     INSTALLED_APPS += [
         "django.contrib.staticfiles",
     ]
+
+AI = {"MODEL": "gpt-oss:120b-cloud"}

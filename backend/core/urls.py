@@ -8,7 +8,7 @@ api = NinjaAPI(
     csrf=False,
 )
 
-api.add_router('/courses/', courses_router)
+api.add_router('/courses', courses_router)
 
 urlpatterns = [
     path('api/', api.urls),
