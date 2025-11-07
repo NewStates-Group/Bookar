@@ -1,82 +1,90 @@
 import json
+from time import perf_counter
 
-from django.conf import settings
-from ninja import Router, Schema
-from ollama import Client
+from django.core.cache import cache
+from django.core.exceptions import ObjectDoesNotExist
+from django.core.files.base import ContentFile
+from django.http import StreamingHttpResponse
+from ninja import Router
+from ninja.errors import HttpError
 
-from .models import LevelChoices, Tag
-
-router = Router()
-client = Client(
-    host="https://ollama.com",
-    headers={
-        "Authorization": "Bearer edeb6900fdab480fa5038618260f04d7.gIzDAUDp-Vx90Te-H4aGpT9j"
-    },
+from .models import Course, Lesson, Module, Tag
+from .schemas import CourseCreateSchema, CoursePlanSchema, TagSchema
+from .services import (
+    generate_course_lesson,
+    generate_course_outline,
+    generate_course_thumb,
 )
 
-
-class CourseCreateSchema(Schema):
-    title: str
-    desc: str
-    level: LevelChoices
+router = Router()
 
 
-class TagSchema(Schema):
-    name: str
+def send_event(message: str, p: int = 0):
+    """Helper para gerar eventos SSE"""
+    data = {"message": message}
+    if p:
+        data["p"] = p  # type: ignore
+    print(message)
+    return f"data: {json.dumps(data)}\n\n"
 
 
-class CoursePlanSchema(Schema):
-    title: str
-    outline: dict
+def get_tag(id):
+    try:
+        return Tag.objects.get(id=id)
+    except ObjectDoesNotExist:
+        raise HttpError(404, "Tag não encontrada.")
 
 
 @router.post("/", response=CoursePlanSchema)
-async def create_course(request, data: CourseCreateSchema):
-    messages = [
-        {
-            "role": "system",
-            "content": (
-                "Você é um criador de roteiros educacionais multimídia. "
-                "Gere um plano de curso JSON seguindo a estrutura: "
-                "{title:str, desc:str, level:str, modules:list[dict]}. "
-                "Cada módulo deve conter: {title:str, desc:str, lessons:list[dict]}, "
-                "e cada aula deve conter {title:str, desc:str, narration:str, key_points:list[str], scene_suggestion:str}. "
-                "A narração deve ser natural, como um professor explicando em vídeo. "
-                "scene_suggestion deve descrever o cenário visual da aula (ex: 'professor em frente a quadro digital'). "
-                "Gere JSON limpo, válido e completo, pronto para salvar no banco e gerar vídeo e áudio automaticamente."
-            ),
-        },
-        {
-            "role": "user",
-            "content": (
-                f"Crie um roteiro completo para o curso '{data.title}'. "
-                f"Descrição: {data.desc}. "
-                f"O nível do curso deve ser: {data.level}. "
-                "Inclua pelo menos 3 módulos, cada módulo com pelo menos 2 a 5 aulas. "
-                "Cada aula deve conter 'narration' e 'scene_suggestion' para vídeos."
-            ),
-        },
-    ]
-    response_text = ""
-    for part in client.chat(
-        settings.AI["MODEL"],
-        messages=messages,
-        stream=True,
-    ):
-        if "content" in part["message"]:
-            content = part["message"]["content"]
-            response_text += content
-    try:
-        course_outline = json.loads(response_text)
-    except json.JSONDecodeError:
-        cleaned = response_text.strip().split("{", 1)[-1]
-        cleaned = "{" + cleaned.rsplit("}", 1)[0] + "}"
-        course_outline = json.loads(cleaned)
+def create_course(request, data: CourseCreateSchema):
+    def course_creation_process():
+        start = perf_counter()
+        tag = get_tag(data.tag)
 
-    return {
-        "title": data.title,
-        "outline": course_outline,
-    }
+        yield send_event("Generating course outline...")
+        course_outline = cache.get_or_set(
+            "course_outline", lambda: generate_course_outline(data), 3600
+        )
+        course = Course.objects.create(
+            title=data.title,
+            desc=data.desc,
+            tag=tag,
+        )
+        yield send_event("Generating course thumb...")
+        thumb = cache.get_or_set(
+            "course_thumb", lambda: generate_course_thumb(data), 3600
+        )
+        course.thumb = thumb
+        yield send_event("Generating course classes...")
+        order = 0
+        for module in course_outline["modules"]:
+            yield send_event(f"Generating {module['title']}...")
+            db_module = Module.objects.create(
+                name=module["title"], desc=module["desc"], order=order
+            )
+            for lesson in module["lessons"]:
+                yield send_event(f"Generating {lesson['title']}...")
+                print(f"Generating {lesson['title']}...")
+                db_lesson = Lesson(
+                    title=lesson["title"],
+                    desc=lesson["desc"],
+                    narration=lesson["narration"],
+                    key_points=lesson["key_points"],
+                    scene_suggestion=lesson["scene_suggestion"],
+                    duration_seconds=lesson["duration_seconds"],
+                    video_file=generate_course_lesson(lesson),
+                )
+                db_lesson.save()
+                db_module.lessons.add(db_lesson)
+            db_module.save()
+            course.modules.add(db_module)
+            order += 1
+        yield send_event("Course generated")
+        print(perf_counter() - start)
+
+    return StreamingHttpResponse(
+        course_creation_process(), content_type="text/event-stream"
+    )
 
 
 @router.get("/tags/", response=list[TagSchema])
