@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 
 import environ
@@ -104,10 +103,14 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 CORS_ALLOW_CREDENTIALS = True
 CORS_ORIGIN_ALLOW_ALL = True
 
+REDIS_URL = "redis://127.0.0.1:6379"
+
+CELERY_BROKER_URL = REDIS_URL
+
 CACHES = {
     "default": {
         "BACKEND": "django.core.cache.backends.redis.RedisCache",
-        "LOCATION": "redis://127.0.0.1:6379",
+        "LOCATION": REDIS_URL,
     }
 }
 
@@ -116,4 +119,9 @@ if DEBUG:
         "django.contrib.staticfiles",
     ]
 
-AI = {"MODEL": "gpt-oss:120b-cloud"}
+AI = {
+    "MODEL": "gpt-oss:120b-cloud",
+    "KEY": "edeb6900fdab480fa5038618260f04d7.gIzDAUDp-Vx90Te-H4aGpT9j",
+}
+
+ELEVENLABS_SECRET_KEY = "sk_9ed2d20e58afb0b160b60b7427a2760218ee340e8d42667b",
