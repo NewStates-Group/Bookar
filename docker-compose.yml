@@ -1,19 +1,69 @@
 services:
+  db:
+    image: postgres:17-alpine
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=bookar
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    ports:
+      - 5432:5432
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - 6379:6379
+
   backend:
     build: ./backend
+    image: backend
     command: sh -c "python manage.py migrate && python manage.py runserver 0.0.0.0:8000"
-    ports:
-      - "8000:8000"
     volumes:
       - ./backend:/app
+    ports:
+      - 8000:8000
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/bookar
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - GENAI_KEY=AIzaSyDyvqvKBMm_ElzlaocaQMGy1UhmsZqHCpU
+      - OLLAMA_KEY=a3a0266acc75406d8255c77af093e451.8tERxykElej3uCmk7itMe2tg
+    depends_on:
+      - db
+      - redis
+
+  worker:
+    image: backend
+    command: celery -A core worker -l info
+    volumes:
+      - ./backend:/app
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/bookar
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - GENAI_KEY=AIzaSyDyvqvKBMm_ElzlaocaQMGy1UhmsZqHCpU
+      - OLLAMA_KEY=a3a0266acc75406d8255c77af093e451.8tERxykElej3uCmk7itMe2tg
+    depends_on:
+      - backend
+      - redis
+
   frontend:
     build: ./frontend
-    environment:
-      BACKEND_URL: http://backend:8000
     volumes:
       - ./frontend:/app
       - /app/node_modules
     ports:
-      - "3000:3000"
+      - 3000:3000
+    environment:
+      - NEXT_PUBLIC_API_URL=http://backend:8000/api
+      - API_URL=http://backend:8000/api
+      - NEXTAUTH_URL=http://backend:8000
+      - NEXTAUTH_SECRET=changeme
     depends_on:
       - backend
+
+volumes:
+  postgres_data:

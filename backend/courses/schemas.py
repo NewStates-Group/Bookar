@@ -1,26 +1,50 @@
-from typing import Optional
+from typing import List
 
 from ninja import Schema
 from ninja.orm import create_schema
-from pydantic import field_validator
+from pydantic import Field
 
-from .models import Course, Lesson, Tag, LevelChoices
+from .models import Course, Lesson, Module
+
+CourseOut = create_schema(
+    Course,
+    fields=[
+        "id",
+        "title",
+        "desc",
+        "level",
+        "thumb",
+        "created_at",
+        "status",
+    ],
+)
+LessonSchema = create_schema(
+    Lesson,
+    fields=[
+        "id",
+        "module",
+        "title",
+        "desc",
+        "duration",
+        "watched",
+        "lesson_file",
+        "narration",
+        "key_points",
+        "scene_suggestion",
+        "created_at",
+        "status",
+    ],
+)
+ModuleSchema = create_schema(Module, fields=["id", "name", "desc"])
 
 
 class CourseIn(Schema):
-    title: str
-    desc: str
-    level: LevelChoices
-    tag: int
+    prompt: str = Field(..., max_length=250)
 
-    @field_validator("tag", mode="after")
-    @classmethod
-    def get_tag(cls, id: int) -> Tag:
-        try:
-            return Tag.objects.get(id=id)
-        except Tag.DoesNotExist:
-            raise ValueError("Tag inexistente")
 
-TagSchema = create_schema(Tag)
-CourseOut = create_schema(Course)
-LessonSchema = create_schema(Lesson)
+class ModuleDetailSchema(ModuleSchema):
+    lessons: List[LessonSchema]
+
+
+class CourseDetailSchema(CourseOut):
+    modules: List[ModuleDetailSchema]

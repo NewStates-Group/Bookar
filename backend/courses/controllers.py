@@ -1,42 +1,35 @@
 from typing import List
-from ninja_extra import api_controller, route
 
 from injector import inject
+from ninja_extra import api_controller, route
+from ninja_jwt.authentication import JWTAuth
 
-from .schemas import CourseIn, CourseOut, LessonSchema, TagSchema
-from .services import TagService, CourseService
-
-
-@api_controller("tags/")
-class TagController:
-    @inject
-    def __init__(self, tag_service: TagService):
-        self.tag_service = tag_service
-
-    @route.get(response=List[TagSchema])
-    def get_tags(self):
-        return self.tag_service.get_tags()
-
-    @route.post(response=TagSchema)
-    def create_tag(self, data: TagSchema):
-        return self.tag_service.create_tag(data.name)
+from .schemas import CourseDetailSchema, CourseIn, CourseOut, LessonSchema
+from .services import CourseService
 
 
-@api_controller("courses/")
+@api_controller("courses/", tags=["Course"], auth=JWTAuth())
 class CourseController:
     @inject
     def __init__(self, course_service: CourseService):
         self.course_service = course_service
 
+    @route.get("", response=List[CourseOut])
+    def list_courses(self, request):
+        return self.course_service.list_courses(request.user)
+
     @route.post(response=CourseOut)
-    def create_course(self, data: CourseIn):
-        return self.course_service.create_course(
-            title=data.title.strip(),
-            desc=data.desc.strip(),
-            level=data.level,
-            tag=data.tag,
-        )
+    def create_course(self, request, data: CourseIn):
+        return self.course_service.create_course(user=request.user, prompt=data.prompt)
 
     @route.get("/get_lesson", response=LessonSchema)
     def get_lesson(self, course_id: int):
         return self.course_service.get_lesson(course_id)
+
+    @route.post("/mark_watched")
+    def mark_watched(self, lesson_id: int):
+        return self.course_service.mark_watched(lesson_id)
+
+    @route.get("/{course_id}", response=CourseDetailSchema)
+    def get_course(self, course_id: int):
+        return self.course_service.get_course(course_id)

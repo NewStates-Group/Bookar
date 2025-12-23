@@ -1,18 +1,8 @@
 from django.conf import settings
 from django.conf.urls.static import static
 from django.urls import path
-from ninja_extra import NinjaExtraAPI
 
-from courses.controllers import TagController, CourseController
-
-api = NinjaExtraAPI(
-    title="Bookar API",
-    description="The greatest AI based learning plataform",
-    csrf=False,
-    version="0.0.1",
-)
-
-api.register_controllers(TagController, CourseController)
+from .api import api
 
 urlpatterns = [
     path("api/", api.urls),

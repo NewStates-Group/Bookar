@@ -1,0 +1,7 @@
+media
+.env
+.venv
+.gitignore
+.vscode
+.ruff_cache
+node_modules

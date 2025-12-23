@@ -1,14 +1,16 @@
 import type { Metadata } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import './globals.css'
+import { Providers } from './providers'
+import { Toaster } from 'sonner'
 
 const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: 'v0 App',
-  description: 'Created with v0',
-  generator: 'v0.app',
+  title: 'Bookar - AI Learning Platform',
+  description: 'Learn with AI-powered courses',
+
 }
 
 export default function RootLayout({
@@ -19,7 +21,11 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`font-sans antialiased`}>
-        {children}
+        <link rel="shortcut icon" href="/logo.png" type="image/x-icon" />
+        <Providers>
+          {children}
+          <Toaster position='top-right'/>
+        </Providers>
       </body>
     </html>
   )

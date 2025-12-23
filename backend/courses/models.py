@@ -1,7 +1,7 @@
 import uuid
 
+from django.conf import settings
 from django.db import models
-from django.utils.text import slugify
 
 
 class LevelChoices(models.TextChoices):
@@ -10,12 +10,28 @@ class LevelChoices(models.TextChoices):
     ADVANCED = "A", "Avançado"
 
 
-class Tag(models.Model):
-    name = models.CharField(max_length=80, null=True, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)
+class CourseStatus(models.TextChoices):
+    PROCESSING = "PROCESSING", "Processando"
+    READY = "READY", "Pronto"
+    ERROR = "ERROR", "Erro"
+
+
+class LessonStatus(models.TextChoices):
+    PENDING = "PENDING", "Pendente"
+    PROCESSING = "PROCESSING", "Processando"
+    READY = "READY", "Pronto"
+    ERROR = "ERROR", "Erro"
 
 
 class Course(models.Model):
+    uuid = models.UUIDField(default=uuid.uuid4)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="courses",
+        null=True,
+        blank=True,
+    )
     title = models.CharField(max_length=80, null=True, blank=True)
     desc = models.TextField(null=True, blank=True)
     level = models.CharField(
@@ -24,14 +40,14 @@ class Course(models.Model):
         null=True,
         blank=True,
     )
+    status = models.CharField(
+        max_length=20,
+        choices=CourseStatus.choices,
+        default=CourseStatus.PROCESSING,
+    )
     thumb = models.CharField(max_length=255, null=True, blank=True)
-    duration = models.CharField(max_length=10, null=True, blank=True)
-    tag = models.ForeignKey(Tag, on_delete=models.CASCADE)
+    failed = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
-
-    # def save(self, *args, **kwargs):
-    #    ...
-    # slugify the title later
 
 
 class Module(models.Model):
@@ -47,7 +63,12 @@ class Lesson(models.Model):
     desc = models.TextField()
     duration = models.PositiveIntegerField(default=0)
     watched = models.BooleanField(default=False)
-    video_file = models.CharField(max_length=150, null=True, blank=True)
+    status = models.CharField(
+        max_length=20,
+        choices=LessonStatus.choices,
+        default=LessonStatus.PENDING,
+    )
+    lesson_file = models.CharField(max_length=150, null=True, blank=True)
     narration = models.TextField(null=True, blank=True)
     key_points = models.CharField(max_length=150, null=True, blank=True)
     scene_suggestion = models.TextField(null=True, blank=True)
