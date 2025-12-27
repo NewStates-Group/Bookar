@@ -1,4 +1,4 @@
-from django.db import get_user_model
+from django.contrib.auth import get_user_model
 from ninja.errors import HttpError
 
 User = get_user_model()
