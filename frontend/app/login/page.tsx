@@ -28,6 +28,7 @@ export default function LoginPage() {
       });
 
       if (result?.error) {
+        console.log(result)
         toast.error("Login falhou. Verifique suas credenciais.");
       } else {
         toast.success("Login realizado com sucesso!");

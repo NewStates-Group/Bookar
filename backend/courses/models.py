@@ -4,12 +4,6 @@ from django.conf import settings
 from django.db import models
 
 
-class LevelChoices(models.TextChoices):
-    BEGINNER = "I", "Iniciante"
-    INTERMEDIATE = "IT", "Intermediário"
-    ADVANCED = "A", "Avançado"
-
-
 class CourseStatus(models.TextChoices):
     PROCESSING = "PROCESSING", "Processando"
     READY = "READY", "Pronto"
@@ -34,12 +28,6 @@ class Course(models.Model):
     )
     title = models.CharField(max_length=80, null=True, blank=True)
     desc = models.TextField(null=True, blank=True)
-    level = models.CharField(
-        max_length=2,
-        choices=LevelChoices.choices,
-        null=True,
-        blank=True,
-    )
     status = models.CharField(
         max_length=20,
         choices=CourseStatus.choices,

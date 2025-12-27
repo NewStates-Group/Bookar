@@ -6,14 +6,13 @@ export const authOptions: NextAuthOptions = {
         CredentialsProvider({
             name: "Credentials",
             credentials: {
-                username: {label: "Username", type: "text"},
-                password: {label: "Password", type: "password"}
+                username: { label: "Username", type: "text" },
+                password: { label: "Password", type: "password" }
             },
             async authorize(credentials, req) {
                 if (!credentials?.username || !credentials?.password) return null;
 
-                const baseUrl = process.env.NEXT_PUBLIC_API_URL;
-
+                const baseUrl = process.env.AUTH_URL;
                 const res = await fetch(`${baseUrl}/auth/pair`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -53,6 +52,6 @@ export const authOptions: NextAuthOptions = {
     pages: {
         signIn: "/login",
     },
-    secret: process.env.NEXTAUTH_SECRET
+    secret: process.env.AUTH_SECRET
 };
 

@@ -28,11 +28,6 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 
-interface Tag {
-  id: number;
-  name: str;
-}
-
 interface Course {
   id: number;
   title: string;
@@ -47,7 +42,6 @@ export default function DashboardPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const [courses, setCourses] = useState<Course[]>([]);
-  const [tags, setTags] = useState<Tag[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
   const [open, setOpen] = useState(false);
@@ -56,12 +50,10 @@ export default function DashboardPage() {
   const [title, setTitle] = useState("");
   const [desc, setDesc] = useState("");
   const [level, setLevel] = useState("I");
-  const [tag, setTag] = useState<string>("");
 
   useEffect(() => {
     if (session?.accessToken) {
       fetchCourses();
-      fetchTags();
     }
   }, [session]);
 
@@ -83,22 +75,6 @@ export default function DashboardPage() {
     }
   };
 
-  const fetchTags = async () => {
-    try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/tags/`, {
-        headers: {
-          Authorization: `Bearer ${session?.accessToken}`,
-        },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setTags(data);
-      }
-    } catch (error) {
-      console.error("Failed to fetch tags", error);
-    }
-  };
-
   const handleCreateCourse = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsCreating(true);
@@ -114,7 +90,6 @@ export default function DashboardPage() {
           title,
           desc,
           level,
-          tag: parseInt(tag),
         }),
       });
 
@@ -124,7 +99,6 @@ export default function DashboardPage() {
         setTitle("");
         setDesc("");
         setLevel("I");
-        setTag("");
         fetchCourses(); // Refresh list
       } else {
         const err = await res.json();
@@ -207,21 +181,6 @@ export default function DashboardPage() {
                         <SelectItem value="I">Iniciante</SelectItem>
                         <SelectItem value="IT">Intermediário</SelectItem>
                         <SelectItem value="A">Avançado</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="tag">Tag</Label>
-                    <Select value={tag} onValueChange={setTag}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Categoria" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {tags.map((t) => (
-                          <SelectItem key={t.id} value={t.id.toString()}>
-                            {t.name}
-                          </SelectItem>
-                        ))}
                       </SelectContent>
                     </Select>
                   </div>

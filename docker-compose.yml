@@ -9,12 +9,10 @@ services:
       - POSTGRES_PASSWORD=postgres
     ports:
       - 5432:5432
-
   redis:
     image: redis:7-alpine
     ports:
       - 6379:6379
-
   backend:
     build: ./backend
     image: backend
@@ -33,7 +31,6 @@ services:
     depends_on:
       - db
       - redis
-
   worker:
     image: backend
     command: celery -A core worker -l info
@@ -49,7 +46,6 @@ services:
     depends_on:
       - backend
       - redis
-
   frontend:
     build: ./frontend
     volumes:
@@ -58,10 +54,9 @@ services:
     ports:
       - 3000:3000
     environment:
-      - NEXT_PUBLIC_API_URL=http://backend:8000/api
-      - API_URL=http://backend:8000/api
-      - NEXTAUTH_URL=http://backend:8000
-      - NEXTAUTH_SECRET=changeme
+      NEXT_PUBLIC_API_URL: http://localhost:8000/api
+      AUTH_URL: http://backend:8000/api
+      AUTH_SECRET: example-secret
     depends_on:
       - backend
 

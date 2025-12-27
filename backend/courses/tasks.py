@@ -413,7 +413,6 @@ def create_course_outline(course_pk: int, user_prompt: str):
             "{\n"
             '  "title": "Course Title",\n'
             '  "desc": "Course Description",\n'
-            '  "level": "Level, B for begginners, I for intermediate and A for advanced",\n'
             '  "modules": [\n'
             "    {\n"
             '      "title": "Module Title",\n'
@@ -431,7 +430,7 @@ def create_course_outline(course_pk: int, user_prompt: str):
             "    }\n"
             "  ]\n"
             "}\n\n"
-            f"Generate all course outline based on this prompt: '{user_prompt}'.\n"
+            f"Generate a course outline based for this prompt: '{user_prompt}'.\n"
             "Ensure the content is high quality, educational, and ready for video production."
         )
 
@@ -449,7 +448,6 @@ def create_course_outline(course_pk: int, user_prompt: str):
         Course.objects.filter(pk=course_pk).update(
             title=course_outline.get("title"),
             desc=course_outline.get("desc"),
-            level=course_outline.get("level"),
         )
 
         if isinstance(course_outline, dict):

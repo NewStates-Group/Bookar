@@ -12,7 +12,6 @@ CourseOut = create_schema(
         "id",
         "title",
         "desc",
-        "level",
         "thumb",
         "created_at",
         "status",

@@ -47,7 +47,7 @@ export default function SignupPage() {
     <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-b from-background to-muted/20">
       <div className="w-full max-w-md">
         <Link href="/" className="flex items-center justify-center gap-2 mb-6">
-          <Image src={"/logo.png"} width={40} height={40} alt="Bookar Logo"/>
+          <Image src={"/logo.png"} width={40} height={40} alt="Bookar Logo" />
           <span className="text-3xl font-bold">Bookar</span>
         </Link>
 
