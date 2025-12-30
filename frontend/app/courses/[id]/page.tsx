@@ -62,7 +62,7 @@ export default function CoursePage() {
         const data = await res.json();
         setCourse(data);
       } else {
-        router.push("/dashboard");
+        router.push("/overview");
       }
     } catch (error) {
       console.error("Failed to fetch course", error);
@@ -85,9 +85,9 @@ export default function CoursePage() {
   return (
     <div className="min-h-screen bg-background p-4 md:p-8">
       <div className="max-w-4xl mx-auto space-y-8">
-        <Link href="/dashboard">
+        <Link href="/overview">
           <Button variant="ghost" className="mb-4 pl-0 hover:pl-2 transition-all">
-            <ArrowLeft className="w-4 h-4 mr-2" /> Voltar para Dashboard
+            <ArrowLeft className="w-4 h-4 mr-2" /> Voltar para Overview
           </Button>
         </Link>
 

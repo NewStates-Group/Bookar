@@ -35,7 +35,7 @@ interface Course {
   created_at: string;
 }
 
-export default function DashboardPage() {
+export default function OverviewPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const [courses, setCourses] = useState<Course[]>([]);

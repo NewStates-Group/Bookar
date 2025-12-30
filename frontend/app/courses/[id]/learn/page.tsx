@@ -120,8 +120,8 @@ export default function LearnPage() {
                 <p className="text-muted-foreground max-w-md mb-8">
                     Você completou todas as aulas disponíveis neste curso.
                 </p>
-                <Link href="/dashboard">
-                    <Button size="lg">Voltar para Dashboard</Button>
+                <Link href="/overview">
+                    <Button size="lg">Voltar para Overview</Button>
                 </Link>
             </div>
         )
@@ -131,7 +131,7 @@ export default function LearnPage() {
         return (
             <div className="min-h-screen flex flex-col items-center justify-center">
                 <p className="text-destructive mb-4">{error || "Aula não encontrada"}</p>
-                <Link href="/dashboard"><Button variant="outline">Voltar</Button></Link>
+                <Link href="/overview"><Button variant="outline">Voltar</Button></Link>
             </div>
         )
     }
