@@ -400,7 +400,7 @@ def generate_lesson(lesson_id: int):
 
 
 @shared_task
-def create_course_outline(course_pk: int, user_prompt: str):
+def create_course_outline(course_pk: int, user_prompt: str, level: str):
     # remove caching later, because we'll different prompts
     # cache user prompt too to be sure
     course_outline = cache.get(f"course_outline-{course_pk}")
@@ -411,8 +411,7 @@ def create_course_outline(course_pk: int, user_prompt: str):
             "Create a detailed multimedia course outline in JSON format. "
             "Strictly follow this JSON schema:\n"
             "{\n"
-            '  "title": "Course Title",\n'
-            '  "desc": "Course Description",\n'
+            '  "course_desc": "Course Description",\n'
             '  "modules": [\n'
             "    {\n"
             '      "title": "Module Title",\n'
@@ -430,7 +429,7 @@ def create_course_outline(course_pk: int, user_prompt: str):
             "    }\n"
             "  ]\n"
             "}\n\n"
-            f"Generate a course outline based for this prompt: '{user_prompt}'.\n"
+            f"Generate a **{level}** course outline based for this prompt: '{user_prompt}'.\n"
             "Ensure the content is high quality, educational, and ready for video production."
         )
 
@@ -446,8 +445,7 @@ def create_course_outline(course_pk: int, user_prompt: str):
             raise CourseCreationError(f"Erro ao criar estrutura do curso: {str(e)}")
     try:
         Course.objects.filter(pk=course_pk).update(
-            title=course_outline.get("title"),
-            desc=course_outline.get("desc"),
+            desc=course_outline.get("course_desc"),
         )
 
         if isinstance(course_outline, dict):
@@ -487,7 +485,7 @@ def create_course_outline(course_pk: int, user_prompt: str):
 
 
 @shared_task
-def create_course_thumb(course_pk: int, user_prompt: str):
+def create_course_thumb(course_pk: int, title: str):
     # remove caching in production
     course_thumb = cache.get(f"course_thumb-{course_pk}")
 
@@ -495,7 +493,7 @@ def create_course_thumb(course_pk: int, user_prompt: str):
         client = get_genai_client()
 
         prompt = (
-            f"Professional educational course thumbnail for this prompt'{user_prompt}'. "
+            f"Professional educational course thumbnail for this title: {title}. "
             "Use a modern, clean, academic design with bright colors and subtle gradients. "
             "Ensure the Course Title is visible and written in Portuguese. Any other text must also be in Portuguese."
         )

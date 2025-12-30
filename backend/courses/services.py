@@ -1,4 +1,5 @@
 import logging
+from uuid import UUID
 
 from django.db.models.query import QuerySet
 from ninja.errors import HttpError
@@ -13,19 +14,17 @@ class CourseService:
     def list_courses(self, user) -> QuerySet[Course]:
         return Course.objects.filter(user=user).order_by("-created_at")
 
-    def get_course(self, course_id: int) -> Course:
+    def get_course(self, uuid: UUID) -> Course:
         try:
-            course = Course.objects.prefetch_related("modules__lessons").get(
-                id=course_id
-            )
+            course = Course.objects.prefetch_related("modules__lessons").get(pk=uuid)
             return course
         except Course.DoesNotExist:
             raise HttpError(404, "Curso não encontrado")
 
-    def create_course(self, user, prompt: str) -> Course:
-        course = Course.objects.create(user=user)
-        create_course_outline.delay(course.pk, prompt)
-        create_course_thumb.delay(course.pk, prompt)
+    def create_course(self, user, title: str, details: str, level: str) -> Course:
+        course = Course.objects.create(user=user, title=title, level=level)
+        create_course_outline.delay(course.pk, details, level)
+        create_course_thumb.delay(course.pk, title)
         return course
 
     def get_lesson(self, course_id: int) -> Lesson:

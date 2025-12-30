@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/select"
 
 interface Course {
-  id: number;
+  uuid: string;
   title: string;
   desc: string;
   level: string;
@@ -46,10 +46,10 @@ export default function OverviewPage() {
   const [step, setStep] = useState(1);
   const [title, setTitle] = useState("");
   const [details, setDetails] = useState("");
-  const [level, setLevel] = useState<"I" | "IT" | "A">("I");
+  const [level, setLevel] = useState<"B" | "IT" | "A" | "NONE">("NONE");
 
   const levelLabel = {
-    I: "Iniciante",
+    B: "Iniciante",
     IT: "Intermediário",
     A: "Avançado",
   };
@@ -88,6 +88,44 @@ export default function OverviewPage() {
     setStep(1);
   };
 
+  const waitForCourseReady = async (courseUUID: string, title: string) => {
+    const toastId = toast.loading(`Criando seu curso de ${title}`);
+
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/courses/${courseUUID}/`,
+          {
+            headers: {
+              Authorization: `Bearer ${session?.accessToken}`,
+            },
+          }
+        );
+
+        if (!res.ok) return;
+
+        const course = await res.json();
+
+        if (course.status === "READY") {
+          clearInterval(interval);
+          toast.success(`Curso de "${title}" criado.`, {
+            id: toastId,
+          });
+          fetchCourses();
+        }
+
+        if (course.status === "ERROR") {
+          clearInterval(interval);
+          toast.error(`Erro ao criar o curso "${title}"`, {
+            id: toastId,
+          });
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }, 5000);
+  };
+
   const handleCreateCourse = async () => {
     if (!details.trim()) return;
 
@@ -108,13 +146,14 @@ export default function OverviewPage() {
       });
 
       if (res.ok) {
-        toast.success("Curso criado com sucesso! O processamento começou.");
+        const course = await res.json();
+
         setOpen(false);
         setTitle("");
         setDetails("");
-        setLevel("I");
+        setLevel("NONE");
         setStep(1);
-        fetchCourses();
+        waitForCourseReady(course.uuid, course.title);
       } else {
         const err = await res.json();
         toast.error(err.message || "Erro ao criar curso");
@@ -132,7 +171,7 @@ export default function OverviewPage() {
       setStep(1);
       setTitle("");
       setDetails("");
-      setLevel("I");
+      setLevel("NONE");
     }
   };
 
@@ -190,7 +229,6 @@ export default function OverviewPage() {
               </div>
 
               <div className="px-8 pb-8 space-y-6">
-                {/* STEP 1 - TÍTULO */}
                 {step === 1 && (
                   <div className="animate-in fade-in slide-in-from-right-5 duration-300">
                     <div className="relative group">
@@ -218,7 +256,6 @@ export default function OverviewPage() {
                   </div>
                 )}
 
-                {/* STEP 2 - DETALHES */}
                 {step === 2 && (
                   <div className="animate-in fade-in slide-in-from-right-5 duration-300 space-y-4">
                     <div className="rounded-2xl border-2 bg-white dark:bg-zinc-800 p-5 focus-within:ring-1/4 focus-within:ring-gray focus-within:border-gray-400 transition-all relative shadow-sm">
@@ -233,7 +270,7 @@ export default function OverviewPage() {
                           <Button
                             type="button"
                             onClick={handleBack}
-                            variant="ghost"
+                            variant="outline"
                             size="sm"
                             className="gap-2 -ml-2 hover:bg-muted/50"
                           >
@@ -242,13 +279,14 @@ export default function OverviewPage() {
                           </Button>
                           <div className="flex items-center gap-0">
 
-                            Nível: <Select value={level} onValueChange={setLevel}>
-                              <SelectTrigger className="border-none">
+                            <Select value={level} onValueChange={setLevel} required>
+                              <SelectTrigger className="border-none text-base">
                                 <SelectValue placeholder="Nível do curso" />
                               </SelectTrigger>
 
                               <SelectContent>
-                                <SelectItem value="I">Iniciante</SelectItem>
+                                <SelectItem value="NONE" disabled>Nível do curso</SelectItem>
+                                <SelectItem value="B">Iniciante</SelectItem>
                                 <SelectItem value="IT">Intermediário</SelectItem>
                                 <SelectItem value="A">Avançado</SelectItem>
                               </SelectContent>
@@ -292,20 +330,14 @@ export default function OverviewPage() {
             <div className="col-span-full flex flex-col items-center justify-center p-12 border border-dashed rounded-lg text-muted-foreground">
               <BookOpen className="w-12 h-12 mb-4 opacity-50" />
               <p>Você ainda não criou nenhum curso.</p>
-              <Button variant="link" onClick={() => setOpen(true)}>
-                Crie seu primeiro curso agora
-              </Button>
             </div>
           ) : (
             courses.map((course) => (
-              <Card key={course.id} className="overflow-hidden flex flex-col hover:shadow-lg transition-shadow">
+              <Card key={course.uuid} className="overflow-hidden flex flex-col hover:shadow-lg transition-shadow">
                 <div className="relative aspect-video bg-muted">
                   {course.thumb ? (
                     <img
-                      src={
-                        "https://d4uonx-ip-154-71-152-134.tunnelmole.net" +
-                        course.thumb.replace("/app", "")
-                      }
+                      src={course.thumb}
                       alt={course.title}
                       className="object-cover w-full h-full"
                     />
@@ -326,7 +358,7 @@ export default function OverviewPage() {
                 <div className="p-4 flex flex-col flex-1">
                   <div className="flex items-start justify-between mb-2">
                     <span className="text-xs font-medium px-2 py-1 rounded-full bg-primary/10 text-primary">
-                      {course.level === "I"
+                      {course.level === "B"
                         ? "Iniciante"
                         : course.level === "IT"
                           ? "Intermediário"
@@ -346,7 +378,7 @@ export default function OverviewPage() {
                   </p>
 
                   {course.status === "READY" ? (
-                    <Link href={`/courses/${course.id}`}>
+                    <Link href={`/courses/${course.uuid}`}>
                       <Button className="w-full gap-2">
                         <PlayCircle className="w-4 h-4" />
                         Acessar Curso

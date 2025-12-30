@@ -1,22 +1,32 @@
 from typing import List
 
-from ninja import Schema
+from django.conf import settings
+from ninja import ModelSchema, Schema
 from ninja.orm import create_schema
-from pydantic import Field
+from pydantic import Field, computed_field
 
-from .models import Course, Lesson, Module
+from .models import Course, CourseLevel, Lesson, Module
 
-CourseOut = create_schema(
-    Course,
-    fields=[
-        "id",
-        "title",
-        "desc",
-        "thumb",
-        "created_at",
-        "status",
-    ],
-)
+
+class CourseOut(ModelSchema):
+    class Meta:
+        model = Course
+        fields = [
+            "uuid",
+            "title",
+            "desc",
+            "created_at",
+            "status",
+        ]
+
+    @computed_field
+    @property
+    def thumb(self) -> str | None:
+        if not self._obj.thumb:
+            return None
+        return settings.SITE_URL + self._obj.thumb.url
+
+
 LessonSchema = create_schema(
     Lesson,
     fields=[
@@ -38,7 +48,9 @@ ModuleSchema = create_schema(Module, fields=["id", "name", "desc"])
 
 
 class CourseIn(Schema):
-    prompt: str = Field(..., max_length=250)
+    title: str
+    details: str = Field(..., max_length=200)
+    level: CourseLevel
 
 
 class ModuleDetailSchema(ModuleSchema):

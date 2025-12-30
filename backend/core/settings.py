@@ -50,6 +50,7 @@ TEMPLATES = [
 
 ASGI_APPLICATION = "core.asgi.application"
 
+SITE_URL = env("SITE_URL", default="")
 
 DATABASES = {
     "default": env.db("DATABASE_URL", default=f"sqlite:///{BASE_DIR}/db.sqlite3"),

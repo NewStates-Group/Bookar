@@ -17,8 +17,14 @@ class LessonStatus(models.TextChoices):
     ERROR = "ERROR", "Erro"
 
 
+class CourseLevel(models.TextChoices):
+    BEGINNER = "B", "Beginner"
+    INTERMEDIATE = "IT", "Intermediate"
+    ADVANCED = "A", "Advance"
+
+
 class Course(models.Model):
-    uuid = models.UUIDField(default=uuid.uuid4)
+    uuid = models.UUIDField(primary_key=True, default=uuid.uuid4)
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -28,6 +34,9 @@ class Course(models.Model):
     )
     title = models.CharField(max_length=80, null=True, blank=True)
     desc = models.TextField(null=True, blank=True)
+    level = models.CharField(
+        max_length=2, choices=CourseLevel.choices, null=True, blank=True
+    )
     status = models.CharField(
         max_length=20,
         choices=CourseStatus.choices,

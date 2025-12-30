@@ -28,6 +28,7 @@ services:
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
       - GENAI_KEY=AIzaSyDyvqvKBMm_ElzlaocaQMGy1UhmsZqHCpU
       - OLLAMA_KEY=a3a0266acc75406d8255c77af093e451.8tERxykElej3uCmk7itMe2tg
+      - SITE_URL=http://localhost:8000
     depends_on:
       - db
       - redis

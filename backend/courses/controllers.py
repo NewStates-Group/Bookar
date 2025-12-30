@@ -1,3 +1,4 @@
+from uuid import UUID
 from typing import List
 
 from injector import inject
@@ -20,7 +21,9 @@ class CourseController:
 
     @route.post(response=CourseOut)
     def create_course(self, request, data: CourseIn):
-        return self.course_service.create_course(user=request.user, prompt=data.prompt)
+        return self.course_service.create_course(
+            user=request.user, details=data.details, level=data.level, title=data.title
+        )
 
     @route.get("/get_lesson", response=LessonSchema)
     def get_lesson(self, course_id: int):
@@ -30,6 +33,6 @@ class CourseController:
     def mark_watched(self, lesson_id: int):
         return self.course_service.mark_watched(lesson_id)
 
-    @route.get("/{course_id}", response=CourseDetailSchema)
-    def get_course(self, course_id: int):
-        return self.course_service.get_course(course_id)
+    @route.get("/{uuid}", response=CourseDetailSchema)
+    def get_course(self, uuid: UUID):
+        return self.course_service.get_course(uuid)

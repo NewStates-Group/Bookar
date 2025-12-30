@@ -24,7 +24,7 @@ export default function RootLayout({
         <link rel="shortcut icon" href="/logo.png" type="image/x-icon" />
         <Providers>
           {children}
-          <Toaster position='top-right'/>
+          <Toaster position='bottom-right'/>
         </Providers>
       </body>
     </html>
