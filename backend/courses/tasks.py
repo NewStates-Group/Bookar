@@ -400,7 +400,7 @@ def generate_lesson(lesson_id: int):
 
 
 @shared_task
-def create_course_outline(course_pk: int, user_prompt: str, level: str):
+def create_course_outline(course_pk: int, title: str, details: str, level: str):
     # remove caching later, because we'll different prompts
     # cache user prompt too to be sure
     course_outline = cache.get(f"course_outline-{course_pk}")
@@ -411,7 +411,7 @@ def create_course_outline(course_pk: int, user_prompt: str, level: str):
             "Create a detailed multimedia course outline in JSON format. "
             "Strictly follow this JSON schema:\n"
             "{\n"
-            '  "course_desc": "Course Description",\n'
+            '  "desc": "Course Description",\n'
             '  "modules": [\n'
             "    {\n"
             '      "title": "Module Title",\n'
@@ -429,7 +429,8 @@ def create_course_outline(course_pk: int, user_prompt: str, level: str):
             "    }\n"
             "  ]\n"
             "}\n\n"
-            f"Generate a **{level}** course outline based for this prompt: '{user_prompt}'.\n"
+            f"Generate a course outline based for this prompt: '{details}'.\n"
+            f"Title: {title}, level: {level}"
             "Ensure the content is high quality, educational, and ready for video production."
         )
 
@@ -445,7 +446,7 @@ def create_course_outline(course_pk: int, user_prompt: str, level: str):
             raise CourseCreationError(f"Erro ao criar estrutura do curso: {str(e)}")
     try:
         Course.objects.filter(pk=course_pk).update(
-            desc=course_outline.get("course_desc"),
+            desc=course_outline.get("desc"),
         )
 
         if isinstance(course_outline, dict):
@@ -485,7 +486,7 @@ def create_course_outline(course_pk: int, user_prompt: str, level: str):
 
 
 @shared_task
-def create_course_thumb(course_pk: int, title: str):
+def create_course_thumb(course_pk: str, title: str):
     # remove caching in production
     course_thumb = cache.get(f"course_thumb-{course_pk}")
 
@@ -520,4 +521,6 @@ def create_course_thumb(course_pk: int, title: str):
             cache.set(f"course_thumb-{course_pk}", course_thumb, 3600)
         except Exception as e:
             raise ThumbnailCreationError(e)
-    Course.objects.filter(pk=course_pk).update(thumb=course_thumb)
+    Course.objects.filter(pk=course_pk).update(
+        thumb=course_thumb.replace("/app", settings.SITE_URL)
+    )

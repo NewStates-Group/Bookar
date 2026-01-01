@@ -1,4 +1,3 @@
-from uuid import UUID
 from typing import List
 
 from injector import inject
@@ -9,7 +8,7 @@ from .schemas import CourseDetailSchema, CourseIn, CourseOut, LessonSchema
 from .services import CourseService
 
 
-@api_controller("courses/", tags=["Course"], auth=JWTAuth())
+@api_controller("courses", tags=["Course"], auth=JWTAuth())
 class CourseController:
     @inject
     def __init__(self, course_service: CourseService):
@@ -19,11 +18,15 @@ class CourseController:
     def list_courses(self, request):
         return self.course_service.list_courses(request.user)
 
-    @route.post(response=CourseOut)
+    @route.post("", response=CourseOut)
     def create_course(self, request, data: CourseIn):
         return self.course_service.create_course(
             user=request.user, details=data.details, level=data.level, title=data.title
         )
+
+    @route.get("/{id}", response=CourseDetailSchema)
+    def get_course(self, id: int):
+        return self.course_service.get_course(id)
 
     @route.get("/get_lesson", response=LessonSchema)
     def get_lesson(self, course_id: int):
@@ -32,7 +35,3 @@ class CourseController:
     @route.post("/mark_watched")
     def mark_watched(self, lesson_id: int):
         return self.course_service.mark_watched(lesson_id)
-
-    @route.get("/{uuid}", response=CourseDetailSchema)
-    def get_course(self, uuid: UUID):
-        return self.course_service.get_course(uuid)

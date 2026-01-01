@@ -1,7 +1,8 @@
-import uuid
 
-from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.db import models
+
+User = get_user_model()
 
 
 class CourseStatus(models.TextChoices):
@@ -24,9 +25,8 @@ class CourseLevel(models.TextChoices):
 
 
 class Course(models.Model):
-    uuid = models.UUIDField(primary_key=True, default=uuid.uuid4)
     user = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
+        User,
         on_delete=models.CASCADE,
         related_name="courses",
         null=True,

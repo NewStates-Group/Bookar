@@ -1,9 +1,8 @@
 from typing import List
 
-from django.conf import settings
 from ninja import ModelSchema, Schema
 from ninja.orm import create_schema
-from pydantic import Field, computed_field
+from pydantic import Field
 
 from .models import Course, CourseLevel, Lesson, Module
 
@@ -12,19 +11,13 @@ class CourseOut(ModelSchema):
     class Meta:
         model = Course
         fields = [
-            "uuid",
+            "id",
             "title",
             "desc",
+            "thumb",
             "created_at",
             "status",
         ]
-
-    @computed_field
-    @property
-    def thumb(self) -> str | None:
-        if not self._obj.thumb:
-            return None
-        return settings.SITE_URL + self._obj.thumb.url
 
 
 LessonSchema = create_schema(

@@ -84,7 +84,6 @@ def get_genai_client():
 def get_next_lesson(course_pk: int) -> Lesson | None:
     return (
         Lesson.objects.filter(module__course_id=course_pk, watched=False)
-        .values_list("id", flat=True)
         .order_by("id")
         .first()
     )

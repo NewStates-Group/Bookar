@@ -1,19 +1,51 @@
 import NextAuth, { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 
+async function refreshAccessToken(token: any) {
+    try {
+        const res = await fetch(`${process.env.AUTH_URL}/auth/refresh`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                refresh: token.refreshToken,
+            }),
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+            throw new Error("Failed to refresh token");
+        }
+
+        return {
+            ...token,
+            accessToken: data.access,
+            accessTokenExpires: Date.now() + 30 * 60 * 1000,
+        };
+    } catch (error) {
+        console.error("Erro ao renovar access token:", error);
+        return {
+            ...token,
+            error: "RefreshAccessTokenError",
+        };
+    }
+}
+
 export const authOptions: NextAuthOptions = {
     providers: [
         CredentialsProvider({
             name: "Credentials",
             credentials: {
                 username: { label: "Username", type: "text" },
-                password: { label: "Password", type: "password" }
+                password: { label: "Password", type: "password" },
             },
-            async authorize(credentials, req) {
-                if (!credentials?.username || !credentials?.password) return null;
 
-                const baseUrl = process.env.AUTH_URL;
-                const res = await fetch(`${baseUrl}/auth/pair`, {
+            async authorize(credentials) {
+                if (!credentials?.username || !credentials?.password) {
+                    return null;
+                }
+
+                const res = await fetch(`${process.env.AUTH_URL}/auth/pair`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
@@ -24,34 +56,47 @@ export const authOptions: NextAuthOptions = {
 
                 const user = await res.json();
 
-                if (res.ok && user.access) {
-                    return {
-                        id: credentials.username,
-                        name: credentials.username,
-                        accessToken: user.access,
-                        refreshToken: user.refresh,
-                    };
+                if (!res.ok || !user.access) {
+                    return null;
                 }
-                return null;
+
+                return {
+                    id: credentials.username,
+                    name: credentials.username,
+                    accessToken: user.access,
+                    refreshToken: user.refresh,
+                };
             },
         }),
     ],
+
     callbacks: {
         async jwt({ token, user }) {
             if (user) {
-                token.accessToken = user.accessToken;
-                token.refreshToken = user.refreshToken;
+                return {
+                    accessToken: user.accessToken,
+                    refreshToken: user.refreshToken,
+                    accessTokenExpires: Date.now() + 30 * 60 * 1000,
+                };
             }
-            return token;
+
+            if (Date.now() < (token.accessTokenExpires as number)) {
+                return token;
+            }
+
+            return refreshAccessToken(token);
         },
+
         async session({ session, token }) {
             session.accessToken = token.accessToken as string;
+            session.error = token.error;
             return session;
         },
     },
+
     pages: {
         signIn: "/login",
     },
-    secret: process.env.AUTH_SECRET
-};
 
+    secret: process.env.AUTH_SECRET,
+};

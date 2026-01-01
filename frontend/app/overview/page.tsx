@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/select"
 
 interface Course {
-  uuid: string;
+  id: string;
   title: string;
   desc: string;
   level: string;
@@ -62,7 +62,7 @@ export default function OverviewPage() {
 
   const fetchCourses = async () => {
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/courses/`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/courses`, {
         headers: {
           Authorization: `Bearer ${session?.accessToken}`,
         },
@@ -88,13 +88,13 @@ export default function OverviewPage() {
     setStep(1);
   };
 
-  const waitForCourseReady = async (courseUUID: string, title: string) => {
+  const waitForCourseReady = async (courseID: string, title: string) => {
     const toastId = toast.loading(`Criando seu curso de ${title}`);
 
     const interval = setInterval(async () => {
       try {
         const res = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/courses/${courseUUID}/`,
+          `${process.env.NEXT_PUBLIC_API_URL}/courses/${courseID}`,
           {
             headers: {
               Authorization: `Bearer ${session?.accessToken}`,
@@ -132,7 +132,7 @@ export default function OverviewPage() {
     setIsCreating(true);
 
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/courses/`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/courses`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -153,7 +153,7 @@ export default function OverviewPage() {
         setDetails("");
         setLevel("NONE");
         setStep(1);
-        waitForCourseReady(course.uuid, course.title);
+        waitForCourseReady(course.id, course.title);
       } else {
         const err = await res.json();
         toast.error(err.message || "Erro ao criar curso");
@@ -333,11 +333,11 @@ export default function OverviewPage() {
             </div>
           ) : (
             courses.map((course) => (
-              <Card key={course.uuid} className="overflow-hidden flex flex-col hover:shadow-lg transition-shadow">
+              <Card key={course.id} className="overflow-hidden flex flex-col hover:shadow-lg transition-shadow">
                 <div className="relative aspect-video bg-muted">
                   {course.thumb ? (
                     <img
-                      src={course.thumb}
+                      src={course.thumb.replace("/app", "http://localhost:8000")}
                       alt={course.title}
                       className="object-cover w-full h-full"
                     />
@@ -378,7 +378,7 @@ export default function OverviewPage() {
                   </p>
 
                   {course.status === "READY" ? (
-                    <Link href={`/courses/${course.uuid}`}>
+                    <Link href={`/courses/${course.id}`}>
                       <Button className="w-full gap-2">
                         <PlayCircle className="w-4 h-4" />
                         Acessar Curso
