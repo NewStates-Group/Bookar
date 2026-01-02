@@ -28,10 +28,10 @@ class CourseController:
     def get_course(self, id: int):
         return self.course_service.get_course(id)
 
-    @route.get("/get_lesson", response=LessonSchema)
+    @route.get("/get-lesson/{course_id}", response=LessonSchema)
     def get_lesson(self, course_id: int):
         return self.course_service.get_lesson(course_id)
 
-    @route.post("/mark_watched")
+    @route.post("/mark-watched/{lesson_id}")
     def mark_watched(self, lesson_id: int):
         return self.course_service.mark_watched(lesson_id)

@@ -31,6 +31,12 @@ class CourseService:
         lesson = get_next_lesson(course_id)
         if lesson.status == "PENDING":
             generate_lesson.delay(lesson.id)
+        else:
+            lesson.delivered = True
+            lesson.save() 
+
+            next_lesson = get_next_lesson(course_id)
+            generate_lesson.delay(next_lesson.id)
         return lesson
 
     def mark_watched(self, lesson_id: int):

@@ -11,41 +11,18 @@ def extract_json(response: str):
     Extracts JSON from a string, handling Markdown code blocks and common formatting issues.
     """
     cleaned = response.strip()
-    if "```json" in cleaned:
-        cleaned = cleaned.split("```json")[1].split("```")[0]
-    elif "```" in cleaned:
-        cleaned = cleaned.split("```")[1].split("```")[0]
-
-    cleaned = cleaned.strip()
-
-    start_brace = cleaned.find("{")
-    start_bracket = cleaned.find("[")
-
-    if start_brace == -1 and start_bracket == -1:
-        raise ValueError("No JSON object or array found in response")
-
-    if start_brace != -1 and (start_bracket == -1 or start_brace < start_bracket):
-        start = start_brace
-        end = cleaned.rfind("}")
-    else:
-        start = start_bracket
-        end = cleaned.rfind("]")
-
-    if end == -1:
-        print(f"FAILED JSON EXTRACTION. Raw: {cleaned[:500]}...")
-        raise ValueError("Unclosed JSON structure")
-
-    json_str = cleaned[start : end + 1]
-
     try:
-        return orjson.loads(json_str)
+        start_bracket = cleaned.index('{')
+        end_bracket = cleaned.rindex('}')
+        cleaned = cleaned[start_bracket:end_bracket+1]
+        return orjson.loads(cleaned)
     except orjson.JSONDecodeError as e:
         print(f"JSON DECODE ERROR: {e}. Attempting AI repair...")
         try:
             client = get_genai_client()
             repair_prompt = (
                 "Fix the following malformed JSON. Return ONLY the valid JSON, no markdown.\n\n"
-                f"{json_str}"
+                f"{cleaned}"
             )
             response = client.models.generate_content(
                 model="gemini-2.0-flash-exp",
@@ -67,7 +44,7 @@ def extract_json(response: str):
             print(f"AI REPAIR FAILED: {repair_error}")
             import json
 
-            return json.loads(json_str)
+            return json.loads(cleaned)
 
 
 def get_ollama_client():
@@ -83,7 +60,7 @@ def get_genai_client():
 
 def get_next_lesson(course_pk: int) -> Lesson | None:
     return (
-        Lesson.objects.filter(module__course_id=course_pk, watched=False)
+        Lesson.objects.filter(module__course_id=course_pk, delivered=False)
         .order_by("id")
         .first()
     )

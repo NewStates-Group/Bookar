@@ -15,6 +15,7 @@ class CourseOut(ModelSchema):
             "title",
             "desc",
             "thumb",
+            "level",
             "created_at",
             "status",
         ]

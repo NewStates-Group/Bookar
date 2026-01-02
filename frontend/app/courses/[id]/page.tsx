@@ -94,7 +94,7 @@ export default function CoursePage() {
         {/* Hero Section */}
         <div className="relative aspect-video rounded-xl overflow-hidden bg-muted shadow-lg">
           {course.thumb && (
-            <img src={"https://d4uonx-ip-154-71-152-134.tunnelmole.net" + course.thumb.replace("/app", "")} alt={course.title} className="object-cover w-full h-full" />
+            <img src={course.thumb.replace("/app", "http://localhost:8000")} alt={course.title} className="object-cover w-full h-full" />
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex flex-col justify-end p-8 text-white">
             <div className="flex items-center gap-2 mb-2">

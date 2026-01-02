@@ -46,7 +46,7 @@ export default function LearnPage() {
 
     const fetchNextLesson = async () => {
         try {
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/courses/get_lesson?course_id=${params?.id}`, {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/courses/get-lesson/${params?.id}`, {
                 headers: {
                     Authorization: `Bearer ${(session as any)?.accessToken}`,
                 },
@@ -87,7 +87,7 @@ export default function LearnPage() {
         if (!lesson) return;
         setLoading(true);
         try {
-            await fetch(`${process.env.NEXT_PUBLIC_API_URL}/courses/mark_watched?lesson_id=${lesson.id}`, {
+            await fetch(`${process.env.NEXT_PUBLIC_API_URL}/courses/mark-watched/${lesson.id}`, {
                 method: "POST",
                 headers: {
                     Authorization: `Bearer ${(session as any)?.accessToken}`,
@@ -180,7 +180,7 @@ export default function LearnPage() {
                 {lesson.status === "READY" && lesson.lesson_file && (
                     <div className="w-full max-w-5xl aspect-video bg-black rounded-xl overflow-hidden shadow-2xl relative group">
                         <video
-                            src={`https://d4uonx-ip-154-71-152-134.tunnelmole.net/media/${lesson.lesson_file}`}
+                            src={`http://localhost:8000/media/${lesson.lesson_file}`}
                             controls
                             className="w-full h-full"
                             autoPlay

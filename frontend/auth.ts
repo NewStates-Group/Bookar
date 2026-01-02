@@ -55,7 +55,7 @@ export const authOptions: NextAuthOptions = {
                 });
 
                 const user = await res.json();
-
+                console.log(user)
                 if (!res.ok || !user.access) {
                     return null;
                 }
@@ -74,6 +74,7 @@ export const authOptions: NextAuthOptions = {
         async jwt({ token, user }) {
             if (user) {
                 return {
+                    name: user.name,
                     accessToken: user.accessToken,
                     refreshToken: user.refreshToken,
                     accessTokenExpires: Date.now() + 30 * 60 * 1000,
@@ -90,6 +91,10 @@ export const authOptions: NextAuthOptions = {
         async session({ session, token }) {
             session.accessToken = token.accessToken as string;
             session.error = token.error;
+            session.user = {
+                ...session.user,
+                name: token.name
+            }
             return session;
         },
     },

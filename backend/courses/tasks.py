@@ -1,4 +1,5 @@
 import concurrent.futures
+import json
 import logging
 import shutil
 import subprocess
@@ -9,7 +10,6 @@ from pathlib import Path
 
 from celery import shared_task
 from django.conf import settings
-from django.core.cache import cache
 from google.genai import types
 from PIL import Image, ImageDraw
 
@@ -48,8 +48,11 @@ def _normalize_audio(input_path, output_path):
         "-i",
         str(input_path),
         "-ac",
+        "2",
         "-ar",
+        "44100",
         "-c:a",
+        "pcm_s16le",
         str(output_path),
     ]
     try:
@@ -65,11 +68,9 @@ def _generate_audio(client, text, output_path):
     Generates audio using Gemini TTS and saves it as a valid WAV file.
     """
     try:
-        tts_prompt = ()
-
         response = client.models.generate_content(
             model=settings.AI.get("GENAI_MODEL_AUDIO", "gemini-2.5-flash-preview-tts"),
-            contents=tts_prompt,
+            contents=text,
             config=types.GenerateContentConfig(
                 response_modalities=["AUDIO"],
                 speech_config=types.SpeechConfig(
@@ -138,9 +139,6 @@ def _generate_image(client, prompt, output_path, timeout=30):
         )
 
     try:
-        if types is None:
-            raise ImportError("google.genai.types is not available")
-
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
             future = executor.submit(_call_api)
             try:
@@ -204,6 +202,8 @@ def _stitch_video(image_path, audio_path, output_path):
         "-pix_fmt",
         "yuv420p",
         "-shortest",
+        "-vf",
+        "scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:-1:-1:color=white",
         str(output_path),
     ]
 
@@ -230,8 +230,6 @@ def generate_lesson(lesson_id: int):
     temp_dir = Path(tempfile.mkdtemp())
     try:
         client = get_genai_client()
-        if types is None:
-            raise ImportError("google.genai.types is not available")
 
         base_context = f"Title: {lesson.title}\nDescription: {lesson.desc}"
         if lesson.narration:
@@ -256,23 +254,38 @@ def generate_lesson(lesson_id: int):
             "Ensure the visual prompts result in simple, clear, educational sketches on a white background."
         )
 
+        segments = []
         try:
             plan_response = client.models.generate_content(
                 model="gemini-2.0-flash-exp",
                 contents=plan_prompt,
                 config={"response_mime_type": "application/json"},
             )
-            segments_json = extract_json(plan_response.text)
+
+            try:
+                segments_json = json.loads(plan_response.text)
+            except json.JSONDecodeError:
+                # Tentar extrair JSON da resposta textual
+                segments_json = extract_json(plan_response.text)
+
+            if segments_json is None:
+                raise ValueError("Não foi possível extrair JSON da resposta")
 
             if isinstance(segments_json, dict):
-                segments = segments_json.get(
-                    "segments", list(segments_json.values())[0]
-                )
-            else:
+                segments = segments_json.get("segments", [])
+                if not segments:
+                    # Tentar encontrar qualquer lista no dicionário
+                    for value in segments_json.values():
+                        if isinstance(value, list):
+                            segments = value
+                            break
+            elif isinstance(segments_json, list):
                 segments = segments_json
+            else:
+                raise ValueError("Formato JSON inválido: não é lista nem dicionário")
 
-            if not isinstance(segments, list):
-                raise ValueError("Parsed JSON is not a list")
+            if not isinstance(segments, list) or len(segments) == 0:
+                raise ValueError("JSON válido não contém lista de segmentos")
 
         except Exception as e:
             logger.error(f"Failed to plan segments: {e}. Using fallback.")
@@ -359,6 +372,8 @@ def generate_lesson(lesson_id: int):
             "veryfast",
             "-c:a",
             "aac",
+            "-b:a",
+            "192k",
             str(output_path),
         ]
 
@@ -382,16 +397,18 @@ def generate_lesson(lesson_id: int):
 
         return f"Video generated: {lesson.lesson_file}"
 
-    except Exception:
-        logger.critical("Error during lesson generation task")
+    except Exception as e:
+        logger.critical(f"Error during lesson generation task: {str(e)}")
 
         try:
             lesson_obj = Lesson.objects.get(id=lesson_id)
             lesson_obj.status = "ERROR"
             lesson_obj.save()
-        except Exception:
-            pass
-        raise
+        except Exception as save_error:
+            logger.error(f"Failed to update lesson status to ERROR: {save_error}")
+
+        # Re-raise para que o Celery saiba que falhou
+        raise Exception(f"Lesson generation failed: {str(e)}")
     finally:
         try:
             shutil.rmtree(temp_dir)
@@ -401,126 +418,169 @@ def generate_lesson(lesson_id: int):
 
 @shared_task
 def create_course_outline(course_pk: int, title: str, details: str, level: str):
-    # remove caching later, because we'll different prompts
-    # cache user prompt too to be sure
-    course_outline = cache.get(f"course_outline-{course_pk}")
+    prompt = (
+        "You are an expert educational content creator. "
+        "Create a detailed multimedia course outline in JSON format. "
+        "Strictly follow this JSON schema:"
+        "{"
+        '  "desc": "Course Description",'
+        '  "modules": ['
+        "    {"
+        '      "title": "Module Title",'
+        '      "desc": "Module Description",'
+        '      "lessons": ['
+        "        {"
+        '          "title": "Lesson Title",'
+        '          "desc": "Lesson Description",'
+        '          "duration": 300, '
+        '          "narration": "Detailed narration text (600-800 words), engaging and podcast-style...",'
+        '          "key_points": "Key takeaway 1, Key takeaway 2",'
+        '          "scene_suggestion": "Visual description for whiteboard animation (e.g. Hand drawing a graph...)"'
+        "        }\n"
+        "      ]\n"
+        "    }\n"
+        "  ]\n"
+        "}\n\n"
+        f"Generate a course outline based for this prompt: '{details}'.\n"
+        f"Title: {title}, level: {level}"
+        "Ensure the content is high quality, educational, and ready for video production."
+    )
 
-    if not course_outline:
-        prompt = (
-            "You are an expert educational content creator. "
-            "Create a detailed multimedia course outline in JSON format. "
-            "Strictly follow this JSON schema:\n"
-            "{\n"
-            '  "desc": "Course Description",\n'
-            '  "modules": [\n'
-            "    {\n"
-            '      "title": "Module Title",\n'
-            '      "desc": "Module Description",\n'
-            '      "lessons": [\n'
-            "        {\n"
-            '          "title": "Lesson Title",\n'
-            '          "desc": "Lesson Description",\n'
-            '          "duration": 300, \n'
-            '          "narration": "Detailed narration text (600-800 words), engaging and podcast-style...",\n'
-            '          "key_points": "Key takeaway 1, Key takeaway 2",\n'
-            '          "scene_suggestion": "Visual description for whiteboard animation (e.g. Hand drawing a graph...)"\n'
-            "        }\n"
-            "      ]\n"
-            "    }\n"
-            "  ]\n"
-            "}\n\n"
-            f"Generate a course outline based for this prompt: '{details}'.\n"
-            f"Title: {title}, level: {level}"
-            "Ensure the content is high quality, educational, and ready for video production."
-        )
-
-        client = get_ollama_client()
-        try:
-            response = client.chat(
-                settings.AI["OLLAMA_MODEL_TEXT"], [{"role": "user", "content": prompt}]
-            )
-            course_outline = extract_json(response["message"]["content"])
-            cache.set(f"course_outline-{course_pk}", course_outline, 3600)
-        except Exception as e:
-            logger.error(f"Outline generation failed: {e}")
-            raise CourseCreationError(f"Erro ao criar estrutura do curso: {str(e)}")
+    course_outline = None
+    client = get_ollama_client()
     try:
+        response = client.chat(
+            settings.AI["OLLAMA_MODEL_TEXT"], [{"role": "user", "content": prompt}]
+        )
+        course_outline_content = response["message"]["content"]
+        logger.info(f"Raw outline response: {course_outline_content[:500]}...")
+
+        # Tentar extrair JSON da resposta
+        try:
+            course_outline = json.loads(course_outline_content)
+        except json.JSONDecodeError:
+            course_outline = extract_json(course_outline_content)
+
+        if course_outline is None:
+            raise ValueError("Não foi possível extrair JSON da resposta da IA")
+
+    except Exception as e:
+        logger.error(f"Outline generation failed: {e}")
+        # Atualizar status do curso para ERROR
+        Course.objects.filter(pk=course_pk).update(status="ERROR", failed=True)
+        raise CourseCreationError(f"Erro ao criar estrutura do curso: {str(e)}")
+
+    try:
+        # Atualizar descrição do curso
+        if isinstance(course_outline, dict):
+            course_desc = course_outline.get("desc", f"Curso sobre {title}")
+        else:
+            course_desc = f"Curso sobre {title}"
+
         Course.objects.filter(pk=course_pk).update(
-            desc=course_outline.get("desc"),
+            desc=course_desc, status="PROCESSING"
         )
 
+        # Extrair módulos do JSON
+        modules_data = []
         if isinstance(course_outline, dict):
             modules_data = course_outline.get("modules", [])
         elif isinstance(course_outline, list):
-            if len(course_outline) > 0 and "modules" in course_outline[0]:
+            if len(course_outline) > 0 and isinstance(course_outline[0], dict):
                 modules_data = course_outline[0].get("modules", [])
             else:
                 modules_data = course_outline
 
+        if not isinstance(modules_data, list) or len(modules_data) == 0:
+            raise ValueError("Nenhum módulo encontrado no JSON")
+
+        # Criar módulos e lições
         for module in modules_data:
             module_object = Module.objects.create(
-                course_id=course_pk, name=module["title"], desc=module["desc"]
+                course_id=course_pk,
+                name=module.get(
+                    "title",
+                    f"Módulo {Module.objects.filter(course_id=course_pk).count() + 1}",
+                ),
+                desc=module.get("desc", ""),
             )
-            Lesson.objects.bulk_create(
-                [
-                    Lesson(
-                        module=module_object,
-                        title=lesson["title"],
-                        desc=lesson["desc"],
-                        narration=lesson["narration"],
-                        key_points=lesson["key_points"],
-                        scene_suggestion=lesson["scene_suggestion"],
-                        duration=lesson["duration"],
+
+            lessons_data = module.get("lessons", [])
+            if lessons_data:
+                lessons_to_create = []
+                for lesson in lessons_data:
+                    lessons_to_create.append(
+                        Lesson(
+                            module=module_object,
+                            title=lesson.get(
+                                "title", f"Lição {len(lessons_to_create) + 1}"
+                            ),
+                            desc=lesson.get("desc", ""),
+                            narration=lesson.get("narration", ""),
+                            key_points=lesson.get("key_points", ""),
+                            scene_suggestion=lesson.get("scene_suggestion", ""),
+                            duration=lesson.get("duration", 300),
+                            status="PENDING",
+                        )
                     )
-                    for lesson in module["lessons"]
-                ]
-            )
-    except KeyError as e:
-        Course.objects.filter(pk=course_pk).update(failed=True)
-        raise CourseCreationError(
-            f"Erro ao salvar dados do curso: Campo ausente {str(e)}"
-        )
+                Lesson.objects.bulk_create(lessons_to_create)
+
+    except Exception as e:
+        Course.objects.filter(pk=course_pk).update(status="ERROR", failed=True)
+        logger.error(f"Erro ao salvar dados do curso: {e}")
+        raise CourseCreationError(f"Erro ao salvar dados do curso: {str(e)}")
+
+    # Iniciar geração da primeira lição
     next_lesson = get_next_lesson(course_pk)
     if next_lesson:
         generate_lesson.delay(next_lesson.id)
+    else:
+        # Se não houver lições, marcar curso como READY
+        Course.objects.filter(pk=course_pk).update(status="READY")
 
 
 @shared_task
 def create_course_thumb(course_pk: str, title: str):
-    # remove caching in production
-    course_thumb = cache.get(f"course_thumb-{course_pk}")
+    client = get_genai_client()
+    prompt = (
+        f"Professional educational course thumbnail for this title: {title}. "
+        "Use a modern, clean, academic design with bright colors and subtle gradients. "
+        "Ensure the Course Title is visible and written in Portuguese. Any other text must also be in Portuguese."
+    )
 
-    if not course_thumb:
-        client = get_genai_client()
-
-        prompt = (
-            f"Professional educational course thumbnail for this title: {title}. "
-            "Use a modern, clean, academic design with bright colors and subtle gradients. "
-            "Ensure the Course Title is visible and written in Portuguese. Any other text must also be in Portuguese."
+    try:
+        response = client.models.generate_content(
+            model=settings.AI.get("GENAI_MODEL_IMAGE", "gemini-2.5-flash-image"),
+            contents=[prompt],
+            config=types.GenerateContentConfig(
+                image_config=types.ImageConfig(aspect_ratio="16:9")
+            ),
         )
 
-        try:
-            response = client.models.generate_content(
-                model=settings.AI["GENAI_MODEL_IMAGE"],
-                contents=[prompt],
-                config=types.GenerateContentConfig(
-                    image_config=types.ImageConfig(aspect_ratio="16:9")
-                ),
-            )
+        output_dir = Path(settings.MEDIA_ROOT) / "courses" / "thumbs"
+        output_dir.mkdir(parents=True, exist_ok=True)
+        filename = f"{uuid.uuid4()}.png"
+        output_path = output_dir / filename
 
-            output_dir = settings.MEDIA_ROOT / "courses" / "thumbs"
-            output_dir.mkdir(parents=True, exist_ok=True)
-            filename = f"{uuid.uuid4()}.png"
-            output_path = output_dir / filename
+        image_saved = False
+        for part in response.parts:
+            if part.inline_data is not None:
+                image = part.as_image()
+                image.save(output_path)
+                image_saved = True
+                break
 
-            for part in response.parts:
-                if part.inline_data is not None:
-                    image = part.as_image()
-                    image.save(output_path)
-            course_thumb = str(output_path)
-            cache.set(f"course_thumb-{course_pk}", course_thumb, 3600)
-        except Exception as e:
-            raise ThumbnailCreationError(e)
-    Course.objects.filter(pk=course_pk).update(
-        thumb=course_thumb.replace("/app", settings.SITE_URL)
-    )
+        if not image_saved:
+            # Tentar método alternativo
+            if hasattr(response, "generated_images") and response.generated_images:
+                image = response.generated_images[0].image
+                image.save(output_path)
+            else:
+                raise ValueError("No image data in response")
+
+        Course.objects.filter(pk=course_pk).update(thumb=output_path)
+
+    except Exception as e:
+        logger.error(f"Thumbnail creation failed: {e}")
+        Course.objects.filter(pk=course_pk).update(status="ERROR")
+        raise ThumbnailCreationError(f"Erro ao criar thumbnail: {str(e)}")

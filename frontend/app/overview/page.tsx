@@ -46,7 +46,7 @@ export default function OverviewPage() {
   const [step, setStep] = useState(1);
   const [title, setTitle] = useState("");
   const [details, setDetails] = useState("");
-  const [level, setLevel] = useState<"B" | "IT" | "A" | "NONE">("NONE");
+  const [level, setLevel] = useState<"B" | "IT" | "A" >("B");
 
   const levelLabel = {
     B: "Iniciante",
@@ -281,11 +281,10 @@ export default function OverviewPage() {
 
                             <Select value={level} onValueChange={setLevel} required>
                               <SelectTrigger className="border-none text-base">
-                                <SelectValue placeholder="Nível do curso" />
+                                <SelectValue />
                               </SelectTrigger>
 
                               <SelectContent>
-                                <SelectItem value="NONE" disabled>Nível do curso</SelectItem>
                                 <SelectItem value="B">Iniciante</SelectItem>
                                 <SelectItem value="IT">Intermediário</SelectItem>
                                 <SelectItem value="A">Avançado</SelectItem>
@@ -378,7 +377,7 @@ export default function OverviewPage() {
                   </p>
 
                   {course.status === "READY" ? (
-                    <Link href={`/courses/${course.id}`}>
+                    <Link href={`/courses/${course.id}/`}>
                       <Button className="w-full gap-2">
                         <PlayCircle className="w-4 h-4" />
                         Acessar Curso
