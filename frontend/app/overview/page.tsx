@@ -413,7 +413,7 @@ export default function OverviewPage() {
                   </button>
 
                   {course.status === "PROCESSING" && (
-                    <div className="absolute inset-0 bg-black/70 backdrop-blur-sm flex flex-col items-center justify-center text-white">
+                    <div className="absolute rounded-lg inset-0 bg-black/70 backdrop-blur-sm flex flex-col items-center justify-center text-white">
                       <div className="w-10 h-10 rounded-full border-4 border-white/20 border-t-white animate-spin mb-2" />
                       <span className="text-sm font-medium">Gerando curso…</span>
                     </div>

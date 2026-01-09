@@ -25,7 +25,27 @@ export default function LearnPage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [viewMode, setViewMode] = useState<"video" | "quiz">("video");
+    const [played, setPlayed] = useState(false);
+    const [nextLesson, setNextLesson] = useState(false);
     const pollingRef = useRef<NodeJS.Timeout | null>(null);
+    
+    const handleNext = async () => {
+        if (!lesson) return;
+        setLoading(true);
+        try {
+            await fetch(`${process.env.NEXT_PUBLIC_API_URL}/courses/mark-watched/${lesson.id}`, {
+                method: "POST",
+                headers: {
+                    Authorization: `Bearer ${(session as any)?.accessToken}`,
+                },
+            });
+            // Fetch next
+            await fetchNextLesson();
+        } catch (e) {
+            toast.error("Erro ao avançar");
+            setLoading(false);
+        }
+    }
 
     useEffect(() => {
         if (session?.accessToken && params?.id) {
@@ -33,6 +53,12 @@ export default function LearnPage() {
         }
         return () => stopPolling();
     }, [session, params]);
+
+    useEffect(() => {
+        if (played) {
+            handleNext()
+        }
+    }, [played, ])
 
     const stopPolling = () => {
         if (pollingRef.current) {
@@ -86,30 +112,6 @@ export default function LearnPage() {
         }
     };
 
-    const handleNext = async () => {
-        if (!lesson) return;
-        setLoading(true);
-        try {
-            await fetch(`${process.env.NEXT_PUBLIC_API_URL}/courses/mark-watched/${lesson.id}`, {
-                method: "POST",
-                headers: {
-                    Authorization: `Bearer ${(session as any)?.accessToken}`,
-                },
-            });
-            // Fetch next
-            await fetchNextLesson();
-        } catch (e) {
-            toast.error("Erro ao avançar");
-            setLoading(false);
-        }
-    }
-
-    const handleQuizComplete = async () => {
-        // Quiz passed -> Mark watched -> Next
-        await handleNext();
-    }
-
-
     if (status === "loading" || loading) {
         return (
             <div className="min-h-screen flex flex-col items-center justify-center bg-black text-white">
@@ -147,7 +149,6 @@ export default function LearnPage() {
 
     return (
         <div className="min-h-screen bg-black flex flex-col">
-            {/* Header */}
             <div className="h-16 flex items-center px-4 border-b border-white/10 text-white">
                 <Link href={`/courses/${params?.id}`}>
                     <Button variant="ghost" size="sm" className="text-white/70 hover:text-white">
@@ -157,10 +158,7 @@ export default function LearnPage() {
                 <span className="ml-4 font-medium text-lg truncate">{lesson.title}</span>
             </div>
 
-            {/* Main Player Area */}
             <div className="flex-1 flex flex-col items-center justify-center p-4 relative">
-
-                {/* PROCESSING STATE */}
                 {(lesson.status === "PROCESSING" || lesson.status === "PENDING") && (
                     <div className="text-center space-y-6 max-w-lg z-10">
                         <div className="relative w-24 h-24 mx-auto">
@@ -178,53 +176,36 @@ export default function LearnPage() {
                         <div className="bg-white/5 rounded-lg p-4 text-sm text-white/50">
                             Status: <span className="text-primary font-mono uppercase">{lesson.status}</span>
                         </div>
-                        {/* Fallback button if stuck */}
                         <Button variant="outline" size="sm" onClick={() => fetchNextLesson()} className="bg-transparent border-white/20 text-white/60">
                             Atualizar Status
                         </Button>
                     </div>
                 )}
 
-                {/* READY STATE - VIDEO */}
                 {lesson.status === "READY" && viewMode === "video" && lesson.lesson_file && (
                     <div className="w-full max-w-5xl aspect-video bg-black rounded-xl overflow-hidden shadow-2xl relative group">
                         <video
                             src={`http://localhost:8000/media/${lesson.lesson_file}`}
                             controls
                             className="w-full h-full"
-                            autoPlay
-                            onEnded={() => { }} // Could auto-show quiz
+                            onEnded={() => { }}
+                            onPlay={() => { setPlayed(true) }}
                         />
                     </div>
                 )}
 
-                {/* READY STATE - QUIZ */}
-                {lesson.status === "READY" && viewMode === "quiz" && (
-                    <div className="w-full max-w-4xl py-8 z-10">
-                        <Quiz lessonId={lesson.id} onComplete={handleQuizComplete} />
-                    </div>
-                )}
-
-                {/* Background Ambience */}
                 <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-blue-600/5 pointer-events-none"></div>
             </div>
 
-            {/* Footer / Controls */}
             <div className="h-24 bg-zinc-950 border-t border-white/10 flex items-center justify-between px-8">
                 <div className="text-white/50 text-sm hidden md:block">
                     {lesson.desc.substring(0, 100)}...
                 </div>
-                {lesson.status === "READY" && (
+                {nextLesson === true && (
                     <div className="flex gap-4">
-                        {viewMode === "video" ? (
-                            <Button size="lg" className="rounded-full px-8" onClick={() => setViewMode("quiz")}>
-                                Fazer Quiz <ArrowRight className="w-5 h-5 ml-2" />
-                            </Button>
-                        ) : (
-                            <Button variant="ghost" onClick={() => setViewMode("video")}>
-                                Voltar ao Vídeo
-                            </Button>
-                        )}
+                        <Button variant="outline" onClick={() => setViewMode("video")}>
+                            Voltar ao Vídeo
+                        </Button>
                     </div>
                 )}
             </div>

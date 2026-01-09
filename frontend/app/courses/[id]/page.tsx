@@ -105,13 +105,12 @@ export default function CoursePage() {
   return (
     <div className="min-h-screen bg-background p-4 md:p-8">
       <div className="max-w-4xl mx-auto space-y-8">
-        <Link href="/overview">
+        <Link href="/overview" className="fixed top-0 left-0 p-4 z-50">
           <Button variant="ghost" className="mb-4 pl-0 hover:pl-2 transition-all">
             <ArrowLeft className="w-4 h-4 mr-2" /> Voltar para Overview
           </Button>
         </Link>
 
-        {/* Hero Section */}
         <div className="relative aspect-video rounded-xl overflow-hidden bg-muted shadow-lg">
           {course.thumb ? (
             <img src={"http://localhost:8000" + course.thumb} alt={course.title} className="object-cover w-full h-full" />
@@ -134,27 +133,18 @@ export default function CoursePage() {
           </div>
         </div>
 
-        {/* Action Bar */}
-        <div className="flex items-center justify-between p-6 bg-card rounded-xl border">
-          <div>
-            <h2 className="text-xl font-semibold mb-1">Começar a Aprender</h2>
-            <p className="text-muted-foreground text-sm">Assista as aulas em sequência para completar o curso.</p>
-          </div>
-          <Link href={`/courses/${course.id}/learn`}>
-            <Button size="lg" className="rounded-full px-8">
-              <Play className="w-5 h-5 mr-2" /> Assistir Curso
-            </Button>
-          </Link>
-        </div>
-
-        {/* Curriculum List */}
         <div className="space-y-6">
           <div className="flex items-center justify-between">
             <h2 className="text-2xl font-bold">Conteúdo do Curso</h2>
-            <Button variant="outline" size="sm" onClick={handleGenerateModule} disabled={isGeneratingModule}>
-              {isGeneratingModule ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
-              Novo Módulo
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="lg" className="rounded-full px-8" onClick={handleGenerateModule} disabled={isGeneratingModule}>
+                {isGeneratingModule ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
+                Novo Módulo
+              </Button>
+              <Button size="lg" className="rounded-full px-8" onClick={() => router.push(`/courses/${course.id}/learn`)}>
+                <Play className="w-4 h-4 mr-2" /> Assistir Curso
+              </Button>
+            </div>
           </div>
           <div className="space-y-4">
             {course.modules.length === 0 && (

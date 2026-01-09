@@ -5,7 +5,12 @@ from ninja.errors import HttpError
 
 from .utils import get_next_lesson
 from .models import Course, Lesson, Quiz, Question, Choice, QuizAttempt
-from .tasks import create_course_description, create_course_thumb, generate_lesson, generate_next_module
+from .tasks import (
+    create_course_description,
+    create_course_thumb,
+    generate_lesson,
+    generate_next_module,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -37,16 +42,14 @@ class CourseService:
         except Course.DoesNotExist:
             raise HttpError(404, "Curso não encontrado ou sem permissão")
 
-
     def get_lesson(self, course_id: int) -> Lesson:
         lesson = get_next_lesson(course_id)
         if not lesson:
-             raise HttpError(404, "Não há mais lições no curso")
-             
-        # If the lesson is still pending, trigger its generation
+            raise HttpError(404, "Não há mais lições no curso")
+
         if lesson.status == "PENDING":
             generate_lesson.delay(lesson.id)
-            
+
         return lesson
 
     def mark_watched(self, lesson_id: int):
@@ -54,13 +57,12 @@ class CourseService:
             lesson = Lesson.objects.get(id=lesson_id)
             lesson.watched = True
             lesson.save()
-            
-            # Trigger generation of next lesson after this one is marked watched
+
             course_id = lesson.module.course_id
             next_lesson = get_next_lesson(course_id)
             if next_lesson and next_lesson.status == "PENDING":
                 generate_lesson.delay(next_lesson.id)
-                
+
             return {"success": True}
         except Lesson.DoesNotExist:
             raise HttpError(404, "Lição não encontrada")
@@ -76,49 +78,41 @@ class CourseService:
             quiz = Quiz.objects.get(pk=quiz_id)
         except Quiz.DoesNotExist:
             raise HttpError(404, "Quiz não encontrado")
-            
+
         total_questions = quiz.questions.count()
         if total_questions == 0:
             return {"score": 100, "passed": True, "correct_answers": []}
-            
+
         correct_count = 0
         correct_choice_ids = []
-        
+
         for ans in answers:
             try:
-                 question = Question.objects.get(pk=ans.question_id, quiz=quiz)
-                 choice = Choice.objects.get(pk=ans.choice_id, question=question)
-                 if choice.is_correct:
-                     correct_count += 1
-                     correct_choice_ids.append(choice.id)
-                 else:
-                     correct_choice = question.choices.filter(is_correct=True).first()
-                     if correct_choice:
-                         correct_choice_ids.append(correct_choice.id)
+                question = Question.objects.get(pk=ans.question_id, quiz=quiz)
+                choice = Choice.objects.get(pk=ans.choice_id, question=question)
+                if choice.is_correct:
+                    correct_count += 1
+                    correct_choice_ids.append(choice.id)
+                else:
+                    correct_choice = question.choices.filter(is_correct=True).first()
+                    if correct_choice:
+                        correct_choice_ids.append(correct_choice.id)
             except (Question.DoesNotExist, Choice.DoesNotExist):
                 continue
-                
+
         # Find correct choices for unanswered questions too? Or just return what was sent?
         # Simpler: just return correct choice IDs for all questions in the quiz.
-        all_correct = Choice.objects.filter(question__quiz=quiz, is_correct=True).values_list('id', flat=True)
-        
+        all_correct = Choice.objects.filter(
+            question__quiz=quiz, is_correct=True
+        ).values_list("id", flat=True)
+
         score = (correct_count / total_questions) * 10.0
         passed = score >= 7.0
-        
-        QuizAttempt.objects.create(
-            user=user,
-            quiz=quiz,
-            score=score,
-            passed=passed
-        )
-        
-        return {
-            "score": score,
-            "passed": passed,
-            "correct_answers": list(all_correct)
-        }
+
+        QuizAttempt.objects.create(user=user, quiz=quiz, score=score, passed=passed)
+
+        return {"score": score, "passed": passed, "correct_answers": list(all_correct)}
 
     def trigger_next_module(self, course_id: int):
         generate_next_module.delay(course_id)
         return {"success": True, "message": "Gerando módulo..."}
-

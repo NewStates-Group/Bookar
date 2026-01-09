@@ -231,6 +231,9 @@ def _stitch_video(image_path, audio_path, output_path):
 def generate_lesson(lesson_id: int):
     try:
         lesson = Lesson.objects.get(id=lesson_id)
+
+        if lesson.status == "PROCESSING":
+            return
     except Lesson.DoesNotExist:
         raise LessonDoesNotExist(f"Lesson {lesson_id} does not exist.")
     Lesson.objects.filter(pk=lesson_id).update(status="PROCESSING")
@@ -403,8 +406,8 @@ def generate_lesson(lesson_id: int):
             logger.error(f"Final concat failed: {e.stderr}")
             raise
 
-        generate_quiz.delay(lesson.id)
-        
+        # generate_quiz.delay(lesson.id)
+
         return f"Video generated: {lesson.lesson_file}"
 
     except Exception as e:
@@ -427,126 +430,6 @@ def generate_lesson(lesson_id: int):
 
 
 @shared_task
-def create_course_module(course_pk: int, title: str, details: str, level: str):
-    prompt = (
-        "You are an expert educational content creator. "
-        "Create a detailed multimedia course outline in JSON format. "
-        "Strictly follow this JSON schema:"
-        "{"
-        '  "modules": ['
-        "    {"
-        '      "title": "Module Title",'
-        '      "desc": "Module Description",'
-        '      "lessons": ['
-        "        {"
-        '          "title": "Lesson Title",'
-        '          "desc": "Lesson Description",'
-        '          "duration": 300, '
-        '          "narration": "Detailed narration text (600-800 words), engaging and podcast-style...",'
-        '          "key_points": "Key takeaway 1, Key takeaway 2",'
-        '          "scene_suggestion": "Visual description for whiteboard animation (e.g. Hand drawing a graph...)"'
-        "        }\n"
-        "      ]\n"
-        "    }\n"
-        "  ]\n"
-        "}\n\n"
-        f"Generate a course outline based for this prompt: '{details}'.\n"
-        f"Title: {title}, level: {level}"
-        "Ensure the content is high quality, educational, and ready for video production."
-    )
-
-    course_outline = None
-    client = get_ollama_client()
-    try:
-        response = client.chat(
-            settings.AI["OLLAMA_MODEL_TEXT"], [{"role": "user", "content": prompt}]
-        )
-        course_outline_content = response["message"]["content"]
-        logger.info(f"Raw outline response: {course_outline_content[:500]}...")
-
-        try:
-            course_outline = orjson.loads(course_outline_content)
-        except orjson.JSONDecodeError:
-            course_outline = extract_json(course_outline_content)
-
-        if course_outline is None:
-            raise ValueError("Não foi possível extrair JSON da resposta da IA")
-
-    except Exception as e:
-        logger.error(f"Outline generation failed: {e}")
-        Course.objects.filter(pk=course_pk).update(status="FAILED")
-        raise CourseCreationError(f"Erro ao criar estrutura do curso: {str(e)}")
-
-    try:
-        # Atualizar descrição do curso
-        if isinstance(course_outline, dict):
-            course_desc = course_outline.get("desc", f"Curso sobre {title}")
-        else:
-            course_desc = f"Curso sobre {title}"
-
-        Course.objects.filter(pk=course_pk).update(
-            desc=course_desc, status="PROCESSING"
-        )
-
-        # Extrair módulos do JSON
-        modules_data = []
-        if isinstance(course_outline, dict):
-            modules_data = course_outline.get("modules", [])
-        elif isinstance(course_outline, list):
-            if len(course_outline) > 0 and isinstance(course_outline[0], dict):
-                modules_data = course_outline[0].get("modules", [])
-            else:
-                modules_data = course_outline
-
-        if not isinstance(modules_data, list) or len(modules_data) == 0:
-            raise ValueError("Nenhum módulo encontrado no JSON")
-
-        # Criar módulos e lições
-        for module in modules_data:
-            module_object = Module.objects.create(
-                course_id=course_pk,
-                name=module.get(
-                    "title",
-                    f"Módulo {Module.objects.filter(course_id=course_pk).count() + 1}",
-                ),
-                desc=module.get("desc", ""),
-            )
-
-            lessons_data = module.get("lessons", [])
-            if lessons_data:
-                lessons_to_create = []
-                for lesson in lessons_data:
-                    lessons_to_create.append(
-                        Lesson(
-                            module=module_object,
-                            title=lesson.get(
-                                "title", f"Lição {len(lessons_to_create) + 1}"
-                            ),
-                            desc=lesson.get("desc", ""),
-                            narration=lesson.get("narration", ""),
-                            key_points=lesson.get("key_points", ""),
-                            scene_suggestion=lesson.get("scene_suggestion", ""),
-                            duration=lesson.get("duration", 300),
-                            status="PENDING",
-                        )
-                    )
-                Lesson.objects.bulk_create(lessons_to_create)
-
-    except Exception as e:
-        Course.objects.filter(pk=course_pk).update(status="FAILED")
-        logger.error(f"Erro ao salvar dados do curso: {e}")
-        raise CourseCreationError(f"Erro ao salvar dados do curso: {str(e)}")
-
-    # Iniciar geração da primeira lição
-    next_lesson = get_next_lesson(course_pk)
-    if next_lesson:
-        generate_lesson.delay(next_lesson.id)
-    else:
-        # Se não houver lições, marcar curso como READY
-        Course.objects.filter(pk=course_pk).update(status="READY")
-
-
-@shared_task
 def generate_next_module(course_pk: int):
     try:
         course = Course.objects.prefetch_related("modules").get(pk=course_pk)
@@ -557,7 +440,7 @@ def generate_next_module(course_pk: int):
     # Build context from existing modules
     existing_modules = course.modules.all().order_by("created_at")
     modules_context = "\n".join([f"- {m.name}: {m.desc}" for m in existing_modules])
-    
+
     prompt = (
         "You are an expert educational content creator. "
         "Create the NEXT module for this course in JSON format. "
@@ -585,14 +468,14 @@ def generate_next_module(course_pk: int):
     try:
         response = ollama_chat([{"role": "user", "content": prompt}])
         module_data = extract_json(response)
-        
+
         if not module_data:
-             raise ValueError("Failed to extract JSON for module")
+            raise ValueError("Failed to extract JSON for module")
 
         # Create Module
         module_object = Module.objects.create(
             course=course,
-            name=module_data.get("title", f"Module {existing_modules.count() + 1}"),
+            name=module_data.get("title")[:80],
             desc=module_data.get("desc", ""),
         )
 
@@ -603,23 +486,26 @@ def generate_next_module(course_pk: int):
             lessons_to_create.append(
                 Lesson(
                     module=module_object,
-                    title=lesson.get("title", "New Lesson"),
+                    title=lesson.get("title", "")[:150],
                     desc=lesson.get("desc", ""),
                     narration=lesson.get("narration", ""),
-                    key_points=lesson.get("key_points", ""),
+                    key_points=lesson.get("key_points", "")[:150],
                     scene_suggestion=lesson.get("scene_suggestion", ""),
-                    duration=lesson.get("duration", 300),
+                    duration=lesson.get("duration", 120),
                     status="PENDING",
                 )
             )
         Lesson.objects.bulk_create(lessons_to_create)
-        course.status = "READY"
-        course.save()
-        first_lesson = Lesson.objects.filter(module=module_object).order_by("id").first()
+        first_lesson = (
+            Lesson.objects.filter(module=module_object).order_by("id").first()
+        )
         if first_lesson:
             generate_lesson.delay(first_lesson.id)
-             
+
     except Exception as e:
+        module_object.delete()
+        course.status = "READY"
+        course.save()
         logger.error(f"Failed to generate next module: {e}")
         # Optionally mark course as failed or handle error
 
@@ -656,7 +542,7 @@ def generate_quiz(lesson_id: int):
     try:
         response = ollama_chat([{"role": "user", "content": prompt}])
         quiz_data = extract_json(response)
-        
+
         if not quiz_data:
             return
 
@@ -664,22 +550,22 @@ def generate_quiz(lesson_id: int):
             lesson=lesson,
             course=lesson.module.course,
             title=quiz_data.get("title", f"Quiz: {lesson.title}"),
-            description=quiz_data.get("description", "")
+            description=quiz_data.get("description", ""),
         )
 
         for q_data in quiz_data.get("questions", []):
             question = Question.objects.create(
                 quiz=quiz,
                 text=q_data.get("text", "?"),
-                explanation=q_data.get("explanation", "")
+                explanation=q_data.get("explanation", ""),
             )
             for c_data in q_data.get("choices", []):
                 Choice.objects.create(
                     question=question,
                     text=c_data.get("text", ""),
-                    is_correct=c_data.get("is_correct", False)
+                    is_correct=c_data.get("is_correct", False),
                 )
-                
+
     except Exception as e:
         logger.error(f"Quiz generation failed: {e}")
 
@@ -727,9 +613,10 @@ def create_course_description(course_pk: int, title: str, details: str, level: s
         course_desc = f"Curso sobre {title}"
 
     Course.objects.filter(pk=course_pk).update(desc=course_desc, status="PROCESSING")
-    
+
     # Trigger first module generation
     generate_next_module.delay(course_pk)
+
 
 @shared_task
 def create_course_thumb(course_pk: str, title: str):
@@ -785,7 +672,7 @@ def create_course_thumb(course_pk: str, title: str):
 
         if not image_saved or not file:
             raise ValueError("No image data in response")
-        
+
         course = Course.objects.get(pk=course_pk)
         course.thumb = file
         course.save()

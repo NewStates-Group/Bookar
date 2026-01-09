@@ -58,7 +58,6 @@ class Lesson(models.Model):
     desc = models.TextField()
     duration = models.PositiveIntegerField(default=0)
     watched = models.BooleanField(default=False)
-    delivered = models.BooleanField(default=False)
     status = models.CharField(
         max_length=20,
         choices=LessonStatus.choices,
