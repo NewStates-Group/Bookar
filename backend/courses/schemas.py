@@ -4,7 +4,7 @@ from ninja import ModelSchema, Schema
 from ninja.orm import create_schema
 from pydantic import Field
 
-from .models import Course, CourseLevel, Lesson, Module
+from .models import Choice, Course, CourseLevel, Lesson, Module, Question, Quiz
 
 
 class CourseOut(ModelSchema):
@@ -53,3 +53,40 @@ class ModuleDetailSchema(ModuleSchema):
 
 class CourseDetailSchema(CourseOut):
     modules: List[ModuleDetailSchema]
+
+
+class ChoiceSchema(ModelSchema):
+    class Meta:
+        model = Choice
+        fields = ["id", "text"]
+
+
+class QuestionSchema(ModelSchema):
+    choices: List[ChoiceSchema]
+
+    class Meta:
+        model = Question
+        fields = ["id", "text"]
+
+
+class QuizSchema(ModelSchema):
+    questions: List[QuestionSchema]
+
+    class Meta:
+        model = Quiz
+        fields = ["id", "title", "description"]
+
+
+class AnswerIn(Schema):
+    question_id: int
+    choice_id: int
+
+
+class QuizSubmission(Schema):
+    answers: List[AnswerIn]
+
+
+class QuizResult(Schema):
+    score: float
+    passed: bool
+    correct_answers: List[int]  # List of correct Choice IDs

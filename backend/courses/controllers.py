@@ -4,7 +4,15 @@ from injector import inject
 from ninja_extra import api_controller, route
 from ninja_jwt.authentication import JWTAuth
 
-from .schemas import CourseDetailSchema, CourseIn, CourseOut, LessonSchema
+from .schemas import (
+    CourseDetailSchema,
+    CourseIn,
+    CourseOut,
+    LessonSchema,
+    QuizResult,
+    QuizSchema,
+    QuizSubmission,
+)
 from .services import CourseService
 
 
@@ -35,3 +43,19 @@ class CourseController:
     @route.post("/mark-watched/{lesson_id}")
     def mark_watched(self, lesson_id: int):
         return self.course_service.mark_watched(lesson_id)
+
+    @route.get("/quiz/{lesson_id}", response=QuizSchema)
+    def get_quiz(self, lesson_id: int):
+        return self.course_service.get_quiz(lesson_id)
+
+    @route.post("/quiz/{quiz_id}/submit", response=QuizResult)
+    def submit_quiz(self, request, quiz_id: int, data: QuizSubmission):
+        return self.course_service.submit_quiz(request.user, quiz_id, data.answers)
+
+    @route.post("/{course_id}/generate-module")
+    def generate_module(self, course_id: int):
+        return self.course_service.trigger_next_module(course_id)
+
+    @route.delete("/{course_id}")
+    def delete_course(self, request, course_id: int):
+        return self.course_service.delete_course(course_id, request.user)

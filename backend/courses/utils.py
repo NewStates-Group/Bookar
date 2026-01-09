@@ -11,40 +11,10 @@ def extract_json(response: str):
     Extracts JSON from a string, handling Markdown code blocks and common formatting issues.
     """
     cleaned = response.strip()
-    try:
-        start_bracket = cleaned.index('{')
-        end_bracket = cleaned.rindex('}')
-        cleaned = cleaned[start_bracket:end_bracket+1]
-        return orjson.loads(cleaned)
-    except orjson.JSONDecodeError as e:
-        print(f"JSON DECODE ERROR: {e}. Attempting AI repair...")
-        try:
-            client = get_genai_client()
-            repair_prompt = (
-                "Fix the following malformed JSON. Return ONLY the valid JSON, no markdown.\n\n"
-                f"{cleaned}"
-            )
-            response = client.models.generate_content(
-                model="gemini-2.0-flash-exp",
-                contents=repair_prompt,
-                config=genai.types.GenerateContentConfig(
-                    response_mime_type="application/json"
-                ),
-            )
-            repaired_json = response.text.strip()
-            if "```json" in repaired_json:
-                repaired_json = (
-                    repaired_json.split("```json")[1].split("```")[0].strip()
-                )
-            elif "```" in repaired_json:
-                repaired_json = repaired_json.split("```")[1].split("```")[0].strip()
-
-            return orjson.loads(repaired_json)
-        except Exception as repair_error:
-            print(f"AI REPAIR FAILED: {repair_error}")
-            import json
-
-            return json.loads(cleaned)
+    start_bracket = cleaned.index("{")
+    end_bracket = cleaned.rindex("}")
+    cleaned = cleaned[start_bracket : end_bracket + 1]
+    return orjson.loads(cleaned)
 
 
 def get_ollama_client():
@@ -54,13 +24,21 @@ def get_ollama_client():
     )
 
 
+def ollama_chat(*args, **kwargs):
+    client = get_ollama_client()
+    return client.chat(settings.AI["OLLAMA_MODEL_TEXT"], *args, **kwargs)["message"][
+        "content"
+    ]
+
+
 def get_genai_client():
     return genai.Client(api_key=settings.AI["GENAI_KEY"])
 
 
+
 def get_next_lesson(course_pk: int) -> Lesson | None:
     return (
-        Lesson.objects.filter(module__course_id=course_pk, delivered=False)
-        .order_by("id")
+        Lesson.objects.filter(module__course_id=course_pk, watched=False)
+        .order_by("module__created_at", "module__id", "id")
         .first()
     )

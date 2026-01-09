@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from 'next/font/google'
 import './globals.css'
 import { Providers } from './providers'
 import { Toaster } from 'sonner'
+import { AuthGuard } from '@/components/AuthGuard'
 
 const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
@@ -23,8 +24,10 @@ export default function RootLayout({
       <body className={`font-sans antialiased`}>
         <link rel="shortcut icon" href="/logo.png" type="image/x-icon" />
         <Providers>
-          {children}
-          <Toaster position='bottom-right'/>
+          <AuthGuard>
+            {children}
+          </AuthGuard>
+          <Toaster position='bottom-right' />
         </Providers>
       </body>
     </html>

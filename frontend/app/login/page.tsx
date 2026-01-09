@@ -10,6 +10,7 @@ import { Card } from "@/components/ui/card";
 import { Sparkles, User, Lock } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
+import Image from "next/image";
 
 export default function LoginPage() {
   const [username, setUsername] = useState("");
@@ -44,29 +45,26 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-b from-background to-muted/20">
       <div className="w-full max-w-md">
-        {/* Logo */}
-        <Link href="/" className="flex items-center justify-center gap-2 mb-8">
-          <div className="flex items-center justify-center w-12 h-12 rounded-lg bg-primary">
-            <Sparkles className="w-7 h-7 text-primary-foreground" />
-          </div>
-          <span className="text-2xl font-bold">AI Academy</span>
+        <Link href="/" className="fixed top-0 left-0  p-6 flex items-center justify-center gap-2 mb-6">
+          <Image src={"/logo.png"} width={40} height={40} alt="Bookar Logo" />
+          <span className="text-3xl font-bold">Bookar</span>
         </Link>
 
         <Card className="p-8">
           <div className="mb-6 text-center">
-            <h1 className="text-2xl font-bold mb-2">Welcome Back</h1>
-            <p className="text-muted-foreground">Sign in to continue your learning journey</p>
+            <h1 className="text-2xl font-bold mb-2">Iniciar Sessão</h1>
+            <p className="text-muted-foreground">Entre para continuar a aprender</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="username">Username</Label>
+              <Label htmlFor="username">Nome usuário</Label>
               <div className="relative">
                 <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                 <Input
                   id="username"
                   type="text"
-                  placeholder="yourusername"
+                  placeholder="Nome usuário"
                   className="pl-10"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
@@ -77,9 +75,9 @@ export default function LoginPage() {
 
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label htmlFor="password">Password</Label>
-                <Link href="/forgot-password" className="text-sm text-primary hover:underline">
-                  Forgot password?
+                <Label htmlFor="password">Palavra-passe</Label>
+                <Link href="/forgot-password" className="text-sm text-primary underline">
+                  Esquece a senha?
                 </Link>
               </div>
               <div className="relative">
@@ -87,7 +85,7 @@ export default function LoginPage() {
                 <Input
                   id="password"
                   type="password"
-                  placeholder="Enter your password"
+                  placeholder="Palavra-passe"
                   className="pl-10"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -97,14 +95,14 @@ export default function LoginPage() {
             </div>
 
             <Button type="submit" className="w-full" size="lg" disabled={isLoading}>
-              {isLoading ? "Signing In..." : "Sign In"}
+              {isLoading ? "Entrando.." : "Avançar"}
             </Button>
           </form>
 
           <p className="mt-6 text-center text-sm text-muted-foreground">
-            Don't have an account?{" "}
+            Não tem conta?{" "}
             <Link href="/signup" className="text-primary font-medium hover:underline">
-              Sign up
+              Criar Conta
             </Link>
           </p>
         </Card>

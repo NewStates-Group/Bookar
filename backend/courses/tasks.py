@@ -1,5 +1,5 @@
 import concurrent.futures
-import json
+import orjson
 import logging
 import shutil
 import subprocess
@@ -11,11 +11,19 @@ from pathlib import Path
 from celery import shared_task
 from django.conf import settings
 from google.genai import types
+from io import BytesIO
+from django.core.files.uploadedfile import InMemoryUploadedFile
 from PIL import Image, ImageDraw
 
 from .exceptions import CourseCreationError, LessonDoesNotExist, ThumbnailCreationError
-from .models import Course, Lesson, Module
-from .utils import extract_json, get_genai_client, get_next_lesson, get_ollama_client
+from .models import Course, Lesson, Module, Quiz, Question, Choice
+from .utils import (
+    extract_json,
+    get_genai_client,
+    get_next_lesson,
+    get_ollama_client,
+    ollama_chat,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -263,8 +271,8 @@ def generate_lesson(lesson_id: int):
             )
 
             try:
-                segments_json = json.loads(plan_response.text)
-            except json.JSONDecodeError:
+                segments_json = orjson.loads(plan_response.text)
+            except orjson.JSONDecodeError:
                 # Tentar extrair JSON da resposta textual
                 segments_json = extract_json(plan_response.text)
 
@@ -395,6 +403,8 @@ def generate_lesson(lesson_id: int):
             logger.error(f"Final concat failed: {e.stderr}")
             raise
 
+        generate_quiz.delay(lesson.id)
+        
         return f"Video generated: {lesson.lesson_file}"
 
     except Exception as e:
@@ -417,13 +427,12 @@ def generate_lesson(lesson_id: int):
 
 
 @shared_task
-def create_course_outline(course_pk: int, title: str, details: str, level: str):
+def create_course_module(course_pk: int, title: str, details: str, level: str):
     prompt = (
         "You are an expert educational content creator. "
         "Create a detailed multimedia course outline in JSON format. "
         "Strictly follow this JSON schema:"
         "{"
-        '  "desc": "Course Description",'
         '  "modules": ['
         "    {"
         '      "title": "Module Title",'
@@ -455,10 +464,9 @@ def create_course_outline(course_pk: int, title: str, details: str, level: str):
         course_outline_content = response["message"]["content"]
         logger.info(f"Raw outline response: {course_outline_content[:500]}...")
 
-        # Tentar extrair JSON da resposta
         try:
-            course_outline = json.loads(course_outline_content)
-        except json.JSONDecodeError:
+            course_outline = orjson.loads(course_outline_content)
+        except orjson.JSONDecodeError:
             course_outline = extract_json(course_outline_content)
 
         if course_outline is None:
@@ -466,8 +474,7 @@ def create_course_outline(course_pk: int, title: str, details: str, level: str):
 
     except Exception as e:
         logger.error(f"Outline generation failed: {e}")
-        # Atualizar status do curso para ERROR
-        Course.objects.filter(pk=course_pk).update(status="ERROR", failed=True)
+        Course.objects.filter(pk=course_pk).update(status="FAILED")
         raise CourseCreationError(f"Erro ao criar estrutura do curso: {str(e)}")
 
     try:
@@ -526,7 +533,7 @@ def create_course_outline(course_pk: int, title: str, details: str, level: str):
                 Lesson.objects.bulk_create(lessons_to_create)
 
     except Exception as e:
-        Course.objects.filter(pk=course_pk).update(status="ERROR", failed=True)
+        Course.objects.filter(pk=course_pk).update(status="FAILED")
         logger.error(f"Erro ao salvar dados do curso: {e}")
         raise CourseCreationError(f"Erro ao salvar dados do curso: {str(e)}")
 
@@ -540,13 +547,214 @@ def create_course_outline(course_pk: int, title: str, details: str, level: str):
 
 
 @shared_task
+def generate_next_module(course_pk: int):
+    try:
+        course = Course.objects.prefetch_related("modules").get(pk=course_pk)
+    except Course.DoesNotExist:
+        logger.error(f"Course {course_pk} not found for module generation")
+        return
+
+    # Build context from existing modules
+    existing_modules = course.modules.all().order_by("created_at")
+    modules_context = "\n".join([f"- {m.name}: {m.desc}" for m in existing_modules])
+    
+    prompt = (
+        "You are an expert educational content creator. "
+        "Create the NEXT module for this course in JSON format. "
+        "Strictly follow this JSON schema:"
+        "{"
+        '  "title": "Module Title",'
+        '  "desc": "Module Description",'
+        '  "lessons": ['
+        "    {"
+        '      "title": "Lesson Title",'
+        '      "desc": "Lesson Description",'
+        '      "duration": 300, '
+        '      "narration": "Detailed narration text (600-800 words), engaging and podcast-style...",'
+        '      "key_points": "Key takeaway 1, Key takeaway 2",'
+        '      "scene_suggestion": "Visual description for whiteboard animation"'
+        "    }\n"
+        "  ]\n"
+        "}\n\n"
+        f"Course Title: {course.title}\n"
+        f"Course Level: {course.level}\n"
+        f"Context (Existing Modules):\n{modules_context}\n\n"
+        "Generate ONLY the ONE next module. Ensure flow and continuity."
+    )
+
+    try:
+        response = ollama_chat([{"role": "user", "content": prompt}])
+        module_data = extract_json(response)
+        
+        if not module_data:
+             raise ValueError("Failed to extract JSON for module")
+
+        # Create Module
+        module_object = Module.objects.create(
+            course=course,
+            name=module_data.get("title", f"Module {existing_modules.count() + 1}"),
+            desc=module_data.get("desc", ""),
+        )
+
+        # Create Lessons
+        lessons_data = module_data.get("lessons", [])
+        lessons_to_create = []
+        for lesson in lessons_data:
+            lessons_to_create.append(
+                Lesson(
+                    module=module_object,
+                    title=lesson.get("title", "New Lesson"),
+                    desc=lesson.get("desc", ""),
+                    narration=lesson.get("narration", ""),
+                    key_points=lesson.get("key_points", ""),
+                    scene_suggestion=lesson.get("scene_suggestion", ""),
+                    duration=lesson.get("duration", 300),
+                    status="PENDING",
+                )
+            )
+        Lesson.objects.bulk_create(lessons_to_create)
+        course.status = "READY"
+        course.save()
+        first_lesson = Lesson.objects.filter(module=module_object).order_by("id").first()
+        if first_lesson:
+            generate_lesson.delay(first_lesson.id)
+             
+    except Exception as e:
+        logger.error(f"Failed to generate next module: {e}")
+        # Optionally mark course as failed or handle error
+
+
+@shared_task
+def generate_quiz(lesson_id: int):
+    try:
+        lesson = Lesson.objects.get(pk=lesson_id)
+    except Lesson.DoesNotExist:
+        return
+
+    prompt = (
+        f"Create a multiple choice quiz for the following lesson content.\n"
+        f"Title: {lesson.title}\n"
+        f"Content: {lesson.narration}\n\n"
+        "Output JSON format:\n"
+        "{\n"
+        '  "title": "Quiz Title",\n'
+        '  "description": "Short description",\n'
+        '  "questions": [\n'
+        "    {\n"
+        '      "text": "Question text?",\n'
+        '      "explanation": "Why this is correct...",\n'
+        '      "choices": [\n'
+        '        {"text": "Option A", "is_correct": false},\n'
+        '        {"text": "Option B", "is_correct": true}\n'
+        "      ]\n"
+        "    }\n"
+        "  ]\n"
+        "}\n"
+        "Generate 3-5 questions."
+    )
+
+    try:
+        response = ollama_chat([{"role": "user", "content": prompt}])
+        quiz_data = extract_json(response)
+        
+        if not quiz_data:
+            return
+
+        quiz = Quiz.objects.create(
+            lesson=lesson,
+            course=lesson.module.course,
+            title=quiz_data.get("title", f"Quiz: {lesson.title}"),
+            description=quiz_data.get("description", "")
+        )
+
+        for q_data in quiz_data.get("questions", []):
+            question = Question.objects.create(
+                quiz=quiz,
+                text=q_data.get("text", "?"),
+                explanation=q_data.get("explanation", "")
+            )
+            for c_data in q_data.get("choices", []):
+                Choice.objects.create(
+                    question=question,
+                    text=c_data.get("text", ""),
+                    is_correct=c_data.get("is_correct", False)
+                )
+                
+    except Exception as e:
+        logger.error(f"Quiz generation failed: {e}")
+
+
+@shared_task
+def create_course_description(course_pk: int, title: str, details: str, level: str):
+    prompt = f"""
+    You are an AI that outputs STRICT JSON.
+
+    Rules:
+    - Output ONLY valid JSON
+    - No comments
+    - No markdown
+    - No extra text
+    - Follow the schema exactly
+    - Do not add or remove fields
+    - Use double quotes only
+
+    Schema:
+    {{
+        "desc": string -> create the course description
+    }}
+
+    Context:
+    Course title: {title}
+    Course level: {level}
+    User Details: {details}
+
+    Task:
+    Generate ONLY the next module.
+    """
+
+    course_outline = None
+    try:
+        response = ollama_chat([{"role": "user", "content": prompt}])
+        course_outline = extract_json(response)
+    except Exception as e:
+        logger.error(f"Outline generation failed: {e}")
+        Course.objects.filter(pk=course_pk).update(status="FAILED")
+        raise CourseCreationError(f"Erro ao criar estrutura do curso: {str(e)}")
+
+    if isinstance(course_outline, dict):
+        course_desc = course_outline.get("desc", f"Curso sobre {title}")
+    else:  # fallback
+        course_desc = f"Curso sobre {title}"
+
+    Course.objects.filter(pk=course_pk).update(desc=course_desc, status="PROCESSING")
+    
+    # Trigger first module generation
+    generate_next_module.delay(course_pk)
+
+@shared_task
 def create_course_thumb(course_pk: str, title: str):
     client = get_genai_client()
-    prompt = (
-        f"Professional educational course thumbnail for this title: {title}. "
-        "Use a modern, clean, academic design with bright colors and subtle gradients. "
-        "Ensure the Course Title is visible and written in Portuguese. Any other text must also be in Portuguese."
-    )
+    prompt = f"""
+    Capa profissional de curso educacional.
+    Título do curso (em português, bem legível): "{title}"
+
+    Estilo visual:
+    - Design moderno, limpo e acadêmico
+    - Cores vibrantes e profissionais
+    - Gradientes suaves
+    - Ilustração ou composição vetorial (não realista)
+
+    Elementos obrigatórios:
+    - O título do curso em português, centralizado ou em destaque
+    - Ícones, símbolos ou logos que REPRESENTEM o tema do curso
+    - Layout equilibrado, sem poluição visual
+
+    Regras:
+    - Todo o texto deve estar em português
+    - Não adicionar textos extras além do título
+    - Não usar marcas d\'água
+    - Fundo claro ou gradiente moderno
+    """
 
     try:
         response = client.models.generate_content(
@@ -557,30 +765,32 @@ def create_course_thumb(course_pk: str, title: str):
             ),
         )
 
-        output_dir = Path(settings.MEDIA_ROOT) / "courses" / "thumbs"
-        output_dir.mkdir(parents=True, exist_ok=True)
-        filename = f"{uuid.uuid4()}.png"
-        output_path = output_dir / filename
-
         image_saved = False
+        file = None
         for part in response.parts:
             if part.inline_data is not None:
-                image = part.as_image()
-                image.save(output_path)
+                inline_data = part.inline_data
+                buffer = BytesIO(inline_data.data)
+                buffer.seek(0)
+                file = InMemoryUploadedFile(
+                    file=buffer,
+                    field_name=None,
+                    name=f"{uuid.uuid4()}.jpg",
+                    content_type=inline_data.mime_type,
+                    size=len(inline_data.data),
+                    charset=None,
+                )
                 image_saved = True
                 break
 
-        if not image_saved:
-            # Tentar método alternativo
-            if hasattr(response, "generated_images") and response.generated_images:
-                image = response.generated_images[0].image
-                image.save(output_path)
-            else:
-                raise ValueError("No image data in response")
-
-        Course.objects.filter(pk=course_pk).update(thumb=output_path)
+        if not image_saved or not file:
+            raise ValueError("No image data in response")
+        
+        course = Course.objects.get(pk=course_pk)
+        course.thumb = file
+        course.save()
 
     except Exception as e:
         logger.error(f"Thumbnail creation failed: {e}")
-        Course.objects.filter(pk=course_pk).update(status="ERROR")
+        Course.objects.filter(pk=course_pk).update(status="FAILED")
         raise ThumbnailCreationError(f"Erro ao criar thumbnail: {str(e)}")

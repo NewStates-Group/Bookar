@@ -7,6 +7,7 @@ import { Loader2, ArrowLeft, ArrowRight, MonitorPlay } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState, useRef } from "react";
 import { toast } from "sonner";
+import { Quiz } from "@/components/Quiz";
 
 interface Lesson {
     id: number;
@@ -23,6 +24,7 @@ export default function LearnPage() {
     const [lesson, setLesson] = useState<Lesson | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [viewMode, setViewMode] = useState<"video" | "quiz">("video");
     const pollingRef = useRef<NodeJS.Timeout | null>(null);
 
     useEffect(() => {
@@ -56,6 +58,7 @@ export default function LearnPage() {
                 const data = await res.json();
                 setLesson(data);
                 setLoading(false);
+                setViewMode("video"); // Reset to video for new lesson
 
                 // If processing, polling!
                 if (data.status === "PROCESSING" || data.status === "PENDING") {
@@ -100,6 +103,12 @@ export default function LearnPage() {
             setLoading(false);
         }
     }
+
+    const handleQuizComplete = async () => {
+        // Quiz passed -> Mark watched -> Next
+        await handleNext();
+    }
+
 
     if (status === "loading" || loading) {
         return (
@@ -176,15 +185,23 @@ export default function LearnPage() {
                     </div>
                 )}
 
-                {/* READY STATE */}
-                {lesson.status === "READY" && lesson.lesson_file && (
+                {/* READY STATE - VIDEO */}
+                {lesson.status === "READY" && viewMode === "video" && lesson.lesson_file && (
                     <div className="w-full max-w-5xl aspect-video bg-black rounded-xl overflow-hidden shadow-2xl relative group">
                         <video
                             src={`http://localhost:8000/media/${lesson.lesson_file}`}
                             controls
                             className="w-full h-full"
                             autoPlay
+                            onEnded={() => { }} // Could auto-show quiz
                         />
+                    </div>
+                )}
+
+                {/* READY STATE - QUIZ */}
+                {lesson.status === "READY" && viewMode === "quiz" && (
+                    <div className="w-full max-w-4xl py-8 z-10">
+                        <Quiz lessonId={lesson.id} onComplete={handleQuizComplete} />
                     </div>
                 )}
 
@@ -199,9 +216,15 @@ export default function LearnPage() {
                 </div>
                 {lesson.status === "READY" && (
                     <div className="flex gap-4">
-                        <Button size="lg" className="rounded-full px-8" onClick={handleNext}>
-                            Próxima Aula <ArrowRight className="w-5 h-5 ml-2" />
-                        </Button>
+                        {viewMode === "video" ? (
+                            <Button size="lg" className="rounded-full px-8" onClick={() => setViewMode("quiz")}>
+                                Fazer Quiz <ArrowRight className="w-5 h-5 ml-2" />
+                            </Button>
+                        ) : (
+                            <Button variant="ghost" onClick={() => setViewMode("video")}>
+                                Voltar ao Vídeo
+                            </Button>
+                        )}
                     </div>
                 )}
             </div>

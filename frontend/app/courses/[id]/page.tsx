@@ -4,7 +4,7 @@ import { useSession } from "next-auth/react";
 import { useRouter, useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Loader2, Play, ArrowLeft } from "lucide-react";
+import { Loader2, Play, ArrowLeft, Plus, ImageOff } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -48,8 +48,28 @@ export default function CoursePage() {
   useEffect(() => {
     if ((session as any)?.accessToken && params?.id) {
       fetchCourse();
+      const interval = setInterval(fetchCourse, 5000);
+      return () => clearInterval(interval);
     }
   }, [session, params]);
+
+  const [isGeneratingModule, setIsGeneratingModule] = useState(false);
+
+  const handleGenerateModule = async () => {
+    setIsGeneratingModule(true);
+    try {
+      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/courses/${course?.id}/generate-module`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${(session as any)?.accessToken}` }
+      });
+      toast.success("Gerando novo módulo em segundo plano...");
+      fetchCourse();
+    } catch (e) {
+      toast.error("Erro ao solicitar módulo");
+    } finally {
+      setIsGeneratingModule(false);
+    }
+  }
 
   const fetchCourse = async () => {
     try {
@@ -93,13 +113,20 @@ export default function CoursePage() {
 
         {/* Hero Section */}
         <div className="relative aspect-video rounded-xl overflow-hidden bg-muted shadow-lg">
-          {course.thumb && (
-            <img src={course.thumb.replace("/app", "http://localhost:8000")} alt={course.title} className="object-cover w-full h-full" />
+          {course.thumb ? (
+            <img src={"http://localhost:8000" + course.thumb} alt={course.title} className="object-cover w-full h-full" />
+          ) : (
+            <div className="flex flex-col items-center justify-center h-full border rounded-lg">
+              <ImageOff className="w-12 h-12 text-slate-400" />
+              <span className="text-gray-500">
+                Capa Indisponível
+              </span>
+            </div>
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex flex-col justify-end p-8 text-white">
             <div className="flex items-center gap-2 mb-2">
               <span className="bg-primary px-3 py-1 rounded-full text-xs font-bold text-primary-foreground">
-                {course.level === 'I' ? 'Iniciante' : course.level === 'IT' ? 'Intermediário' : 'Avançado'}
+                {course.level === 'B' ? 'Iniciante' : course.level === 'IT' ? 'Intermediário' : 'Avançado'}
               </span>
             </div>
             <h1 className="text-4xl font-bold mb-2">{course.title}</h1>
@@ -122,7 +149,13 @@ export default function CoursePage() {
 
         {/* Curriculum List */}
         <div className="space-y-6">
-          <h2 className="text-2xl font-bold">Conteúdo do Curso</h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-2xl font-bold">Conteúdo do Curso</h2>
+            <Button variant="outline" size="sm" onClick={handleGenerateModule} disabled={isGeneratingModule}>
+              {isGeneratingModule ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
+              Novo Módulo
+            </Button>
+          </div>
           <div className="space-y-4">
             {course.modules.length === 0 && (
               <p className="text-muted-foreground">Nenhum módulo encontrado.</p>
