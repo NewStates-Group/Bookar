@@ -1,22 +1,23 @@
 import concurrent.futures
-import orjson
 import logging
 import shutil
 import subprocess
 import tempfile
 import uuid
 import wave
+from io import BytesIO
 from pathlib import Path
 
+import orjson
 from celery import shared_task
 from django.conf import settings
+from django.core.files.base import ContentFile
+from django.core.files.storage import default_storage
 from google.genai import types
-from io import BytesIO
-from django.core.files.uploadedfile import InMemoryUploadedFile
 from PIL import Image, ImageDraw
 
 from .exceptions import CourseCreationError, LessonDoesNotExist, ThumbnailCreationError
-from .models import Course, Lesson, Module, Quiz, Question, Choice
+from .models import Choice, Course, Lesson, Module, Question, Quiz
 from .utils import (
     extract_json,
     get_genai_client,
@@ -397,8 +398,8 @@ def generate_lesson(lesson_id: int):
 
             course = lesson.module.course
             if course.status == "PROCESSING":
-                course.status = "READY"
-                course.save()
+                Course.objects.filter(pk=course.pk).update(status="READY")
+
         except subprocess.TimeoutExpired:
             logger.error("Final concatenation timed out")
             raise
@@ -444,14 +445,16 @@ def generate_next_module(course_pk: int):
     prompt = (
         "You are an expert educational content creator. "
         "Create the NEXT module for this course in JSON format. "
+        "Don't enumerate the lesson like this 1.1 -, don't enumerate nothing. "
+        "Generate de JSON values in portugues, keep the keys in english. "
         "Strictly follow this JSON schema:"
         "{"
-        '  "title": "Module Title",'
-        '  "desc": "Module Description",'
+        '  "title": "Título do módulo",'
+        '  "desc": "Descrição do módulo",'
         '  "lessons": ['
         "    {"
-        '      "title": "Lesson Title",'
-        '      "desc": "Lesson Description",'
+        '      "title": "Título da lição",'
+        '      "desc": "Descrição da lição",'
         '      "duration": 300, '
         '      "narration": "Detailed narration text (600-800 words), engaging and podcast-style...",'
         '      "key_points": "Key takeaway 1, Key takeaway 2",'
@@ -472,14 +475,12 @@ def generate_next_module(course_pk: int):
         if not module_data:
             raise ValueError("Failed to extract JSON for module")
 
-        # Create Module
         module_object = Module.objects.create(
             course=course,
             name=module_data.get("title")[:80],
             desc=module_data.get("desc", ""),
         )
 
-        # Create Lessons
         lessons_data = module_data.get("lessons", [])
         lessons_to_create = []
         for lesson in lessons_data:
@@ -504,10 +505,9 @@ def generate_next_module(course_pk: int):
 
     except Exception as e:
         module_object.delete()
-        course.status = "READY"
-        course.save()
         logger.error(f"Failed to generate next module: {e}")
-        # Optionally mark course as failed or handle error
+    finally:
+        Course.objects.filter(pk=course_pk).update(status="READY")
 
 
 @shared_task
@@ -613,9 +613,8 @@ def create_course_description(course_pk: int, title: str, details: str, level: s
         course_desc = f"Curso sobre {title}"
 
     Course.objects.filter(pk=course_pk).update(desc=course_desc, status="PROCESSING")
-
-    # Trigger first module generation
-    generate_next_module.delay(course_pk)
+    create_course_thumb.delay(course_pk, title)
+    
 
 
 @shared_task
@@ -652,31 +651,23 @@ def create_course_thumb(course_pk: str, title: str):
             ),
         )
 
-        image_saved = False
-        file = None
+        image_bytes = None
         for part in response.parts:
-            if part.inline_data is not None:
-                inline_data = part.inline_data
-                buffer = BytesIO(inline_data.data)
-                buffer.seek(0)
-                file = InMemoryUploadedFile(
-                    file=buffer,
-                    field_name=None,
-                    name=f"{uuid.uuid4()}.jpg",
-                    content_type=inline_data.mime_type,
-                    size=len(inline_data.data),
-                    charset=None,
-                )
-                image_saved = True
+            if part.inline_data:
+                image_bytes = part.inline_data.data
                 break
 
-        if not image_saved or not file:
-            raise ValueError("No image data in response")
+        image = Image.open(BytesIO(image_bytes)).convert("RGB")
 
-        course = Course.objects.get(pk=course_pk)
-        course.thumb = file
-        course.save()
+        filename = f"thumbs/{uuid.uuid4()}.jpg"
+        buffer = BytesIO()
+        image.save(buffer, format="JPEG", quality=90)
+        buffer.seek(0)
 
+        default_storage.save(filename, ContentFile(buffer.read()))
+        Course.objects.filter(pk=course_pk).update(thumb=filename)
+        
+        generate_next_module.delay(course_pk)
     except Exception as e:
         logger.error(f"Thumbnail creation failed: {e}")
         Course.objects.filter(pk=course_pk).update(status="FAILED")

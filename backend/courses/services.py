@@ -31,7 +31,6 @@ class CourseService:
         create_course_description.delay(
             course.pk, title, details, course.get_level_display()
         )
-        create_course_thumb.delay(course.pk, title)
         return course
 
     def delete_course(self, course_id: int, user):
@@ -51,6 +50,9 @@ class CourseService:
             generate_lesson.delay(lesson.id)
 
         return lesson
+    
+    def get_lesson_data(self, user, lesson_id: int):
+        return Lesson.objects.filter(id=lesson_id, module__course__user=user).first()
 
     def mark_watched(self, lesson_id: int):
         try:

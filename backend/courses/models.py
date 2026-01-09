@@ -41,13 +41,13 @@ class Course(models.Model):
         choices=CourseStatus.choices,
         default=CourseStatus.PROCESSING,
     )
-    thumb = models.ImageField(upload_to="thumbs/", null=True, blank=True)
+    thumb = models.TextField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
 
 class Module(models.Model):
     course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name="modules")
-    name = models.CharField(max_length=80, null=True, blank=True)
+    name = models.CharField(max_length=150, null=True, blank=True)
     desc = models.TextField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)
 
