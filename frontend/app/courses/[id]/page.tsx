@@ -4,7 +4,7 @@ import { useSession } from "next-auth/react";
 import { useRouter, useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Loader2, Play, ArrowLeft, Plus, ImageOff } from "lucide-react";
+import { Loader2, Play, ArrowLeft, Plus, ImageOff, PlayCircle } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -48,8 +48,6 @@ export default function CoursePage() {
   useEffect(() => {
     if ((session as any)?.accessToken && params?.id) {
       fetchCourse();
-      const interval = setInterval(fetchCourse, 5000);
-      return () => clearInterval(interval);
     }
   }, [session, params]);
 
@@ -113,7 +111,7 @@ export default function CoursePage() {
 
         <div className="relative aspect-video rounded-xl overflow-hidden bg-muted shadow-lg">
           {course.thumb ? (
-            <img src={"http://localhost:8000" + course.thumb} alt={course.title} className="object-cover w-full h-full" />
+            <img src={"http://localhost:8000/media/" + course.thumb} alt={course.title} className="object-cover w-full h-full" />
           ) : (
             <div className="flex flex-col items-center justify-center h-full border rounded-lg">
               <ImageOff className="w-12 h-12 text-slate-400" />
@@ -172,10 +170,12 @@ export default function CoursePage() {
                       </div>
                       <div className="text-xs">
                         {lesson.status === 'READY' ? (
-                          <span className="text-green-600 bg-green-100 px-2 py-1 rounded-full">Pronta</span>
+                          <Link href={`/watch?l=${lesson.id}`}>
+                            <PlayCircle className="w-5 h-5 text-gray-600" />
+                          </Link>
                         ) : lesson.status === 'PROCESSING' ? (
                           <span className="text-blue-600 bg-blue-100 px-2 py-1 rounded-full flex items-center gap-1">
-                            <Loader2 className="w-3 h-3 animate-spin" /> Mágica IA...
+                            <Loader2 className="w-3 h-3 animate-spin" /> Gerando
                           </span>
                         ) : (
                           <span className="text-gray-500 bg-gray-100 px-2 py-1 rounded-full">Aguardando</span>

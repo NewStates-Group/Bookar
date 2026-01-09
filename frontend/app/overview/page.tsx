@@ -380,14 +380,9 @@ export default function OverviewPage() {
                 className="group cursor-pointer overflow-hidden border-0 bg-transparent shadow-none transition-all duration-300"
                 onClick={() => router.push('/courses/' + course.id)}
               >
-                {/* Thumbnail */}
-                <div className="relative aspect-video overflow-hidden">
+                <div className="relative aspect-video rounded-xl overflow-hidden bg-muted shadow-lg">
                   {course.thumb ? (
-                    <img
-                      src={`http://localhost:8000${course.thumb}`}
-                      alt={course.title}
-                      className="object-cover w-full h-full group-hover:scale-105 rounded-lg transition-transform duration-300"
-                    />
+                    <img src={"http://localhost:8000/media/" + course.thumb} alt={course.title} className="object-cover w-full h-full" />
                   ) : (
                     <div className="flex flex-col items-center justify-center h-full border rounded-lg">
                       <ImageOff className="w-12 h-12 text-slate-400" />
@@ -396,34 +391,14 @@ export default function OverviewPage() {
                       </span>
                     </div>
                   )}
-
-                  <button
-                    onClick={() => handleDeleteCourse(course.id)}
-                    className="
-                      absolute top-2 right-2
-                      opacity-0 group-hover:opacity-100
-                      transition-opacity
-                      bg-black/70 hover:bg-red-600
-                      text-white p-2 rounded-full
-                      backdrop-blur
-                    "
-                    title="Eliminar curso"
-                  >
-                    <Trash className="w-5 h-5" />
-                  </button>
-
-                  {course.status === "PROCESSING" && (
-                    <div className="absolute rounded-lg inset-0 bg-black/70 backdrop-blur-sm flex flex-col items-center justify-center text-white">
-                      <div className="w-10 h-10 rounded-full border-4 border-white/20 border-t-white animate-spin mb-2" />
-                      <span className="text-sm font-medium">Gerando curso…</span>
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex flex-col justify-end p-8 text-white">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="bg-primary px-3 py-1 rounded-full text-xs font-bold text-primary-foreground">
+                        {course.level === 'B' ? 'Iniciante' : course.level === 'IT' ? 'Intermediário' : 'Avançado'}
+                      </span>
                     </div>
-                  )}
-                </div>
-
-                <div className="px-1">
-                  <h3 className="font-semibold text-sm line-clamp-2 group-hover:text-primary transition-colors capitalize text-xl">
-                    {course.title}
-                  </h3>
+                    <h1 className="text-xl font-bold mb-2 capitalize">{course.title}</h1>
+                  </div>
                 </div>
               </Card>
 
