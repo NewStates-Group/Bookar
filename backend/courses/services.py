@@ -1,9 +1,10 @@
 import logging
 
+from django.db.models import Prefetch
 from django.db.models.query import QuerySet
 from ninja.errors import HttpError
 
-from .models import Course, Lesson, Quiz, Question, Choice, QuizAttempt
+from .models import Choice, Course, Lesson, Question, Quiz, QuizAttempt, Module
 from .tasks import (
     create_course_description,
     generate_lesson,
@@ -19,8 +20,17 @@ class CourseService:
 
     def get_course(self, id: int) -> Course:
         try:
-            course = Course.objects.prefetch_related("modules__lessons").get(pk=id)
-            return course
+            return (
+                Course.objects.prefetch_related(
+                    Prefetch(
+                        "modules",
+                        queryset=Module.objects.order_by("created_at").prefetch_related(
+                            Prefetch("lessons", queryset=Lesson.objects.order_by("id"))
+                        ),
+                    )
+                )
+                .get(pk=id)
+            )
         except Course.DoesNotExist:
             raise HttpError(404, "Curso não encontrado")
 
