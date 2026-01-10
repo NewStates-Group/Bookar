@@ -42,6 +42,7 @@ class Course(models.Model):
         default=CourseStatus.PROCESSING,
     )
     thumb = models.TextField(null=True, blank=True)
+    deleted = models.BooleanField(default=False, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
 
