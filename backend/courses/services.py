@@ -20,17 +20,14 @@ class CourseService:
 
     def get_course(self, id: int) -> Course:
         try:
-            return (
-                Course.objects.prefetch_related(
-                    Prefetch(
-                        "modules",
-                        queryset=Module.objects.order_by("created_at").prefetch_related(
-                            Prefetch("lessons", queryset=Lesson.objects.order_by("id"))
-                        ),
-                    )
+            return Course.objects.prefetch_related(
+                Prefetch(
+                    "modules",
+                    queryset=Module.objects.order_by("created_at").prefetch_related(
+                        Prefetch("lessons", queryset=Lesson.objects.order_by("id"))
+                    ),
                 )
-                .get(pk=id)
-            )
+            ).get(pk=id)
         except Course.DoesNotExist:
             raise HttpError(404, "Curso não encontrado")
 
