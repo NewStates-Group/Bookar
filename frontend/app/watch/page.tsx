@@ -208,7 +208,9 @@ export default function LearnPage() {
         <div className="min-h-screen bg-black flex flex-col" key={`${l}-${course}`}>
             <div className="h-16 flex items-center justify-between px-4 border-b border-white/10 text-white">
                 <div className="flex gap-1 items-center">
-                    <Button variant="ghost" size="sm" className="text-white/70 hover:text-white hover:bg-transparent" onClick={() => { router.back() }}>
+                    <Button variant="ghost" size="sm"
+                        className="text-white/70 hover:text-white hover:bg-transparent"
+                        onClick={() => { router.push(`/courses/${course}`) }}>
                         <ArrowLeft className="w-4 h-4 mr-2" />
                         <span className="hidden md:block">
                             Voltar
