@@ -230,7 +230,7 @@ def _stitch_video(image_path, audio_path, output_path):
 
 @shared_task
 def generate_lesson(user_id, lesson_id: int):
-    if Lesson.objects.filter(module__course_user_id=user_id, status="PROCESSING"):
+    if Lesson.objects.filter(module__course__user_id=user_id, status="PROCESSING"):
         raise RuntimeError("Can only generator one lesson per time")
 
     try:
