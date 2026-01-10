@@ -85,7 +85,7 @@ def _generate_audio(client, text, output_path):
         if hasattr(response, "parts"):
             for part in response.parts:
                 if part.inline_data:
-                    return _save_pcm_as_wav(output_path, part.inline_data)
+                    return _save_pcm_as_wav(output_path, part.inline_data.data)
             raise ValueError("No audio data received from API")
     except Exception as e:
         logger.error(f"Audio generation failed: {e}")
