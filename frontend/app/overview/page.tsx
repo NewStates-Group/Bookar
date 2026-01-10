@@ -4,8 +4,7 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { BookOpen, Plus, Loader2, Trash, ArrowRight, ArrowLeft, ArrowUp, ImageOff } from "lucide-react";
-import Link from "next/link";
+import { BookOpen, Plus, Loader2, ArrowRight, ArrowLeft, ArrowUp, ImageOff, LogOut } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
   Dialog,
@@ -14,6 +13,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { signOut } from "next-auth/react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
@@ -230,126 +230,133 @@ export default function OverviewPage() {
                 </div>
               </div>
             </div>
+            <div className="flex gap-2 items-center justify-center">
+              <Dialog open={open} onOpenChange={handleOpenChange}>
+                <DialogTrigger asChild>
+                  <Button size="lg" className="gap-2 shadow-lg hover:shadow-xl transition-all">
+                    <Plus className="h-5 w-5" />
+                    Criar Curso
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-[650px] p-0 overflow-hidden border-0 shadow-2xl">
+                  <div className="relative overflow-hidden">
+                    <div className="p-8 pb-3">
+                      <DialogTitle className="text-center text-3xl font-bold">
+                        Criar Novo Curso
+                      </DialogTitle>
+                      <DialogDescription className="mt-2 text-center  text-base">
+                        {step === 1
+                          ? "Dê um nome ao seu curso"
+                          : "Descreva o que você quer aprender"}
+                      </DialogDescription>
+                    </div>
 
-            <Dialog open={open} onOpenChange={handleOpenChange}>
-              <DialogTrigger asChild>
-                <Button size="lg" className="gap-2 shadow-lg hover:shadow-xl transition-all">
-                  <Plus className="h-5 w-5" />
-                  Criar Curso
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-[650px] p-0 overflow-hidden border-0 shadow-2xl">
-                <div className="relative overflow-hidden">
-                  <div className="p-8 pb-3">
-                    <DialogTitle className="text-center text-3xl font-bold">
-                      Criar Novo Curso
-                    </DialogTitle>
-                    <DialogDescription className="mt-2 text-center  text-base">
-                      {step === 1
-                        ? "Dê um nome ao seu curso"
-                        : "Descreva o que você quer aprender"}
-                    </DialogDescription>
-                  </div>
-
-                  <div className="px-8 pb-8">
-                    {step === 1 && (
-                      <div className="space-y-4 animate-in fade-in slide-in-from-right-3 duration-300">
-                        <div className="space-y-2">
-                          <label className="text-sm font-medium text-muted-foreground">
-                            Título do curso
-                          </label>
-                          <div className="relative group">
-                            <Input
-                              value={title}
-                              onChange={(e) => setTitle(e.target.value)}
-                              onKeyPress={handleKeyPress}
-                              placeholder="Digite o título do seu curso"
-                              className="h-14 text-lg pr-14 border-2 focus:ring-0 transition-all"
-                              autoFocus
-                            />
-                            <Button
-                              type="button"
-                              onClick={handleNext}
-                              disabled={!title.trim()}
-                              size="icon"
-                              className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full shadow-md hover:shadow-lg transition-all disabled:opacity-50"
-                            >
-                              <ArrowRight className="h-5 w-5" />
-                            </Button>
+                    <div className="px-8 pb-8">
+                      {step === 1 && (
+                        <div className="space-y-4 animate-in fade-in slide-in-from-right-3 duration-300">
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium text-muted-foreground">
+                              Título do curso
+                            </label>
+                            <div className="relative group">
+                              <Input
+                                value={title}
+                                onChange={(e) => setTitle(e.target.value)}
+                                onKeyPress={handleKeyPress}
+                                placeholder="Digite o título do seu curso"
+                                className="h-14 text-lg pr-14 border-2 focus:ring-0 transition-all"
+                                autoFocus
+                              />
+                              <Button
+                                type="button"
+                                onClick={handleNext}
+                                disabled={!title.trim()}
+                                size="icon"
+                                className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full shadow-md hover:shadow-lg transition-all disabled:opacity-50"
+                              >
+                                <ArrowRight className="h-5 w-5" />
+                              </Button>
+                            </div>
                           </div>
+                          <p className="text-xs text-muted-foreground flex items-center gap-2">
+                            <span className="w-1.5 h-1.5 rounded-full bg-primary" />
+                            Pressione Enter para continuar
+                          </p>
                         </div>
-                        <p className="text-xs text-muted-foreground flex items-center gap-2">
-                          <span className="w-1.5 h-1.5 rounded-full bg-primary" />
-                          Pressione Enter para continuar
-                        </p>
-                      </div>
-                    )}
+                      )}
 
-                    {step === 2 && (
-                      <div className="space-y-4 animate-in fade-in slide-in-from-right-3 duration-300">
-                        <div className="space-y-2">
-                          <div className="relative rounded-xl border-2 focus-within:border-gray-300 transition-all bg-white shadow-sm">
-                            <Textarea
-                              value={details}
-                              onChange={(e) => setDetails(e.target.value)}
-                              placeholder="Descreva os tópicos que você quer aprender..."
-                              className="min-h-[100px] resize-none border-0 text-base p-4"
-                            />
-                            <div className="border-t px-4 py-3 bg-slate-50/50 flex items-center justify-between gap-4">
-                              <div className="flex items-center gap-2">
-                                <Button
-                                  type="button"
-                                  onClick={handleBack}
-                                  variant="ghost"
-                                  size="sm"
-                                  className="gap-2 hover:bg-white"
-                                >
-                                  <ArrowLeft className="h-4 w-4" />
-                                  Voltar
-                                </Button>
-                                <div className="h-4 w-px bg-border" />
-                                <Select
-                                  value={level}
-                                  onValueChange={(v) => setLevel(v as any)}
-                                >
-                                  <SelectTrigger className="w-[160px] border-0 bg-transparent hover:bg-white transition-colors outline-none focus-visible:border-ring focus-visible:ring-[1px] focus-visible:ring-gray-300">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="B">Iniciante</SelectItem>
-                                    <SelectItem value="IT">Intermediário</SelectItem>
-                                    <SelectItem value="A">Avançado</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                              </div>
+                      {step === 2 && (
+                        <div className="space-y-4 animate-in fade-in slide-in-from-right-3 duration-300">
+                          <div className="space-y-2">
+                            <div className="relative rounded-xl border-2 focus-within:border-gray-300 transition-all bg-white shadow-sm">
+                              <Textarea
+                                value={details}
+                                onChange={(e) => setDetails(e.target.value)}
+                                placeholder="Descreva os tópicos que você quer aprender..."
+                                className="min-h-[100px] resize-none border-0 text-base p-4"
+                              />
+                              <div className="border-t px-4 py-3 bg-slate-50/50 flex items-center justify-between gap-4">
+                                <div className="flex items-center gap-2">
+                                  <Button
+                                    type="button"
+                                    onClick={handleBack}
+                                    variant="ghost"
+                                    size="sm"
+                                    className="gap-2 hover:bg-white"
+                                  >
+                                    <ArrowLeft className="h-4 w-4" />
+                                    Voltar
+                                  </Button>
+                                  <div className="h-4 w-px bg-border" />
+                                  <Select
+                                    value={level}
+                                    onValueChange={(v) => setLevel(v as any)}
+                                  >
+                                    <SelectTrigger className="w-[160px] border-0 bg-transparent hover:bg-white transition-colors outline-none focus-visible:border-ring focus-visible:ring-[1px] focus-visible:ring-gray-300">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="B">Iniciante</SelectItem>
+                                      <SelectItem value="IT">Intermediário</SelectItem>
+                                      <SelectItem value="A">Avançado</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
 
-                              <div className="flex items-center gap-3">
-                                <span className="text-xs text-muted-foreground">
-                                  {details.length}/150
-                                </span>
-                                <Button
-                                  type="button"
-                                  onClick={handleCreateCourse}
-                                  disabled={isCreating || !details.trim()}
-                                  size="icon"
-                                  className="h-9 w-9 rounded-full shadow-md hover:shadow-lg transition-all"
-                                >
-                                  {isCreating ? (
-                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                  ) : (
-                                    <ArrowUp className="h-4 w-4" />
-                                  )}
-                                </Button>
+                                <div className="flex items-center gap-3">
+                                  <span className="text-xs text-muted-foreground">
+                                    {details.length}/150
+                                  </span>
+                                  <Button
+                                    type="button"
+                                    onClick={handleCreateCourse}
+                                    disabled={isCreating || !details.trim()}
+                                    size="icon"
+                                    className="h-9 w-9 rounded-full shadow-md hover:shadow-lg transition-all"
+                                  >
+                                    {isCreating ? (
+                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                      <ArrowUp className="h-4 w-4" />
+                                    )}
+                                  </Button>
+                                </div>
                               </div>
                             </div>
                           </div>
                         </div>
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </div>
-                </div>
-              </DialogContent>
-            </Dialog>
+                </DialogContent>
+              </Dialog>
+              <Button onClick={() => {
+                signOut({ callbackUrl: '/login' })
+              }} size="lg" className="gap-2 shadow-lg hover:shadow-xl transition-all" variant={"outline"}>
+                <LogOut className="h-5 w-5 text-red-500" />
+                <span className="text-black">Sair</span>
+              </Button>
+            </div>
           </div>
         </div>
       </div>

@@ -27,7 +27,7 @@ export default function RootLayout({
           <AuthGuard>
             {children}
           </AuthGuard>
-          <Toaster position='bottom-right' />
+          <Toaster position='top-right' />
         </Providers>
       </body>
     </html>

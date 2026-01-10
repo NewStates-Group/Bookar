@@ -30,9 +30,8 @@ export default function LoginPage() {
 
       if (result?.error) {
         console.log(result)
-        toast.error("Login falhou. Verifique suas credenciais.");
+        toast.error("Username/Palavra-passe incorrectos");
       } else {
-        toast.success("Login realizado com sucesso!");
         router.push("/");
       }
     } catch (error) {

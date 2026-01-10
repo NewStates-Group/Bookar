@@ -2,6 +2,7 @@ import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 
 async function refreshAccessToken(token: any) {
+    console.log("refreshAccessToken")
     try {
         const res = await fetch(`${process.env.AUTH_URL}/auth/refresh`, {
             method: "POST",
@@ -20,7 +21,7 @@ async function refreshAccessToken(token: any) {
         return {
             ...token,
             accessToken: data.access,
-            accessTokenExpires: Date.now() + 30 * 60 * 1000,
+            accessTokenExpires: Date.now() + (1 * 60 * 1000),
         };
     } catch (error) {
         return {
@@ -54,10 +55,7 @@ export const authOptions: NextAuthOptions = {
                 });
 
                 const user = await res.json();
-                
-                if (!res.ok || !user.access) {
-                    return null;
-                }
+                if (!res.ok || !user.access) return null
 
                 return {
                     id: credentials.username,
@@ -74,25 +72,27 @@ export const authOptions: NextAuthOptions = {
             if (user) {
                 return {
                     name: user.name,
-                    accessToken: user.accessToken,
-                    refreshToken: user.refreshToken,
-                    accessTokenExpires: Date.now() + 30 * 60 * 1000,
+                    accessToken: user?.accessToken,
+                    refreshToken: user?.refreshToken,
+                    accessTokenExpires: Date.now() + (1 * 60 * 1000),
                 };
             }
 
-            if (Date.now() < (token.accessTokenExpires as number)) {
-                return token;
+            if ((token.accessTokenExpires as number) > Date.now()) {
+                return token
             }
 
             return refreshAccessToken(token);
         },
 
         async session({ session, token }) {
-            session.accessToken = token.accessToken as string;
-            session.error = token.error;
-            session.user = {
-                ...session.user,
-                name: token.name
+            if (token) {
+                session.accessToken = token.accessToken as string;
+                session.error = token.error;
+                session.user = {
+                    ...session.user,
+                    name: token.name
+                }
             }
             return session;
         },
