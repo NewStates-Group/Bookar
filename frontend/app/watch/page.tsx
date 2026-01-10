@@ -18,7 +18,6 @@ interface Lesson {
     watched: boolean;
     status: "PENDING" | "PROCESSING" | "READY" | "ERROR";
     narration: string;
-    courseFinished?: boolean;
 }
 
 export default function LearnPage() {
@@ -227,14 +226,12 @@ export default function LearnPage() {
                     {((ended && lesson.watched) || lesson.watched) && (
                         <div className="flex gap-4">
                             <Button
-                                variant="ghost"
+                                variant="outline"
                                 size="sm"
-                                className="p-0 text-white/70 hover:text-white hover:bg-transparent"
-                                onClick={watchCourse}
-                                hidden={lesson?.courseFinished}
-                            >
+                                className="p-0 text-black"
+                                onClick={watchCourse}>
                                 <span className="hidden md:block">
-                                    Próxima aula
+                                    Avançar
                                 </span>
                                 <ArrowRight className="w-5 h-5" />
                             </Button>
