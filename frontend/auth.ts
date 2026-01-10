@@ -23,7 +23,6 @@ async function refreshAccessToken(token: any) {
             accessTokenExpires: Date.now() + 30 * 60 * 1000,
         };
     } catch (error) {
-        console.error("Erro ao renovar access token:", error);
         return {
             ...token,
             error: "RefreshAccessTokenError",
