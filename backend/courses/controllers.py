@@ -43,8 +43,10 @@ class CourseController:
 
     @route.get("{course_id}/get-next-lesson", response=GetNextLessonSchema)
     def get_next_lesson(self, request, course_id: int):
-        return self.course_service.get_next_lesson(request.user, course_id)
-
+        lesson = self.course_service.get_next_lesson(request.user, course_id)
+        if not lesson:
+            return
+        return lesson
     @route.post("{course_id}/generate-module")
     def generate_module(self, course_id: int):
         return self.course_service.trigger_next_module(course_id)
