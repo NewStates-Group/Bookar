@@ -55,7 +55,7 @@ export const authOptions: NextAuthOptions = {
                 });
 
                 const user = await res.json();
-                console.log(user)
+                
                 if (!res.ok || !user.access) {
                     return null;
                 }
