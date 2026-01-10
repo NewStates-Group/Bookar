@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 class CourseService:
     def list_courses(self, user) -> QuerySet[Course]:
-        return Course.objects.filter(user=user).order_by("-created_at")
+        return Course.objects.filter(user=user, deleted=False).order_by("-created_at")
 
     def get_course(self, id: int) -> Course:
         try:
