@@ -27,6 +27,10 @@ logger = logging.getLogger(__name__)
 
 
 def _save_pcm_as_wav(filename, pcm_bytes, channels=1, rate=24000, sample_width=2):
+    if pcm_bytes is None:
+        logger.error("PCM bytes is None, skipping WAV save")
+        return False
+
     try:
         with wave.open(str(filename), "wb") as wf:
             wf.setnchannels(channels)
@@ -78,11 +82,10 @@ def _generate_audio(client, text, output_path):
             ),
         )
 
-        audio_bytes = None
         if hasattr(response, "parts"):
             for part in response.parts:
                 if part.inline_data:
-                    return _save_pcm_as_wav(output_path, audio_bytes)
+                    return _save_pcm_as_wav(output_path, part.inline_data)
             raise ValueError("No audio data received from API")
     except Exception as e:
         logger.error(f"Audio generation failed: {e}")

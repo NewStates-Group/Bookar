@@ -3,11 +3,9 @@ import logging
 from django.db.models.query import QuerySet
 from ninja.errors import HttpError
 
-from .utils import get_next_lesson as utils_get_next_lesson
 from .models import Course, Lesson, Quiz, Question, Choice, QuizAttempt
 from .tasks import (
     create_course_description,
-    create_course_thumb,
     generate_lesson,
     generate_next_module,
 )
@@ -123,7 +121,6 @@ class LessonService:
                 lesson.save(update_fields=["delivered"])
 
                 course_id = lesson.module.course_id
-                logger.critical(str(user))
                 next_undelivered_lesson = (
                     Lesson.objects.filter(
                         module__course__user=user,
