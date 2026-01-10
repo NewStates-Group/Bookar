@@ -209,14 +209,26 @@ export default function LearnPage() {
                             Voltar
                         </span>
                     </Button>
-                    <span className="ml-4 font-medium text-lg truncate">{lesson.title}</span>
+                    <span className="ml-4 font-medium text-lg truncate max-w-2xs sm:max-w-xl" title={lesson.title}>{lesson.title}</span>
                 </div>
-                <Button variant="ghost" size="sm" className="text-white/70 hover:text-white hover:bg-transparent" onClick={() => { toast.info("Em desenvolvimento...") }}>
-                    <Sparkles className="w-5 h-5" />
-                    <span className="hidden md:block">
-                        Dúvidas sobre a aula?
-                    </span>
-                </Button>
+                <div className="flex md:gap-2 items-center">
+                    <Button variant="ghost" size="sm" className="text-white/70 hover:text-white hover:bg-transparent" onClick={() => { toast.info("Em desenvolvimento...") }}>
+                        <Sparkles className="w-5 h-5" />
+                        <span className="hidden md:block">
+                            Dúvidas sobre a aula?
+                        </span>
+                    </Button>
+                    {(ended && lesson.watched) && (
+                        <div className="flex gap-4">
+                            <Button variant="ghost" size="sm" className="p-0 text-white/70 hover:text-white hover:bg-transparent" onClick={watchCourse}>
+                                <span className="hidden md:block">
+                                    Próxima aula
+                                </span>
+                                <ArrowRight className="w-5 h-5" />
+                            </Button>
+                        </div>
+                    )}
+                </div>
             </div>
 
             <div className="flex flex-col items-center justify-center p-4 relative">
@@ -254,17 +266,10 @@ export default function LearnPage() {
                 <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-blue-600/5 pointer-events-none"></div>
             </div>
 
-            <div className="h-24 bg-zinc-950 border-t border-white/10 flex items-center justify-between px-8">
-                <div className="text-white/50 text-sm hidden md:block">
+            <div className="bg-zinc-950 border-t border-white/10 flex items-start justify-between px-8 py-5 gap-2">
+                <div className="text-white/50 text-base block">
                     {lesson.desc}
                 </div>
-                {(ended && lesson.watched) && (
-                    <div className="flex gap-4">
-                        <Button variant="outline" onClick={watchCourse}>
-                            Próxima aula
-                        </Button>
-                    </div>
-                )}
             </div>
         </div>
     );

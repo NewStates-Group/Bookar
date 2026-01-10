@@ -158,7 +158,12 @@ export default function CoursePage() {
                 Novo Módulo
               </Button>
               <Button size="lg" className="rounded-full px-8" onClick={watchCourse}>
-                <Play className="w-4 h-4 mr-2" /> Assistir Curso
+                <Play className="w-4 h-4 mr-2" /> 
+                {
+                  course.modules.find((module) => {
+                    module.lessons.some((lesson) => lesson.watched)
+                  }) ? "Assistir Curso" : "Continuar Assistindo"
+                }
               </Button>
             </div>
           </div>
