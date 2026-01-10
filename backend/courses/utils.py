@@ -1,5 +1,4 @@
 import orjson
-import re
 from django.conf import settings
 from google import genai
 from ollama import Client as OllamaClient
@@ -7,20 +6,12 @@ from ollama import Client as OllamaClient
 from .models import Lesson
 
 
-def extract_json(response: str):
-    if not response:
-        return None
-
-    cleaned = re.sub(r"```(?:json)?", "", response).strip()
-    decoder = orjson.JSONDecoder()
-
-    for i in range(len(cleaned)):
-        try:
-            obj, _ = decoder.raw_decode(cleaned[i:])
-            return obj
-        except orjson.JSONDecodeError:
-            continue
-    raise orjson.JSONDecodeError("Falha ao decodificar")
+def extract_json(response: str, isList: bool = False):
+    cleaned = response.strip()
+    start_bracket = cleaned.index("{" if not isList else "[")
+    end_bracket = cleaned.rindex("}" if not isList else "]")
+    cleaned = cleaned[start_bracket : end_bracket + 1]
+    return orjson.loads(cleaned)
 
 
 def get_ollama_client():
@@ -39,7 +30,6 @@ def ollama_chat(*args, **kwargs):
 
 def get_genai_client():
     return genai.Client(api_key=settings.AI["GENAI_KEY"])
-
 
 
 def get_next_lesson(course_pk: int) -> Lesson | None:

@@ -123,24 +123,24 @@ class LessonService:
                 lesson.save(update_fields=["delivered"])
 
                 course_id = lesson.module.course_id
+                logger.critical(str(user))
                 next_undelivered_lesson = (
                     Lesson.objects.filter(
                         module__course__user=user,
-                        module__course_id=course_id,
+                        module__course_id=course_id,    
                         delivered=False,
                     )
                     .only("module", "id", "status", "delivered")
                     .order_by("module__created_at", "module__id", "id")
                     .first()
                 )
-
                 if (
                     next_undelivered_lesson
                     and next_undelivered_lesson.status == "PENDING"
                 ):
                     generate_lesson.delay(user.id, next_undelivered_lesson.id)
-
-                return {"success": True}
+                    return {"success": True}
+                return {"info": "Sem aulas restantes"}
             return {"error": "Já foi entregue"}
         except Lesson.DoesNotExist:
             raise HttpError(404, "Lição não encontrada")

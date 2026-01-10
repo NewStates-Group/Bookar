@@ -213,7 +213,7 @@ def generate_lesson(user_id, lesson_id: int):
             contents=plan_prompt,
             config={"response_mime_type": "application/json"},
         )
-        segments = extract_json(plan_response.text) or []
+        segments = extract_json(plan_response.text, isList=True) or []
         if not segments:
             raise ValueError("No segments generated")
 
