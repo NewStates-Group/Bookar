@@ -80,6 +80,7 @@ export default function CoursePage() {
         const data = await res.json();
         setCourse(data);
       } else {
+        setIsLoading(false);
         router.push("/overview");
       }
     } catch (error) {
@@ -98,7 +99,7 @@ export default function CoursePage() {
       });
       if (res.ok) {
         const data = await res.json();
-        router.push(`/watch?l=${data.id}`)
+        router.push(`/watch?l=${data.id}?c=${course?.id}`)
       }
     } catch (error) {
       toast.error('Erro desconhecido, aguarde')

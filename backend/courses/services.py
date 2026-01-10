@@ -41,19 +41,6 @@ class CourseService:
         except Course.DoesNotExist:
             raise HttpError(404, "Curso não encontrado ou sem permissão")
 
-    def get_lesson(self, course_id: int) -> Lesson:
-        lesson = utils_get_next_lesson(course_id)
-        if not lesson:
-            raise HttpError(404, "Não há mais lições no curso")
-
-        if lesson.status == "PENDING":
-            generate_lesson.delay(lesson.id)
-
-        return lesson
-
-    def get_lesson_data(self, user, lesson_id: int):
-        return Lesson.objects.filter(id=lesson_id, module__course__user=user).first()
-
     def get_next_lesson(self, user, course_id: int):
         return (
             Lesson.objects.filter(
@@ -63,21 +50,6 @@ class CourseService:
             .order_by("module__created_at", "module__id", "id")
             .first()
         )
-
-    def mark_watched(self, lesson_id: int):
-        try:
-            lesson = Lesson.objects.get(id=lesson_id)
-            lesson.watched = True
-            lesson.save()
-
-            course_id = lesson.module.course_id
-            next_lesson = utils_get_next_lesson(course_id)
-            if next_lesson and next_lesson.status == "PENDING":
-                generate_lesson.delay(next_lesson.id)
-
-            return {"success": True}
-        except Lesson.DoesNotExist:
-            raise HttpError(404, "Lição não encontrada")
 
     def get_quiz(self, lesson_id: int) -> Quiz:
         try:
@@ -128,4 +100,47 @@ class CourseService:
         return {"success": True, "message": "Gerando módulo..."}
 
 
-class LessonService: ...
+class LessonService:
+    def get_lesson(self, user, lesson_id: int):
+        return Lesson.objects.filter(id=lesson_id, module__course__user=user).first()
+
+    def mark_watched(self, user, lesson_id: int):
+        try:
+            lesson = Lesson.objects.get(id=lesson_id, module__course__user=user)
+            if not lesson.watched:
+                lesson.watched = True
+                lesson.save(update_fields=["watched"])
+                return {"success": True}
+            return {"error": "Já foi assistida"}
+        except Lesson.DoesNotExist:
+            raise HttpError(404, "Lição não encontrada")
+    
+    def mark_delivered(self, user, lesson_id: int):
+        try:
+            lesson = Lesson.objects.get(id=lesson_id)
+            if not lesson.delivered:
+                lesson.delivered = True
+                lesson.save(update_fields=["delivered"])
+
+                course_id = lesson.module.course_id
+                next_undelivered_lesson = (
+                    Lesson.objects.filter(
+                        module__course__user=user,
+                        module__course_id=course_id,
+                        delivered=False,
+                    )
+                    .only("module", "id", "status", "delivered", "watched")
+                    .order_by("module__created_at", "module__id", "id")
+                    .first()
+                )
+
+                if (
+                    next_undelivered_lesson
+                    and next_undelivered_lesson.status == "PENDING"
+                ):
+                    generate_lesson.delay(next_undelivered_lesson.id)
+
+                return {"success": True}
+            return {"error": "Já foi entregue"}
+        except Lesson.DoesNotExist:
+            raise HttpError(404, "Lição não encontrada")

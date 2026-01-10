@@ -33,40 +33,32 @@ class CourseController:
             user=request.user, details=data.details, level=data.level, title=data.title
         )
 
-    @route.get("/{id}", response=CourseDetailSchema)
-    def get_course(self, id: int):
-        return self.course_service.get_course(id)
+    @route.get("{course_id}", response=CourseDetailSchema)
+    def get_course(self, course_id: int):
+        return self.course_service.get_course(course_id)
 
-    @route.get("/{course_id}/get-next-lesson/", response=GetNextLessonSchema)
-    def get_next_lesson(self, request, course_id: int):
-        return self.course_service.get_next_lesson(request.user, course_id)
-
-    
-
-    @route.get("/get-lesson/{course_id}", response=LessonSchema)
-    def get_lesson(self, course_id: int):
-        return self.course_service.get_lesson(course_id)
-
-    
-
-    @route.get("/quiz/{lesson_id}", response=QuizSchema)
-    def get_quiz(self, lesson_id: int):
-        return self.course_service.get_quiz(lesson_id)
-
-    @route.post("/quiz/{quiz_id}/submit", response=QuizResult)
-    def submit_quiz(self, request, quiz_id: int, data: QuizSubmission):
-        return self.course_service.submit_quiz(request.user, quiz_id, data.answers)
-
-    @route.post("/{course_id}/generate-module")
-    def generate_module(self, course_id: int):
-        return self.course_service.trigger_next_module(course_id)
-
-    @route.delete("/{course_id}")
+    @route.delete("{course_id}")
     def delete_course(self, request, course_id: int):
         return self.course_service.delete_course(course_id, request.user)
 
+    @route.get("{course_id}/get-next-lesson", response=GetNextLessonSchema)
+    def get_next_lesson(self, request, course_id: int):
+        return self.course_service.get_next_lesson(request.user, course_id)
 
-@api_controller("lesson", tags=["Lesson"], auth=JWTAuth())
+    @route.post("{course_id}/generate-module")
+    def generate_module(self, course_id: int):
+        return self.course_service.trigger_next_module(course_id)
+
+    @route.get("quiz/{lesson_id}", response=QuizSchema)
+    def get_quiz(self, lesson_id: int):
+        return self.course_service.get_quiz(lesson_id)
+
+    @route.post("quiz/{quiz_id}/submit", response=QuizResult)
+    def submit_quiz(self, request, quiz_id: int, data: QuizSubmission):
+        return self.course_service.submit_quiz(request.user, quiz_id, data.answers)
+
+
+@api_controller("lessons", tags=["Lesson"], auth=JWTAuth())
 class LessonController:
     @inject
     def __init__(self, lesson_service: LessonService):
@@ -74,12 +66,15 @@ class LessonController:
 
     @route.get("{lesson_id}", response=LessonSchema)
     def get_lesson(self, request, lesson_id: int):
-        return self.course_service.get_lesson_data(request.user, lesson_id)
+        lesson = self.lesson_service.get_lesson(request.user, lesson_id)
+        if not lesson:
+            return {"error": "Você ainda não criou esta aula"}
+        return lesson
 
-    @route.post("{lesson_id}/mark-watched")
-    def mark_watched(self, lesson_id: int):
-        return self.course_service.mark_watched(lesson_id)
-    
-    @route.post("{lesson_id}/mark-delivered")
-    def mark_delivered(self, lesson_id: int):
-        return self.course_service.mark_delivered(lesson_id)
+    @route.put("{lesson_id}/mark-watched")
+    def mark_watched(self, request, lesson_id: int):
+        return self.lesson_service.mark_watched(request.user, lesson_id)
+
+    @route.put("{lesson_id}/mark-delivered")
+    def mark_delivered(self, request, lesson_id: int):
+        return self.lesson_service.mark_delivered(request.user, lesson_id)

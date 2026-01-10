@@ -14,6 +14,8 @@ interface Lesson {
     title: string;
     desc: string;
     lesson_file: string | null;
+    delivered: boolean;
+    watched: boolean;
     status: "PENDING" | "PROCESSING" | "READY" | "ERROR";
     narration: string;
 }
@@ -31,25 +33,31 @@ export default function LearnPage() {
     const pollingRef = useRef<NodeJS.Timeout | null>(null);
     const router = useRouter()
 
-    const generateNextLesson = async () => {
+    const markDelivered = async () => {
         if (!lesson) return;
-        setLoading(true);
-        try {
-            await fetch(`${process.env.NEXT_PUBLIC_API_URL}/courses/mark-watched/${lesson.id}`, {
-                method: "POST",
-                headers: {
-                    Authorization: `Bearer ${(session as any)?.accessToken}`,
-                },
-            });
-        } catch (e) {
-            toast.error("Erro ao avançar");
-            setLoading(false);
-        }
+        const resp = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/${lesson.id}/mark-delivered`, {
+            method: "PUT",
+            headers: {
+                Authorization: `Bearer ${(session as any)?.accessToken}`,
+            },
+        });
+        lesson.delivered = true
+    }
+
+    const markWatched = async () => {
+        if (!lesson) return;
+        await fetch(`${process.env.NEXT_PUBLIC_API_URL}/${lesson.id}/mark-watched`, {
+            method: "PUT",
+            headers: {
+                Authorization: `Bearer ${(session as any)?.accessToken}`,
+            },
+        });
+        lesson.watched = true
     }
 
     const getLesson = async () => {
         try {
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/courses/get-lesson-data/${searchParams.get('l')}`, {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/lessons/${searchParams.get('l')}`, {
                 headers: {
                     Authorization: `Bearer ${(session as any)?.accessToken}`,
                 },
@@ -81,7 +89,18 @@ export default function LearnPage() {
         if (session?.accessToken) {
             getLesson();
         }
+
     }, [session, params]);
+
+    useEffect(() => {
+        if (!lesson?.delivered && played) {
+            //markDelivered()
+        }
+
+        if (!lesson?.watched && ended) {
+            //markWatched()
+        }
+    }, [played, ended])
 
     // const stopPolling = () => {
     //     if (pollingRef.current) {
@@ -148,7 +167,14 @@ export default function LearnPage() {
         return (
             <div className="min-h-screen flex flex-col items-center justify-center">
                 <p className="text-destructive mb-4">{error || "Aula não encontrada"}</p>
-                <Button variant="outline" onClick={() => { router.back() }}>Voltar</Button>
+                <Button variant="outline" onClick={() => {
+                    let c = searchParams.get('c');
+                    if (c) {
+                        router.push(`/courses/${c}`)
+                    } else {
+                        router.push(`/overview`)
+                    }
+                }}>Voltar</Button>
             </div>
         )
     }
@@ -199,7 +225,7 @@ export default function LearnPage() {
                             src={`http://localhost:8000/media/${lesson.lesson_file}`}
                             controls
                             className="w-full h-full"
-                            onEnded={() => { setEnded(true)}}
+                            onEnded={() => { setEnded(true) }}
                             onPlay={() => { setPlayed(true) }}
                         />
                     </div>

@@ -229,12 +229,15 @@ def _stitch_video(image_path, audio_path, output_path):
 
 
 @shared_task
-def generate_lesson(lesson_id: int):
+def generate_lesson(user_id, lesson_id: int):
+    if Lesson.objects.filter(module__course_user_id=user_id, status="PROCESSING"):
+        raise RuntimeError("Can only generator one lesson per time")
+
     try:
         lesson = Lesson.objects.get(id=lesson_id)
 
         if lesson.status == "PROCESSING":
-            return
+            raise RuntimeError("It's already under generation")
     except Lesson.DoesNotExist:
         raise LessonDoesNotExist(f"Lesson {lesson_id} does not exist.")
     Lesson.objects.filter(pk=lesson_id).update(status="PROCESSING")
@@ -614,7 +617,6 @@ def create_course_description(course_pk: int, title: str, details: str, level: s
 
     Course.objects.filter(pk=course_pk).update(desc=course_desc, status="PROCESSING")
     create_course_thumb.delay(course_pk, title)
-    
 
 
 @shared_task
@@ -666,7 +668,7 @@ def create_course_thumb(course_pk: str, title: str):
 
         default_storage.save(filename, ContentFile(buffer.read()))
         Course.objects.filter(pk=course_pk).update(thumb=filename)
-        
+
         generate_next_module.delay(course_pk)
     except Exception as e:
         logger.error(f"Thumbnail creation failed: {e}")

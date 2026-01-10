@@ -30,6 +30,7 @@ LessonSchema = create_schema(
         "desc",
         "duration",
         "watched",
+        "delivered",
         "lesson_file",
         "narration",
         "key_points",
