@@ -71,9 +71,17 @@ export default function LearnPage() {
 
             if (res.ok) {
                 const data = await res.json();
-                setLesson(data);
-                setLoading(false);
-                setViewMode("video");
+                if (data.status === "READY") {
+                    setLesson(data);
+                    setLoading(false);
+                    setViewMode("video");
+                } else {
+                    toast.info(
+                        data.status === "PROCESSING" ? "Esta aula está a ser gerada" : "Esta aula ainda não foi gerada"
+                    )
+                    router.push('/courses/' + course)
+                    return
+                }
             } else {
                 const errorData = await res.json();
                 setError(errorData.message || "Erro ao carregar aula");
@@ -127,58 +135,6 @@ export default function LearnPage() {
             markWatched()
         }
     }, [played, ended])
-
-    // const stopPolling = () => {
-    //     if (pollingRef.current) {
-    //         clearInterval(pollingRef.current);
-    //         pollingRef.current = null;
-    //     }
-    // };
-
-    // const startPolling = () => {
-    //     stopPolling();
-    //     pollingRef.current = setInterval(fetchNextLesson, 5000); // Poll every 5s
-    // };
-
-    // const fetchNextLesson = async () => {
-    //     try {
-    //         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/courses/get-lesson/${params?.id}`, {
-    //             headers: {
-    //                 Authorization: `Bearer ${(session as any)?.accessToken}`,
-    //             },
-    //         });
-
-    //         if (res.ok) {
-    //             const data = await res.json();
-    //             setLesson(data);
-    //             setLoading(false);
-    //             setViewMode("video"); // Reset to video for new lesson
-
-    //             // If processing, polling!
-    //             if (data.status === "PROCESSING" || data.status === "PENDING") {
-    //                 if (!pollingRef.current) startPolling();
-    //             } else {
-    //                 stopPolling();
-    //             }
-    //         } else {
-    //             const errorData = await res.json();
-    //             // If 400 and message says "No more lessons", it's finished?
-    //             // backend says: "Não há mais lições no curso"
-    //             if (errorData.message?.includes("Não há mais")) {
-    //                 setError("FINISHED");
-    //                 setLoading(false);
-    //                 stopPolling();
-    //             } else {
-    //                 setError(errorData.message || "Erro ao carregar aula");
-    //                 setLoading(false);
-    //             }
-    //         }
-    //     } catch (e) {
-    //         console.error(e);
-    //         setError("Erro de conexão");
-    //         setLoading(false);
-    //     }
-    // };
 
     if (status === "loading" || loading) {
         return (
