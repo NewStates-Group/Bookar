@@ -174,27 +174,6 @@ export default function OverviewPage() {
     }
   };
 
-  const handleDeleteCourse = async (courseId: Number) => {
-    try {
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/courses/${courseId}`,
-        {
-          method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${session?.accessToken}`,
-          },
-        }
-      );
-      if (res.ok) {
-        fetchCourses();
-      } else {
-        toast.error("Erro ao excluir curso");
-      }
-    } catch (e) {
-      toast.error("Erro de conexão");
-    }
-  };
-
   if (status === "loading") {
     return null
   }

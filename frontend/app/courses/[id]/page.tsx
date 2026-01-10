@@ -4,7 +4,7 @@ import { useSession } from "next-auth/react";
 import { useRouter, useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Loader2, Play, ArrowLeft, Plus, ImageOff, PlayCircle } from "lucide-react";
+import { Loader2, Play, ArrowLeft, Plus, ImageOff, PlayCircle, Trash } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -120,6 +120,25 @@ export default function CoursePage() {
     }
   }
 
+  const handleDeleteCourse = async () => {
+    try {
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/courses/${course}`,
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${session?.accessToken}`,
+          },
+        }
+      );
+      if (res.ok) {
+        router.push('/overview')
+      }
+    } catch (e) {
+      toast.error("Erro de conexão");
+    }
+  };
+
   useEffect(() => {
     if ((session as any)?.accessToken && params?.id) {
       fetchCourse();
@@ -175,9 +194,17 @@ export default function CoursePage() {
           <div className="flex items-center justify-between">
             <h2 className="text-2xl font-bold">Conteúdo do Curso</h2>
             <div className="flex items-center gap-2">
+              <Button variant="outline" size="lg" className="rounded-full px-8" onClick={handleDeleteCourse}>
+                <Trash className="w-4 h-4 text-red-500" />
+                <span className="text-red-500 hidden md:block">
+                  Eliminar Curso
+                </span>
+              </Button>
               <Button variant="outline" size="lg" className="rounded-full px-8" onClick={handleGenerateModule} disabled={isGeneratingModule}>
-                {isGeneratingModule ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
-                Novo Módulo
+                {isGeneratingModule ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                <span className="hidden md:block">
+                  Novo Módulo
+                </span>
               </Button>
               <Button size="lg" className="rounded-full px-8" onClick={watchCourse} hidden={finished}>
                 <Play className="w-4 h-4 mr-2" />
