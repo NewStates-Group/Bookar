@@ -8,7 +8,6 @@ import wave
 from io import BytesIO
 from pathlib import Path
 
-import orjson
 from celery import shared_task
 from django.conf import settings
 from django.core.files.base import ContentFile

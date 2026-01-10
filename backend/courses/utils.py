@@ -1,4 +1,5 @@
 import orjson
+import re
 from django.conf import settings
 from google import genai
 from ollama import Client as OllamaClient
@@ -7,14 +8,19 @@ from .models import Lesson
 
 
 def extract_json(response: str):
-    """
-    Extracts JSON from a string, handling Markdown code blocks and common formatting issues.
-    """
-    cleaned = response.strip()
-    start_bracket = cleaned.index("{")
-    end_bracket = cleaned.rindex("}")
-    cleaned = cleaned[start_bracket : end_bracket + 1]
-    return orjson.loads(cleaned)
+    if not response:
+        return None
+
+    cleaned = re.sub(r"```(?:json)?", "", response).strip()
+    decoder = orjson.JSONDecoder()
+
+    for i in range(len(cleaned)):
+        try:
+            obj, _ = decoder.raw_decode(cleaned[i:])
+            return obj
+        except orjson.JSONDecodeError:
+            continue
+    raise orjson.JSONDecodeError("Falha ao decodificar")
 
 
 def get_ollama_client():
