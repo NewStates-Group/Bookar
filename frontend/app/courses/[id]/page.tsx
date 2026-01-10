@@ -103,7 +103,7 @@ export default function CoursePage() {
   return (
     <div className="min-h-screen bg-background p-4 md:p-8">
       <div className="max-w-4xl mx-auto space-y-8">
-        <Link href="/overview" className="fixed top-0 left-0 p-4 z-50">
+        <Link href="/overview" className="md:fixed top-0 left-0 p-4 z-50">
           <Button variant="ghost" className="mb-4 pl-0 hover:pl-2 transition-all">
             <ArrowLeft className="w-4 h-4 mr-2" /> Voltar para Overview
           </Button>
@@ -120,15 +120,25 @@ export default function CoursePage() {
               </span>
             </div>
           )}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex flex-col justify-end p-8 text-white">
+          <div className="md:absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex flex-col justify-end p-8 text-white ">
             <div className="flex items-center gap-2 mb-2">
+              <h1 className="text-4xl font-bold mb-2 capitalize">{course.title}</h1>
               <span className="bg-primary px-3 py-1 rounded-full text-xs font-bold text-primary-foreground">
                 {course.level === 'B' ? 'Iniciante' : course.level === 'IT' ? 'Intermediário' : 'Avançado'}
               </span>
             </div>
-            <h1 className="text-4xl font-bold mb-2">{course.title}</h1>
-            <p className="text-white/80 max-w-2xl">{course.desc}</p>
+            <p className="text-white/80 l">{course.desc}</p>
           </div>
+        </div>
+        <div className="md:hidden">
+          <div className="flex items-center gap-2 mb-2">
+            <h1 className="text-4xl font-bold mb-2 capitalize">{course.title}</h1>
+            <span className="bg-primary px-3 py-1 rounded-full text-xs font-bold text-primary-foreground">
+              {course.level === 'B' ? 'Iniciante' : course.level === 'IT' ? 'Intermediário' : 'Avançado'}
+            </span>
+          </div>
+          <p className="text-black/80 l">{course.desc}</p>
+          <div className="w-full border mt-2"></div>
         </div>
 
         <div className="space-y-6">
