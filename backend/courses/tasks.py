@@ -21,8 +21,6 @@ from .models import Choice, Course, Lesson, Module, Question, Quiz
 from .utils import (
     extract_json,
     get_genai_client,
-    get_next_lesson,
-    get_ollama_client,
     ollama_chat,
 )
 
@@ -30,10 +28,6 @@ logger = logging.getLogger(__name__)
 
 
 def _save_pcm_as_wav(filename, pcm_bytes, channels=1, rate=24000, sample_width=2):
-    """
-    Writes raw PCM bytes to a valid WAV file using python's wave module.
-    Default parameters match Gemini TTS output: 24kHz, 16-bit (width=2), Mono.
-    """
     try:
         with wave.open(str(filename), "wb") as wf:
             wf.setnchannels(channels)
@@ -47,10 +41,6 @@ def _save_pcm_as_wav(filename, pcm_bytes, channels=1, rate=24000, sample_width=2
 
 
 def _normalize_audio(input_path, output_path):
-    """
-    Resamples input audio to standardized 44.1kHz Stereo WAV.
-    Input is assumed to be a valid WAV file from _save_pcm_as_wav.
-    """
     cmd = [
         "ffmpeg",
         "-y",
@@ -73,9 +63,6 @@ def _normalize_audio(input_path, output_path):
 
 
 def _generate_audio(client, text, output_path):
-    """
-    Generates audio using Gemini TTS and saves it as a valid WAV file.
-    """
     try:
         response = client.models.generate_content(
             model=settings.AI.get("GENAI_MODEL_AUDIO", "gemini-2.5-flash-preview-tts"),
@@ -96,36 +83,19 @@ def _generate_audio(client, text, output_path):
         if hasattr(response, "parts"):
             for part in response.parts:
                 if part.inline_data:
-                    audio_bytes = part.inline_data.data
-                    break
-
-        if not audio_bytes and hasattr(response, "candidates") and response.candidates:
-            for part in response.candidates[0].content.parts:
-                if part.inline_data:
-                    audio_bytes = part.inline_data.data
-                    break
-
-        if not audio_bytes:
+                    return _save_pcm_as_wav(output_path, audio_bytes)
             raise ValueError("No audio data received from API")
-
-        return _save_pcm_as_wav(output_path, audio_bytes)
-
     except Exception as e:
         logger.error(f"Audio generation failed: {e}")
         return False
 
 
 def _create_fallback_image(prompt, output_path):
-    """
-    Creates a simple text-based fallback image.
-    """
     try:
-        img = Image.new("RGB", (1920, 1080), color="white")
+        img = Image.new("RGB", (1920, 1080), "white")
         draw = ImageDraw.Draw(img)
-        text_preview = prompt[:200] + "..." if len(prompt) > 200 else prompt
-        draw.text((100, 500), f"Visual Concept:\n{text_preview}", fill="black")
+        draw.text((100, 500), prompt[:200], fill="black")
         img.save(output_path)
-        logger.warning(f"Generated fallback image for: {output_path}")
         return True
     except Exception as e:
         logger.error(f"Fallback image generation failed: {e}")
@@ -133,308 +103,185 @@ def _create_fallback_image(prompt, output_path):
 
 
 def _generate_image(client, prompt, output_path, timeout=30):
-    """
-    Generates an image with a strict timeout using ThreadPoolExecutor.
-    """
-
-    def _call_api():
+    try:
         img_prompt = f"Hand-drawn whiteboard animation style, minimalist black marker on white board: {prompt}. Any visible text MUST be in Portuguese."
-        return client.models.generate_content(
+        response = client.models.generate_content(
             model=settings.AI.get("GENAI_MODEL_IMAGE", "gemini-2.5-flash-image"),
             contents=img_prompt,
             config=types.GenerateContentConfig(
                 image_config=types.ImageConfig(aspect_ratio="16:9")
             ),
         )
-
-    try:
-        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-            future = executor.submit(_call_api)
-            try:
-                response = future.result(timeout=timeout)
-            except concurrent.futures.TimeoutError:
-                logger.error("Image generation timed out.")
-                raise TimeoutError("Image generation timed out")
-
-        img_data = None
-        if hasattr(response, "parts"):
-            for part in response.parts:
-                if part.inline_data:
-                    img_data = part.inline_data.data
-                    break
-        elif hasattr(response, "generated_images"):
-            img_data = response.generated_images[0].image.image_bytes
-
-        if not img_data:
-            raise ValueError("No image data received from API")
-
-        with open(output_path, "wb") as f:
-            f.write(img_data)
-
-        try:
-            with Image.open(output_path) as img:
-                img.verify()
-        except Exception as e:
-            logger.error(f"Generated image is invalid/corrupt: {e}")
-            if output_path.exists():
-                output_path.unlink()
-            raise ValueError("Invalid image generated")
-
-        return True
-
+        for part in response.parts:
+            if part.inline_data:
+                output_path.write_bytes(part.inline_data.data)
+                return True
+        raise ValueError("No image data")
     except Exception as e:
-        logger.error(f"Image generation failed: {e}")
-        return False
+        logger.warning(f"Image failed, using fallback: {e}")
+        return _create_fallback_image(prompt, output_path)
 
 
-def _stitch_video(image_path, audio_path, output_path):
-    """
-    Combines image and audio into a video segment using ffmpeg.
-    """
+def _stitch_video(image, audio, output):
     cmd = [
         "ffmpeg",
         "-y",
         "-loop",
         "1",
         "-i",
-        str(image_path),
+        str(image),
         "-i",
-        str(audio_path),
+        str(audio),
         "-c:v",
         "libx264",
         "-tune",
         "stillimage",
-        "-c:a",
-        "aac",
-        "-b:a",
-        "192k",
+        "-preset",
+        "ultrafast",
         "-pix_fmt",
         "yuv420p",
         "-shortest",
-        "-vf",
-        "scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:-1:-1:color=white",
-        str(output_path),
+        "-c:a",
+        "aac",
+        str(output),
     ]
-
     try:
-        subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=60)
+        subprocess.run(cmd, check=True, capture_output=True, timeout=60)
         return True
-    except subprocess.TimeoutExpired:
-        logger.error("FFmpeg stitch timed out after 60s")
+    except Exception as e:
+        logger.error(f"FFmpeg failed: {e}")
         return False
-    except subprocess.CalledProcessError as e:
-        logger.error(f"FFmpeg failed for segment {output_path.name}")
-        logger.error(f"Stderr: {e.stderr}")
-        return False
+
+
+def _process_segment(i, segment, client, temp_dir):
+    narration = segment.get("narration")
+    visual = segment.get("visual_prompt")
+
+    if not narration:
+        return None
+
+    audio = temp_dir / f"s{i}.wav"
+    image = temp_dir / f"s{i}.png"
+    video = temp_dir / f"s{i}.mp4"
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+        audio_future = pool.submit(_generate_audio, client, narration, audio)
+        image_future = pool.submit(_generate_image, client, visual, image)
+
+        if not audio_future.result():
+            return None
+        image_future.result()
+
+    if not _stitch_video(image, audio, video):
+        return None
+    return video
 
 
 @shared_task
 def generate_lesson(user_id, lesson_id: int):
-    if Lesson.objects.filter(module__course__user_id=user_id, status="PROCESSING"):
-        raise RuntimeError("Can only generator one lesson per time")
+    lesson = Lesson.objects.filter(id=lesson_id).first()
+    if not lesson:
+        raise LessonDoesNotExist()
 
-    try:
-        lesson = Lesson.objects.get(id=lesson_id)
+    if Lesson.objects.filter(
+        module__course__user_id=user_id, status="PROCESSING"
+    ).exists():
+        raise RuntimeError("Only one lesson at a time")
 
-        if lesson.status == "PROCESSING":
-            raise RuntimeError("It's already under generation")
-    except Lesson.DoesNotExist:
-        raise LessonDoesNotExist(f"Lesson {lesson_id} does not exist.")
-    Lesson.objects.filter(pk=lesson_id).update(status="PROCESSING")
+    lesson.status = "PROCESSING"
+    lesson.save(update_fields=["status"])
 
     temp_dir = Path(tempfile.mkdtemp())
+    client = get_genai_client()
     try:
-        client = get_genai_client()
+        plan_prompt = f"""
+        Title: {lesson.title}
+        Description: {lesson.desc}
+        Context: {lesson.narration}
+        **USE PORTUGUESE ON THE JSON VALUES**
+        **KEYS MUST KEEP THE ORIGINAL ENGLISH NAMES**
+        Generate a JSON list of segments:
+        [
+        {{
+            "narration": "...",
+            "visual_prompt": "..."
+        }}
+        ]
+        """
 
-        base_context = f"Title: {lesson.title}\nDescription: {lesson.desc}"
-        if lesson.narration:
-            base_context += f"\nBase Context/Narration: {lesson.narration}"
+        plan_response = client.models.generate_content(
+            model="gemini-2.0-flash-exp",
+            contents=plan_prompt,
+            config={"response_mime_type": "application/json"},
+        )
+        segments = extract_json(plan_response.text) or []
+        if not segments:
+            raise ValueError("No segments generated")
 
-        plan_prompt = (
-            f"{base_context}\n\n"
-            "Create a structured Video Lesson Plan as a JSON LIST of segments. "
-            "Target total duration: 2, 3 or 5 minute at the maximun. "
-            "Each segment represents 20-40 seconds of content. "
-            "LANGUAGE PROTOCOL:\n"
-            "1. Analyze the language of the Title and Description.\n"
-            "2. Generate the 'narration' in that SAME language.\n"
-            "3. If the language is unclear or not specified, STRICTLY USE PORTUGUESE (pt-PT).\n\n"
-            "Format: \n"
-            "[\n"
-            "  {\n"
-            '    "narration": "Text for the narrator to speak (approx 3-5 sentences)...",\n'
-            '    "visual_prompt": "Detailed description for a Hand-drawn Whiteboard Style image..."\n'
-            "  }\n"
-            "]\n"
-            "Ensure the visual prompts result in simple, clear, educational sketches on a white background."
+        videos = []
+        with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+            futures = [
+                executor.submit(_process_segment, i, s, client, temp_dir)
+                for i, s in enumerate(segments)
+            ]
+            for f in concurrent.futures.as_completed(futures):
+                result = f.result()
+                if result:
+                    videos.append(result)
+
+        if not videos:
+            raise RuntimeError("No video segments created")
+
+        list_file = temp_dir / "list.txt"
+        list_file.write_text("\n".join(f"file '{v}'" for v in videos))
+        output_dir = Path(settings.MEDIA_ROOT) / "courses/lessons"
+        output_dir.mkdir(parents=True, exist_ok=True)
+        output = output_dir / f"{uuid.uuid4()}.mp4"
+
+        subprocess.run(
+            [
+                "ffmpeg",
+                "-y",
+                "-f",
+                "concat",
+                "-safe",
+                "0",
+                "-i",
+                str(list_file),
+                "-c:v",
+                "libx264",
+                "-preset",
+                "veryfast",
+                "-pix_fmt",
+                "yuv420p",
+                "-c:a",
+                "aac",
+                str(output),
+            ],
+            check=True,
+            timeout=300,
         )
 
-        segments = []
-        try:
-            plan_response = client.models.generate_content(
-                model="gemini-2.0-flash-exp",
-                contents=plan_prompt,
-                config={"response_mime_type": "application/json"},
-            )
+        lesson.lesson_file = f"courses/lessons/{output.name}"
+        lesson.status = "READY"
+        lesson.save()
 
-            try:
-                segments_json = orjson.loads(plan_response.text)
-            except orjson.JSONDecodeError:
-                # Tentar extrair JSON da resposta textual
-                segments_json = extract_json(plan_response.text)
+        Course.objects.filter(id=lesson.module.course_id, status="PROCESSING").update(
+            status="READY"
+        )
 
-            if segments_json is None:
-                raise ValueError("Não foi possível extrair JSON da resposta")
-
-            if isinstance(segments_json, dict):
-                segments = segments_json.get("segments", [])
-                if not segments:
-                    # Tentar encontrar qualquer lista no dicionário
-                    for value in segments_json.values():
-                        if isinstance(value, list):
-                            segments = value
-                            break
-            elif isinstance(segments_json, list):
-                segments = segments_json
-            else:
-                raise ValueError("Formato JSON inválido: não é lista nem dicionário")
-
-            if not isinstance(segments, list) or len(segments) == 0:
-                raise ValueError("JSON válido não contém lista de segmentos")
-
-        except Exception as e:
-            logger.error(f"Failed to plan segments: {e}. Using fallback.")
-            segments = [
-                {
-                    "narration": lesson.narration
-                    if lesson.narration
-                    else f"Welcome to {lesson.title}.",
-                    "visual_prompt": f"Title card for {lesson.title}",
-                }
-            ]
-
-        logger.info(f"Generated {len(segments)} segments.")
-
-        segment_videos = []
-
-        for i, segment in enumerate(segments):
-            logger.info(f"Processing segment {i + 1}/{len(segments)}...")
-
-            narration_text = segment.get("narration", "")
-            visual_prompt = segment.get("visual_prompt", "")
-
-            if not narration_text:
-                continue
-
-            raw_audio_path = temp_dir / f"seg_{i}_raw_audio.wav"
-            if not _generate_audio(client, narration_text, raw_audio_path):
-                logger.warning(f"Skipping segment {i} due to audio failure")
-                continue
-
-            audio_path = temp_dir / f"seg_{i}_audio.wav"
-            if not _normalize_audio(raw_audio_path, audio_path):
-                logger.warning(
-                    f"Skipping segment {i} due to audio normalization failure"
-                )
-                continue
-
-            image_path = temp_dir / f"seg_{i}_img.png"
-            success = _generate_image(client, visual_prompt, image_path, timeout=40)
-
-            if not success:
-                logger.info(f"Using fallback image for segment {i}")
-                if not _create_fallback_image(visual_prompt, image_path):
-                    logger.warning(f"Skipping segment {i} due to total image failure")
-                    continue
-
-            video_path = temp_dir / f"seg_{i}_video.mp4"
-            if _stitch_video(image_path, audio_path, video_path):
-                segment_videos.append(video_path)
-            else:
-                logger.warning(f"Skipping segment {i} due to ffmpeg failure")
-
-        if not segment_videos:
-            raise Exception("No video segments were successfully generated.")
-
-        logger.info("Concatenating segments...")
-
-        list_file = temp_dir / "segments_list.txt"
-        with open(list_file, "w") as f:
-            for v_path in segment_videos:
-                f.write(f"file '{v_path.absolute()}'\n")
-
-        output_dir = Path(settings.MEDIA_ROOT) / "courses" / "lessons"
-        output_dir.mkdir(parents=True, exist_ok=True)
-        output_filename = f"{uuid.uuid4()}.mp4"
-        output_path = output_dir / output_filename
-
-        cmd_concat = [
-            "ffmpeg",
-            "-y",
-            "-f",
-            "concat",
-            "-safe",
-            "0",
-            "-i",
-            str(list_file),
-            "-c:v",
-            "libx264",
-            "-pix_fmt",
-            "yuv420p",
-            "-crf",
-            "23",
-            "-preset",
-            "veryfast",
-            "-c:a",
-            "aac",
-            "-b:a",
-            "192k",
-            str(output_path),
-        ]
-
-        try:
-            subprocess.run(cmd_concat, check=True, capture_output=True, timeout=300)
-            logger.info(f"Video generated at {output_path}")
-            lesson.lesson_file = f"courses/lessons/{output_filename}"
-            lesson.status = "READY"
-            lesson.save()
-
-            course = lesson.module.course
-            if course.status == "PROCESSING":
-                Course.objects.filter(pk=course.pk).update(status="READY")
-
-        except subprocess.TimeoutExpired:
-            logger.error("Final concatenation timed out")
-            raise
-        except subprocess.CalledProcessError as e:
-            logger.error(f"Final concat failed: {e.stderr}")
-            raise
-
-        # generate_quiz.delay(lesson.id)
-
+        return lesson.lesson_file
         return f"Video generated: {lesson.lesson_file}"
-
     except Exception as e:
-        logger.critical(f"Error during lesson generation task: {str(e)}")
-
-        try:
-            lesson_obj = Lesson.objects.get(id=lesson_id)
-            lesson_obj.status = "ERROR"
-            lesson_obj.save()
-        except Exception as save_error:
-            logger.error(f"Failed to update lesson status to ERROR: {save_error}")
-
-        # Re-raise para que o Celery saiba que falhou
-        raise Exception(f"Lesson generation failed: {str(e)}")
+        lesson.status = "ERROR"
+        lesson.save(update_fields=["status"])
+        raise e
     finally:
-        try:
-            shutil.rmtree(temp_dir)
-        except Exception as e:
-            logger.warning(f"Failed to cleanup temp dir: {e}")
+        shutil.rmtree(temp_dir, ignore_errors=True)
 
 
 @shared_task
-def generate_next_module(user_pk:int, course_pk: int):
+def generate_next_module(user_pk: int, course_pk: int):
     try:
         course = Course.objects.prefetch_related("modules").get(pk=course_pk)
     except Course.DoesNotExist:
