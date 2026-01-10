@@ -193,7 +193,7 @@ export default function CoursePage() {
                       </div>
                       <div className="text-xs">
                         {lesson.status === 'READY' ? (
-                          <Link href={`/watch?l=${lesson.id}`}>
+                          <Link href={`/watch?l=${lesson.id}&c=${course.id}`}>
                             <PlayCircle className="w-5 h-5 text-gray-600" />
                           </Link>
                         ) : lesson.status === 'PROCESSING' ? (

@@ -25,6 +25,7 @@ export default function LearnPage() {
     const params = useParams();
     const searchParams = useSearchParams();
     const course = searchParams.get('c');
+    const l = searchParams.get('l');
     const [lesson, setLesson] = useState<Lesson | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -94,7 +95,7 @@ export default function LearnPage() {
             });
             if (res.ok) {
                 const data = await res.json();
-                router.push(`/watch?l=${data.id}?c=${course}`)
+                router.push(`/watch?l=${data.id}&c=${course}`)
             }
         } catch (error) {
             toast.error('Erro desconhecido, aguarde')
@@ -200,7 +201,7 @@ export default function LearnPage() {
     }
 
     return (
-        <div className="min-h-screen bg-black flex flex-col">
+        <div className="min-h-screen bg-black flex flex-col" key={`${l}-${course}`}>
             <div className="h-16 flex items-center justify-between px-4 border-b border-white/10 text-white">
                 <div className="flex gap-1 items-center">
                     <Button variant="ghost" size="sm" className="text-white/70 hover:text-white hover:bg-transparent" onClick={() => { router.back() }}>
@@ -218,7 +219,7 @@ export default function LearnPage() {
                             Dúvidas sobre a aula?
                         </span>
                     </Button>
-                    {(ended && lesson.watched) && (
+                    {((ended && lesson.watched) ||lesson.watched) && (
                         <div className="flex gap-4">
                             <Button variant="ghost" size="sm" className="p-0 text-white/70 hover:text-white hover:bg-transparent" onClick={watchCourse}>
                                 <span className="hidden md:block">
