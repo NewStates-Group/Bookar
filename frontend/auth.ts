@@ -21,7 +21,7 @@ async function refreshAccessToken(token: any) {
         return {
             ...token,
             accessToken: data.access,
-            accessTokenExpires: Date.now() + (1 * 60 * 1000),
+            accessTokenExpires: Date.now() + (30 * 60 * 1000),
         };
     } catch (error) {
         return {
@@ -74,7 +74,7 @@ export const authOptions: NextAuthOptions = {
                     name: user.name,
                     accessToken: user?.accessToken,
                     refreshToken: user?.refreshToken,
-                    accessTokenExpires: Date.now() + (1 * 60 * 1000),
+                    accessTokenExpires: Date.now() + (30 * 60 * 1000),
                 };
             }
 
