@@ -99,7 +99,7 @@ export default function CoursePage() {
       });
       if (res.ok) {
         const data = await res.json();
-        router.push(`/watch?l=${data.id}?c=${course?.id}`)
+        router.push(`/watch?l=${data.id}&c=${course?.id}`)
       }
     } catch (error) {
       toast.error('Erro desconhecido, aguarde')
