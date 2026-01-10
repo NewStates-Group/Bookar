@@ -41,8 +41,9 @@ class CourseService:
     def delete_course(self, course_id: int, user):
         try:
             course = Course.objects.get(pk=course_id, user=user)
-            course.delete()  # Cascade will delete modules, lessons, quizzes
-            return {"success": True, "message": "Curso excluído com sucesso"}
+            course.deleted = True
+            course.save(update_fields=["deleted"])
+            return {"success": True}
         except Course.DoesNotExist:
             raise HttpError(404, "Curso não encontrado ou sem permissão")
 
