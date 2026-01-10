@@ -18,6 +18,7 @@ interface Lesson {
     watched: boolean;
     status: "PENDING" | "PROCESSING" | "READY" | "ERROR";
     narration: string;
+    courseFinished?: boolean;
 }
 
 export default function LearnPage() {
@@ -195,7 +196,7 @@ export default function LearnPage() {
                 <p className="text-destructive mb-4">{error || "Aula não encontrada"}</p>
                 <Button variant="outline" onClick={() => {
                     if (course) {
-                        router.push(`/courses/${c}`)
+                        router.push(`/courses/${course}`)
                     } else {
                         router.push(`/overview`)
                     }
@@ -229,7 +230,9 @@ export default function LearnPage() {
                                 variant="ghost"
                                 size="sm"
                                 className="p-0 text-white/70 hover:text-white hover:bg-transparent"
-                                onClick={watchCourse}>
+                                onClick={watchCourse}
+                                hidden={lesson?.courseFinished}
+                            >
                                 <span className="hidden md:block">
                                     Próxima aula
                                 </span>
