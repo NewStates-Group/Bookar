@@ -196,19 +196,7 @@ export default function OverviewPage() {
   };
 
   if (status === "loading") {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-white to-slate-50">
-        <div className="text-center space-y-4">
-          <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto" />
-          <p className="text-muted-foreground">Carregando...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!session) {
-    router.push("/login");
-    return null;
+    return null
   }
 
   return (
@@ -376,7 +364,7 @@ export default function OverviewPage() {
           <div className="flex items-center justify-center py-20">
             <div className="text-center space-y-4">
               <Loader2 className="w-10 h-10 animate-spin text-primary mx-auto" />
-              <p className="text-muted-foreground">Carregando seus cursos...</p>
+              <p className="text-muted-foreground">Carregando seus dados...</p>
             </div>
           </div>
         ) : courses.length === 0 ? (

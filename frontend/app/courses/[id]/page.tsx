@@ -103,16 +103,9 @@ export default function CoursePage() {
     if ((session as any)?.accessToken && params?.id) {
       fetchCourse();
     }
-  }, [session, params, fetchCourse]);
+  }, [session, params]);
 
-  if (status === "loading" || isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
+  if (status === "loading" || isLoading) return null
   if (!course) return null;
 
   return (

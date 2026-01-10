@@ -4,29 +4,33 @@ import { NextResponse } from "next/server";
 export default withAuth(
     function middleware(req) {
         const token = req.nextauth.token;
-        const isAuth = !!token;
-        const isAuthPage =
-            req.nextUrl.pathname.startsWith("/login") ||
-            req.nextUrl.pathname.startsWith("/signup") ||
-            req.nextUrl.pathname === "/";
+        const { pathname } = req.nextUrl;
 
-        if (isAuth && isAuthPage) {
+        const isPublic =
+            pathname === "/" ||
+            pathname.startsWith("/login") ||
+            pathname.startsWith("/signup");
+
+        if (token?.error === "RefreshAccessTokenError") {
+            if (!isPublic) {
+                return NextResponse.redirect(new URL("/login", req.url));
+            }
+            return NextResponse.next();
+        }
+
+        if (!token && !isPublic) {
+            return NextResponse.redirect(new URL("/login", req.url));
+        }
+
+        if (token && isPublic) {
             return NextResponse.redirect(new URL("/overview", req.url));
         }
+
         return NextResponse.next();
     },
     {
         callbacks: {
-            authorized: ({ token, req }) => {
-                if (
-                    req.nextUrl.pathname.startsWith("/login") ||
-                    req.nextUrl.pathname.startsWith("/signup") ||
-                    req.nextUrl.pathname === "/"
-                ) {
-                    return true;
-                }
-                return !!token;
-            },
+            authorized: () => true,
         },
     }
 );

@@ -2,7 +2,6 @@ import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 
 async function refreshAccessToken(token: any) {
-    console.log("refreshAccessToken")
     try {
         const res = await fetch(`${process.env.AUTH_URL}/auth/refresh`, {
             method: "POST",
@@ -82,7 +81,17 @@ export const authOptions: NextAuthOptions = {
                 return token
             }
 
-            return refreshAccessToken(token);
+            const refreshed = refreshAccessToken(token);
+
+            if (refreshed?.error) {
+                return {
+                    ...refreshed,
+                    accessToken: null,
+                    refreshToken: null,
+                };
+            }
+
+            return refreshed
         },
 
         async session({ session, token }) {
