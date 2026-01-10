@@ -37,7 +37,7 @@ export default function LearnPage() {
     const markDelivered = async () => {
         if (!lesson) return;
         if (!lesson.delivered) {
-            await fetch(`${process.env.NEXT_PUBLIC_API_URL}/${lesson.id}/mark-delivered`, {
+            await fetch(`${process.env.NEXT_PUBLIC_API_URL}/lessons/${lesson.id}/mark-delivered`, {
                 method: "PUT",
                 headers: {
                     Authorization: `Bearer ${(session as any)?.accessToken}`,
@@ -50,7 +50,7 @@ export default function LearnPage() {
     const markWatched = async () => {
         if (!lesson) return;
         if (!lesson.watched) {
-            await fetch(`${process.env.NEXT_PUBLIC_API_URL}/${lesson.id}/mark-watched`, {
+            await fetch(`${process.env.NEXT_PUBLIC_API_URL}/lessons/${lesson.id}/mark-watched`, {
                 method: "PUT",
                 headers: {
                     Authorization: `Bearer ${(session as any)?.accessToken}`,
@@ -115,11 +115,11 @@ export default function LearnPage() {
 
     useEffect(() => {
         if (!lesson?.delivered && played) {
-            //markDelivered()
+            markDelivered()
         }
 
         if (!lesson?.watched && ended) {
-            //markWatched()
+            markWatched()
         }
     }, [played, ended])
 
