@@ -42,16 +42,14 @@ class CourseController:
     def delete_course(self, request, course_id: int):
         return self.course_service.delete_course(course_id, request.user)
 
-    @route.get(
-        "{course_id}/get-next-lesson", response={200: GetNextLessonSchema, 404: MessageSchema}
-    )
+    @route.get("{course_id}/get-next-lesson")
     def get_next_lesson(self, request, course_id: int, current_lesson: int = 0):
         lesson = self.course_service.get_next_lesson(
             request.user, course_id, current_lesson
         )
         if not lesson:
-            return 404, {}
-        return lesson
+            return {"finished": True}
+        return GetNextLessonSchema.from_orm(lesson)
 
     @route.post("{course_id}/generate-module")
     def generate_module(self, course_id: int):
