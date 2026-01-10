@@ -9,11 +9,12 @@ from .schemas import (
     CourseIn,
     CourseOut,
     LessonSchema,
+    GetNextLessonSchema,
     QuizResult,
     QuizSchema,
     QuizSubmission,
 )
-from .services import CourseService
+from .services import CourseService, LessonService
 
 
 @api_controller("courses", tags=["Course"], auth=JWTAuth())
@@ -36,13 +37,17 @@ class CourseController:
     def get_course(self, id: int):
         return self.course_service.get_course(id)
 
-    @route.get("/get-lesson/{course_id}", response=LessonSchema)
-    def get_lesson(self, course_id: int):
-        return self.course_service.get_lesson(course_id)
+    @route.get("/{course_id}/get-next-lesson/", response=GetNextLessonSchema)
+    def get_next_lesson(self, request, course_id: int):
+        return self.course_service.get_next_lesson(request.user, course_id)
 
     @route.get("/get-lesson-data/{lesson_id}", response=LessonSchema)
     def get_lesson_data(self, request, lesson_id: int):
         return self.course_service.get_lesson_data(request.user, lesson_id)
+
+    @route.get("/get-lesson/{course_id}", response=LessonSchema)
+    def get_lesson(self, course_id: int):
+        return self.course_service.get_lesson(course_id)
 
     @route.post("/mark-watched/{lesson_id}")
     def mark_watched(self, lesson_id: int):
@@ -63,3 +68,10 @@ class CourseController:
     @route.delete("/{course_id}")
     def delete_course(self, request, course_id: int):
         return self.course_service.delete_course(course_id, request.user)
+
+
+@api_controller("lesson", tags=["Lesson"], auth=JWTAuth())
+class LessonController:
+    @inject
+    def __init__(self, lesson_service: LessonService):
+        self.lesson_service = lesson_service

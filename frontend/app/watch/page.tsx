@@ -3,7 +3,7 @@
 import { useSession } from "next-auth/react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Loader2, ArrowLeft, ArrowRight, MonitorPlay } from "lucide-react";
+import { Loader2, ArrowLeft, ArrowRight, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState, useRef } from "react";
 import { toast } from "sonner";
@@ -27,6 +27,7 @@ export default function LearnPage() {
     const [error, setError] = useState<string | null>(null);
     const [viewMode, setViewMode] = useState<"video" | "quiz">("video");
     const [played, setPlayed] = useState(false);
+    const [ended, setEnded] = useState(false);
     const pollingRef = useRef<NodeJS.Timeout | null>(null);
     const router = useRouter()
 
@@ -154,14 +155,25 @@ export default function LearnPage() {
 
     return (
         <div className="min-h-screen bg-black flex flex-col">
-            <div className="h-16 flex items-center px-4 border-b border-white/10 text-white">
-                <Button variant="ghost" size="sm" className="text-white/70 hover:text-white hover:bg-transparent" onClick={() => { router.back() }}>
-                    <ArrowLeft className="w-4 h-4 mr-2" /> Voltar
+            <div className="h-16 flex items-center justify-between px-4 border-b border-white/10 text-white">
+                <div className="flex gap-1 items-center">
+                    <Button variant="ghost" size="sm" className="text-white/70 hover:text-white hover:bg-transparent" onClick={() => { router.back() }}>
+                        <ArrowLeft className="w-4 h-4 mr-2" />
+                        <span className="hidden md:block">
+                            Voltar
+                        </span>
+                    </Button>
+                    <span className="ml-4 font-medium text-lg truncate">{lesson.title}</span>
+                </div>
+                <Button variant="ghost" size="sm" className="text-white/70 hover:text-white hover:bg-transparent" onClick={() => { toast.info("Em desenvolvimento...") }}>
+                    <Sparkles className="w-5 h-5" />
+                    <span className="hidden md:block">
+                        Dúvidas sobre a aula?
+                    </span>
                 </Button>
-                <span className="ml-4 font-medium text-lg truncate">{lesson.title}</span>
             </div>
 
-            <div className="flex-1 flex flex-col items-center justify-center p-4 relative">
+            <div className="flex flex-col items-center justify-center p-4 relative">
                 {(lesson.status === "PROCESSING" || lesson.status === "PENDING") && (
                     <div className="text-center space-y-6 max-w-lg z-10">
                         <div className="relative w-24 h-24 mx-auto">
@@ -187,7 +199,7 @@ export default function LearnPage() {
                             src={`http://localhost:8000/media/${lesson.lesson_file}`}
                             controls
                             className="w-full h-full"
-                            onEnded={() => { }}
+                            onEnded={() => { setEnded(true)}}
                             onPlay={() => { setPlayed(true) }}
                         />
                     </div>
@@ -200,7 +212,7 @@ export default function LearnPage() {
                 <div className="text-white/50 text-sm hidden md:block">
                     {lesson.desc}
                 </div>
-                {/* {nextLesson === true && (
+                {/* {lessonEnd === true && (
                     <div className="flex gap-4">
                         <Button variant="outline" onClick={() => setViewMode("video")}>
                             Voltar ao Vídeo

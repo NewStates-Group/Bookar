@@ -38,6 +38,16 @@ LessonSchema = create_schema(
         "status",
     ],
 )
+
+GetNextLessonSchema = create_schema(
+    Lesson,
+    fields=[
+        "id",
+        "module",
+        "watched",
+        "status",
+    ],
+)
 ModuleSchema = create_schema(Module, fields=["id", "name", "desc"])
 
 

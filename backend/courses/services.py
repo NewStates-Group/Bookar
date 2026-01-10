@@ -3,7 +3,7 @@ import logging
 from django.db.models.query import QuerySet
 from ninja.errors import HttpError
 
-from .utils import get_next_lesson
+from .utils import get_next_lesson as utils_get_next_lesson
 from .models import Course, Lesson, Quiz, Question, Choice, QuizAttempt
 from .tasks import (
     create_course_description,
@@ -42,7 +42,7 @@ class CourseService:
             raise HttpError(404, "Curso não encontrado ou sem permissão")
 
     def get_lesson(self, course_id: int) -> Lesson:
-        lesson = get_next_lesson(course_id)
+        lesson = utils_get_next_lesson(course_id)
         if not lesson:
             raise HttpError(404, "Não há mais lições no curso")
 
@@ -50,9 +50,19 @@ class CourseService:
             generate_lesson.delay(lesson.id)
 
         return lesson
-    
+
     def get_lesson_data(self, user, lesson_id: int):
         return Lesson.objects.filter(id=lesson_id, module__course__user=user).first()
+
+    def get_next_lesson(self, user, course_id: int):
+        return (
+            Lesson.objects.filter(
+                module__course__user=user, module__course_id=course_id, watched=False
+            )
+            .only("module", "id", "status")
+            .order_by("module__created_at", "module__id", "id")
+            .first()
+        )
 
     def mark_watched(self, lesson_id: int):
         try:
@@ -61,7 +71,7 @@ class CourseService:
             lesson.save()
 
             course_id = lesson.module.course_id
-            next_lesson = get_next_lesson(course_id)
+            next_lesson = utils_get_next_lesson(course_id)
             if next_lesson and next_lesson.status == "PENDING":
                 generate_lesson.delay(next_lesson.id)
 
@@ -102,8 +112,6 @@ class CourseService:
             except (Question.DoesNotExist, Choice.DoesNotExist):
                 continue
 
-        # Find correct choices for unanswered questions too? Or just return what was sent?
-        # Simpler: just return correct choice IDs for all questions in the quiz.
         all_correct = Choice.objects.filter(
             question__quiz=quiz, is_correct=True
         ).values_list("id", flat=True)
@@ -118,3 +126,6 @@ class CourseService:
     def trigger_next_module(self, course_id: int):
         generate_next_module.delay(course_id)
         return {"success": True, "message": "Gerando módulo..."}
+
+
+class LessonService: ...
