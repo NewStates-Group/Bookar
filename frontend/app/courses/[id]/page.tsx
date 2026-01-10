@@ -123,7 +123,7 @@ export default function CoursePage() {
   const handleDeleteCourse = async () => {
     try {
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/courses/${course}`,
+        `${process.env.NEXT_PUBLIC_API_URL}/courses/${course?.id}`,
         {
           method: "DELETE",
           headers: {
