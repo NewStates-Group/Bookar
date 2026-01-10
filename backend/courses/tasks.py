@@ -434,7 +434,7 @@ def generate_lesson(user_id, lesson_id: int):
 
 
 @shared_task
-def generate_next_module(course_pk: int):
+def generate_next_module(user_pk:int, course_pk: int):
     try:
         course = Course.objects.prefetch_related("modules").get(pk=course_pk)
     except Course.DoesNotExist:
@@ -504,7 +504,7 @@ def generate_next_module(course_pk: int):
             Lesson.objects.filter(module=module_object).order_by("id").first()
         )
         if first_lesson:
-            generate_lesson.delay(first_lesson.id)
+            generate_lesson.delay(user_pk, first_lesson.id)
 
     except Exception as e:
         module_object.delete()
@@ -668,8 +668,8 @@ def create_course_thumb(course_pk: str, title: str):
 
         default_storage.save(filename, ContentFile(buffer.read()))
         Course.objects.filter(pk=course_pk).update(thumb=filename)
-
-        generate_next_module.delay(course_pk)
+        course = Course.objects.get(pk=course_pk)
+        generate_next_module.delay(course.user.pk, course_pk)
     except Exception as e:
         logger.error(f"Thumbnail creation failed: {e}")
         Course.objects.filter(pk=course_pk).update(status="FAILED")

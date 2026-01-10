@@ -117,7 +117,7 @@ class LessonService:
     
     def mark_delivered(self, user, lesson_id: int):
         try:
-            lesson = Lesson.objects.get(id=lesson_id)
+            lesson = Lesson.objects.get(id=lesson_id, module__course__user=user)
             if not lesson.delivered:
                 lesson.delivered = True
                 lesson.save(update_fields=["delivered"])
@@ -129,7 +129,7 @@ class LessonService:
                         module__course_id=course_id,
                         delivered=False,
                     )
-                    .only("module", "id", "status", "delivered", "watched")
+                    .only("module", "id", "status", "delivered")
                     .order_by("module__created_at", "module__id", "id")
                     .first()
                 )
@@ -138,7 +138,7 @@ class LessonService:
                     next_undelivered_lesson
                     and next_undelivered_lesson.status == "PENDING"
                 ):
-                    generate_lesson.delay(next_undelivered_lesson.id)
+                    generate_lesson.delay(user.id, next_undelivered_lesson.id)
 
                 return {"success": True}
             return {"error": "Já foi entregue"}
