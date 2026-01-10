@@ -24,6 +24,7 @@ export default function LearnPage() {
     const { data: session, status } = useSession();
     const params = useParams();
     const searchParams = useSearchParams();
+    const course = searchParams.get('c');
     const [lesson, setLesson] = useState<Lesson | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -35,24 +36,28 @@ export default function LearnPage() {
 
     const markDelivered = async () => {
         if (!lesson) return;
-        const resp = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/${lesson.id}/mark-delivered`, {
-            method: "PUT",
-            headers: {
-                Authorization: `Bearer ${(session as any)?.accessToken}`,
-            },
-        });
-        lesson.delivered = true
+        if (!lesson.delivered) {
+            await fetch(`${process.env.NEXT_PUBLIC_API_URL}/${lesson.id}/mark-delivered`, {
+                method: "PUT",
+                headers: {
+                    Authorization: `Bearer ${(session as any)?.accessToken}`,
+                },
+            });
+            lesson.delivered = true
+        }
     }
 
     const markWatched = async () => {
         if (!lesson) return;
-        await fetch(`${process.env.NEXT_PUBLIC_API_URL}/${lesson.id}/mark-watched`, {
-            method: "PUT",
-            headers: {
-                Authorization: `Bearer ${(session as any)?.accessToken}`,
-            },
-        });
-        lesson.watched = true
+        if (!lesson.watched) {
+            await fetch(`${process.env.NEXT_PUBLIC_API_URL}/${lesson.id}/mark-watched`, {
+                method: "PUT",
+                headers: {
+                    Authorization: `Bearer ${(session as any)?.accessToken}`,
+                },
+            });
+            lesson.watched = true
+        }
     }
 
     const getLesson = async () => {
@@ -80,8 +85,24 @@ export default function LearnPage() {
         }
     };
 
+    const watchCourse = async () => {
+        try {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/courses/${course}/get-next-lesson`, {
+                headers: {
+                    Authorization: `Bearer ${(session as any)?.accessToken}`,
+                },
+            });
+            if (res.ok) {
+                const data = await res.json();
+                router.push(`/watch?l=${data.id}?c=${course}`)
+            }
+        } catch (error) {
+            toast.error('Erro desconhecido, aguarde')
+        }
+    }
+
     useEffect(() => {
-        if (!searchParams.get('l')) {
+        if (!searchParams.get('l') || !course) {
             router.back()
             return
         }
@@ -168,8 +189,7 @@ export default function LearnPage() {
             <div className="min-h-screen flex flex-col items-center justify-center">
                 <p className="text-destructive mb-4">{error || "Aula não encontrada"}</p>
                 <Button variant="outline" onClick={() => {
-                    let c = searchParams.get('c');
-                    if (c) {
+                    if (course) {
                         router.push(`/courses/${c}`)
                     } else {
                         router.push(`/overview`)
@@ -238,13 +258,13 @@ export default function LearnPage() {
                 <div className="text-white/50 text-sm hidden md:block">
                     {lesson.desc}
                 </div>
-                {/* {lessonEnd === true && (
+                {(ended && lesson.watched) && (
                     <div className="flex gap-4">
-                        <Button variant="outline" onClick={() => setViewMode("video")}>
-                            Voltar ao Vídeo
+                        <Button variant="outline" onClick={watchCourse}>
+                            Próxima aula
                         </Button>
                     </div>
-                )} */}
+                )}
             </div>
         </div>
     );
