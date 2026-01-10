@@ -39,7 +39,15 @@ class CourseService:
         except Course.DoesNotExist:
             raise HttpError(404, "Curso não encontrado ou sem permissão")
 
-    def get_next_lesson(self, user, course_id: int):
+    def get_next_lesson(self, user, course_id: int, current_lesson: int = 0):
+        if current_lesson:
+            return (
+                Lesson.objects.filter(module__course_id=course_id)
+                .only("module", "id", "status")
+                .order_by("module__created_at", "id")
+                .filter(id__gt=current_lesson)
+                .first()
+            )
         return (
             Lesson.objects.filter(
                 module__course__user=user, module__course_id=course_id, watched=False
@@ -112,7 +120,7 @@ class LessonService:
             return {"error": "Já foi assistida"}
         except Lesson.DoesNotExist:
             raise HttpError(404, "Lição não encontrada")
-    
+
     def mark_delivered(self, user, lesson_id: int):
         try:
             lesson = Lesson.objects.get(id=lesson_id, module__course__user=user)
@@ -124,7 +132,7 @@ class LessonService:
                 next_undelivered_lesson = (
                     Lesson.objects.filter(
                         module__course__user=user,
-                        module__course_id=course_id,    
+                        module__course_id=course_id,
                         delivered=False,
                     )
                     .only("module", "id", "status", "delivered")

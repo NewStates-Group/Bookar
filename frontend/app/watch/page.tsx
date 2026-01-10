@@ -88,14 +88,18 @@ export default function LearnPage() {
 
     const watchCourse = async () => {
         try {
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/courses/${course}/get-next-lesson`, {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/courses/${course}/get-next-lesson?current_lesson=${lesson?.watched ? lesson.id : 0}`, {
                 headers: {
                     Authorization: `Bearer ${(session as any)?.accessToken}`,
                 },
             });
             if (res.ok) {
                 const data = await res.json();
-                router.push(`/watch?l=${data.id}&c=${course}`)
+                if (data.id) {
+                    router.push(`/watch?l=${data.id}&c=${course}`)
+                } else {
+                    router.push(`/courses/${course}`)
+                }
             }
         } catch (error) {
             toast.error('Erro desconhecido, aguarde')
@@ -219,9 +223,13 @@ export default function LearnPage() {
                             Dúvidas sobre a aula?
                         </span>
                     </Button>
-                    {((ended && lesson.watched) ||lesson.watched) && (
+                    {((ended && lesson.watched) || lesson.watched) && (
                         <div className="flex gap-4">
-                            <Button variant="ghost" size="sm" className="p-0 text-white/70 hover:text-white hover:bg-transparent" onClick={watchCourse}>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                className="p-0 text-white/70 hover:text-white hover:bg-transparent"
+                                onClick={watchCourse}>
                                 <span className="hidden md:block">
                                     Próxima aula
                                 </span>

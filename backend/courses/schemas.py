@@ -101,3 +101,7 @@ class QuizResult(Schema):
     score: float
     passed: bool
     correct_answers: List[int]  # List of correct Choice IDs
+
+
+class MessageSchema(Schema):
+    msg: str = ""

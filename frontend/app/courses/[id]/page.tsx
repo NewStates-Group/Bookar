@@ -44,6 +44,7 @@ export default function CoursePage() {
   const params = useParams();
   const [course, setCourse] = useState<CourseDetail | null>(null);
   const [isGeneratingModule, setIsGeneratingModule] = useState(false);
+  const [finished, setFinished] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   const handleGenerateModule = async () => {
@@ -59,6 +60,26 @@ export default function CoursePage() {
       toast.error("Erro ao solicitar módulo");
     } finally {
       setIsGeneratingModule(false);
+    }
+  }
+
+  const checkFinishment = async () => {
+    try {
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/courses/${course?.id}/get-next-lesson`,
+        {
+          headers: {
+            Authorization: `Bearer ${(session as any)?.accessToken}`,
+          },
+        });
+      const data = await res.json();
+      if (res.ok) {
+        if (!data.id) {
+          setFinished(true)
+        }
+      }
+    } catch (error) {
+      toast.error('Erro desconhecido, aguarde.')
     }
   }
 
@@ -95,13 +116,14 @@ export default function CoursePage() {
         router.push(`/watch?l=${data.id}&c=${course?.id}`)
       }
     } catch (error) {
-      toast.error('Erro desconhecido, aguarde')
+      toast.error('Erro desconhecido, aguarde ' + error)
     }
   }
 
   useEffect(() => {
     if ((session as any)?.accessToken && params?.id) {
       fetchCourse();
+      //checkFinishment()
     }
   }, [session, params]);
 
@@ -157,8 +179,8 @@ export default function CoursePage() {
                 {isGeneratingModule ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
                 Novo Módulo
               </Button>
-              <Button size="lg" className="rounded-full px-8" onClick={watchCourse}>
-                <Play className="w-4 h-4 mr-2" /> 
+              <Button size="lg" className="rounded-full px-8" onClick={watchCourse} hidden={finished}>
+                <Play className="w-4 h-4 mr-2" />
                 {
                   course.modules.find((module) => {
                     module.lessons.some((lesson) => lesson.watched)
