@@ -1,7 +1,7 @@
 from ninja_extra import NinjaExtraAPI
 
 from accounts.controllers import AuthController
-from courses.controllers import CourseController
+from courses.controllers import CourseController, LessonController
 
 api = NinjaExtraAPI(
     title="Bookar API",
@@ -10,4 +10,4 @@ api = NinjaExtraAPI(
     version="0.0.1",
 )
 
-api.register_controllers(AuthController, CourseController)
+api.register_controllers(AuthController, CourseController, LessonController)

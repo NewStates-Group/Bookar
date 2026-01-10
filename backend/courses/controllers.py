@@ -41,17 +41,13 @@ class CourseController:
     def get_next_lesson(self, request, course_id: int):
         return self.course_service.get_next_lesson(request.user, course_id)
 
-    @route.get("/get-lesson-data/{lesson_id}", response=LessonSchema)
-    def get_lesson_data(self, request, lesson_id: int):
-        return self.course_service.get_lesson_data(request.user, lesson_id)
+    
 
     @route.get("/get-lesson/{course_id}", response=LessonSchema)
     def get_lesson(self, course_id: int):
         return self.course_service.get_lesson(course_id)
 
-    @route.post("/mark-watched/{lesson_id}")
-    def mark_watched(self, lesson_id: int):
-        return self.course_service.mark_watched(lesson_id)
+    
 
     @route.get("/quiz/{lesson_id}", response=QuizSchema)
     def get_quiz(self, lesson_id: int):
@@ -75,3 +71,15 @@ class LessonController:
     @inject
     def __init__(self, lesson_service: LessonService):
         self.lesson_service = lesson_service
+
+    @route.get("{lesson_id}", response=LessonSchema)
+    def get_lesson(self, request, lesson_id: int):
+        return self.course_service.get_lesson_data(request.user, lesson_id)
+
+    @route.post("{lesson_id}/mark-watched")
+    def mark_watched(self, lesson_id: int):
+        return self.course_service.mark_watched(lesson_id)
+    
+    @route.post("{lesson_id}/mark-delivered")
+    def mark_delivered(self, lesson_id: int):
+        return self.course_service.mark_delivered(lesson_id)
