@@ -66,7 +66,7 @@ export default function CoursePage() {
   const checkFinishment = async () => {
     try {
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/courses/${course?.id}/get-next-lesson`,
+        `${process.env.NEXT_PUBLIC_API_URL}/courses/${params?.id}/get-next-lesson`,
         {
           headers: {
             Authorization: `Bearer ${(session as any)?.accessToken}`,
@@ -74,7 +74,7 @@ export default function CoursePage() {
         });
       const data = await res.json();
       if (res.ok) {
-        if (!data.id) {
+        if (data.finished) {
           setFinished(true)
         }
       }
@@ -123,7 +123,7 @@ export default function CoursePage() {
   useEffect(() => {
     if ((session as any)?.accessToken && params?.id) {
       fetchCourse();
-      //checkFinishment()
+      checkFinishment()
     }
   }, [session, params]);
 
