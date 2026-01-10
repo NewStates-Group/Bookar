@@ -43,15 +43,8 @@ export default function CoursePage() {
   const router = useRouter();
   const params = useParams();
   const [course, setCourse] = useState<CourseDetail | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    if ((session as any)?.accessToken && params?.id) {
-      fetchCourse();
-    }
-  }, [session, params]);
-
   const [isGeneratingModule, setIsGeneratingModule] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   const handleGenerateModule = async () => {
     setIsGeneratingModule(true);
@@ -105,6 +98,12 @@ export default function CoursePage() {
       toast.error('Erro desconhecido, aguarde')
     }
   }
+
+  useEffect(() => {
+    if ((session as any)?.accessToken && params?.id) {
+      fetchCourse();
+    }
+  }, [session, params, fetchCourse]);
 
   if (status === "loading" || isLoading) {
     return (
