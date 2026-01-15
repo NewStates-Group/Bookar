@@ -13,7 +13,7 @@ from django.conf import settings
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from google.genai import types
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, UnidentifiedImageError
 
 from .exceptions import CourseCreationError, LessonDoesNotExist, ThumbnailCreationError
 from .models import Choice, Course, Lesson, Module, Question, Quiz
@@ -423,7 +423,7 @@ def generate_quiz(lesson_id: int):
 
 
 @shared_task
-def create_course_description(course_pk: int, title: str, details: str, level: str):
+def create_course_details(course_pk: int, prompt: str, level: str):
     prompt = f"""
     You are an AI that outputs STRICT JSON.
 
@@ -435,19 +435,20 @@ def create_course_description(course_pk: int, title: str, details: str, level: s
     - Follow the schema exactly
     - Do not add or remove fields
     - Use double quotes only
+    - **GENERATE ALL THE VALUES IN PORTUGUESE;THE KEYS REMAIN IN ENGLISH**
 
     Schema:
     {{
-        "desc": string -> create the course description
+        "title": string, 
+        "desc": string
     }}
 
     Context:
-    Course title: {title}
+    Course prompt: {prompt}
     Course level: {level}
-    User Details: {details}
 
     Task:
-    Generate ONLY the next module.
+    Generate a title and description for the course prompt
     """
 
     course_outline = None
@@ -459,21 +460,21 @@ def create_course_description(course_pk: int, title: str, details: str, level: s
         Course.objects.filter(pk=course_pk).update(status="FAILED")
         raise CourseCreationError(f"Erro ao criar estrutura do curso: {str(e)}")
 
-    if isinstance(course_outline, dict):
-        course_desc = course_outline.get("desc", f"Curso sobre {title}")
-    else:  # fallback
-        course_desc = f"Curso sobre {title}"
+    course_title = course_outline.get("title", "Sem título")
+    course_desc = course_outline.get("desc", course_title)
 
-    Course.objects.filter(pk=course_pk).update(desc=course_desc, status="PROCESSING")
-    create_course_thumb.delay(course_pk, title)
+    Course.objects.filter(pk=course_pk).update(
+        desc=course_desc, title=course_title, status="PROCESSING"
+    )
+    create_course_thumb.delay(course_pk, prompt)
 
 
 @shared_task
-def create_course_thumb(course_pk: str, title: str):
+def create_course_thumb(course_pk: str, prompt: str):
     client = get_genai_client()
-    prompt = f"""
+    ai_prompt = f"""
     Capa profissional de curso educacional.
-    Título do curso (em português, bem legível): "{title}"
+    Tema do curso (em português, bem legível): "{prompt}"
 
     Estilo visual:
     - Design moderno, limpo e acadêmico
@@ -481,34 +482,39 @@ def create_course_thumb(course_pk: str, title: str):
     - Gradientes suaves
     - Ilustração ou composição vetorial (não realista)
 
-    Elementos obrigatórios:
-    - O título do curso em português, centralizado ou em destaque
-    - Ícones, símbolos ou logos que REPRESENTEM o tema do curso
-    - Layout equilibrado, sem poluição visual
-
     Regras:
     - Todo o texto deve estar em português
-    - Não adicionar textos extras além do título
+    - Não adicionar textos desnecessários
     - Não usar marcas d\'água
-    - Fundo claro ou gradiente moderno
     """
 
     try:
         response = client.models.generate_content(
             model=settings.AI.get("GENAI_MODEL_IMAGE", "gemini-2.5-flash-image"),
-            contents=[prompt],
+            contents=[ai_prompt],
             config=types.GenerateContentConfig(
                 image_config=types.ImageConfig(aspect_ratio="16:9")
             ),
         )
 
-        image_bytes = None
-        for part in response.parts:
-            if part.inline_data:
-                image_bytes = part.inline_data.data
-                break
+        image_part = next(
+            (
+                part.inline_data
+                for part in response.parts
+                if getattr(part, "inline_data", None)
+            ),
+            None,
+        )
 
-        image = Image.open(BytesIO(image_bytes)).convert("RGB")
+        if not image_part or not image_part.mime_type.startswith("image/"):
+            raise ThumbnailCreationError("IA não retornou uma imagem válida")
+
+        try:
+            image = Image.open(BytesIO(image_part.data))
+            image.verify()
+            image = Image.open(BytesIO(image_part.data)).convert("RGB")
+        except UnidentifiedImageError:
+            raise ThumbnailCreationError("Conteúdo retornado não é uma imagem")
 
         filename = f"thumbs/{uuid.uuid4()}.jpg"
         buffer = BytesIO()

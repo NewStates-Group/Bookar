@@ -53,8 +53,7 @@ ModuleSchema = create_schema(Module, fields=["id", "name", "desc"])
 
 
 class CourseIn(Schema):
-    title: str
-    details: str = Field(..., max_length=200)
+    prompt: str
     level: CourseLevel
 
 

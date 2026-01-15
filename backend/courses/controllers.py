@@ -31,7 +31,7 @@ class CourseController:
     @route.post("", response=CourseOut)
     def create_course(self, request, data: CourseIn):
         return self.course_service.create_course(
-            user=request.user, details=data.details, level=data.level, title=data.title
+            user=request.user, level=data.level, prompt=data.prompt
         )
 
     @route.get("{course_id}", response=CourseDetailSchema)

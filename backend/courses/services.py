@@ -6,7 +6,7 @@ from ninja.errors import HttpError
 
 from .models import Choice, Course, Lesson, Question, Quiz, QuizAttempt, Module
 from .tasks import (
-    create_course_description,
+    create_course_details,
     generate_lesson,
     generate_next_module,
 )
@@ -31,10 +31,10 @@ class CourseService:
         except Course.DoesNotExist:
             raise HttpError(404, "Curso não encontrado")
 
-    def create_course(self, user, title: str, details: str, level: str) -> Course:
-        course = Course.objects.create(user=user, title=title, level=level)
-        create_course_description.delay(
-            course.pk, title, details, course.get_level_display()
+    def create_course(self, user, prompt: str, level: str) -> Course:
+        course = Course.objects.create(user=user, level=level)
+        create_course_details.delay(
+            course.pk, prompt, course.get_level_display()
         )
         return course
 
