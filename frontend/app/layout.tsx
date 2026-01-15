@@ -9,8 +9,8 @@ const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: 'Bookar - AI Learning Platform',
-  description: 'Learn with AI-powered courses',
+  title: 'Bookar',
+  description: 'Aprenda utilizando IA',
 
 }
 
@@ -20,15 +20,15 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en">
+    <html lang="pt-PT">
       <body className={`font-sans antialiased`}>
         <link rel="shortcut icon" href="/logo.png" type="image/x-icon" />
         <Providers>
           <AuthGuard>
             {children}
           </AuthGuard>
-          <Toaster position='top-right' />
         </Providers>
+        <Toaster position='top-right' />
       </body>
     </html>
   )

@@ -79,7 +79,7 @@ export default function LearnPage() {
                     toast.info(
                         data.status === "PROCESSING" ? "Esta aula está a ser gerada" : "Esta aula ainda não foi gerada"
                     )
-                    router.push('/courses/' + course)
+                    router.push('/app/courses/' + course)
                     return
                 }
             } else {
@@ -104,9 +104,9 @@ export default function LearnPage() {
             if (res.ok) {
                 const data = await res.json();
                 if (data.id) {
-                    router.push(`/watch?l=${data.id}&c=${course}`)
+                    router.push(`/app/courses/watch?l=${data.id}&c=${course}`)
                 } else {
-                    router.push(`/courses/${course}`)
+                    router.push(`/app/courses/${course}`)
                 }
             }
         } catch (error) {
@@ -151,9 +151,9 @@ export default function LearnPage() {
                 <p className="text-destructive mb-4">{error || "Aula não encontrada"}</p>
                 <Button variant="outline" onClick={() => {
                     if (course) {
-                        router.push(`/courses/${course}`)
+                        router.push(`/app/courses/${course}`)
                     } else {
-                        router.push(`/overview`)
+                        router.push(`/app`)
                     }
                 }}>Voltar</Button>
             </div>
@@ -166,7 +166,7 @@ export default function LearnPage() {
                 <div className="flex gap-1 items-center">
                     <Button variant="ghost" size="sm"
                         className="text-white/70 hover:text-white hover:bg-transparent"
-                        onClick={() => { router.push(`/courses/${course}`) }}>
+                        onClick={() => { router.push(`/app/courses/${course}`) }}>
                         <ArrowLeft className="w-4 h-4 mr-2" />
                         <span className="hidden md:block">
                             Voltar

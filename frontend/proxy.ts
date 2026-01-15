@@ -23,7 +23,7 @@ export default withAuth(
         }
 
         if (token && isPublic) {
-            return NextResponse.redirect(new URL("/overview", req.url));
+            return NextResponse.redirect(new URL("/app", req.url));
         }
 
         return NextResponse.next();
@@ -36,5 +36,5 @@ export default withAuth(
 );
 
 export const config = {
-    matcher: ["/overview/:path*", "/login", "/signup", "/"],
+    matcher: ["/app/:path*", "/login", "/signup", "/"],
 };

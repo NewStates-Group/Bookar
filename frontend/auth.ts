@@ -1,6 +1,22 @@
 import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 
+
+async function getMe(accessToken: string) {
+    const res = await fetch(`${process.env.AUTH_URL}/auth/me`, {
+        headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+        },
+    });
+
+    if (!res.ok) {
+        throw new Error("Failed to fetch /me");
+    }
+
+    return res.json();
+}
+
 async function refreshAccessToken(token: any) {
     try {
         const res = await fetch(`${process.env.AUTH_URL}/auth/refresh`, {
@@ -20,7 +36,8 @@ async function refreshAccessToken(token: any) {
         return {
             ...token,
             accessToken: data.access,
-            accessTokenExpires: Date.now() + (30 * 60 * 1000),
+            accessTokenExpires: Date.now() + 30 * 60 * 1000,
+            error: undefined,
         };
     } catch (error) {
         return {
@@ -30,10 +47,16 @@ async function refreshAccessToken(token: any) {
     }
 }
 
+
 export const authOptions: NextAuthOptions = {
+    session: {
+        strategy: "jwt",
+    },
+
     providers: [
         CredentialsProvider({
             name: "Credentials",
+
             credentials: {
                 username: { label: "Username", type: "text" },
                 password: { label: "Password", type: "password" },
@@ -53,14 +76,15 @@ export const authOptions: NextAuthOptions = {
                     }),
                 });
 
-                const user = await res.json();
-                if (!res.ok || !user.access) return null
+                const data = await res.json();
+
+                if (!res.ok || !data.access) {
+                    return null;
+                }
 
                 return {
-                    id: credentials.username,
-                    name: credentials.username,
-                    accessToken: user.access,
-                    refreshToken: user.refresh,
+                    accessToken: data.access,
+                    refreshToken: data.refresh,
                 };
             },
         }),
@@ -69,21 +93,27 @@ export const authOptions: NextAuthOptions = {
     callbacks: {
         async jwt({ token, user }) {
             if (user) {
+                const profile = await getMe(user.accessToken);
+
                 return {
-                    name: user.name,
-                    accessToken: user?.accessToken,
-                    refreshToken: user?.refreshToken,
-                    accessTokenExpires: Date.now() + (30 * 60 * 1000),
+                    accessToken: user.accessToken,
+                    refreshToken: user.refreshToken,
+                    accessTokenExpires: Date.now() + 30 * 60 * 1000,
+
+                    user: {
+                        username: profile.username,
+                        email: profile.email,
+                    },
                 };
             }
 
-            if ((token.accessTokenExpires as number) > Date.now()) {
-                return token
+            if (Date.now() < (token.accessTokenExpires as number)) {
+                return token;
             }
 
-            const refreshed = refreshAccessToken(token);
+            const refreshed = await refreshAccessToken(token);
 
-            if (refreshed?.error) {
+            if (refreshed.error) {
                 return {
                     ...refreshed,
                     accessToken: null,
@@ -91,18 +121,23 @@ export const authOptions: NextAuthOptions = {
                 };
             }
 
-            return refreshed
+            const profile = await getMe(refreshed.accessToken);
+
+            return {
+                ...refreshed,
+                user: {
+                    username: profile.username,
+                    email: profile.email,
+                },
+            };
         },
 
         async session({ session, token }) {
-            if (token) {
-                session.accessToken = token.accessToken as string;
-                session.error = token.error;
-                session.user = {
-                    ...session.user,
-                    name: token.name
-                }
-            }
+            session.accessToken = token.accessToken as string;
+            session.error = token.error;
+
+            session.user = token.user as any;
+
             return session;
         },
     },

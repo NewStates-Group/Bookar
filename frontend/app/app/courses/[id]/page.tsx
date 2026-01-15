@@ -93,9 +93,10 @@ export default function CoursePage() {
       if (res.ok) {
         const data = await res.json();
         setCourse(data);
+
       } else {
         setIsLoading(false);
-        router.push("/overview");
+        router.push("/app");
       }
     } catch (error) {
       console.error("Failed to fetch course", error);
@@ -113,7 +114,7 @@ export default function CoursePage() {
       });
       if (res.ok) {
         const data = await res.json();
-        router.push(`/watch?l=${data.id}&c=${course?.id}`)
+        router.push(`/app/courses/watch?l=${data.id}&c=${course?.id}`)
       }
     } catch (error) {
       toast.error('Erro desconhecido, aguarde ' + error)
@@ -132,7 +133,7 @@ export default function CoursePage() {
         }
       );
       if (res.ok) {
-        router.push('/overview')
+        router.push('/app')
       }
     } catch (e) {
       toast.error("Erro de conexão");
@@ -141,7 +142,18 @@ export default function CoursePage() {
 
   useEffect(() => {
     if ((session as any)?.accessToken && params?.id) {
-      fetchCourse();
+      let i;
+      if (course?.modules.find(module => {
+        module.lessons.some(lesson => lesson.status === "PROCESSING")
+      })) {
+        i = setInterval(() => {
+          fetchCourse();
+        }, 5000)
+
+      } else {
+        clearInterval(i)
+        fetchCourse();
+      }
       checkFinishment()
     }
   }, [session, params]);

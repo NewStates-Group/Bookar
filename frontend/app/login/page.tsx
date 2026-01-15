@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
-import { Sparkles, User, Lock } from "lucide-react";
+import { User, Lock } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import Image from "next/image";
@@ -32,7 +32,7 @@ export default function LoginPage() {
         console.log(result)
         toast.error("Username/Palavra-passe incorrectos");
       } else {
-        router.push("/");
+        router.push("/app");
       }
     } catch (error) {
       toast.error("Ocorreu um erro ao tentar fazer login.");

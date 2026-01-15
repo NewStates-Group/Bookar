@@ -27,7 +27,8 @@ import {
 
 interface Course {
   id: Number;
-  title: string;
+  prompt: string;
+  title?: string;
   desc: string;
   level: string;
   thumb: string;
@@ -44,8 +45,7 @@ export default function OverviewPage() {
   const [open, setOpen] = useState(false);
 
   const [step, setStep] = useState(1);
-  const [title, setTitle] = useState("");
-  const [details, setDetails] = useState("");
+  const [prompt, setPrompt] = useState("");
   const [level, setLevel] = useState<"B" | "IT" | "A">("B");
 
   const levelConfig = {
@@ -79,7 +79,7 @@ export default function OverviewPage() {
   };
 
   const handleNext = () => {
-    if (step === 1 && title.trim()) {
+    if (step === 1 && prompt.trim()) {
       setStep(2);
     }
   };
@@ -113,7 +113,6 @@ export default function OverviewPage() {
   };
 
   const handleCreateCourse = async () => {
-    if (!details.trim()) return;
 
     setIsCreating(true);
 
@@ -125,8 +124,7 @@ export default function OverviewPage() {
           Authorization: `Bearer ${session?.accessToken}`,
         },
         body: JSON.stringify({
-          title,
-          details,
+          prompt,
           level,
         }),
       });
@@ -135,8 +133,7 @@ export default function OverviewPage() {
         const course = await res.json();
 
         setOpen(false);
-        setTitle("");
-        setDetails("");
+        setPrompt("");
         setLevel("B");
         setStep(1);
 
@@ -157,8 +154,7 @@ export default function OverviewPage() {
     setOpen(newOpen);
     if (!newOpen) {
       setStep(1);
-      setTitle("");
-      setDetails("");
+      setPrompt("");
       setLevel("B");
     }
   };
@@ -180,39 +176,11 @@ export default function OverviewPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
-      <div className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 md:px-8 py-6">
-          <div className="flex items-center justify-between">
-            <div className="space-y-1">
-              <div className="flex items-center gap-3">
-                <div>
-                  <h1 className="text-2xl font-bold tracking-tight">
-                    Olá, {session.user?.name}!
-                  </h1>
-                  <p className="text-sm text-muted-foreground">
-                    Comece sua jornada de aprendizado.
-                  </p>
-                </div>
-              </div>
-            </div>
-            <div className="flex gap-2 items-center justify-center">
-
-              <Button onClick={() => {
-                signOut({ callbackUrl: '/login' })
-              }} size="lg" className="gap-2 shadow-lg hover:shadow-xl transition-all" variant={"outline"}>
-                <LogOut className="h-5 w-5 text-red-500" />
-                <span className="text-black">Sair</span>
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="max-w-7xl mx-auto px-4 md:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 md:px-8 py-3">
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-3xl font-bold">Cursos</h1>
-            <span className="text-sm text-gray-700">Crie cursos e aprenda com eles</span>
+            <span className="text-sm text-gray-700">Crie cursos com IA e aprenda com eles!</span>
           </div>
           <div>
             <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -241,22 +209,22 @@ export default function OverviewPage() {
                     {step === 1 && (
                       <div className="space-y-4 animate-in fade-in slide-in-from-right-3 duration-300">
                         <div className="space-y-2">
-                          <label className="text-sm font-medium text-muted-foreground">
-                            Título do curso
+                          <label className="text-base font-medium text-muted-foreground mb-1">
+                            O que você quer aprender?
                           </label>
                           <div className="relative group">
                             <Input
-                              value={title}
-                              onChange={(e) => setTitle(e.target.value)}
+                              value={prompt}
+                              onChange={(e) => setPrompt(e.target.value)}
                               onKeyPress={handleKeyPress}
-                              placeholder="Digite o título do seu curso"
+                              placeholder="Exemplo: Inglês, Docker, Eletrónica, etc."
                               className="h-14 text-lg pr-14 border-2 focus:ring-0 transition-all"
                               autoFocus
                             />
                             <Button
                               type="button"
                               onClick={handleNext}
-                              disabled={!title.trim()}
+                              disabled={!prompt.trim()}
                               size="icon"
                               className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full shadow-md hover:shadow-lg transition-all disabled:opacity-50"
                             >
@@ -264,70 +232,48 @@ export default function OverviewPage() {
                             </Button>
                           </div>
                         </div>
-                        <p className="text-xs text-muted-foreground flex items-center gap-2">
-                          <span className="w-1.5 h-1.5 rounded-full bg-primary" />
-                          Pressione Enter para continuar
-                        </p>
                       </div>
                     )}
 
                     {step === 2 && (
                       <div className="space-y-4 animate-in fade-in slide-in-from-right-3 duration-300">
                         <div className="space-y-2">
-                          <div className="relative rounded-xl border-2 focus-within:border-gray-300 transition-all bg-white shadow-sm">
-                            <Textarea
-                              value={details}
-                              onChange={(e) => setDetails(e.target.value)}
-                              placeholder="Descreva os tópicos que você quer aprender..."
-                              className="min-h-[100px] resize-none border-0 text-base p-4"
-                            />
-                            <div className="border-t px-4 py-3 bg-slate-50/50 flex items-center justify-between gap-4">
-                              <div className="flex items-center gap-2">
-                                <Button
-                                  type="button"
-                                  onClick={handleBack}
-                                  variant="ghost"
-                                  size="sm"
-                                  className="gap-2 hover:bg-white"
-                                >
-                                  <ArrowLeft className="h-4 w-4" />
-                                  Voltar
-                                </Button>
-                                <div className="h-4 w-px bg-border" />
-                                <Select
-                                  value={level}
-                                  onValueChange={(v) => setLevel(v as any)}
-                                >
-                                  <SelectTrigger className="w-[160px] border-0 bg-transparent hover:bg-white transition-colors outline-none focus-visible:border-ring focus-visible:ring-[1px] focus-visible:ring-gray-300">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="B">Iniciante</SelectItem>
-                                    <SelectItem value="IT">Intermediário</SelectItem>
-                                    <SelectItem value="A">Avançado</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                              </div>
-
-                              <div className="flex items-center gap-3">
-                                <span className="text-xs text-muted-foreground">
-                                  {details.length}/150
-                                </span>
-                                <Button
-                                  type="button"
-                                  onClick={handleCreateCourse}
-                                  disabled={isCreating || !details.trim()}
-                                  size="icon"
-                                  className="h-9 w-9 rounded-full shadow-md hover:shadow-lg transition-all"
-                                >
-                                  {isCreating ? (
-                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                  ) : (
-                                    <ArrowUp className="h-4 w-4" />
-                                  )}
-                                </Button>
-                              </div>
-                            </div>
+                          <label className="text-base font-medium text-muted-foreground mb-2 ml-1">
+                            Escolha o nível do curso
+                          </label>
+                          <Select
+                            value={level}
+                            onValueChange={(v) => setLevel(v as any)}
+                          >
+                            <SelectTrigger className="w-full">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="B">Iniciante</SelectItem>
+                              <SelectItem value="IT">Intermediário</SelectItem>
+                              <SelectItem value="A">Avançado</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <div className="w-full flex gap-2 justify-end">
+                            <Button
+                              type="button"
+                              onClick={handleBack}
+                              variant="outline"
+                            >
+                              Voltar
+                            </Button>
+                            <Button
+                              type="button"
+                              onClick={handleCreateCourse}
+                              disabled={isCreating}
+                            >
+                              {isCreating ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                  <ArrowUp className="h-4 w-4" />
+                              )}
+                              {isCreating ? "Criando..." : "Avançar"}
+                            </Button>
                           </div>
                         </div>
                       </div>
@@ -351,9 +297,9 @@ export default function OverviewPage() {
             <div className="mb-4">
               <BookOpen className="w-10 h-10 text-primary/60" />
             </div>
-            <h3 className="text-xl font-semibold mb-2">Nenhum curso ainda</h3>
+            <h3 className="text-xl font-semibold mb-2">Nenhum curso</h3>
             <p className="text-muted-foreground text-center max-w-md mb-6">
-              Comece sua jornada de aprendizado criando seu primeiro curso personalizado
+              Comece sua jornada, crie um curso personalizado.
             </p>
           </div>
         ) : (
@@ -362,7 +308,7 @@ export default function OverviewPage() {
               <Card
                 key={`${course.id}`}
                 className="group cursor-pointer overflow-hidden border-0 bg-transparent shadow-none transition-all duration-300"
-                onClick={() => router.push('/courses/' + course.id)}
+                onClick={() => router.push('/app/courses/' + course.id)}
               >
                 <div className="relative aspect-video rounded-xl overflow-hidden bg-muted shadow-lg">
                   {course.thumb ? (
