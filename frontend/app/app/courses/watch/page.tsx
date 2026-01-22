@@ -8,6 +8,12 @@ import Link from "next/link";
 import { useEffect, useState, useRef } from "react";
 import { toast } from "sonner";
 import { Quiz } from "@/components/Quiz";
+import { AppSidebar } from "@/components/sidebar"
+import {
+    SidebarInset,
+    SidebarProvider,
+} from "@/components/ui/sidebar"
+import { CourseWatchSidebar } from "@/components/course-sidebar";
 
 interface Lesson {
     id: number;
@@ -20,7 +26,7 @@ interface Lesson {
     narration: string;
 }
 
-export default function LearnPage() {
+export default function WatchPage() {
     const { data: session, status } = useSession();
     const params = useParams();
     const searchParams = useSearchParams();
@@ -161,83 +167,95 @@ export default function LearnPage() {
     }
 
     return (
-        <div className="min-h-screen bg-black flex flex-col" key={`${l}-${course}`}>
-            <div className="h-16 flex items-center justify-between px-4 border-b border-white/10 text-white">
-                <div className="flex gap-1 items-center">
-                    <Button variant="ghost" size="sm"
-                        className="text-white/70 hover:text-white hover:bg-transparent"
-                        onClick={() => { router.push(`/app/courses/${course}`) }}>
-                        <ArrowLeft className="w-4 h-4 mr-2" />
-                        <span className="hidden md:block">
-                            Voltar
-                        </span>
-                    </Button>
-                    <span className="ml-4 font-medium text-lg truncate max-w-2xs sm:max-w-xl" title={lesson.title}>{lesson.title}</span>
-                </div>
-                <div className="flex md:gap-2 items-center">
-                    <Button variant="ghost" size="sm" className="text-white/70 hover:text-white hover:bg-transparent" onClick={() => { toast.info("Em desenvolvimento...") }}>
-                        <Sparkles className="w-5 h-5" />
-                        <span className="hidden md:block">
-                            Dúvidas sobre a aula?
-                        </span>
-                    </Button>
-                    {((ended && lesson.watched) || lesson.watched) && (
-                        <div className="flex gap-4">
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                className="p-0 text-black"
-                                onClick={watchCourse}>
+        <SidebarProvider
+            style={
+                {
+                    "--sidebar-width": "calc(var(--spacing) * 100)",
+                    "--header-height": "calc(var(--spacing) * 12)",
+                } as React.CSSProperties
+            }
+        >
+            <CourseWatchSidebar />
+            <SidebarInset>
+                <div className="flex flex-col" key={`${l}-${course}`}>
+                    <div className="h-16 flex items-center justify-between px-4 border-b border-white/10 text-white">
+                        <div className="flex gap-1 items-center">
+                            <Button variant="ghost" size="sm"
+                                className="text-white/70 hover:text-white hover:bg-transparent"
+                                onClick={() => { router.push(`/app/courses/${course}`) }}>
+                                <ArrowLeft className="w-4 h-4 mr-2" />
                                 <span className="hidden md:block">
-                                    Avançar
+                                    Voltar
                                 </span>
-                                <ArrowRight className="w-5 h-5" />
                             </Button>
+                            <span className="ml-4 font-medium text-lg truncate max-w-2xs sm:max-w-xl" title={lesson.title}>{lesson.title}</span>
                         </div>
-                    )}
-                </div>
-            </div>
-
-            <div className="flex flex-col items-center justify-center p-4 relative">
-                {(lesson.status === "PROCESSING" || lesson.status === "PENDING") && (
-                    <div className="text-center space-y-6 max-w-lg z-10">
-                        <div className="relative w-24 h-24 mx-auto">
-                            <div className="absolute inset-0 border-4 border-primary/30 rounded-full"></div>
-                            <div className="absolute inset-0 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+                        <div className="flex md:gap-2 items-center">
+                            <Button variant="ghost" size="sm" className="text-white/70 hover:text-white hover:bg-transparent" onClick={() => { toast.info("Em desenvolvimento...") }}>
+                                <Sparkles className="w-5 h-5" />
+                                <span className="hidden md:block">
+                                    Dúvidas sobre a aula?
+                                </span>
+                            </Button>
+                            {((ended && lesson.watched) || lesson.watched) && (
+                                <div className="flex gap-4">
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="p-0 text-black"
+                                        onClick={watchCourse}>
+                                        <span className="hidden md:block">
+                                            Avançar
+                                        </span>
+                                        <ArrowRight className="w-5 h-5" />
+                                    </Button>
+                                </div>
+                            )}
                         </div>
-                        <div>
-                            <h2 className="text-2xl font-bold text-white mb-2">Criando sua aula com...</h2>
-                            <p className="text-white/60">
-                                Nossa IA está gerando o roteiro, a narração e as animações para este tópico.
-                                Isso leva cerca de 2-3 minutos.
-                            </p>
-                        </div>
-                        <Button variant="outline" size="sm" className="bg-transparent border-white/20 text-white/60">
-                            Verificar estado
-                        </Button>
                     </div>
-                )}
 
-                {lesson.status === "READY" && viewMode === "video" && lesson.lesson_file && (
-                    <div className="w-full max-w-5xl aspect-video bg-black rounded-xl overflow-hidden shadow-2xl relative group">
-                        <video
-                            src={`http://localhost:8000/media/${lesson.lesson_file}`}
-                            controls
-                            className="w-full h-full"
-                            onEnded={() => { setEnded(true) }}
-                            onPlay={() => { setPlayed(true) }}
-                        />
+                    <div className="flex flex-col items-center justify-center p-4 relative">
+                        {(lesson.status === "PROCESSING" || lesson.status === "PENDING") && (
+                            <div className="text-center space-y-6 max-w-lg z-10">
+                                <div className="relative w-24 h-24 mx-auto">
+                                    <div className="absolute inset-0 border-4 border-primary/30 rounded-full"></div>
+                                    <div className="absolute inset-0 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+                                </div>
+                                <div>
+                                    <h2 className="text-2xl font-bold text-white mb-2">Criando sua aula com...</h2>
+                                    <p className="text-white/60">
+                                        Nossa IA está gerando o roteiro, a narração e as animações para este tópico.
+                                        Isso leva cerca de 2-3 minutos.
+                                    </p>
+                                </div>
+                                <Button variant="outline" size="sm" className="bg-transparent border-white/20 text-white/60">
+                                    Verificar estado
+                                </Button>
+                            </div>
+                        )}
+
+                        {lesson.status === "READY" && viewMode === "video" && lesson.lesson_file && (
+                            <div className="w-full max-w-5xl aspect-video bg-black rounded-xl overflow-hidden shadow-2xl relative group">
+                                <video
+                                    src={`http://localhost:8000/media/${lesson.lesson_file}`}
+                                    controls
+                                    className="w-full h-full"
+                                    onEnded={() => { setEnded(true) }}
+                                    onPlay={() => { setPlayed(true) }}
+                                />
+                            </div>
+                        )}
+
+                        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-blue-600/5 pointer-events-none"></div>
                     </div>
-                )}
 
-                <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-blue-600/5 pointer-events-none"></div>
-            </div>
-
-            <div className="bg-zinc-950 border-t border-white/10 flex items-start justify-between px-8 py-5 gap-2">
-                <div className="text-white/50 text-base block">
-                    {lesson.desc}
+                    <div className="bg-zinc-950 border-t border-white/10 flex items-start justify-between px-8 py-5 gap-2">
+                        <div className="text-white/50 text-base block">
+                            {lesson.desc}
+                        </div>
+                    </div>
                 </div>
-            </div>
-        </div>
+            </SidebarInset>
+        </SidebarProvider>
     );
 }

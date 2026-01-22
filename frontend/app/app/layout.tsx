@@ -1,29 +1,15 @@
-import { AppSidebar } from "@/components/sidebar"
-import {
-  SidebarInset,
-  SidebarProvider,
-} from "@/components/ui/sidebar"
+import { FloatingNavbar } from "@/components/floating-navbar"
 
 
-export default function RootLayout({
+export default function AppLayout({
   children,
 }: Readonly<{
   children: React.ReactNode
 }>) {
   return (
-    <SidebarProvider
-      style={
-        {
-          "--sidebar-width": "calc(var(--spacing) * 72)",
-          "--header-height": "calc(var(--spacing) * 12)",
-        } as React.CSSProperties
-      }
-    >
-      <AppSidebar variant="inset" />
-      <SidebarInset>
-        {children}
-      </SidebarInset>
-    </SidebarProvider>
-
+    <main className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
+      <FloatingNavbar />
+      {children}
+    </main>
   )
 }

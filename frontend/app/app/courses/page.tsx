@@ -36,7 +36,7 @@ interface Course {
   created_at: string;
 }
 
-export default function OverviewPage() {
+export default function CoursesPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const [courses, setCourses] = useState<Course[]>([]);
@@ -175,174 +175,171 @@ export default function OverviewPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
-      <div className="max-w-7xl mx-auto px-4 md:px-8 py-3">
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold">Cursos</h1>
-            <span className="text-sm text-gray-700">Crie cursos com IA e aprenda com eles!</span>
-          </div>
-          <div>
-            <Dialog open={open} onOpenChange={handleOpenChange}>
-              <DialogTrigger asChild>
-                <Button size="lg" className="gap-2 shadow-lg hover:shadow-xl transition-all" title="Novo curso">
-                  <Plus className="h-5 w-5" />
-                  <span className="hidden md:block">
-                    Criar Curso
-                  </span>
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-[650px] p-0 overflow-hidden border-0 shadow-2xl">
-                <div className="relative overflow-hidden">
-                  <div className="p-8 pb-3">
-                    <DialogTitle className="text-center text-3xl font-bold">
-                      Criar Novo Curso
-                    </DialogTitle>
-                    <DialogDescription className="mt-2 text-center  text-base">
-                      {step === 1
-                        ? "Dê um nome ao seu curso"
-                        : "Descreva o que você quer aprender"}
-                    </DialogDescription>
-                  </div>
-
-                  <div className="px-8 pb-8">
-                    {step === 1 && (
-                      <div className="space-y-4 animate-in fade-in slide-in-from-right-3 duration-300">
-                        <div className="space-y-2">
-                          <label className="text-base font-medium text-muted-foreground mb-1">
-                            O que você quer aprender?
-                          </label>
-                          <div className="relative group">
-                            <Input
-                              value={prompt}
-                              onChange={(e) => setPrompt(e.target.value)}
-                              onKeyPress={handleKeyPress}
-                              placeholder="Exemplo: Inglês, Docker, Eletrónica, etc."
-                              className="h-14 text-lg pr-14 border-2 focus:ring-0 transition-all"
-                              autoFocus
-                            />
-                            <Button
-                              type="button"
-                              onClick={handleNext}
-                              disabled={!prompt.trim()}
-                              size="icon"
-                              className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full shadow-md hover:shadow-lg transition-all disabled:opacity-50"
-                            >
-                              <ArrowRight className="h-5 w-5" />
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {step === 2 && (
-                      <div className="space-y-4 animate-in fade-in slide-in-from-right-3 duration-300">
-                        <div className="space-y-2">
-                          <label className="text-base font-medium text-muted-foreground mb-2 ml-1">
-                            Escolha o nível do curso
-                          </label>
-                          <Select
-                            value={level}
-                            onValueChange={(v) => setLevel(v as any)}
-                          >
-                            <SelectTrigger className="w-full">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="B">Iniciante</SelectItem>
-                              <SelectItem value="IT">Intermediário</SelectItem>
-                              <SelectItem value="A">Avançado</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <div className="w-full flex gap-2 justify-end">
-                            <Button
-                              type="button"
-                              onClick={handleBack}
-                              variant="outline"
-                            >
-                              Voltar
-                            </Button>
-                            <Button
-                              type="button"
-                              onClick={handleCreateCourse}
-                              disabled={isCreating}
-                            >
-                              {isCreating ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                  <ArrowUp className="h-4 w-4" />
-                              )}
-                              {isCreating ? "Criando..." : "Avançar"}
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </DialogContent>
-            </Dialog>
-          </div>
+    <div className="max-w-7xl mx-auto px-4 md:px-8 py-3">
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold">Cursos</h1>
+          <span className="text-sm text-gray-700">Crie cursos com IA e aprenda com eles!</span>
         </div>
-        <div className="w-full border mt-2"></div>
-        {isLoading ? (
-          <div className="flex items-center justify-center py-20">
-            <div className="text-center space-y-4">
-              <Loader2 className="w-10 h-10 animate-spin text-primary mx-auto" />
-              <p className="text-muted-foreground">Carregando seus dados...</p>
-            </div>
-          </div>
-        ) : courses.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 px-4">
-            <div className="mb-4">
-              <BookOpen className="w-10 h-10 text-primary/60" />
-            </div>
-            <h3 className="text-xl font-semibold mb-2">Nenhum curso</h3>
-            <p className="text-muted-foreground text-center max-w-md mb-6">
-              Comece sua jornada, crie um curso personalizado.
-            </p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {courses.map((course) => (
-              <Card
-                key={`${course.id}`}
-                className="group cursor-pointer overflow-hidden border-0 bg-transparent shadow-none transition-all duration-300"
-                onClick={() => router.push('/app/courses/' + course.id)}
-              >
-                <div className="relative aspect-video rounded-xl overflow-hidden bg-muted shadow-lg">
-                  {course.thumb ? (
-                    <img src={"http://localhost:8000/media/" + course.thumb} alt={course.title} className="object-cover w-full h-full" />
-                  ) : course.status === "PROCESSING" ? (
-                    <div className="flex flex-col items-center justify-center h-full border rounded-lg">
-                      <Loader2 className="w-12 h-12 text-slate-600 animation-spin" />
-                      <span className="text-gray-500">
-                        Gerando curso...
-                      </span>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col items-center justify-center h-full border rounded-lg">
-                      <ImageOff className="w-12 h-12 text-slate-400" />
-                      <span className="text-gray-500">
-                        Capa Indisponível
-                      </span>
+        <div>
+          <Dialog open={open} onOpenChange={handleOpenChange}>
+            <DialogTrigger asChild>
+              <Button size="lg" className="bg-cyan-500 hover:bg-cyan-600 gap-2 shadow-lg hover:shadow-xl transition-all" title="Novo curso">
+                <Plus className="h-5 w-5" />
+                <span className="hidden md:block">
+                  Criar Curso
+                </span>
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[650px] p-0 overflow-hidden border-0 shadow-2xl">
+              <div className="relative overflow-hidden">
+                <div className="p-8 pb-3">
+                  <DialogTitle className="text-center text-3xl font-bold">
+                    Criar Novo Curso
+                  </DialogTitle>
+                  <DialogDescription className="mt-2 text-center  text-base">
+                    {step === 1
+                      ? "Dê um nome ao seu curso"
+                      : "Descreva o que você quer aprender"}
+                  </DialogDescription>
+                </div>
+
+                <div className="px-8 pb-8">
+                  {step === 1 && (
+                    <div className="space-y-4 animate-in fade-in slide-in-from-right-3 duration-300">
+                      <div className="space-y-2">
+                        <label className="text-base font-medium text-muted-foreground mb-1">
+                          O que você quer aprender?
+                        </label>
+                        <div className="relative group">
+                          <Input
+                            value={prompt}
+                            onChange={(e) => setPrompt(e.target.value)}
+                            onKeyPress={handleKeyPress}
+                            placeholder="Exemplo: Inglês, Docker, Eletrónica, etc."
+                            className="h-14 text-lg pr-14 border-2 focus:ring-0 transition-all"
+                            autoFocus
+                          />
+                          <Button
+                            type="button"
+                            onClick={handleNext}
+                            disabled={!prompt.trim()}
+                            size="icon"
+                            className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full shadow-md hover:shadow-lg transition-all disabled:opacity-50"
+                          >
+                            <ArrowRight className="h-5 w-5" />
+                          </Button>
+                        </div>
+                      </div>
                     </div>
                   )}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex flex-col justify-end p-4 px-6 text-white">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="bg-primary px-3 py-1 rounded-full text-xs font-bold text-primary-foreground">
-                        {course.level === 'B' ? 'Iniciante' : course.level === 'IT' ? 'Intermediário' : 'Avançado'}
-                      </span>
-                    </div>
-                    <h1 className="text-xl font-bold capitalize">{course.title}</h1>
-                  </div>
-                </div>
-              </Card>
 
-            ))}
-          </div>
-        )}
+                  {step === 2 && (
+                    <div className="space-y-4 animate-in fade-in slide-in-from-right-3 duration-300">
+                      <div className="space-y-2">
+                        <label className="text-base font-medium text-muted-foreground mb-2 ml-1">
+                          Escolha o nível do curso
+                        </label>
+                        <Select
+                          value={level}
+                          onValueChange={(v) => setLevel(v as any)}
+                        >
+                          <SelectTrigger className="w-full">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="B">Iniciante</SelectItem>
+                            <SelectItem value="IT">Intermediário</SelectItem>
+                            <SelectItem value="A">Avançado</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <div className="w-full flex gap-2 justify-end">
+                          <Button
+                            type="button"
+                            onClick={handleBack}
+                            variant="outline"
+                          >
+                            Voltar
+                          </Button>
+                          <Button
+                            type="button"
+                            onClick={handleCreateCourse}
+                            disabled={isCreating}
+                          >
+                            {isCreating ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <ArrowUp className="h-4 w-4" />
+                            )}
+                            {isCreating ? "Criando..." : "Avançar"}
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
+      {isLoading ? (
+        <div className="flex items-center justify-center py-20">
+          <div className="text-center space-y-4">
+            <Loader2 className="w-10 h-10 animate-spin text-primary mx-auto" />
+            <p className="text-muted-foreground">Carregando seus dados...</p>
+          </div>
+        </div>
+      ) : courses.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-20 px-4">
+          <div className="mb-4">
+            <BookOpen className="w-10 h-10 text-primary/60" />
+          </div>
+          <h3 className="text-xl font-semibold mb-2">Nenhum curso</h3>
+          <p className="text-muted-foreground text-center max-w-md mb-6">
+            Comece sua jornada, crie um curso personalizado.
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {courses.map((course) => (
+            <Card
+              key={`${course.id}`}
+              className="group cursor-pointer overflow-hidden border-0 bg-transparent shadow-none transition-all duration-300"
+              onClick={() => router.push('/app/courses/' + course.id)}
+            >
+              <div className="relative aspect-video rounded-xl overflow-hidden bg-muted shadow-lg">
+                {course.thumb ? (
+                  <img src={"http://localhost:8000/media/" + course.thumb} alt={course.title} className="object-cover w-full h-full" />
+                ) : course.status === "PROCESSING" ? (
+                  <div className="flex flex-col items-center justify-center h-full border rounded-lg">
+                    <Loader2 className="w-12 h-12 text-slate-600 animation-spin" />
+                    <span className="text-gray-500">
+                      Gerando curso...
+                    </span>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center h-full border rounded-lg">
+                    <ImageOff className="w-12 h-12 text-slate-400" />
+                    <span className="text-gray-500">
+                      Capa Indisponível
+                    </span>
+                  </div>
+                )}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex flex-col justify-end p-4 px-6 text-white">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="bg-primary px-3 py-1 rounded-full text-xs font-bold text-primary-foreground">
+                      {course.level === 'B' ? 'Iniciante' : course.level === 'IT' ? 'Intermediário' : 'Avançado'}
+                    </span>
+                  </div>
+                  <h1 className="text-xl font-bold capitalize">{course.title}</h1>
+                </div>
+              </div>
+            </Card>
+
+          ))}
+        </div>
+      )}
     </div>
   );
 }

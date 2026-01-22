@@ -162,11 +162,11 @@ export default function CoursePage() {
   if (!course) return null;
 
   return (
-    <div className="min-h-screen bg-background p-4 md:p-8">
+    <div className="relative min-h-screen bg-background p-4 md:p-8">
       <div className="max-w-4xl mx-auto space-y-8">
-        <Link href="/overview" className="lg:fixed top-0 left-0 p-4 z-50">
+        <Link href="/overview" className="hidden lg:absolute top-0 left-0 p-4 z-50">
           <Button variant="ghost" className="mb-4 pl-0 hover:pl-2 transition-all">
-            <ArrowLeft className="w-4 h-4 mr-2" /> Voltar para Overview
+            <ArrowLeft className="w-4 h-4 mr-2" /> Voltar
           </Button>
         </Link>
 
@@ -218,12 +218,12 @@ export default function CoursePage() {
                   Novo Módulo
                 </span>
               </Button>
-              <Button size="lg" className="rounded-full px-8" onClick={watchCourse} hidden={finished}>
+              <Button size="lg" className="rounded-full px-8 bg-cyan-500 hover:bg-cyan-600" onClick={watchCourse} hidden={finished}>
                 <Play className="w-4 h-4 mr-2" />
                 {
                   course.modules.find((module) => {
                     module.lessons.some((lesson) => lesson.watched)
-                  }) ? "Assistir Curso" : "Continuar Assistindo"
+                  }) ? "Continuar Assistindo" : "Assistir Curso"
                 }
               </Button>
             </div>
@@ -254,7 +254,7 @@ export default function CoursePage() {
                       </div>
                       <div className="text-xs">
                         {lesson.status === 'READY' ? (
-                          <Link href={`/watch?l=${lesson.id}&c=${course.id}`}>
+                          <Link href={`/app/courses/watch?l=${lesson.id}&c=${course.id}`}>
                             <PlayCircle className="w-5 h-5 text-gray-600" />
                           </Link>
                         ) : lesson.status === 'PROCESSING' ? (
