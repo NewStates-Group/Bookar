@@ -290,7 +290,6 @@ def generate_next_module(user_pk: int, course_pk: int):
         logger.error(f"Course {course_pk} not found for module generation")
         return
 
-    # Build context from existing modules
     existing_modules = course.modules.all().order_by("created_at")
     modules_context = "\n".join([f"- {m.name}: {m.desc}" for m in existing_modules])
 
@@ -299,6 +298,8 @@ def generate_next_module(user_pk: int, course_pk: int):
         "Create the NEXT module for this course in JSON format. "
         "Don't enumerate the lesson like this 1.1 -, don't enumerate nothing. "
         "Generate de JSON values in portugues, keep the keys in english. "
+        "Cada módulo deve ter entre 8-10 aulas. "
+        "Cada aula deve ter conteúdo para 3 a 5 minutos se for conceitual, se for prática o máximo aumenta para 10 minutos (mas a duration em segundos). "
         "Strictly follow this JSON schema:"
         "{"
         '  "title": "Título do módulo",'
@@ -310,7 +311,7 @@ def generate_next_module(user_pk: int, course_pk: int):
         '      "duration": 300, '
         '      "narration": "Detailed narration text (600-800 words), engaging and podcast-style...",'
         '      "key_points": "Key takeaway 1, Key takeaway 2",'
-        '      "scene_suggestion": "Visual description for whiteboard animation"'
+        '      "scene_suggestion": "Visual description for eboard animation"'
         "    }\n"
         "  ]\n"
         "}\n\n"
@@ -474,17 +475,17 @@ def create_course_thumb(course_pk: str, prompt: str):
     client = get_genai_client()
     ai_prompt = f"""
     Capa profissional de curso educacional.
-    Tema do curso (em português, bem legível): "{prompt}"
+    Tema do curso: "{prompt}"
 
     Estilo visual:
-    - Design moderno, limpo e acadêmico
-    - Cores vibrantes e profissionais
-    - Gradientes suaves
-    - Ilustração ou composição vetorial (não realista)
+    - Design moderno e limpo
+    - Cores adequadas ao tema
+    - Gradientes suaves se necessário
+    - Logos ou ilustrações (não realistas)
 
     Regras:
     - Todo o texto deve estar em português
-    - Não adicionar textos desnecessários
+    - Não adicionar textos desnecessários, é apenas uma capa
     - Não usar marcas d\'água
     """
 
