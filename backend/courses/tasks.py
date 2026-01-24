@@ -425,7 +425,7 @@ def generate_quiz(lesson_id: int):
 
 @shared_task
 def create_course_details(course_pk: int, prompt: str, level: str):
-    prompt = f"""
+    ai_prompt = f"""
     You are an AI that outputs STRICT JSON.
 
     Rules:
@@ -454,7 +454,7 @@ def create_course_details(course_pk: int, prompt: str, level: str):
 
     course_outline = None
     try:
-        response = ollama_chat([{"role": "user", "content": prompt}])
+        response = ollama_chat([{"role": "user", "content": ai_prompt}])
         course_outline = extract_json(response)
     except Exception as e:
         logger.error(f"Outline generation failed: {e}")
@@ -474,7 +474,7 @@ def create_course_details(course_pk: int, prompt: str, level: str):
 def create_course_thumb(course_pk: str, prompt: str):
     client = get_genai_client()
     ai_prompt = f"""
-    Capa profissional de curso educacional.
+    Cria uma capa profissional de curso educacional.
     Tema do curso: "{prompt}"
 
     Estilo visual:
@@ -502,9 +502,9 @@ def create_course_thumb(course_pk: str, prompt: str):
             (
                 part.inline_data
                 for part in response.parts
-                if getattr(part, "inline_data", None)
+                if part.inline_data is not None
             ),
-            None,
+            None
         )
 
         if not image_part or not image_part.mime_type.startswith("image/"):
