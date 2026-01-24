@@ -1,10 +1,11 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import { ChevronDown, PlayCircle, Loader2, CheckCircle2, X } from "lucide-react";
+import { ChevronDown, PlayCircle, Loader2, CheckCircle2, X, ChevronLeft } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { CourseData, Module } from "@/app/app/courses/watch/page";
+import Image from "next/image";
 
 export function CourseWatchSidebar({ course, onClose }: { course: CourseData | null, onClose: () => void }) {
     if (!course) return

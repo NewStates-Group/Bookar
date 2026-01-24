@@ -3,10 +3,11 @@
 import { useSession } from "next-auth/react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Loader2, ArrowRight, ChevronLeft, ChevronRight, HelpCircle, X, Menu } from "lucide-react";
+import { Loader2, ArrowRight, ChevronLeft, ChevronRight, HelpCircle, X, Menu, ArrowLeft } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
 import { toast } from "sonner";
 import { CourseWatchSidebar } from "@/components/course-sidebar";
+import Link from "next/link";
 
 export interface Module {
     id: number;
@@ -17,6 +18,8 @@ export interface Module {
 export interface CourseData {
     id: number;
     title: string;
+    thumb: string;
+    desc: string;
     modules: Module[];
 }
 
@@ -222,7 +225,16 @@ export default function WatchPage() {
             </div>
 
             <div className="flex-1 flex flex-col overflow-hidden bg-background">
-                <div className="h-16 grid grid-cols-4 border-b border-border">
+                <div className="h-16 grid grid-cols-5 border-b border-border">
+                    <button
+                        onClick={() => router.push(`/app/courses/${course?.id}`)}
+                        className="flex gap-1 items-center justify-center border-r cursor-pointer hover:bg-muted transition-colors"
+                    >
+                        <ArrowLeft className="w-5 h-5 " />
+                        <span className="hidden md:block">
+                            Voltar
+                        </span>
+                    </button>
                     <button
                         onClick={() => setSidebarOpen(!sidebarOpen)}
                         className="flex gap-1 items-center justify-center border-r cursor-pointer hover:bg-muted transition-colors"
@@ -306,6 +318,9 @@ export default function WatchPage() {
                                     src={`http://localhost:8000/media/${lesson.lesson_file}`}
                                     controls
                                     className="w-full h-full"
+                                    onContextMenu={(e) => e.preventDefault()}
+                                    controlsList="nodownload noplaybackrate"
+                                    disablePictureInPicture
                                     onEnded={() => { setEnded(true) }}
                                     onPlay={() => { setPlayed(true) }}
                                 />
