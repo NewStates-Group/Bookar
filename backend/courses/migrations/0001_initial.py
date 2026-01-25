@@ -6,7 +6,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     initial = True
 
     dependencies = [
@@ -15,44 +14,129 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.CreateModel(
-            name='Course',
+            name="Course",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('title', models.CharField(blank=True, max_length=80, null=True)),
-                ('desc', models.TextField(blank=True, null=True)),
-                ('level', models.CharField(blank=True, choices=[('B', 'Beginner'), ('IT', 'Intermediate'), ('A', 'Advance')], max_length=2, null=True)),
-                ('status', models.CharField(choices=[('PROCESSING', 'Processando'), ('READY', 'Pronto'), ('ERROR', 'Erro')], default='PROCESSING', max_length=20)),
-                ('thumb', models.CharField(blank=True, max_length=255, null=True)),
-                ('failed', models.BooleanField(default=False)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('user', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, related_name='courses', to=settings.AUTH_USER_MODEL)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("title", models.CharField(blank=True, max_length=80, null=True)),
+                ("desc", models.TextField(blank=True, null=True)),
+                (
+                    "level",
+                    models.CharField(
+                        blank=True,
+                        choices=[
+                            ("B", "Beginner"),
+                            ("IT", "Intermediate"),
+                            ("A", "Advance"),
+                        ],
+                        max_length=2,
+                        null=True,
+                    ),
+                ),
+                (
+                    "status",
+                    models.CharField(
+                        choices=[
+                            ("PROCESSING", "Processando"),
+                            ("READY", "Pronto"),
+                            ("ERROR", "Erro"),
+                        ],
+                        default="PROCESSING",
+                        max_length=20,
+                    ),
+                ),
+                ("thumb", models.CharField(blank=True, max_length=255, null=True)),
+                ("failed", models.BooleanField(default=False)),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                (
+                    "user",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="courses",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
             ],
         ),
         migrations.CreateModel(
-            name='Module',
+            name="Module",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('name', models.CharField(blank=True, max_length=80, null=True)),
-                ('desc', models.TextField(blank=True, null=True)),
-                ('created_at', models.DateTimeField(auto_now_add=True, null=True)),
-                ('course', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='modules', to='courses.course')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("name", models.CharField(blank=True, max_length=80, null=True)),
+                ("desc", models.TextField(blank=True, null=True)),
+                ("created_at", models.DateTimeField(auto_now_add=True, null=True)),
+                (
+                    "course",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="modules",
+                        to="courses.course",
+                    ),
+                ),
             ],
         ),
         migrations.CreateModel(
-            name='Lesson',
+            name="Lesson",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('title', models.CharField(max_length=150)),
-                ('desc', models.TextField()),
-                ('duration', models.PositiveIntegerField(default=0)),
-                ('watched', models.BooleanField(default=False)),
-                ('status', models.CharField(choices=[('PENDING', 'Pendente'), ('PROCESSING', 'Processando'), ('READY', 'Pronto'), ('ERROR', 'Erro')], default='PENDING', max_length=20)),
-                ('lesson_file', models.CharField(blank=True, max_length=150, null=True)),
-                ('narration', models.TextField(blank=True, null=True)),
-                ('key_points', models.CharField(blank=True, max_length=150, null=True)),
-                ('scene_suggestion', models.TextField(blank=True, null=True)),
-                ('created_at', models.DateTimeField(auto_now_add=True, null=True)),
-                ('module', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='lessons', to='courses.module')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("title", models.CharField(max_length=150)),
+                ("desc", models.TextField()),
+                ("duration", models.PositiveIntegerField(default=0)),
+                ("watched", models.BooleanField(default=False)),
+                (
+                    "status",
+                    models.CharField(
+                        choices=[
+                            ("PENDING", "Pendente"),
+                            ("PROCESSING", "Processando"),
+                            ("READY", "Pronto"),
+                            ("ERROR", "Erro"),
+                        ],
+                        default="PENDING",
+                        max_length=20,
+                    ),
+                ),
+                (
+                    "lesson_file",
+                    models.CharField(blank=True, max_length=150, null=True),
+                ),
+                ("narration", models.TextField(blank=True, null=True)),
+                ("key_points", models.CharField(blank=True, max_length=150, null=True)),
+                ("scene_suggestion", models.TextField(blank=True, null=True)),
+                ("created_at", models.DateTimeField(auto_now_add=True, null=True)),
+                (
+                    "module",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="lessons",
+                        to="courses.module",
+                    ),
+                ),
             ],
         ),
     ]

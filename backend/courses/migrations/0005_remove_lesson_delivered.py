@@ -4,14 +4,13 @@ from django.db import migrations
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('courses', '0004_question_remove_course_failed_alter_course_status_and_more'),
+        ("courses", "0004_question_remove_course_failed_alter_course_status_and_more"),
     ]
 
     operations = [
         migrations.RemoveField(
-            model_name='lesson',
-            name='delivered',
+            model_name="lesson",
+            name="delivered",
         ),
     ]

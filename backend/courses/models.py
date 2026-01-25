@@ -113,7 +113,9 @@ class Choice(models.Model):
 
 
 class QuizAttempt(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="quiz_attempts")
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="quiz_attempts"
+    )
     quiz = models.ForeignKey(Quiz, on_delete=models.CASCADE, related_name="attempts")
     score = models.FloatField()
     passed = models.BooleanField(default=False)

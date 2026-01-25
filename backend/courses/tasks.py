@@ -504,7 +504,7 @@ def create_course_thumb(course_pk: str, prompt: str):
                 for part in response.parts
                 if part.inline_data is not None
             ),
-            None
+            None,
         )
 
         if not image_part or not image_part.mime_type.startswith("image/"):

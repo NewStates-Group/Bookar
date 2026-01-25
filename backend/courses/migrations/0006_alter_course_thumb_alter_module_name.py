@@ -4,20 +4,19 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('courses', '0005_remove_lesson_delivered'),
+        ("courses", "0005_remove_lesson_delivered"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='course',
-            name='thumb',
+            model_name="course",
+            name="thumb",
             field=models.TextField(blank=True, null=True),
         ),
         migrations.AlterField(
-            model_name='module',
-            name='name',
+            model_name="module",
+            name="name",
             field=models.CharField(blank=True, max_length=150, null=True),
         ),
     ]

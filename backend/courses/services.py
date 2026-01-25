@@ -33,9 +33,7 @@ class CourseService:
 
     def create_course(self, user, prompt: str, level: str) -> Course:
         course = Course.objects.create(user=user, level=level)
-        create_course_details.delay(
-            course.pk, prompt, course.get_level_display()
-        )
+        create_course_details.delay(course.pk, prompt, course.get_level_display())
         return course
 
     def delete_course(self, course_id: int, user):
