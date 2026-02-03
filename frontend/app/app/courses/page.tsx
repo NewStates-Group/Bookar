@@ -305,8 +305,13 @@ export default function CoursesPage() {
           {courses.map((course) => (
             <Card
               key={`${course.id}`}
-              className="group cursor-pointer overflow-hidden border-0 bg-transparent shadow-none transition-all duration-300"
-              onClick={() => router.push('/app/courses/' + course.id)}
+              className={`group ${course.status === "READY" ? 'cursor-pointer' : "coursor-default"} overflow-hidden border-0 bg-transparent shadow-none transition-all duration-300`}
+              onClick={() => {
+                if (course.status === "READY") {
+                  router.push('/app/courses/' + course.id)
+                }
+              }
+              }
             >
               <div className="relative aspect-video rounded-xl overflow-hidden bg-muted shadow-lg">
                 {course.thumb ? (
