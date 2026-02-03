@@ -211,12 +211,8 @@ def generate_lesson(user_id, lesson_id: int):
         ]
         """
 
-        plan_response = client.models.generate_content(
-            model="gemini-2.0-flash-exp",
-            contents=plan_prompt,
-            config={"response_mime_type": "application/json"},
-        )
-        segments = extract_json(plan_response.text, isList=True) or []
+        response = ollama_chat([{"role": "user", "content": plan_prompt}])
+        segments = extract_json(response, isList=True) or []
         if not segments:
             raise ValueError("No segments generated")
 
