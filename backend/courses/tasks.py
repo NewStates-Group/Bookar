@@ -297,7 +297,7 @@ def generate_next_module(user_pk: int, course_pk: int):
         "Don't enumerate the lesson like this 1.1 -, don't enumerate nothing. "
         "Generate de JSON values in portugues, keep the keys in english. "
         "Cada módulo deve ter entre 8-10 aulas. "
-        "Cada aula deve ter conteúdo para 3 a 5 minutos se for conceitual, se for prática o máximo aumenta para 10 minutos (mas a duration em segundos). "
+        "Cada aula deve ter conteúdo para 5 a 12 minutos"
         "Strictly follow this JSON schema:"
         "{"
         '  "title": "Título do módulo",'
@@ -307,7 +307,7 @@ def generate_next_module(user_pk: int, course_pk: int):
         '      "title": "Título da lição",'
         '      "desc": "Descrição da lição",'
         '      "duration": 300, '
-        '      "narration": "Detailed narration text (600-800 words), engaging and podcast-style...",'
+        '      "narration": "Detailed narration text, engaging and podcast-style...",'
         '      "key_points": "Key takeaway 1, Key takeaway 2",'
         '      "scene_suggestion": "Visual description for eboard animation"'
         "    }\n"
@@ -486,6 +486,8 @@ def create_course_thumb(course_pk: str, prompt: str):
     - Todo o texto deve estar em português
     - Não adicionar textos desnecessários, é apenas uma capa
     - Não usar marcas d\'água
+    - Não coloca nenhum texto ou figura nos cantos
+    - Não coloca elementos aleatórios tipo logos que não estão relacionadas com o curso pedido
     """
 
     try:
@@ -506,18 +508,35 @@ def create_course_thumb(course_pk: str, prompt: str):
             None,
         )
 
-        if not image_part or not image_part.mime_type.startswith("image/"):
+        if not image_part or not image_part.mime_type.startswith("image/"): # NOQA
             raise ThumbnailCreationError("IA não retornou uma imagem válida")
 
         try:
-            image = Image.open(BytesIO(image_part.data))
+            bytes_data = BytesIO(image_part.data) # NOQA
+            image = Image.open(bytes_data)
             image.verify()
-            image = Image.open(BytesIO(image_part.data)).convert("RGB")
+            image = Image.open(bytes_data).convert("RGBA")
         except UnidentifiedImageError:
             raise ThumbnailCreationError("Conteúdo retornado não é uma imagem")
 
-        filename = f"thumbs/{uuid.uuid4()}.jpg"
+
+        logo_path = settings.BASE_DIR / "static" / "logo.png"
+        logo = Image.open(logo_path).convert("RGBA")
+        img_width, img_height = image.size
+        logo_width = int(img_width * 0.8)
+        logo_ratio = logo_width / logo.width
+        logo_height = int(logo.height * logo_ratio)
+
+        logo = logo.resize((logo_width, logo_height), Image.Resampling.LANCZOS)
+
+        margin = int(img_width * 0.03)
+        position = (margin, margin)
+
+        image.paste(logo, position, logo)
+        image = image.convert("RGB")
+
         buffer = BytesIO()
+        filename = f"thumbs/{uuid.uuid4()}.jpg"
         image.save(buffer, format="JPEG", quality=90)
         buffer.seek(0)
 
