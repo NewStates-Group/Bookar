@@ -308,39 +308,43 @@ export default function CoursesPage() {
               key={`${course.id}`}
               className="group md:max-w-sm p-4 border overflow-hidden shadow-none bg-transparent hover:bg-gray-50 transition-all duration-300 gap-0"
             >
-              <div className={`aspect-video mb-3 ${course.status === "READY" ? 'cursor-pointer' : "coursor-default"}`} onClick={() => {
-                if (course.status === "READY") {
-                  router.push('/app/courses/' + course.id)
-                }
-              }}>
-                {course.thumb ? (
-                  <img src={"http://localhost:8000/media/" + course.thumb} alt={course.title} className="rounded-xl object-cover w-full h-full" />
-                ) : course.status === "PROCESSING" ? (
-                  <div className="flex flex-col items-center justify-center h-full border rounded-lg">
-                    <Loader2 className="w-12 h-12 text-slate-600 animate-spin" />
-                    <span className="text-gray-500">
-                      Gerando curso...
+              {course.status === "PROCESSING" ? (
+                <div className="flex flex-col items-center justify-center h-full rounded-lg">
+                  <Loader2 className="w-12 h-12 text-slate-600 animate-spin" />
+                  <span className="text-gray-500">
+                    Gerando curso...
+                  </span>
+                </div>
+              ) : (
+                <>
+                  <div className={`aspect-video mb-3 ${course.status === "READY" ? 'cursor-pointer' : "coursor-default"}`} onClick={() => {
+                    if (course.status === "READY") {
+                      router.push('/app/courses/' + course.id)
+                    }
+                  }}>
+                    {course.thumb ? (
+                      <img src={"http://localhost:8000/media/" + course.thumb} alt={course.title} className="rounded-xl object-cover w-full h-full" />
+                    ) : (
+                      <div className="flex flex-col items-center justify-center h-full border rounded-lg">
+                        <ImageOff className="w-12 h-12 text-slate-400" />
+                        <span className="text-gray-500">
+                          Capa Indisponível
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  <h1 className="text-lg mb-1">{course.title}</h1>
+                  <p className="line-clamp-2 text-gray-600 text-base">{course.desc}</p>
+                  {course.status === "READY" && (
+                    <Link href={'/app/courses/' + course.id} className="text-blue-600 mt-2 mb-4">Veja mais</Link>
+                  )}
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="inline-flex items-center rounded-md bg-cyan-300/10 px-2 py-1 text-xs font-medium text-blue-400 inset-ring inset-ring-blue-300/30">
+                      {course.level === 'B' ? 'Iniciante' : course.level === 'IT' ? 'Intermediário' : 'Avançado'}
                     </span>
                   </div>
-                ) : (
-                  <div className="flex flex-col items-center justify-center h-full border rounded-lg">
-                    <ImageOff className="w-12 h-12 text-slate-400" />
-                    <span className="text-gray-500">
-                      Capa Indisponível
-                    </span>
-                  </div>
-                )}
-              </div>
-              <h1 className="text-lg mb-1">{course.title}</h1>
-              <p className="line-clamp-2 text-gray-600 text-base">{course.desc}</p>
-              {course.status === "READY" && (
-                <Link href={'/app/courses/' + course.id} className="text-blue-600 mt-2 mb-4">Veja mais</Link>
+                </>
               )}
-              <div className="flex items-center gap-2 mb-1">
-                <span className="inline-flex items-center rounded-md bg-cyan-300/10 px-2 py-1 text-xs font-medium text-blue-400 inset-ring inset-ring-blue-300/30">
-                  {course.level === 'B' ? 'Iniciante' : course.level === 'IT' ? 'Intermediário' : 'Avançado'}
-                </span>
-              </div>
             </Card>
 
           ))}
