@@ -313,7 +313,7 @@ export default function CoursesPage() {
                   <img src={"http://localhost:8000/media/" + course.thumb} alt={course.title} className="object-cover w-full h-full" />
                 ) : course.status === "PROCESSING" ? (
                   <div className="flex flex-col items-center justify-center h-full border rounded-lg">
-                    <Loader2 className="w-12 h-12 text-slate-600 animation-spin" />
+                    <Loader2 className="w-12 h-12 text-slate-600 animate-spin" />
                     <span className="text-gray-500">
                       Gerando curso...
                     </span>
