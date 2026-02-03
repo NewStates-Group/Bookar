@@ -213,6 +213,7 @@ def generate_lesson(user_id, lesson_id: int):
 
         response = ollama_chat([{"role": "user", "content": plan_prompt}])
         segments = extract_json(response, isList=True) or []
+
         if not segments:
             raise ValueError("No segments generated")
 
@@ -281,12 +282,13 @@ def generate_lesson(user_id, lesson_id: int):
 @shared_task
 def generate_next_module(user_pk: int, course_pk: int):
     try:
-        course = Course.objects.prefetch_related("modules").get(pk=course_pk)
+        course = Course.objects.get(pk=course_pk)
     except Course.DoesNotExist:
         logger.error(f"Course {course_pk} not found for module generation")
         return
 
     existing_modules = course.modules.all().order_by("created_at")
+    logger.critical(existing_modules)
     modules_context = "\n".join([f"- {m.name}: {m.desc}" for m in existing_modules])
 
     prompt = (
@@ -316,7 +318,7 @@ def generate_next_module(user_pk: int, course_pk: int):
         f"Context (Existing Modules):\n{modules_context}\n\n"
         "Generate ONLY the ONE next module. Ensure flow and continuity."
     )
-
+    module_object = None
     try:
         response = ollama_chat([{"role": "user", "content": prompt}])
         module_data = extract_json(response)
@@ -353,7 +355,8 @@ def generate_next_module(user_pk: int, course_pk: int):
             generate_lesson.delay(user_pk, first_lesson.id)
 
     except Exception as e:
-        module_object.delete()
+        if module_object:
+            module_object.delete()
         logger.error(f"Failed to generate next module: {e}")
     finally:
         Course.objects.filter(pk=course_pk).update(status="READY")
