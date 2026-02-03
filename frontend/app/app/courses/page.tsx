@@ -4,7 +4,7 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { BookOpen, Plus, Loader2, ArrowRight, ArrowLeft, ArrowUp, ImageOff, LogOut, Trash } from "lucide-react";
+import { BookOpen, Plus, Loader2, ArrowRight, ArrowUp, ImageOff } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
   Dialog,
@@ -24,6 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import Link from "next/link";
 
 interface Course {
   id: Number;
@@ -176,7 +177,7 @@ export default function CoursesPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 md:px-8 py-3">
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center mb-8">
         <div>
           <h1 className="text-3xl font-bold">Cursos</h1>
           <span className="text-sm text-gray-700">Crie cursos com IA e aprenda com eles!</span>
@@ -301,21 +302,19 @@ export default function CoursesPage() {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
           {courses.map((course) => (
             <Card
               key={`${course.id}`}
-              className={`group ${course.status === "READY" ? 'cursor-pointer' : "coursor-default"} overflow-hidden border-0 bg-transparent shadow-none transition-all duration-300`}
-              onClick={() => {
+              className="group md:max-w-sm p-4 border overflow-hidden shadow-none bg-transparent hover:bg-gray-50 transition-all duration-300 gap-0"
+            >
+              <div className={`aspect-video mb-3 ${course.status === "READY" ? 'cursor-pointer' : "coursor-default"}`} onClick={() => {
                 if (course.status === "READY") {
                   router.push('/app/courses/' + course.id)
                 }
-              }
-              }
-            >
-              <div className="relative aspect-video rounded-xl overflow-hidden bg-muted shadow-lg">
+              }}>
                 {course.thumb ? (
-                  <img src={"http://localhost:8000/media/" + course.thumb} alt={course.title} className="object-cover w-full h-full" />
+                  <img src={"http://localhost:8000/media/" + course.thumb} alt={course.title} className="rounded-xl object-cover w-full h-full" />
                 ) : course.status === "PROCESSING" ? (
                   <div className="flex flex-col items-center justify-center h-full border rounded-lg">
                     <Loader2 className="w-12 h-12 text-slate-600 animate-spin" />
@@ -331,14 +330,16 @@ export default function CoursesPage() {
                     </span>
                   </div>
                 )}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex flex-col justify-end p-4 px-6 text-white">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="bg-primary px-3 py-1 rounded-full text-xs font-bold text-primary-foreground">
-                      {course.level === 'B' ? 'Iniciante' : course.level === 'IT' ? 'Intermediário' : 'Avançado'}
-                    </span>
-                  </div>
-                  <h1 className="text-xl font-bold capitalize">{course.title}</h1>
-                </div>
+              </div>
+              <h1 className="text-lg mb-1">{course.title}</h1>
+              <p className="line-clamp-2 text-gray-600 text-base">{course.desc}</p>
+              {course.status === "READY" && (
+                <Link href={'/app/courses/' + course.id} className="text-blue-600 mt-2 mb-4">Veja mais</Link>
+              )}
+              <div className="flex items-center gap-2 mb-1">
+                <span className="inline-flex items-center rounded-md bg-cyan-300/10 px-2 py-1 text-xs font-medium text-blue-400 inset-ring inset-ring-blue-300/30">
+                  {course.level === 'B' ? 'Iniciante' : course.level === 'IT' ? 'Intermediário' : 'Avançado'}
+                </span>
               </div>
             </Card>
 
