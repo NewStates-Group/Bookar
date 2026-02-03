@@ -182,23 +182,23 @@ export default function CoursePage() {
             </div>
           )}
           <div className="md:absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex flex-col justify-end p-8 text-white ">
-            <div className="flex items-center gap-2 mb-2">
-              <h1 className="text-4xl font-bold mb-2 capitalize">{course.title}</h1>
-              <span className="bg-primary px-3 py-1 rounded-full text-sm font-bold text-primary-foreground">
+            <h1 className="text-4xl font-bold mb-2 capitalize">{course.title}</h1>
+            <p className="text-white/80 l">{course.desc}</p>
+            <div className="mt-1">
+              <span className="inline-flex items-center rounded-md bg-cyan-300/10 px-2 py-1 text-sm font-semibold text-cyan-400 inset-ring inset-ring-cyan-300/30">
                 {course.level === 'B' ? 'Iniciante' : course.level === 'IT' ? 'Intermediário' : 'Avançado'}
               </span>
             </div>
-            <p className="text-white/80 l">{course.desc}</p>
           </div>
         </div>
         <div className="md:hidden">
-          <div className="flex items-center gap-2 mb-2">
-            <h1 className="text-4xl font-bold mb-2 capitalize">{course.title}</h1>
-            <span className="bg-primary px-3 py-1 rounded-full text-xs font-bold text-primary-foreground">
+          <h1 className="text-2xl font-bold mb-2 capitalize">{course.title}</h1>
+          <p className="text-black/80 text-base">{course.desc}</p>
+          <div className="mt-2">
+            <span className="inline-flex items-center rounded-md bg-cyan-300/10 px-2 py-1 text-sm font-medium text-cyan-600 inset-ring inset-ring-cyan-300/30">
               {course.level === 'B' ? 'Iniciante' : course.level === 'IT' ? 'Intermediário' : 'Avançado'}
             </span>
           </div>
-          <p className="text-black/80 l">{course.desc}</p>
           <div className="w-full border mt-2"></div>
         </div>
 
@@ -219,12 +219,14 @@ export default function CoursePage() {
                 </span>
               </Button>
               <Button size="lg" className="rounded-full px-8 bg-cyan-500 hover:bg-cyan-600" onClick={watchCourse} hidden={finished}>
-                <Play className="w-4 h-4 mr-2" />
-                {
-                  course.modules.find((module) => {
-                    module.lessons.some((lesson) => lesson.watched)
-                  }) ? "Continuar Assistindo" : "Assistir Curso"
-                }
+                <Play className="w-4 h-4" />
+                <span className="ml-2 hidden md:block">
+                  {
+                    course.modules.find((module) => {
+                      module.lessons.some((lesson) => lesson.watched)
+                    }) ? "Continuar Assistindo" : "Assistir Curso"
+                  }
+                </span>
               </Button>
             </div>
           </div>
