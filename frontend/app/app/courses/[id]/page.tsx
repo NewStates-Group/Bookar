@@ -260,11 +260,15 @@ export default function CoursePage() {
                             <PlayCircle className="w-5 h-5 text-gray-600" />
                           </Link>
                         ) : lesson.status === 'PROCESSING' ? (
-                          <span className="text-blue-600 bg-blue-100 px-2 py-1 rounded-full flex items-center gap-1">
-                            <Loader2 className="w-3 h-3 animate-spin" /> Gerando
-                          </span>
+                          <Link href={`/app/courses/watch?l=${lesson.id}&c=${course.id}`}>
+                            <span className="text-blue-600 bg-blue-100 px-2 py-1 rounded-full flex items-center gap-1">
+                              <Loader2 className="w-3 h-3 animate-spin" /> Gerando
+                            </span>
+                          </Link>
                         ) : (
-                          <span className="text-gray-500 bg-gray-100 px-2 py-1 rounded-full">Aguardando</span>
+                          <Link href={`/app/courses/watch?l=${lesson.id}&c=${course.id}`}>
+                            <span className="text-gray-500 bg-gray-100 px-2 py-1 rounded-full cursor-pointer">Aguardando</span>
+                          </Link>
                         )}
                       </div>
                     </div>

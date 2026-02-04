@@ -7,6 +7,19 @@ import { useEffect, useState } from "react";
 import { CourseData, Module } from "@/app/app/courses/watch/page";
 import Image from "next/image";
 
+const LessonStatusIcon = ({ status }: { status: string }) => {
+    switch (status) {
+        case "READY":
+            return <PlayCircle className="w-4 h-4 flex-shrink-0" />;
+        case "PROCESSING":
+            return <Loader2 className="w-4 h-4 flex-shrink-0 animate-spin" />;
+        case "ERROR":
+            return <div className="w-4 h-4 rounded-full bg-destructive/50 flex-shrink-0" />;
+        default:
+            return <div className="w-4 h-4 rounded-full border border-border flex-shrink-0" />;
+    }
+}
+
 export function CourseWatchSidebar({ course, onClose }: { course: CourseData | null, onClose: () => void }) {
     if (!course) return
 
@@ -110,15 +123,7 @@ export function CourseWatchSidebar({ course, onClose }: { course: CourseData | n
                                                             : "text-foreground/60 hover:bg-muted hover:text-foreground/80"
                                                             }`}
                                                     >
-                                                        {lesson.status === "READY" ? (
-                                                            <PlayCircle className="w-4 h-4 flex-shrink-0" />
-                                                        ) : lesson.status === "PROCESSING" ? (
-                                                            <Loader2 className="w-4 h-4 flex-shrink-0 animate-spin" />
-                                                        ) : lesson.status === "ERROR" ? (
-                                                            <div className="w-4 h-4 rounded-full bg-destructive/50 flex-shrink-0" />
-                                                        ) : (
-                                                            <div className="w-4 h-4 rounded-full border border-border flex-shrink-0" />
-                                                        )}
+                                                        <LessonStatusIcon status={lesson.status} />
                                                         <div className="flex-1 text-left min-w-0">
                                                             <p className="truncate text-xs">{lesson.title}</p>
                                                             <p className="text-xs text-foreground/40">

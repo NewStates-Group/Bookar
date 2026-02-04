@@ -335,9 +335,12 @@ def generate_next_module(user_pk: int, course_pk: int):
         "You are an expert educational content creator. "
         "Create the NEXT module for this course in JSON format. "
         "Don't enumerate the lesson like this 1.1 -, don't enumerate nothing. "
-        "Generate de JSON values in portugues, keep the keys in english. "
+        "Generate the JSON values in portugues, keep the keys in english. "
         "Cada módulo deve ter entre 8-15 aulas. "
-        "Gera módulos começandos dos conceitos e definições e só depois parte para os temas mais avançados"
+        "Gera módulos seguindo uma progressão lógica: Comece SEMPRE com História, Definição, Conceitos Teóricos e Contexto. "
+        "NÃO comece com prática imediata ou tópicos avançados. "
+        "Exemplo: Se for um curso de HTML, 1. História da Web, 2. O que é HTML, 3. Estrutura Básica, e então Prática. "
+        "Mantenha essa estrutura progressiva para todo o curso. "
         "Cada aula deve ter conteúdo para 5 a 12 minutos"
         "Strictly follow this JSON schema:"
         "{"
@@ -350,7 +353,7 @@ def generate_next_module(user_pk: int, course_pk: int):
         '      "duration": 300, '
         '      "narration": "Detailed narration text, engaging and podcast-style...",'
         '      "key_points": "Key takeaway 1, Key takeaway 2",'
-        '      "scene_suggestion": "Visual description for eboard animation"'
+        '      "scene_suggestion": "Visual description for whiteboard animation"'
         "    }\n"
         "  ]\n"
         "}\n\n"

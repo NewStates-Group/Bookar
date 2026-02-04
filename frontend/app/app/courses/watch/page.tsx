@@ -8,6 +8,7 @@ import { useEffect, useState, useRef } from "react";
 import { toast } from "sonner";
 import { CourseWatchSidebar } from "@/components/course-sidebar";
 import Link from "next/link";
+import { BuildingBlocksLoader } from "@/components/ui/building-blocks-loader";
 
 export interface Module {
     id: number;
@@ -91,17 +92,9 @@ export default function WatchPage() {
 
             if (res.ok) {
                 const data = await res.json();
-                if (data.status === "READY") {
-                    setLesson(data);
-                    setLoading(false);
-                    setViewMode("video");
-                } else {
-                    toast.info(
-                        data.status === "PROCESSING" ? "Esta aula está a ser gerada" : "Esta aula ainda não foi gerada"
-                    )
-                    router.push('/app/courses/' + courseID)
-                    return
-                }
+                setLesson(data);
+                setLoading(false);
+                setViewMode("video");
             } else {
                 const errorData = await res.json();
                 setError(errorData.message || "Erro ao carregar aula");
@@ -295,9 +288,8 @@ export default function WatchPage() {
                         </div>
                         {(lesson?.status === "PROCESSING" || lesson?.status === "PENDING") && (
                             <div className="text-center space-y-6 max-w-lg z-10">
-                                <div className="relative w-24 h-24 mx-auto">
-                                    <div className="absolute inset-0 border-4 border-primary/30 rounded-full"></div>
-                                    <div className="absolute inset-0 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+                                <div className="mb-8">
+                                    <BuildingBlocksLoader />
                                 </div>
                                 <div>
                                     <h2 className="text-2xl font-bold text-foreground mb-2">Criando sua aula com IA...</h2>
