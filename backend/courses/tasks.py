@@ -148,7 +148,7 @@ def _stitch_video(image, audio, output):
         str(output),
     ]
     try:
-        subprocess.run(cmd, check=True, capture_output=True, timeout=60)
+        subprocess.run(cmd, check=True, capture_output=True, timeout=15 * 60)
         return True
     except Exception as e:
         logger.error(f"FFmpeg failed: {e}")
@@ -286,7 +286,7 @@ def generate_lesson(user_id, lesson_id: int):
                 str(output),  # sobrescreve ou use outro nome
             ],
             check=True,
-            timeout=300,
+            timeout=15 * 60,
         )
 
         lesson.lesson_file = f"courses/lessons/{output.name}"
