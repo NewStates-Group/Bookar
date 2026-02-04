@@ -202,6 +202,7 @@ def generate_lesson(user_id, lesson_id: int):
         Context: {lesson.narration}
         **USE PORTUGUESE ON THE JSON VALUES**
         **KEYS MUST KEEP THE ORIGINAL ENGLISH NAMES**
+        A narration deve ser suficiente para cobrir 7 a 12 minutos de aula
         Generate a JSON list of segments:
         [
         {{
@@ -231,22 +232,49 @@ def generate_lesson(user_id, lesson_id: int):
         if not videos:
             raise RuntimeError("No video segments created")
 
+        logo_path = settings.BASE_DIR / "static" / "logo.png"
+        filter_complex = "[1:v]scale=iw*0.08:-1[logo];[0:v][logo]overlay=20:20"
+
         list_file = temp_dir / "list.txt"
         list_file.write_text("\n".join(f"file '{v}'" for v in videos))
         output_dir = Path(settings.MEDIA_ROOT) / "courses/lessons"
         output_dir.mkdir(parents=True, exist_ok=True)
         output = output_dir / f"{uuid.uuid4()}.mp4"
 
+        # subprocess.run(
+        #     [
+        #         "ffmpeg",
+        #         "-y",
+        #         "-f",
+        #         "concat",
+        #         "-safe",
+        #         "0",
+        #         "-i",
+        #         str(list_file),
+        #         "-c:v",
+        #         "libx264",
+        #         "-preset",
+        #         "veryfast",
+        #         "-pix_fmt",
+        #         "yuv420p",
+        #         "-c:a",
+        #         "aac",
+        #         str(output),
+        #     ],
+        #     check=True,
+        #     timeout=300,
+        # )
+
         subprocess.run(
             [
                 "ffmpeg",
                 "-y",
-                "-f",
-                "concat",
-                "-safe",
-                "0",
                 "-i",
-                str(list_file),
+                str(output),  # vídeo final concatenado
+                "-i",
+                str(logo_path),  # logo
+                "-filter_complex",
+                filter_complex,
                 "-c:v",
                 "libx264",
                 "-preset",
@@ -254,8 +282,8 @@ def generate_lesson(user_id, lesson_id: int):
                 "-pix_fmt",
                 "yuv420p",
                 "-c:a",
-                "aac",
-                str(output),
+                "copy",
+                str(output),  # sobrescreve ou use outro nome
             ],
             check=True,
             timeout=300,
@@ -296,11 +324,11 @@ def generate_next_module(user_pk: int, course_pk: int):
         "Create the NEXT module for this course in JSON format. "
         "Don't enumerate the lesson like this 1.1 -, don't enumerate nothing. "
         "Generate de JSON values in portugues, keep the keys in english. "
-        "Cada módulo deve ter entre 8-10 aulas. "
+        "Cada módulo deve ter entre 8-15 aulas. "
         "Cada aula deve ter conteúdo para 5 a 12 minutos"
         "Strictly follow this JSON schema:"
         "{"
-        '  "title": "Título do módulo",'
+        '  "title": "Título do módulo (sem enumeração, Módulo 1:, directo o título do módulo)",'
         '  "desc": "Descrição do módulo",'
         '  "lessons": ['
         "    {"
@@ -480,7 +508,8 @@ def create_course_thumb(course_pk: str, prompt: str):
     - Design moderno e limpo
     - Cores adequadas ao tema
     - Gradientes suaves se necessário
-    - Logos ou ilustrações (não realistas)
+    - Logos ou ilustrações no centro (não realistas)
+    - Faz uma thumb retângular, não quadrada
 
     Regras:
     - Todo o texto deve estar em português
@@ -523,7 +552,7 @@ def create_course_thumb(course_pk: str, prompt: str):
         logo_path = settings.BASE_DIR / "static" / "logo.png"
         logo = Image.open(logo_path).convert("RGBA")
         img_width, img_height = image.size
-        logo_width = int(img_width * 0.8)
+        logo_width = int(img_width * 0.08)
         logo_ratio = logo_width / logo.width
         logo_height = int(logo.height * logo_ratio)
 
