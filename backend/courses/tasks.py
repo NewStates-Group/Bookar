@@ -233,13 +233,13 @@ def generate_lesson(user_id, lesson_id: int):
             raise RuntimeError("No video segments created")
 
         logo_path = settings.BASE_DIR / "static" / "logo.png"
-        filter_complex = "[1:v]scale=iw*0.08:-1[logo];[0:v][logo]overlay=20:20"
 
         list_file = temp_dir / "list.txt"
         list_file.write_text("\n".join(f"file '{v}'" for v in videos))
         output_dir = Path(settings.MEDIA_ROOT) / "courses/lessons"
         output_dir.mkdir(parents=True, exist_ok=True)
         output = output_dir / f"{uuid.uuid4()}.mp4"
+        temp_output = output_dir / f"temp_{uuid.uuid4()}.mp4"
 
         # subprocess.run(
         #     [
@@ -269,27 +269,39 @@ def generate_lesson(user_id, lesson_id: int):
             [
                 "ffmpeg",
                 "-y",
-                "-i",
-                str(output),  # vídeo final concatenado
-                "-i",
-                str(logo_path),  # logo
-                "-filter_complex",
-                filter_complex,
-                "-c:v",
-                "libx264",
-                "-preset",
-                "veryfast",
-                "-pix_fmt",
-                "yuv420p",
-                "-c:a",
-                "copy",
-                str(output),  # sobrescreve ou use outro nome
+                "-f", "concat",
+                "-safe", "0",
+                "-i", str(list_file),
+                "-c:v", "libx264",
+                "-preset", "veryfast",
+                "-pix_fmt", "yuv420p",
+                "-c:a", "aac",
+                str(output),
             ],
             check=True,
-            timeout=15 * 60,
+            timeout=15*60,
         )
 
-        lesson.lesson_file = f"courses/lessons/{output.name}"
+        subprocess.run(
+            [
+                "ffmpeg",
+                "-y",
+                "-i", str(output),
+                "-i", str(logo_path),
+                "-filter_complex", "[1:v]scale=iw*0.08:-1[logo];[logo]format=rgba[logo];[0:v][logo]overlay=20:20",
+                "-c:v", "libx264",
+                "-preset", "veryfast",
+                "-pix_fmt", "yuv420p",
+                "-c:a", "aac",
+                "-b:a", "128k",
+                str(temp_output),
+            ],
+            check=True,
+            timeout=15*60,
+        )
+
+
+        lesson.lesson_file = f"courses/lessons/{temp_output.name}"
         lesson.status = "READY"
         lesson.save()
 
@@ -325,6 +337,7 @@ def generate_next_module(user_pk: int, course_pk: int):
         "Don't enumerate the lesson like this 1.1 -, don't enumerate nothing. "
         "Generate de JSON values in portugues, keep the keys in english. "
         "Cada módulo deve ter entre 8-15 aulas. "
+        "Gera módulos começandos dos conceitos e definições e só depois parte para os temas mais avançados"
         "Cada aula deve ter conteúdo para 5 a 12 minutos"
         "Strictly follow this JSON schema:"
         "{"
@@ -537,17 +550,16 @@ def create_course_thumb(course_pk: str, prompt: str):
             None,
         )
 
-        if not image_part or not image_part.mime_type.startswith("image/"): # NOQA
+        if not image_part or not image_part.mime_type.startswith("image/"):  # NOQA
             raise ThumbnailCreationError("IA não retornou uma imagem válida")
 
         try:
-            bytes_data = BytesIO(image_part.data) # NOQA
+            bytes_data = BytesIO(image_part.data)  # NOQA
             image = Image.open(bytes_data)
             image.verify()
             image = Image.open(bytes_data).convert("RGBA")
         except UnidentifiedImageError:
             raise ThumbnailCreationError("Conteúdo retornado não é uma imagem")
-
 
         logo_path = settings.BASE_DIR / "static" / "logo.png"
         logo = Image.open(logo_path).convert("RGBA")

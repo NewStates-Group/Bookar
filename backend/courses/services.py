@@ -107,8 +107,8 @@ class CourseService:
 
         return {"score": score, "passed": passed, "correct_answers": list(all_correct)}
 
-    def trigger_next_module(self, course_id: int):
-        generate_next_module.delay(course_id)
+    def trigger_next_module(self, user_pk, course_id: int):
+        generate_next_module.delay(user_pk, course_id)
         return {"success": True, "message": "Gerando módulo..."}
 
 

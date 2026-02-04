@@ -52,8 +52,8 @@ class CourseController:
         return GetNextLessonSchema.from_orm(lesson)
 
     @route.post("{course_id}/generate-module")
-    def generate_module(self, course_id: int):
-        return self.course_service.trigger_next_module(course_id)
+    def generate_module(self, request, course_id: int):
+        return self.course_service.trigger_next_module(request.user.pk, course_id)
 
     @route.get("quiz/{lesson_id}", response=QuizSchema)
     def get_quiz(self, lesson_id: int):
