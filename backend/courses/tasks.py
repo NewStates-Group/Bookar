@@ -20,7 +20,7 @@ from .models import Choice, Course, Lesson, Module, Question, Quiz
 from .utils import (
     extract_json,
     get_genai_client,
-    ollama_chat,
+    genai_chat,
 )
 
 logger = logging.getLogger(__name__)
@@ -212,7 +212,7 @@ def generate_lesson(user_id, lesson_id: int):
         ]
         """
 
-        response = ollama_chat([{"role": "user", "content": plan_prompt}])
+        response = genai_chat([{"role": "user", "content": plan_prompt}])
         segments = extract_json(response, isList=True) or []
 
         if not segments:
@@ -364,7 +364,7 @@ def generate_next_module(user_pk: int, course_pk: int):
     )
     module_object = None
     try:
-        response = ollama_chat([{"role": "user", "content": prompt}])
+        response = genai_chat([{"role": "user", "content": prompt}])
         module_data = extract_json(response)
 
         if not module_data:
@@ -436,7 +436,7 @@ def generate_quiz(lesson_id: int):
     )
 
     try:
-        response = ollama_chat([{"role": "user", "content": prompt}])
+        response = genai_chat([{"role": "user", "content": prompt}])
         quiz_data = extract_json(response)
 
         if not quiz_data:
@@ -497,13 +497,13 @@ def create_course_details(course_pk: int, prompt: str, level: str):
 
     course_outline = None
     try:
-        response = ollama_chat([{"role": "user", "content": ai_prompt}])
+        response = genai_chat([{"role": "user", "content": ai_prompt}])
         course_outline = extract_json(response)
     except Exception as e:
         logger.error(f"Outline generation failed: {e}")
         Course.objects.filter(pk=course_pk).update(status="FAILED")
-        raise CourseCreationError(f"Erro ao criar estrutura do curso: {str(e)}")
-
+        return
+    
     course_title = course_outline.get("title", "Sem título")
     course_desc = course_outline.get("desc", course_title)
 

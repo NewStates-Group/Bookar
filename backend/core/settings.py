@@ -112,4 +112,5 @@ AI = {
     "OLLAMA_MODEL_TEXT": "gpt-oss:120b-cloud",
     "GENAI_MODEL_IMAGE": "gemini-2.5-flash-image",
     "GENAI_MODEL_AUDIO": "gemini-2.5-flash-preview-tts",
+    "GENAI_MODEL_TEXT": "gemini-2.0-flash",
 }

@@ -18,6 +18,7 @@ class CourseOut(ModelSchema):
             "level",
             "created_at",
             "status",
+            "max_modules",
         ]
 
 
@@ -55,6 +56,7 @@ ModuleSchema = create_schema(Module, fields=["id", "name", "desc"])
 class CourseIn(Schema):
     prompt: str
     level: CourseLevel
+    num_modules: int = 5
 
 
 class ModuleDetailSchema(ModuleSchema):

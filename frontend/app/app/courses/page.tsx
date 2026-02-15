@@ -35,6 +35,7 @@ interface Course {
   thumb: string;
   status: "PROCESSING" | "READY" | "ERROR";
   created_at: string;
+  max_modules?: number;
 }
 
 export default function CoursesPage() {
@@ -47,6 +48,7 @@ export default function CoursesPage() {
 
   const [step, setStep] = useState(1);
   const [prompt, setPrompt] = useState("");
+  const [numModules, setNumModules] = useState<number>(5);
   const [level, setLevel] = useState<"B" | "IT" | "A">("B");
 
   const levelConfig = {
@@ -82,11 +84,17 @@ export default function CoursesPage() {
   const handleNext = () => {
     if (step === 1 && prompt.trim()) {
       setStep(2);
+    } else if (step === 2 && numModules >= 1 && numModules <= 20) {
+      setStep(3);
     }
   };
 
   const handleBack = () => {
-    setStep(1);
+    if (step === 3) {
+      setStep(2);
+    } else if (step === 2) {
+      setStep(1);
+    }
   };
 
   const waitForCourseReady = async (courseID: Number) => {
@@ -127,6 +135,7 @@ export default function CoursesPage() {
         body: JSON.stringify({
           prompt,
           level,
+          num_modules: numModules,
         }),
       });
 
@@ -135,6 +144,7 @@ export default function CoursesPage() {
 
         setOpen(false);
         setPrompt("");
+        setNumModules(5);
         setLevel("B");
         setStep(1);
 
@@ -156,6 +166,7 @@ export default function CoursesPage() {
     if (!newOpen) {
       setStep(1);
       setPrompt("");
+      setNumModules(5);
       setLevel("B");
     }
   };
@@ -163,7 +174,7 @@ export default function CoursesPage() {
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      if (step === 1) {
+      if (step === 1 || step === 2) {
         handleNext();
       } else {
         handleCreateCourse();
@@ -201,7 +212,9 @@ export default function CoursesPage() {
                   <DialogDescription className="mt-2 text-center  text-base">
                     {step === 1
                       ? "Dê um nome ao seu curso"
-                      : "Descreva o que você quer aprender"}
+                      : step === 2
+                        ? "Quantos módulos deseja?"
+                        : "Escolha o nível do curso"}
                   </DialogDescription>
                 </div>
 
@@ -236,6 +249,39 @@ export default function CoursesPage() {
                   )}
 
                   {step === 2 && (
+                    <div className="space-y-4 animate-in fade-in slide-in-from-right-3 duration-300">
+                      <div className="space-y-2">
+                        <label className="text-base font-medium text-muted-foreground mb-1">
+                          Número de módulos
+                        </label>
+                        <div className="relative group">
+                          <Input
+                            type="number"
+                            min={1}
+                            max={20}
+                            value={numModules}
+                            onChange={(e) => setNumModules(parseInt(e.target.value) || 1)}
+                            onKeyPress={handleKeyPress}
+                            placeholder="Ex: 5"
+                            className="h-14 text-lg pr-14 border-2 focus:ring-0 transition-all"
+                            autoFocus
+                          />
+                          <Button
+                            type="button"
+                            onClick={handleNext}
+                            disabled={!numModules || numModules < 1 || numModules > 20}
+                            size="icon"
+                            className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full shadow-md hover:shadow-lg transition-all disabled:opacity-50"
+                          >
+                            <ArrowRight className="h-5 w-5" />
+                          </Button>
+                        </div>
+                        <p className="text-xs text-muted-foreground ml-1">Mínimo: 1, Máximo: 20</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {step === 3 && (
                     <div className="space-y-4 animate-in fade-in slide-in-from-right-3 duration-300">
                       <div className="space-y-2">
                         <label className="text-base font-medium text-muted-foreground mb-2 ml-1">

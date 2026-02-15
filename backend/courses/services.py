@@ -31,8 +31,8 @@ class CourseService:
         except Course.DoesNotExist:
             raise HttpError(404, "Curso não encontrado")
 
-    def create_course(self, user, prompt: str, level: str) -> Course:
-        course = Course.objects.create(user=user, level=level)
+    def create_course(self, user, prompt: str, level: str, num_modules: int = 5) -> Course:
+        course = Course.objects.create(user=user, level=level, max_modules=num_modules)
         create_course_details.delay(course.pk, prompt, course.get_level_display())
         return course
 
@@ -108,8 +108,17 @@ class CourseService:
         return {"score": score, "passed": passed, "correct_answers": list(all_correct)}
 
     def trigger_next_module(self, user_pk, course_id: int):
-        generate_next_module.delay(user_pk, course_id)
-        return {"success": True, "message": "Gerando módulo..."}
+        try:
+            course = Course.objects.get(pk=course_id)
+            current_module_count = course.modules.count()
+            
+            if course.max_modules and current_module_count >= course.max_modules:
+                raise HttpError(400, f"Limite de módulos atingido ({course.max_modules})")
+            
+            generate_next_module.delay(user_pk, course_id)
+            return {"success": True, "message": "Gerando módulo..."}
+        except Course.DoesNotExist:
+            raise HttpError(404, "Curso não encontrado")
 
 
 class LessonService:

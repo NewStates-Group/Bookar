@@ -32,6 +32,25 @@ def get_genai_client():
     return genai.Client(api_key=settings.AI["GENAI_KEY"])
 
 
+def genai_chat(messages, model=None):
+    client = get_genai_client()
+    if model is None:
+        model = settings.AI.get("GENAI_MODEL_TEXT", "gemini-2.0-flash")
+    
+    # Extract content from the last message if it's a list of dicts (Ollama style)
+    if isinstance(messages, list) and len(messages) > 0 and isinstance(messages[-1], dict):
+        prompt = messages[-1].get("content", "")
+    else:
+        prompt = str(messages)
+
+    response = client.models.generate_content(
+        model=model,
+        contents=prompt,
+    )
+    
+    return response.text
+
+
 def get_next_lesson(course_pk: int) -> Lesson | None:
     return (
         Lesson.objects.filter(module__course_id=course_pk, watched=False)

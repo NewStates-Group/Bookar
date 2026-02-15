@@ -17,6 +17,7 @@ interface Course {
   thumb: string;
   status: string;
   created_at: string;
+  max_modules?: number;
 }
 
 interface Lesson {
@@ -212,12 +213,14 @@ export default function CoursePage() {
                   Eliminar Curso
                 </span>
               </Button>
-              <Button variant="outline" size="lg" className="rounded-full px-8" onClick={handleGenerateModule} disabled={isGeneratingModule}>
-                {isGeneratingModule ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-                <span className="hidden md:block">
-                  Novo Módulo
-                </span>
-              </Button>
+              {(!course.max_modules || course.modules.length < course.max_modules) && (
+                <Button variant="outline" size="lg" className="rounded-full px-8" onClick={handleGenerateModule} disabled={isGeneratingModule}>
+                  {isGeneratingModule ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                  <span className="hidden md:block">
+                    Novo Módulo
+                  </span>
+                </Button>
+              )}
               <Button size="lg" className="rounded-full px-8 bg-cyan-500 hover:bg-cyan-600" onClick={watchCourse} hidden={finished}>
                 <Play className="w-4 h-4" />
                 <span className="ml-2 hidden md:block">
@@ -230,6 +233,11 @@ export default function CoursePage() {
               </Button>
             </div>
           </div>
+          {course.max_modules && (
+            <p className="text-sm text-muted-foreground">
+              {course.modules.length} / {course.max_modules} módulos
+            </p>
+          )}
           <div className="space-y-4">
             {course.modules.length === 0 && (
               <p className="text-muted-foreground">Nenhum módulo encontrado.</p>

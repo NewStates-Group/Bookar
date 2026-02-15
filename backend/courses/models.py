@@ -43,6 +43,7 @@ class Course(models.Model):
     )
     thumb = models.TextField(null=True, blank=True)
     deleted = models.BooleanField(default=False, null=True, blank=True)
+    max_modules = models.PositiveIntegerField(null=True, blank=True, default=5)
     created_at = models.DateTimeField(auto_now_add=True)
 
 
