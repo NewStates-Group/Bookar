@@ -79,7 +79,7 @@ export const authOptions: NextAuthOptions = {
                 const data = await res.json();
 
                 if (!res.ok || !data.access) {
-                    return null;
+                    throw new Error(data.detail || "Authentication failed");
                 }
 
                 return {

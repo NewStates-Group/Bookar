@@ -15,22 +15,22 @@ class RegisterIn(Schema):
     def validate_username(cls, value: str) -> str:
         username = value.strip()
         if len(username) < 3:
-            raise ValueError("Too short username")
+            raise ValueError("Username must be at least 3 characters long")
         if User.objects.filter(username=value).exists():
-            raise ValueError("Username was taken")
+            raise ValueError("This username is already taken")
         return username
 
     @field_validator("email", mode="after")
     def validate_email(cls, value: str) -> str:
         if User.objects.filter(email=value).exists():
-            raise ValueError("Invalid e-mail")
+            raise ValueError("This email is already registered")
         return value
 
     @field_validator("password", mode="after")
     @classmethod
-    def validate_password(cls, value: EmailStr) -> EmailStr:
+    def validate_password(cls, value: str) -> str:
         if len(value) < 12:
-            raise ValueError("Weak password")
+            raise ValueError("Password must be at least 12 characters long")
         return value
 
 
