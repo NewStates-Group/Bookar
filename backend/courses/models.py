@@ -17,6 +17,12 @@ class LessonStatus(models.TextChoices):
     ERROR = "ERROR", "Erro"
 
 
+class ModuleStatus(models.TextChoices):
+    PROCESSING = "PROCESSING", "Processando"
+    READY = "READY", "Pronto"
+    FAILED = "FAILED", "Falhou"
+
+
 class CourseLevel(models.TextChoices):
     BEGINNER = "B", "Beginner"
     INTERMEDIATE = "IT", "Intermediate"
@@ -46,11 +52,85 @@ class Course(models.Model):
     max_modules = models.PositiveIntegerField(null=True, blank=True, default=5)
     created_at = models.DateTimeField(auto_now_add=True)
 
+    @property
+    def is_completed(self):
+        # Check if all lessons are watched
+        total_lessons = Lesson.objects.filter(module__course=self).count()
+        if total_lessons == 0:
+            return False
+        watched_lessons = Lesson.objects.filter(module__course=self, watched=True).count()
+        if watched_lessons < total_lessons:
+            return False
+
+        # Check quizzes
+        for module in self.modules.all():
+            if hasattr(module, 'quiz'):
+                # We need to import QuizAttempt inside method to avoid circular import if define elsewhere
+                # But models.py defines all. We need to make sure QuizAttempt is available or use strict relation
+                # QuizAttempt is defined below. Python resolves at runtime, so it should be fine if defined in same file.
+                # However, QuizAttempt is usually defined AFTER Course.
+                # Use string reference or import locally?
+                # Actually, QuizAttempt is defined in same file, likely below. 
+                # Let's check where QuizAttempt is defined.
+                pass
+        
+        # Re-implementing with lookup that doesn't depend on order if possible, or just moving class?
+        # Better: use reverse relation if available.
+        # QuizAttempt has 'quiz' FK.
+        # Quiz has 'module' OneToOne.
+        # So module.quiz.attempts.filter(user=self.user, passed=True).exists()
+        
+        # But wait, Course.user is the owner.
+        return self._check_completion()
+
+    def _check_completion(self):
+        # We use runtime lookup because QuizAttempt is defined below
+        for module in self.modules.all():
+            if hasattr(module, 'quiz'):
+                # Check if passed attempt exists
+                if not module.quiz.attempts.filter(passed=True).exists():
+                    return False
+        return True
+
+    @property
+    def is_fully_completed(self):
+        """
+        Comprehensive completion check:
+        - All modules generated (reached max_modules)
+        - All lessons in all modules are watched
+        - All module quizzes are passed
+        """
+        # 1. Check if all modules are generated
+        if self.max_modules and self.modules.count() < self.max_modules:
+            return False
+        
+        # 2. Check if all lessons are watched and ready
+        total_lessons = Lesson.objects.filter(module__course=self).count()
+        if total_lessons == 0:
+            return False
+            
+        watched_lessons = Lesson.objects.filter(module__course=self, watched=True, status="READY").count()
+        if watched_lessons < total_lessons:
+            return False
+            
+        # 3. Check if all module quizzes are passed
+        for module in self.modules.all():
+            if hasattr(module, 'quiz'):
+                if not module.quiz.attempts.filter(passed=True).exists():
+                    return False
+        
+        return True
+
 
 class Module(models.Model):
     course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name="modules")
     name = models.CharField(max_length=150, null=True, blank=True)
     desc = models.TextField(null=True, blank=True)
+    status = models.CharField(
+        max_length=20,
+        choices=ModuleStatus.choices,
+        default=ModuleStatus.READY,
+    )
     created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)
 
 
@@ -88,6 +168,9 @@ class CourseGenerationContext(models.Model):
 class Quiz(models.Model):
     course = models.ForeignKey(
         Course, on_delete=models.CASCADE, related_name="quizzes", null=True, blank=True
+    )
+    module = models.OneToOneField(
+        Module, on_delete=models.CASCADE, related_name="quiz", null=True, blank=True
     )
     lesson = models.OneToOneField(
         Lesson, on_delete=models.CASCADE, related_name="quiz", null=True, blank=True

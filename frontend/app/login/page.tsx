@@ -33,7 +33,7 @@ export default function LoginPage() {
         toast.error(result.error);
       } else {
         toast.success("Login efetuado com sucesso!");
-        router.push("/app");
+        router.push("/app/courses");
       }
     } catch (error) {
       toast.error("Ocorreu um erro ao tentar fazer login.");

@@ -1,4 +1,5 @@
-from typing import List
+from datetime import datetime
+from typing import List, Optional
 
 from ninja import ModelSchema, Schema
 from ninja.orm import create_schema
@@ -8,6 +9,9 @@ from .models import Choice, Course, CourseLevel, Lesson, Module, Question, Quiz
 
 
 class CourseOut(ModelSchema):
+    is_fully_completed: bool = False
+    is_completed: bool = False
+
     class Meta:
         model = Course
         fields = [
@@ -56,15 +60,26 @@ ModuleSchema = create_schema(Module, fields=["id", "name", "desc"])
 class CourseIn(Schema):
     prompt: str
     level: CourseLevel
-    num_modules: int = 5
+    num_modules: Optional[int] = 5
 
 
 class ModuleDetailSchema(ModuleSchema):
     lessons: List[LessonSchema]
+    quiz_id: int = None
+    quiz_title: str = None
+
+    @staticmethod
+    def resolve_quiz_id(obj):
+        return obj.quiz.id if hasattr(obj, "quiz") else None
+
+    @staticmethod
+    def resolve_quiz_title(obj):
+        return obj.quiz.title if hasattr(obj, "quiz") else None
 
 
 class CourseDetailSchema(CourseOut):
     modules: List[ModuleDetailSchema]
+    is_fully_completed: bool = False
 
 
 class ChoiceSchema(ModelSchema):

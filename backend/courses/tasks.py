@@ -7,7 +7,7 @@ import uuid
 import wave
 from io import BytesIO
 from pathlib import Path
-
+from typing import List, Optional
 from celery import shared_task
 from django.conf import settings
 from django.core.files.base import ContentFile
@@ -185,9 +185,13 @@ def generate_lesson(user_id, lesson_id: int):
     if not lesson:
         raise LessonDoesNotExist()
 
+    if lesson.status == "READY":
+        logger.info(f"Lesson {lesson_id} already READY, skipping generation.")
+        return lesson.lesson_file
+
     if Lesson.objects.filter(
         module__course__user_id=user_id, status="PROCESSING"
-    ).exists():
+    ).exclude(id=lesson_id).exists():
         raise RuntimeError("Only one lesson at a time")
 
     lesson.status = "PROCESSING"
@@ -305,10 +309,6 @@ def generate_lesson(user_id, lesson_id: int):
         lesson.status = "READY"
         lesson.save()
 
-        Course.objects.filter(id=lesson.module.course_id, status="PROCESSING").update(
-            status="READY"
-        )
-
         return lesson.lesson_file
         return f"Video generated: {lesson.lesson_file}"
     except Exception as e:
@@ -320,7 +320,7 @@ def generate_lesson(user_id, lesson_id: int):
 
 
 @shared_task
-def generate_next_module(user_pk: int, course_pk: int):
+def generate_next_module(user_pk: int, course_pk: int, module_pk: int = None):
     try:
         course = Course.objects.get(pk=course_pk)
     except Course.DoesNotExist:
@@ -330,13 +330,13 @@ def generate_next_module(user_pk: int, course_pk: int):
     existing_modules = course.modules.all().order_by("created_at")
     logger.critical(existing_modules)
     modules_context = "\n".join([f"- {m.name}: {m.desc}" for m in existing_modules])
-
+    # entre 8-15
     prompt = (
         "You are an expert educational content creator. "
         "Create the NEXT module for this course in JSON format. "
         "Don't enumerate the lesson like this 1.1 -, don't enumerate nothing. "
         "Generate the JSON values in portugues, keep the keys in english. "
-        "Cada módulo deve ter entre 8-15 aulas. "
+        "Cada módulo deve ter apenas 2 aulas. "
         "Gera módulos seguindo uma progressão lógica: Comece SEMPRE com História, Definição, Conceitos Teóricos e Contexto. "
         "NÃO comece com prática imediata ou tópicos avançados. "
         "Exemplo: Se for um curso de HTML, 1. História da Web, 2. O que é HTML, 3. Estrutura Básica, e então Prática. "
@@ -370,11 +370,19 @@ def generate_next_module(user_pk: int, course_pk: int):
         if not module_data:
             raise ValueError("Failed to extract JSON for module")
 
-        module_object = Module.objects.create(
-            course=course,
-            name=module_data.get("title")[:80],
-            desc=module_data.get("desc", ""),
-        )
+        if module_pk:
+            module_object = Module.objects.get(pk=module_pk)
+            module_object.name = module_data.get("title")[:80]
+            module_object.desc = module_data.get("desc", "")
+            module_object.status = "READY"
+            module_object.save()
+        else:
+            module_object = Module.objects.create(
+                course=course,
+                name=module_data.get("title")[:80],
+                desc=module_data.get("desc", ""),
+                status="READY"
+            )
 
         lessons_data = module_data.get("lessons", [])
         lessons_to_create = []
@@ -392,78 +400,102 @@ def generate_next_module(user_pk: int, course_pk: int):
                 )
             )
         Lesson.objects.bulk_create(lessons_to_create)
-        first_lesson = (
-            Lesson.objects.filter(module=module_object).order_by("id").first()
-        )
-        if first_lesson:
-            generate_lesson.delay(user_pk, first_lesson.id)
+        
+        # Only auto-generate the first lesson if this is the very first module of the course
+        if course.modules.count() == 1:
+            first_lesson = (
+                Lesson.objects.filter(module=module_object).order_by("id").first()
+            )
+            if first_lesson:
+                generate_lesson.delay(user_pk, first_lesson.id)
+            
+            # For the first module, mark course as READY to show in dashboard
+            Course.objects.filter(pk=course_pk).update(status="READY")
+                
+        # Generate module quiz
+        generate_module_quiz.delay(module_object.id)
 
     except Exception as e:
-        if module_object:
+        if module_pk:
+            Module.objects.filter(pk=module_pk).update(status="FAILED")
+        elif module_object:
             module_object.delete()
         logger.error(f"Failed to generate next module: {e}")
-    finally:
-        Course.objects.filter(pk=course_pk).update(status="READY")
+        # Only set course to READY if it was processing the very first module
+        if course.modules.count() <= 1:
+            Course.objects.filter(pk=course_pk).update(status="READY")
 
 
 @shared_task
-def generate_quiz(lesson_id: int):
-    try:
-        lesson = Lesson.objects.get(pk=lesson_id)
-    except Lesson.DoesNotExist:
+def generate_module_quiz(module_id: int):
+    module_object = Module.objects.filter(pk=module_id).first()
+    if not module_object:
+        logger.error(f"Module {module_id} not found")
         return
 
-    prompt = (
-        f"Create a multiple choice quiz for the following lesson content.\n"
-        f"Title: {lesson.title}\n"
-        f"Content: {lesson.narration}\n\n"
-        "Output JSON format:\n"
-        "{\n"
-        '  "title": "Quiz Title",\n'
-        '  "description": "Short description",\n'
-        '  "questions": [\n'
-        "    {\n"
-        '      "text": "Question text?",\n'
-        '      "explanation": "Why this is correct...",\n'
-        '      "choices": [\n'
-        '        {"text": "Option A", "is_correct": false},\n'
-        '        {"text": "Option B", "is_correct": true}\n'
-        "      ]\n"
-        "    }\n"
-        "  ]\n"
-        "}\n"
-        "Generate 3-5 questions."
-    )
-
     try:
-        response = genai_chat([{"role": "user", "content": prompt}])
+        # Aggregate content from all lessons in the module
+        lessons_content = []
+        for lesson in module_object.lessons.all():
+            lessons_content.append(f"Lesson: {lesson.title}\nContent: {lesson.key_points}\n")
+        
+        full_text = "\n".join(lessons_content)
+
+        prompt = f"""
+        Baseado no conteúdo abaixo, crie um quiz com 3 perguntas de múltipla escolha para testar o conhecimento do aluno sobre este módulo.
+        
+        Conteúdo do Módulo:
+        {full_text}
+
+        Retorne APENAS um JSON válido com a seguinte estrutura:
+        {{
+            "title": "Título do Quiz",
+            "questions": [
+                {{
+                    "text": "Pergunta 1",
+                    "explanation": "Explicação da resposta correta",
+                    "choices": [
+                        {{"text": "Opção A", "is_correct": false}},
+                        {{"text": "Opção B", "is_correct": true}},
+                        {{"text": "Opção C", "is_correct": false}}
+                    ]
+                }}
+            ]
+        }}
+        """
+
+        response = genai_chat(prompt)
         quiz_data = extract_json(response)
 
         if not quiz_data:
+            logger.error("Failed to parse quiz JSON")
             return
 
+        # Create Quiz linked to Module
         quiz = Quiz.objects.create(
-            lesson=lesson,
-            course=lesson.module.course,
-            title=quiz_data.get("title", f"Quiz: {lesson.title}"),
-            description=quiz_data.get("description", ""),
+            module=module_object,
+            course=module_object.course,
+            title=quiz_data.get("title", f"Quiz: {module_object.name}"),
         )
 
-        for q_data in quiz_data.get("questions", []):
+        for q in quiz_data.get("questions", []):
             question = Question.objects.create(
                 quiz=quiz,
-                text=q_data.get("text", "?"),
-                explanation=q_data.get("explanation", ""),
+                text=q.get("text"),
+                explanation=q.get("explanation", ""),
             )
-            for c_data in q_data.get("choices", []):
+            for c in q.get("choices", []):
                 Choice.objects.create(
                     question=question,
-                    text=c_data.get("text", ""),
-                    is_correct=c_data.get("is_correct", False),
+                    text=c.get("text"),
+                    is_correct=c.get("is_correct", False),
                 )
+        
+        logger.info(f"Quiz generated for module {module_id}")
 
     except Exception as e:
-        logger.error(f"Quiz generation failed: {e}")
+        logger.error(f"Module quiz generation failed: {e}") 
+
 
 
 @shared_task
@@ -484,7 +516,8 @@ def create_course_details(course_pk: int, prompt: str, level: str):
     Schema:
     {{
         "title": string, 
-        "desc": string
+        "desc": string,
+        "max_modules": integer (between 3 and 5)
     }}
 
     Context:
@@ -492,7 +525,7 @@ def create_course_details(course_pk: int, prompt: str, level: str):
     Course level: {level}
 
     Task:
-    Generate a title and description for the course prompt
+    Generate a title, description, and an estimated number of modules (max_modules) to cover this topic comprehensively.
     """
 
     course_outline = None
@@ -506,9 +539,16 @@ def create_course_details(course_pk: int, prompt: str, level: str):
     
     course_title = course_outline.get("title", "Sem título")
     course_desc = course_outline.get("desc", course_title)
+    max_modules = course_outline.get("max_modules", 5)
+
+    # Validate max_modules range
+    if not isinstance(max_modules, int) or max_modules < 3:
+        max_modules = 3
+    if max_modules > 5:
+        max_modules = 5
 
     Course.objects.filter(pk=course_pk).update(
-        desc=course_desc, title=course_title, status="PROCESSING"
+        desc=course_desc, title=course_title, max_modules=max_modules, status="PROCESSING"
     )
     create_course_thumb.delay(course_pk, prompt)
 

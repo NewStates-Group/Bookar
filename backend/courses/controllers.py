@@ -31,7 +31,7 @@ class CourseController:
     @route.post("", response=CourseOut)
     def create_course(self, request, data: CourseIn):
         return self.course_service.create_course(
-            user=request.user, level=data.level, prompt=data.prompt, num_modules=data.num_modules
+            request.user, data.prompt, data.level, data.num_modules
         )
 
     @route.get("{course_id}", response=CourseDetailSchema)
@@ -58,6 +58,18 @@ class CourseController:
     @route.get("quiz/{lesson_id}", response=QuizSchema)
     def get_quiz(self, lesson_id: int):
         return self.course_service.get_quiz(lesson_id)
+
+    @route.get("module-quiz/{module_id}", response=QuizSchema)
+    def get_module_quiz(self, module_id: int):
+        return self.course_service.get_module_quiz(module_id)
+
+    @route.get("{course_id}/certificate")
+    def download_certificate(self, request, course_id: int, full_name: str = None):
+        pdf_buffer = self.course_service.generate_certificate(request.user, course_id, full_name)
+        from django.http import HttpResponse
+        response = HttpResponse(pdf_buffer, content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="certificate_course_{course_id}.pdf"'
+        return response
 
     @route.post("quiz/{quiz_id}/submit", response=QuizResult)
     def submit_quiz(self, request, quiz_id: int, data: QuizSubmission):

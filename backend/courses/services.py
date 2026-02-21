@@ -31,8 +31,106 @@ class CourseService:
         except Course.DoesNotExist:
             raise HttpError(404, "Curso não encontrado")
 
-    def create_course(self, user, prompt: str, level: str, num_modules: int = 5) -> Course:
-        course = Course.objects.create(user=user, level=level, max_modules=num_modules)
+    def create_course(self, user, prompt: str, level: str, num_modules: int = None) -> Course:
+        # Check if a course with this prompt already exists and is READY
+        from .models import CourseGenerationContext
+        existing_context = CourseGenerationContext.objects.filter(
+            prompt=prompt, 
+            course__level=level, 
+            course__status="READY"
+        ).first()
+
+        if existing_context:
+            existing_course = existing_context.course
+            logger.info(f"Reusing existing course {existing_course.id} for prompt '{prompt}'")
+            
+            # Create new course for current user
+            new_course = Course.objects.create(
+                user=user,
+                title=existing_course.title,
+                desc=existing_course.desc,
+                level=existing_course.level,
+                thumb=existing_course.thumb,
+                max_modules=existing_course.max_modules,
+                status="READY"
+            )
+
+            # Duplicate Modules
+            for module in existing_course.modules.all():
+                new_module = Module.objects.create(
+                    course=new_course,
+                    name=module.name,
+                    desc=module.desc,
+                    created_at=module.created_at
+                )
+
+                # Duplicate Lessons
+                for lesson in module.lessons.all():
+                    new_lesson = Lesson.objects.create(
+                        module=new_module,
+                        title=lesson.title,
+                        desc=lesson.desc,
+                        duration=lesson.duration,
+                        status="READY", # Ensure ready
+                        lesson_file=lesson.lesson_file,
+                        narration=lesson.narration,
+                        key_points=lesson.key_points,
+                        scene_suggestion=lesson.scene_suggestion,
+                        created_at=lesson.created_at,
+                        delivered=True # Since it's ready
+                    )
+                    
+                    # Duplicate Quiz for Lesson if exists
+                    if hasattr(lesson, 'quiz'):
+                        original_quiz = lesson.quiz
+                        new_quiz = Quiz.objects.create(
+                            lesson=new_lesson,
+                            title=original_quiz.title,
+                            description=original_quiz.description
+                        )
+                        # Duplicate Questions
+                        for question in original_quiz.questions.all():
+                            new_question = Question.objects.create(
+                                quiz=new_quiz,
+                                text=question.text,
+                                explanation=question.explanation
+                            )
+                            # Duplicate Choices
+                            for choice in question.choices.all():
+                                Choice.objects.create(
+                                    question=new_question,
+                                    text=choice.text,
+                                    is_correct=choice.is_correct
+                                )
+
+                # Duplicate Quiz for Module if exists
+                if hasattr(module, 'quiz'):
+                    original_quiz = module.quiz
+                    new_quiz = Quiz.objects.create(
+                        module=new_module,
+                        title=original_quiz.title,
+                        description=original_quiz.description
+                    )
+                    # Duplicate Questions
+                    for question in original_quiz.questions.all():
+                        new_question = Question.objects.create(
+                            quiz=new_quiz,
+                            text=question.text,
+                            explanation=question.explanation
+                        )
+                        # Duplicate Choices
+                        for choice in question.choices.all():
+                            Choice.objects.create(
+                                question=new_question,
+                                text=choice.text,
+                                is_correct=choice.is_correct
+                            )
+            
+            return new_course
+
+        # If no existing course, create new one
+        # If num_modules is None, default to 5, but task will update it
+        course = Course.objects.create(user=user, level=level, max_modules=num_modules or 5)
         create_course_details.delay(course.pk, prompt, course.get_level_display())
         return course
 
@@ -66,6 +164,12 @@ class CourseService:
     def get_quiz(self, lesson_id: int) -> Quiz:
         try:
             return Quiz.objects.get(lesson_id=lesson_id)
+        except Quiz.DoesNotExist:
+            raise HttpError(404, "Quiz ainda não disponível")
+
+    def get_module_quiz(self, module_id: int) -> Quiz:
+        try:
+            return Quiz.objects.get(module_id=module_id)
         except Quiz.DoesNotExist:
             raise HttpError(404, "Quiz ainda não disponível")
 
@@ -114,11 +218,78 @@ class CourseService:
             
             if course.max_modules and current_module_count >= course.max_modules:
                 raise HttpError(400, f"Limite de módulos atingido ({course.max_modules})")
+
+            # Check if the previous module's quiz is passed
+            last_module = course.modules.order_by("id").last()
+            if last_module:
+                try:
+                    # Assuming simple check: did the user pass *any* attempt for this quiz?
+                    quiz = last_module.quiz
+                    if quiz:
+                        passed = QuizAttempt.objects.filter(
+                            user_id=user_pk, quiz=quiz, passed=True
+                        ).exists()
+                        if not passed:
+                            raise HttpError(400, "Você precisa passar no quiz do módulo anterior para avançar.")
+                except Quiz.DoesNotExist:
+                    pass # No quiz for previous module, allow proceed (or maybe generate one?)
             
-            generate_next_module.delay(user_pk, course_id)
-            return {"success": True, "message": "Gerando módulo..."}
+            # Pre-create the module in PROCESSING status
+            new_module = Module.objects.create(
+                course=course,
+                name="Gerando módulo...",
+                status="PROCESSING"
+            )
+            
+            generate_next_module.delay(user_pk, course_id, new_module.pk)
+            return {"success": True, "message": "Gerando módulo...", "module_id": new_module.pk}
         except Course.DoesNotExist:
             raise HttpError(404, "Curso não encontrado")
+
+    def generate_certificate(self, user, course_id: int, full_name: str = None):
+        course = Course.objects.get(pk=course_id, user=user)
+        
+        # Verify completion
+        if not course.is_fully_completed:
+            raise HttpError(400, "O curso ainda não foi totalmente concluído.")
+
+        # Determine the name to show on the certificate
+        if not full_name:
+            full_name = f"{user.first_name} {user.last_name}".strip()
+            if not full_name:
+                full_name = user.username
+
+        # Generate PDF
+        from reportlab.pdfgen import canvas
+        from reportlab.lib.pagesizes import letter
+        from reportlab.lib.units import inch
+        import io
+        
+        buffer = io.BytesIO()
+        c = canvas.Canvas(buffer, pagesize=letter)
+        width, height = letter
+        
+        # Draw some simple certificate content
+        c.setFont("Helvetica-Bold", 30)
+        c.drawCentredString(width / 2, height - 2 * inch, "CERTIFICADO DE CONCLUSÃO")
+        
+        c.setFont("Helvetica", 20)
+        c.drawCentredString(width / 2, height - 3.5 * inch, f"Certificamos que")
+        
+        c.setFont("Helvetica-Bold", 24)
+        c.drawCentredString(width / 2, height - 4.5 * inch, f"{full_name}")
+        
+        c.setFont("Helvetica", 20)
+        c.drawCentredString(width / 2, height - 5.5 * inch, f"concluiu com êxito o curso")
+        
+        c.setFont("Helvetica-Bold", 24)
+        c.drawCentredString(width / 2, height - 6.5 * inch, f"{course.title}")
+        
+        c.showPage()
+        c.save()
+        
+        buffer.seek(0)
+        return buffer
 
 
 class LessonService:

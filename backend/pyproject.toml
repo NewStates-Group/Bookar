@@ -95,4 +95,5 @@ dependencies = [
     "zstandard==0.25.0",
     "psycopg2-binary>=2.9.11",
     "email-validator>=2.3.0",
+    "reportlab>=4.4.10",
 ]

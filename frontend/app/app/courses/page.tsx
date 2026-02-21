@@ -4,8 +4,9 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { BookOpen, Plus, Loader2, ArrowRight, ArrowUp, ImageOff } from "lucide-react";
-import { useEffect, useState } from "react";
+import { BookOpen, Plus, Loader2, ArrowRight, ArrowUp, ImageOff, Sparkles, GraduationCap, Award, FileDown, X } from "lucide-react";
+import { useEffect, useState, useRef } from "react";
+import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
@@ -36,6 +37,7 @@ interface Course {
   status: "PROCESSING" | "READY" | "ERROR";
   created_at: string;
   max_modules?: number;
+  is_fully_completed: boolean;
 }
 
 export default function CoursesPage() {
@@ -45,11 +47,17 @@ export default function CoursesPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
   const [open, setOpen] = useState(false);
+  const [showNameModal, setShowNameModal] = useState(false);
+  const [fullName, setFullName] = useState("");
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
 
   const [step, setStep] = useState(1);
   const [prompt, setPrompt] = useState("");
   const [numModules, setNumModules] = useState<number>(5);
   const [level, setLevel] = useState<"B" | "IT" | "A">("B");
+
+  const pollingRefs = useRef<Set<Number>>(new Set());
 
   const levelConfig = {
     B: { label: "Iniciante", color: "bg-emerald-100 text-emerald-700 border-emerald-200" },
@@ -62,6 +70,15 @@ export default function CoursesPage() {
       fetchCourses();
     }
   }, [session]);
+
+  // Resume polling for courses that are still processing on load/refresh
+  useEffect(() => {
+    courses.forEach(course => {
+      if (course.status === "PROCESSING" && !pollingRefs.current.has(course.id)) {
+        waitForCourseReady(course.id);
+      }
+    });
+  }, [courses]);
 
   const fetchCourses = async () => {
     try {
@@ -98,6 +115,10 @@ export default function CoursesPage() {
   };
 
   const waitForCourseReady = async (courseID: Number) => {
+    if (pollingRefs.current.has(courseID)) return;
+
+    pollingRefs.current.add(courseID);
+
     const interval = setInterval(async () => {
       try {
         const res = await fetch(
@@ -111,14 +132,61 @@ export default function CoursesPage() {
 
         if (!res.ok) return;
         const course = await res.json();
+
         if (course.status === "READY" || course.status === "FAILED") {
           clearInterval(interval);
+          pollingRefs.current.delete(courseID);
           fetchCourses();
         }
       } catch (err) {
         console.error(err);
       }
-    }, 3000);
+    }, 8000);
+  };
+
+  const downloadCertificate = async (course: Course, name?: string) => {
+    setIsDownloading(true);
+    try {
+      const queryParams = name ? `?full_name=${encodeURIComponent(name)}` : '';
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/courses/${course.id}/certificate${queryParams}`, {
+        headers: {
+          Authorization: `Bearer ${session?.accessToken}`,
+        },
+      });
+
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Certificado_${course.title || 'Curso'}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        toast.success("Certificado baixado com sucesso!");
+        setShowNameModal(false);
+      } else {
+        const error = await res.json();
+        toast.error(error.message || "Erro ao baixar certificado");
+      }
+    } catch (e) {
+      toast.error("Erro ao baixar certificado");
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
+  const handleCertificateClick = (course: Course) => {
+    setSelectedCourse(course);
+    // @ts-ignore
+    const sessionName = session?.user?.name || (session as any)?.user?.full_name;
+
+    if (sessionName) {
+      downloadCertificate(course, sessionName);
+    } else {
+      setShowNameModal(true);
+    }
   };
 
   const handleCreateCourse = async () => {
@@ -148,7 +216,20 @@ export default function CoursesPage() {
         setLevel("B");
         setStep(1);
 
-        fetchCourses();
+        // Add the new course to the list immediately with PROCESSING status
+        const newCourse: Course = {
+          id: course.id,
+          prompt: prompt,
+          desc: "Gerando descrição...", // Placeholder
+          level: level,
+          thumb: "",
+          status: "PROCESSING",
+          created_at: new Date().toISOString(),
+          max_modules: numModules,
+          is_fully_completed: false
+        };
+
+        setCourses(prev => [newCourse, ...prev]);
         waitForCourseReady(course.id);
       } else {
         const err = await res.json();
@@ -186,6 +267,64 @@ export default function CoursesPage() {
     return null
   }
 
+  const nextStep = () => setStep(step + 1);
+  const prevStep = () => setStep(step - 1);
+
+  const steps = [
+    {
+      title: "Sobre o que você quer aprender?",
+      desc: "Descreva o tema do curso que você quer gerar ex: 'História da Roma Antiga' ou 'Introdução ao Python'.",
+      content: (
+        <div className="space-y-4">
+          <Label htmlFor="prompt" className="text-lg">
+            Tópico do Curso
+          </Label>
+          <Textarea
+            id="prompt"
+            placeholder="Ex: Marketing Digital para Iniciantes, Física Quântica Básica..."
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            className="h-32 text-lg resize-none"
+            onKeyDown={handleKeyPress}
+          />
+        </div>
+      ),
+    },
+    {
+      title: "Qual o seu nível de conhecimento?",
+      desc: "Isso ajuda a IA a adaptar a complexidade do conteúdo.",
+      content: (
+        <div className="space-y-4">
+          <Label className="text-lg">Nível de Dificuldade</Label>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {[
+              { value: "B", label: "Iniciante", icon: Sparkles, desc: "Para quem está começando do zero." },
+              { value: "IT", label: "Intermediário", icon: BookOpen, desc: "Para quem já tem noção do assunto." },
+              { value: "A", label: "Avançado", icon: GraduationCap, desc: "Para quem busca aprofundamento técnico." },
+            ].map((option) => (
+              <div
+                key={option.value}
+                onClick={() => setLevel(option.value as "B" | "IT" | "A")}
+                className={`
+                                    cursor-pointer rounded-xl border-2 p-4 transition-all hover:border-primary/50 hover:bg-muted/50
+                                    ${level === option.value ? "border-primary bg-primary/5 ring-2 ring-primary/20" : "border-border bg-card"}
+                                `}
+              >
+                <div className="flex items-center gap-3 mb-2">
+                  <div className={`p-2 rounded-lg ${level === option.value ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
+                    <option.icon className="w-5 h-5" />
+                  </div>
+                  <span className="font-semibold">{option.label}</span>
+                </div>
+                <p className="text-sm text-muted-foreground">{option.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      ),
+    },
+  ];
+
   return (
     <div className="max-w-7xl mx-auto px-4 md:px-8 py-3">
       <div className="flex justify-between items-center mb-8">
@@ -210,120 +349,45 @@ export default function CoursesPage() {
                     Criar Novo Curso
                   </DialogTitle>
                   <DialogDescription className="mt-2 text-center  text-base">
-                    {step === 1
-                      ? "Dê um nome ao seu curso"
-                      : step === 2
-                        ? "Quantos módulos deseja?"
-                        : "Escolha o nível do curso"}
+                    {steps[step - 1]?.desc}
                   </DialogDescription>
                 </div>
 
                 <div className="px-8 pb-8">
-                  {step === 1 && (
-                    <div className="space-y-4 animate-in fade-in slide-in-from-right-3 duration-300">
-                      <div className="space-y-2">
-                        <label className="text-base font-medium text-muted-foreground mb-1">
-                          O que você quer aprender?
-                        </label>
-                        <div className="relative group">
-                          <Input
-                            value={prompt}
-                            onChange={(e) => setPrompt(e.target.value)}
-                            onKeyPress={handleKeyPress}
-                            placeholder="Exemplo: Inglês, Docker, Eletrónica, etc."
-                            className="h-14 text-lg pr-14 border-2 focus:ring-0 transition-all"
-                            autoFocus
-                          />
-                          <Button
-                            type="button"
-                            onClick={handleNext}
-                            disabled={!prompt.trim()}
-                            size="icon"
-                            className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full shadow-md hover:shadow-lg transition-all disabled:opacity-50"
-                          >
-                            <ArrowRight className="h-5 w-5" />
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {step === 2 && (
-                    <div className="space-y-4 animate-in fade-in slide-in-from-right-3 duration-300">
-                      <div className="space-y-2">
-                        <label className="text-base font-medium text-muted-foreground mb-1">
-                          Número de módulos
-                        </label>
-                        <div className="relative group">
-                          <Input
-                            type="number"
-                            min={1}
-                            max={20}
-                            value={numModules}
-                            onChange={(e) => setNumModules(parseInt(e.target.value) || 1)}
-                            onKeyPress={handleKeyPress}
-                            placeholder="Ex: 5"
-                            className="h-14 text-lg pr-14 border-2 focus:ring-0 transition-all"
-                            autoFocus
-                          />
-                          <Button
-                            type="button"
-                            onClick={handleNext}
-                            disabled={!numModules || numModules < 1 || numModules > 20}
-                            size="icon"
-                            className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full shadow-md hover:shadow-lg transition-all disabled:opacity-50"
-                          >
-                            <ArrowRight className="h-5 w-5" />
-                          </Button>
-                        </div>
-                        <p className="text-xs text-muted-foreground ml-1">Mínimo: 1, Máximo: 20</p>
-                      </div>
-                    </div>
-                  )}
-
-                  {step === 3 && (
-                    <div className="space-y-4 animate-in fade-in slide-in-from-right-3 duration-300">
-                      <div className="space-y-2">
-                        <label className="text-base font-medium text-muted-foreground mb-2 ml-1">
-                          Escolha o nível do curso
-                        </label>
-                        <Select
-                          value={level}
-                          onValueChange={(v) => setLevel(v as any)}
-                        >
-                          <SelectTrigger className="w-full">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="B">Iniciante</SelectItem>
-                            <SelectItem value="IT">Intermediário</SelectItem>
-                            <SelectItem value="A">Avançado</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <div className="w-full flex gap-2 justify-end">
-                          <Button
-                            type="button"
-                            onClick={handleBack}
-                            variant="outline"
-                          >
-                            Voltar
-                          </Button>
-                          <Button
-                            type="button"
-                            onClick={handleCreateCourse}
-                            disabled={isCreating}
-                          >
-                            {isCreating ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <ArrowUp className="h-4 w-4" />
-                            )}
-                            {isCreating ? "Criando..." : "Avançar"}
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
+                  {steps[step - 1].content}
+                  <div className="w-full flex gap-2 justify-end mt-6">
+                    {step > 1 && (
+                      <Button
+                        type="button"
+                        onClick={prevStep}
+                        variant="outline"
+                      >
+                        Voltar
+                      </Button>
+                    )}
+                    {step < steps.length ? (
+                      <Button
+                        type="button"
+                        onClick={nextStep}
+                        disabled={step === 1 && !prompt.trim()}
+                      >
+                        Avançar
+                      </Button>
+                    ) : (
+                      <Button
+                        type="button"
+                        onClick={handleCreateCourse}
+                        disabled={isCreating}
+                      >
+                        {isCreating ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <ArrowUp className="h-4 w-4" />
+                        )}
+                        {isCreating ? "Criando..." : "Criar Curso"}
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </div>
             </DialogContent>
@@ -384,16 +448,101 @@ export default function CoursesPage() {
                   {course.status === "READY" && (
                     <Link href={'/app/courses/' + course.id} className="text-blue-600 mt-2 mb-4">Veja mais</Link>
                   )}
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="inline-flex items-center rounded-md bg-cyan-300/10 px-2 py-1 text-xs font-medium text-blue-400 inset-ring inset-ring-blue-300/30">
-                      {course.level === 'B' ? 'Iniciante' : course.level === 'IT' ? 'Intermediário' : 'Avançado'}
-                    </span>
+                  <div className="flex items-center justify-between mt-auto">
+                    <div className="flex items-center gap-2">
+                      <span className="inline-flex items-center rounded-md bg-cyan-300/10 px-2 py-1 text-xs font-medium text-blue-400 inset-ring inset-ring-blue-300/30">
+                        {course.level === 'B' ? 'Iniciante' : course.level === 'IT' ? 'Intermediário' : 'Avançado'}
+                      </span>
+                    </div>
+                    {course.is_fully_completed && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-cyan-500 hover:text-cyan-600 hover:bg-cyan-50 gap-1 h-8"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleCertificateClick(course);
+                        }}
+                        disabled={isDownloading && selectedCourse?.id === course.id}
+                      >
+                        {isDownloading && selectedCourse?.id === course.id ? (
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                        ) : (
+                          <Award className="w-3 h-3" />
+                        )}
+                        Certificado
+                      </Button>
+                    )}
                   </div>
                 </>
               )}
             </Card>
-
           ))}
+        </div>
+      )}
+
+      {showNameModal && selectedCourse && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] backdrop-blur-sm">
+          <div className="bg-card border border-border rounded-2xl max-w-md w-full mx-4 p-8 shadow-2xl scale-in-center">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <div className="bg-cyan-500/10 p-2 rounded-lg">
+                  <Award className="w-6 h-6 text-cyan-500" />
+                </div>
+                <h2 className="text-2xl font-bold text-foreground">Certificado</h2>
+              </div>
+              <button
+                onClick={() => setShowNameModal(false)}
+                className="text-foreground/40 hover:text-foreground hover:bg-muted p-1 rounded-full transition-colors"
+                disabled={isDownloading}
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <p className="text-foreground/70 mb-6 leading-relaxed">
+              Parabéns! Para gerar seu certificado de <strong>{selectedCourse.title}</strong>, precisamos que confirme o seu <strong>nome completo</strong>.
+            </p>
+
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label htmlFor="full-name" className="text-sm font-medium text-foreground/60 ml-1">Nome Completo</label>
+                <Input
+                  id="full-name"
+                  type="text"
+                  placeholder="Seu nome para o certificado"
+                  autoFocus
+                  className="w-full bg-muted border border-border rounded-xl p-4 h-12 text-foreground placeholder-foreground/30 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 focus:border-cyan-500 transition-all"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && fullName.trim() && !isDownloading) {
+                      downloadCertificate(selectedCourse, fullName);
+                    }
+                  }}
+                />
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowNameModal(false)}
+                  className="flex-1 h-12 rounded-xl border-border hover:bg-muted font-semibold"
+                  disabled={isDownloading}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={() => downloadCertificate(selectedCourse, fullName)}
+                  className="flex-1 h-12 rounded-xl bg-cyan-500 hover:bg-cyan-600 text-white font-bold shadow-lg shadow-cyan-500/20"
+                  disabled={!fullName.trim() || isDownloading}
+                >
+                  {isDownloading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <FileDown className="w-4 h-4 mr-2" />}
+                  Download PDF
+                </Button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

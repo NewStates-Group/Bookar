@@ -112,31 +112,74 @@ export function CourseWatchSidebar({ course, onClose }: { course: CourseData | n
                                     <div className="pl-2 space-y-1 my-1">
                                         {module.lessons.map((lesson) => {
                                             const isActive = parseInt(lessonId || "") === lesson.id;
+                                            const isPending = lesson.status === "PENDING";
+                                            const isProcessing = lesson.status === "PROCESSING";
+
+                                            const content = (
+                                                <button
+                                                    disabled={isPending}
+                                                    className={`cursor-pointer w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-all 
+                                                        ${isActive
+                                                            ? "bg-cyan-300/10 text-primary border-l-2 border-cyan-600"
+                                                            : isPending
+                                                                ? "opacity-50 cursor-not-allowed bg-muted/50"
+                                                                : "text-foreground/60 hover:bg-muted hover:text-foreground/80"
+                                                        }`}
+                                                >
+                                                    <LessonStatusIcon status={lesson.status} />
+                                                    <div className="flex-1 text-left min-w-0">
+                                                        <p className="truncate text-xs">{lesson.title}</p>
+                                                        <p className="text-xs text-foreground/40">
+                                                            {Math.floor(lesson.duration / 60)} min
+                                                        </p>
+                                                    </div>
+                                                    {lesson.watched && (
+                                                        <CheckCircle2 className="w-4 h-4 text-green-600 flex-shrink-0" />
+                                                    )}
+                                                </button>
+                                            );
+
+                                            if (isPending) {
+                                                return <div key={lesson.id}>{content}</div>;
+                                            }
+
                                             return (
                                                 <Link
                                                     key={lesson.id}
                                                     href={`/app/courses/watch?l=${lesson.id}&c=${course.id}`}
                                                 >
-                                                    <button
-                                                        className={`cursor-pointer w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-all ${isActive
-                                                            ? "bg-cyan-300/10 text-primary border-l-2 border-cyan-600"
-                                                            : "text-foreground/60 hover:bg-muted hover:text-foreground/80"
-                                                            }`}
-                                                    >
-                                                        <LessonStatusIcon status={lesson.status} />
-                                                        <div className="flex-1 text-left min-w-0">
-                                                            <p className="truncate text-xs">{lesson.title}</p>
-                                                            <p className="text-xs text-foreground/40">
-                                                                {Math.floor(lesson.duration / 60)} min
-                                                            </p>
-                                                        </div>
-                                                        {lesson.watched && (
-                                                            <CheckCircle2 className="w-4 h-4 text-green-600 flex-shrink-0" />
-                                                        )}
-                                                    </button>
+                                                    {content}
                                                 </Link>
                                             );
                                         })}
+                                        {/* @ts-ignore */}
+                                        {module.quiz_id && (
+                                            <div className="mt-1">
+                                                <Link
+                                                    href={`/app/courses/watch?l=quiz&id=${module.id}&c=${course.id}`}
+                                                >
+                                                    <button
+                                                        // @ts-ignore
+                                                        className={`cursor-pointer w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-all ${
+                                                            // @ts-ignore
+                                                            searchParams.get("l") === "quiz" && searchParams.get("id") == module.id
+                                                                ? "bg-cyan-300/10 text-primary border-l-2 border-cyan-600"
+                                                                : "text-foreground/60 hover:bg-muted hover:text-foreground/80"
+                                                            }`}
+                                                    >
+                                                        <div className="w-4 h-4 rounded-full border border-border flex-shrink-0 flex items-center justify-center bg-primary/10">
+                                                            <span className="text-[10px] font-bold text-primary">?</span>
+                                                        </div>
+                                                        <div className="flex-1 text-left min-w-0">
+                                                            <p className="truncate text-xs">Quiz: {module.name}</p>
+                                                            <p className="text-xs text-foreground/40">
+                                                                Exercício Prático
+                                                            </p>
+                                                        </div>
+                                                    </button>
+                                                </Link>
+                                            </div>
+                                        )}
                                     </div>
                                 )}
                             </div>
