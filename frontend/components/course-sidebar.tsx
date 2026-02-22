@@ -171,7 +171,17 @@ export function CourseWatchSidebar({ course, onClose }: { course: CourseData | n
                                                             <span className="text-[10px] font-bold text-primary">?</span>
                                                         </div>
                                                         <div className="flex-1 text-left min-w-0">
-                                                            <p className="truncate text-xs">Quiz: {module.name}</p>
+                                                            <div className="flex justify-between items-center pr-1">
+                                                                <p className="truncate text-xs">{module.name}</p>
+                                                                {module.last_quiz_score !== undefined && module.last_quiz_score !== null && (
+                                                                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${module.last_quiz_passed
+                                                                            ? "bg-green-500/20 text-green-600"
+                                                                            : "bg-red-500/20 text-red-600"
+                                                                        }`}>
+                                                                        {module.last_quiz_score.toFixed(1)}
+                                                                    </span>
+                                                                )}
+                                                            </div>
                                                             <p className="text-xs text-foreground/40">
                                                                 Exercício Prático
                                                             </p>

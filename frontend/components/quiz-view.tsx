@@ -104,9 +104,10 @@ export function QuizView({
             if (res.ok) {
                 const data = await res.json();
                 setResult(data);
+                if (onComplete) onComplete();
+
                 if (data.passed) {
                     toast.success("Parabéns! Você passou no quiz.");
-                    if (onComplete) onComplete();
                 } else {
                     toast.error("Você não atingiu a pontuação mínima. Tente novamente.");
                 }

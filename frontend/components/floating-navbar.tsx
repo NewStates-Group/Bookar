@@ -59,9 +59,9 @@ export function FloatingNavbar() {
                     </Link>
                 </div>
 
-                <button className="flex items-center justify-center w-10 h-10 rounded-full border cursor-pointer">
+                <Link href="/app/profile" className="flex items-center justify-center w-10 h-10 rounded-full border cursor-pointer">
                     <User className="w-5 h-5  group-hover:text-cyan-300 transition-colors" />
-                </button>
+                </Link>
             </div>
         </nav>
     )

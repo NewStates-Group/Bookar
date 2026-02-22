@@ -475,7 +475,7 @@ def generate_module_quiz(module_id: int):
         quiz = Quiz.objects.create(
             module=module_object,
             course=module_object.course,
-            title=quiz_data.get("title", f"Quiz: {module_object.name}"),
+            title=quiz_data.get("title", f"{module_object.name}"),
         )
 
         for q in quiz_data.get("questions", []):

@@ -67,6 +67,8 @@ class ModuleDetailSchema(ModuleSchema):
     lessons: List[LessonSchema]
     quiz_id: int = None
     quiz_title: str = None
+    last_quiz_score: Optional[float] = None
+    last_quiz_passed: Optional[bool] = None
 
     @staticmethod
     def resolve_quiz_id(obj):
@@ -75,6 +77,14 @@ class ModuleDetailSchema(ModuleSchema):
     @staticmethod
     def resolve_quiz_title(obj):
         return obj.quiz.title if hasattr(obj, "quiz") else None
+
+    @staticmethod
+    def resolve_last_quiz_score(obj):
+        return getattr(obj, "_last_quiz_score", None)
+
+    @staticmethod
+    def resolve_last_quiz_passed(obj):
+        return getattr(obj, "_last_quiz_passed", None)
 
 
 class CourseDetailSchema(CourseOut):

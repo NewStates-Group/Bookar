@@ -35,8 +35,8 @@ class CourseController:
         )
 
     @route.get("{course_id}", response=CourseDetailSchema)
-    def get_course(self, course_id: int):
-        return self.course_service.get_course(course_id)
+    def get_course(self, request, course_id: int):
+        return self.course_service.get_course(course_id, request.user)
 
     @route.delete("{course_id}")
     def delete_course(self, request, course_id: int):

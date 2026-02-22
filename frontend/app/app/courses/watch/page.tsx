@@ -16,6 +16,8 @@ export interface Module {
     name: string;
     lessons: Lesson[];
     quiz_id?: number;
+    last_quiz_score?: number;
+    last_quiz_passed?: boolean;
 }
 
 export interface CourseData {

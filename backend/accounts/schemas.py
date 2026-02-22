@@ -15,25 +15,49 @@ class RegisterIn(Schema):
     def validate_username(cls, value: str) -> str:
         username = value.strip()
         if len(username) < 3:
-            raise ValueError("Username must be at least 3 characters long")
+            raise ValueError("USERNAME_TOO_SHORT")
         if User.objects.filter(username=value).exists():
-            raise ValueError("This username is already taken")
+            raise ValueError("USERNAME_TAKEN")
         return username
 
     @field_validator("email", mode="after")
-    def validate_email(cls, value: str) -> str:
+    @classmethod
+    def validate_email(cls, value: str) -> EmailStr:
         if User.objects.filter(email=value).exists():
-            raise ValueError("This email is already registered")
+            raise ValueError("EMAIL_TAKEN")
         return value
 
     @field_validator("password", mode="after")
     @classmethod
     def validate_password(cls, value: str) -> str:
         if len(value) < 12:
-            raise ValueError("Password must be at least 12 characters long")
+            raise ValueError("PASSWORD_TOO_SHORT")
         return value
 
 
+class UserStatsSchema(Schema):
+    ongoing_courses: int
+    finished_courses: int
+    certificates_issued: int
+
 class RegisterOut(Schema):
+    id: int
     username: str
     email: str
+    bio: str = ""
+    avatar: str | None = None
+    stats: UserStatsSchema | None = None
+
+    @staticmethod
+    def resolve_avatar(obj):
+        if obj.avatar:
+            return obj.avatar.url
+        return None
+
+class ProfileUpdateIn(Schema):
+    username: str = None
+    email: EmailStr = None
+    bio: str = None
+
+class GoogleLoginIn(Schema):
+    id_token: str

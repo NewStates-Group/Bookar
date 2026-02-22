@@ -36,7 +36,7 @@ ROOT_URLCONF = "core.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [],
+        "DIRS": [BASE_DIR / "templates"],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -114,3 +114,14 @@ AI = {
     "GENAI_MODEL_AUDIO": "gemini-2.5-flash-preview-tts",
     "GENAI_MODEL_TEXT": "gemini-2.0-flash",
 }
+
+GOOGLE_CLIENT_ID = env("GOOGLE_CLIENT_ID", default="")
+
+# Email Configuration
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+EMAIL_HOST = "smtp.gmail.com"
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = "newstates.bookar@gmail.com"
+EMAIL_HOST_PASSWORD = env("EMAIL_PASSWORD", default="")
+DEFAULT_FROM_EMAIL = f"Bookar <{EMAIL_HOST_USER}>"

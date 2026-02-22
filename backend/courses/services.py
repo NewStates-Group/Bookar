@@ -18,9 +18,9 @@ class CourseService:
     def list_courses(self, user) -> QuerySet[Course]:
         return Course.objects.filter(user=user, deleted=False).order_by("-created_at")
 
-    def get_course(self, id: int) -> Course:
+    def get_course(self, id: int, user=None) -> Course:
         try:
-            return Course.objects.prefetch_related(
+            course = Course.objects.prefetch_related(
                 Prefetch(
                     "modules",
                     queryset=Module.objects.order_by("created_at").prefetch_related(
@@ -28,6 +28,20 @@ class CourseService:
                     ),
                 )
             ).get(pk=id)
+
+            if user:
+                for module in course.modules.all():
+                    if hasattr(module, "quiz"):
+                        last_attempt = (
+                            module.quiz.attempts.filter(user=user)
+                            .order_by("-completed_at")
+                            .first()
+                        )
+                        if last_attempt:
+                            module._last_quiz_score = last_attempt.score
+                            module._last_quiz_passed = last_attempt.passed
+
+            return course
         except Course.DoesNotExist:
             raise HttpError(404, "Curso não encontrado")
 
@@ -288,6 +302,12 @@ class CourseService:
         c.showPage()
         c.save()
         
+        from core.mail import send_certificate_email
+        try:
+            send_certificate_email(user, course)
+        except Exception as e:
+            logger.error(f"Failed to send certificate email: {e}")
+
         buffer.seek(0)
         return buffer
 

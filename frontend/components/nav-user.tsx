@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/sidebar"
 import { LogOut } from "lucide-react"
 import { signOut, useSession } from "next-auth/react"
+import Link from "next/link"
 
 export function NavUser() {
     const { data: session, status } = useSession();
@@ -38,8 +39,8 @@ export function NavUser() {
                             className="cursor-pointer data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
                         >
                             <Avatar className="h-8 w-8 rounded-lg grayscale">
-                                <AvatarImage src={session?.user?.image || ""} alt={session?.user?.username} />
-                                <AvatarFallback className="rounded-lg">{session?.user?.username.slice(0, 2).toUpperCase()}</AvatarFallback>
+                                <AvatarImage src={session?.user?.avatar ? `${process.env.NEXT_PUBLIC_API_URL}${session.user.avatar}` : ""} alt={session?.user?.username} />
+                                <AvatarFallback className="rounded-lg">{session?.user?.username?.slice(0, 2).toUpperCase()}</AvatarFallback>
                             </Avatar>
                             <div className="grid flex-1 text-left text-sm leading-tight">
                                 <span className="truncate font-medium">{session?.user?.username}</span>
@@ -58,8 +59,8 @@ export function NavUser() {
                         <DropdownMenuLabel className="p-0 font-normal">
                             <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
                                 <Avatar className="h-8 w-8 rounded-lg">
-                                    <AvatarImage src={session?.user?.image || ""} alt={session?.user?.username} />
-                                    <AvatarFallback className="rounded-lg">{session?.user?.username.slice(0, 2).toUpperCase()}</AvatarFallback>
+                                    <AvatarImage src={session?.user?.avatar ? `${process.env.NEXT_PUBLIC_API_URL}${session.user.avatar}` : ""} alt={session?.user?.username} />
+                                    <AvatarFallback className="rounded-lg">{session?.user?.username?.slice(0, 2).toUpperCase()}</AvatarFallback>
                                 </Avatar>
                                 <div className="grid flex-1 text-left text-sm leading-tight">
                                     <span className="truncate font-medium">{session?.user?.username}</span>
@@ -71,14 +72,16 @@ export function NavUser() {
                         </DropdownMenuLabel>
                         <DropdownMenuSeparator />
                         <DropdownMenuGroup>
-                            <DropdownMenuItem>
-                                Account
+                            <DropdownMenuItem asChild>
+                                <Link href="/app/profile" className="cursor-pointer">
+                                    Conta
+                                </Link>
                             </DropdownMenuItem>
                             <DropdownMenuItem>
-                                Billing
+                                Subscrição
                             </DropdownMenuItem>
                             <DropdownMenuItem>
-                                Notifications
+                                Notificações
                             </DropdownMenuItem>
                         </DropdownMenuGroup>
                         <DropdownMenuSeparator />

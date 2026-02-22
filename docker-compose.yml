@@ -29,6 +29,7 @@ services:
       - GENAI_KEY=AIzaSyDyvqvKBMm_ElzlaocaQMGy1UhmsZqHCpU 
       - OLLAMA_KEY=a3a0266acc75406d8255c77af093e451.8tERxykElej3uCmk7itMe2tg
       - SITE_URL=http://localhost:8000
+      - GOOGLE_CLIENT_ID=88572783054-i4pesjt105o1bq83ne3grt9sjss4m616.apps.googleusercontent.com
     depends_on:
       - db
       - redis
@@ -44,6 +45,7 @@ services:
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
       - GENAI_KEY=AIzaSyDyvqvKBMm_ElzlaocaQMGy1UhmsZqHCpU
       - OLLAMA_KEY=74d3ffcd27984f848026dc532370ff74.87ZjfHPN-6kjVml_C_8bC10I
+      - GOOGLE_CLIENT_ID=88572783054-i4pesjt105o1bq83ne3grt9sjss4m616.apps.googleusercontent.com
     depends_on:
       - backend
       - redis
@@ -58,6 +60,9 @@ services:
       NEXT_PUBLIC_API_URL: http://localhost:8000/api
       AUTH_URL: http://backend:8000/api
       AUTH_SECRET: example-secret
+      GOOGLE_CLIENT_ID: 88572783054-i4pesjt105o1bq83ne3grt9sjss4m616.apps.googleusercontent.com
+      GOOGLE_CLIENT_SECRET: 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
+      NEXTAUTH_URL: http://localhost:3000
     depends_on:
       - backend
   adminer:

@@ -34,6 +34,8 @@ interface Module {
   id: number;
   name: string;
   lessons: Lesson[];
+  last_quiz_score?: number;
+  last_quiz_passed?: boolean;
 }
 
 interface CourseDetail extends Course {
@@ -317,11 +319,13 @@ export default function CoursePage() {
             {course.modules.map((module, i) => (
               <Card key={module.id} className="p-0 gap-0 overflow-hidden">
                 <div className="bg-muted/50 p-4 border-b">
-                  <h3 className="font-semibold text-lg flex items-center">
-                    <span className="bg-primary/10 text-primary w-8 h-8 rounded-full flex items-center justify-center mr-3 text-sm">
-                      {i + 1}
-                    </span>
-                    {module.name}
+                  <h3 className="font-semibold text-lg flex items-center justify-between w-full pr-4">
+                    <div className="flex items-center">
+                      <span className="bg-primary/10 text-primary w-8 h-8 rounded-full flex items-center justify-center mr-3 text-sm">
+                        {i + 1}
+                      </span>
+                      {module.name}
+                    </div>
                   </h3>
                 </div>
                 <div className="divide-y">

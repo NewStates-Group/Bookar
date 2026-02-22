@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px; }
+        .header { text-align: center; padding: 20px 0; border-bottom: 2px solid #06b6d4; }
+        .content { padding: 30px; }
+        .button { display: inline-block; padding: 12px 24px; background-color: #06b6d4; color: #ffffff !important; text-decoration: none; border-radius: 6px; font-weight: bold; margin-top: 20px; }
+        .button:hover { background-color: #0891b2; }
+        .footer { text-align: center; font-size: 12px; color: #777; padding: 20px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 style="color: #06b6d4; margin: 0;">Bem-vindo ao Bookar!</h1>
+        </div>
+        <div class="content">
+            <p>Olá, <strong>{{ username }}</strong>!</p>
+            <p>Ficamos muito felizes em ter você conosco na plataforma Bookar. Sua jornada de aprendizado personalizado com IA começa agora!</p>
+            <p>Explore nossos cursos e comece a transformar seu futuro hoje mesmo.</p>
+            <a href="{{ site_url }}" class="button">Acessar Minha Conta</a>
+        </div>
+        <div class="footer">
+            &copy; 2026 Bookar Platform. Todos os direitos reservados.
+        </div>
+    </div>
+</body>
+</html>

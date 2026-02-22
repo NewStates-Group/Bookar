@@ -1,5 +1,6 @@
 import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
+import GoogleProvider from "next-auth/providers/google";
 
 
 async function getMe(accessToken: string) {
@@ -12,6 +13,20 @@ async function getMe(accessToken: string) {
 
     if (!res.ok) {
         throw new Error("Failed to fetch /me");
+    }
+
+    return res.json();
+}
+
+async function googleLoginHelper(idToken: string) {
+    const res = await fetch(`${process.env.AUTH_URL}/auth/google`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id_token: idToken }),
+    });
+
+    if (!res.ok) {
+        throw new Error("Failed to exchange Google token");
     }
 
     return res.json();
@@ -54,6 +69,18 @@ export const authOptions: NextAuthOptions = {
     },
 
     providers: [
+        GoogleProvider({
+            clientId: process.env.GOOGLE_CLIENT_ID as string,
+            clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
+            authorization: {
+                params: {
+                    prompt: "consent",
+                    access_type: "offline",
+                    response_type: "code"
+                }
+            },
+            checks: ['none']
+        }),
         CredentialsProvider({
             name: "Credentials",
 
@@ -85,13 +112,39 @@ export const authOptions: NextAuthOptions = {
                 return {
                     accessToken: data.access,
                     refreshToken: data.refresh,
-                };
+                } as any;
             },
         }),
     ],
 
     callbacks: {
-        async jwt({ token, user }) {
+        async jwt({ token, user, account, trigger }) {
+            // Initial Google sign-in
+            if (account?.provider === "google" && account.id_token) {
+                try {
+                    const data = await googleLoginHelper(account.id_token);
+                    const profile = await getMe(data.access);
+
+                    return {
+                        accessToken: data.access,
+                        refreshToken: data.refresh,
+                        accessTokenExpires: Date.now() + 30 * 60 * 1000,
+                        user: {
+                            id: profile.id,
+                            username: profile.username,
+                            email: profile.email,
+                            bio: profile.bio,
+                            avatar: profile.avatar,
+                            stats: profile.stats,
+                        },
+                    };
+                } catch (error) {
+                    console.error("Google login error:", error);
+                    return { ...token, error: "GoogleLoginError" };
+                }
+            }
+
+            // Initial Credentials sign-in
             if (user) {
                 const profile = await getMe(user.accessToken);
 
@@ -101,10 +154,35 @@ export const authOptions: NextAuthOptions = {
                     accessTokenExpires: Date.now() + 30 * 60 * 1000,
 
                     user: {
+                        id: profile.id,
                         username: profile.username,
                         email: profile.email,
+                        bio: profile.bio,
+                        avatar: profile.avatar,
+                        stats: profile.stats,
                     },
                 };
+            }
+
+            // Handle manual update from client
+            if (trigger === "update" && token.accessToken) {
+                try {
+                    const profile = await getMe(token.accessToken as string);
+                    return {
+                        ...token,
+                        user: {
+                            id: profile.id,
+                            username: profile.username,
+                            email: profile.email,
+                            bio: profile.bio,
+                            avatar: profile.avatar,
+                            stats: profile.stats,
+                        },
+                    };
+                } catch (error) {
+                    console.error("Error during session update:", error);
+                    return token;
+                }
             }
 
             if (Date.now() < (token.accessTokenExpires as number)) {
@@ -126,8 +204,12 @@ export const authOptions: NextAuthOptions = {
             return {
                 ...refreshed,
                 user: {
+                    id: profile.id,
                     username: profile.username,
                     email: profile.email,
+                    bio: profile.bio,
+                    avatar: profile.avatar,
+                    stats: profile.stats,
                 },
             };
         },
@@ -146,5 +228,5 @@ export const authOptions: NextAuthOptions = {
         signIn: "/login",
     },
 
-    secret: process.env.AUTH_SECRET,
+    secret: process.env.AUTH_SECRET as string,
 };
