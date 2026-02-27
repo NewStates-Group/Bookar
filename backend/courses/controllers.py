@@ -64,12 +64,8 @@ class CourseController:
         return self.course_service.get_module_quiz(module_id)
 
     @route.get("{course_id}/certificate")
-    def download_certificate(self, request, course_id: int, full_name: str = None):
-        pdf_buffer = self.course_service.generate_certificate(request.user, course_id, full_name)
-        from django.http import HttpResponse
-        response = HttpResponse(pdf_buffer, content_type='application/pdf')
-        response['Content-Disposition'] = f'attachment; filename="certificate_course_{course_id}.pdf"'
-        return response
+    def get_certificate(self, request, course_id: int):
+        return self.course_service.get_certificate_info(request.user, course_id)
 
     @route.post("quiz/{quiz_id}/submit", response=QuizResult)
     def submit_quiz(self, request, quiz_id: int, data: QuizSubmission):

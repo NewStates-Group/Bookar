@@ -23,6 +23,7 @@ class CourseOut(ModelSchema):
             "created_at",
             "status",
             "max_modules",
+            "certificate_status",
         ]
 
 

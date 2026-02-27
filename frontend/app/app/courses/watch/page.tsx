@@ -27,6 +27,7 @@ export interface CourseData {
     desc: string;
     modules: Module[];
     is_fully_completed: boolean;
+    certificate_status: "NOT_GENERATED" | "PROCESSING" | "READY";
 }
 
 export interface Lesson {
@@ -61,9 +62,6 @@ export default function WatchPage() {
     const [previousLesson, setPreviousLesson] = useState<Lesson | null>(null)
     const [nextLesson, setNextLesson] = useState<Lesson | null>(null)
     const [nextQuiz, setNextQuiz] = useState<{ id: number, moduleId: number } | null>(null)
-    const [showNameModal, setShowNameModal] = useState(false);
-    const [fullName, setFullName] = useState("");
-    const [isDownloading, setIsDownloading] = useState(false);
 
 
     const markDelivered = async () => {
@@ -124,49 +122,6 @@ export default function WatchPage() {
         }
     };
 
-    const downloadCertificate = async (name?: string) => {
-        setIsDownloading(true);
-        try {
-            const queryParams = name ? `?full_name=${encodeURIComponent(name)}` : '';
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/courses/${courseID}/certificate${queryParams}`, {
-                headers: {
-                    Authorization: `Bearer ${(session as any)?.accessToken}`,
-                },
-            });
-
-            if (res.ok) {
-                const blob = await res.blob();
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `Certificado_${course?.title || 'Curso'}.pdf`;
-                document.body.appendChild(a);
-                a.click();
-                window.URL.revokeObjectURL(url);
-                document.body.removeChild(a);
-                toast.success("Certificado baixado com sucesso!");
-                setShowNameModal(false);
-            } else {
-                const error = await res.json();
-                toast.error(error.message || "Erro ao baixar certificado");
-            }
-        } catch (e) {
-            toast.error("Erro ao baixar certificado");
-        } finally {
-            setIsDownloading(false);
-        }
-    };
-
-    const handleCertificateClick = () => {
-        // @ts-ignore
-        const sessionName = session?.user?.name || (session as any)?.user?.full_name;
-
-        if (sessionName) {
-            downloadCertificate(sessionName);
-        } else {
-            setShowNameModal(true);
-        }
-    };
 
     const fetchLessonStatus = async (id: number) => {
         try {
@@ -343,7 +298,7 @@ export default function WatchPage() {
             </div>
 
             <div className="flex-1 flex flex-col overflow-hidden bg-background">
-                <div className="h-16 grid grid-cols-6 border-b border-border">
+                <div className="h-16 grid grid-cols-5 border-b border-border">
                     <button
                         onClick={() => router.push(`/app/courses/${course?.id}`)}
                         className="flex gap-1 items-center justify-center border-r cursor-pointer hover:bg-muted transition-colors"
@@ -398,19 +353,6 @@ export default function WatchPage() {
                             Dúvidas
                         </span>
                     </button>
-
-                    {course?.is_fully_completed && (
-                        <button
-                            className="flex gap-2 items-center cursor-pointer justify-center bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-500 transition-colors px-4"
-                            onClick={handleCertificateClick}
-                            disabled={isDownloading}
-                        >
-                            {isDownloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Award className="w-4 h-4" />}
-                            <span className="hidden lg:block font-bold">
-                                Certificado
-                            </span>
-                        </button>
-                    )}
                 </div>
 
                 <div className="flex-1 overflow-y-auto">
@@ -496,70 +438,6 @@ export default function WatchPage() {
                 </div>
             )}
 
-            {showNameModal && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[120] backdrop-blur-sm">
-                    <div className="bg-card border border-border rounded-2xl max-w-md w-full mx-4 p-8 shadow-2xl">
-                        <div className="flex items-center justify-between mb-6">
-                            <div className="flex items-center gap-3">
-                                <div className="bg-cyan-500/10 p-2 rounded-lg">
-                                    <Award className="w-6 h-6 text-cyan-500" />
-                                </div>
-                                <h2 className="text-2xl font-bold text-foreground">Certificado</h2>
-                            </div>
-                            <button
-                                onClick={() => setShowNameModal(false)}
-                                className="text-foreground/40 hover:text-foreground hover:bg-muted p-1 rounded-full transition-colors"
-                                disabled={isDownloading}
-                            >
-                                <X className="w-5 h-5" />
-                            </button>
-                        </div>
-
-                        <p className="text-foreground/70 mb-6 leading-relaxed">
-                            Parabéns! Para gerar seu certificado, precisamos que confirme o seu <strong>nome completo</strong>.
-                        </p>
-
-                        <div className="space-y-4">
-                            <div className="space-y-2">
-                                <label htmlFor="full-name" className="text-sm font-medium text-foreground/60 ml-1">Nome Completo</label>
-                                <input
-                                    id="full-name"
-                                    type="text"
-                                    placeholder="Seu nome para o certificado"
-                                    autoFocus
-                                    className="w-full bg-muted border border-border rounded-xl p-4 text-foreground placeholder-foreground/30 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 focus:border-cyan-500 transition-all font-medium"
-                                    value={fullName}
-                                    onChange={(e) => setFullName(e.target.value)}
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter' && fullName.trim() && !isDownloading) {
-                                            downloadCertificate(fullName);
-                                        }
-                                    }}
-                                />
-                            </div>
-
-                            <div className="flex gap-3 pt-4">
-                                <Button
-                                    variant="outline"
-                                    onClick={() => setShowNameModal(false)}
-                                    className="flex-1 py-6 rounded-xl border-border hover:bg-muted font-semibold"
-                                    disabled={isDownloading}
-                                >
-                                    Cancelar
-                                </Button>
-                                <Button
-                                    onClick={() => downloadCertificate(fullName)}
-                                    className="flex-1 py-6 rounded-xl bg-cyan-500 hover:bg-cyan-600 text-white font-bold shadow-lg shadow-cyan-500/20"
-                                    disabled={!fullName.trim() || isDownloading}
-                                >
-                                    {isDownloading ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <FileDown className="w-5 h-5 mr-2" />}
-                                    Download PDF
-                                </Button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     );
 }

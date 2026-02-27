@@ -1,4 +1,5 @@
 "use client";
+import React from "react";
 
 import { useSession } from "next-auth/react";
 import { useState, useEffect, useRef } from "react";
@@ -20,6 +21,8 @@ export default function ProfilePage() {
     const [formData, setFormData] = useState({
         username: "",
         email: "",
+        first_name: "",
+        last_name: "",
         bio: "",
     });
 
@@ -28,6 +31,8 @@ export default function ProfilePage() {
             setFormData({
                 username: session.user.username || "",
                 email: session.user.email || "",
+                first_name: (session.user as any).first_name || "",
+                last_name: (session.user as any).last_name || "",
                 bio: session.user.bio || "",
             });
         }
@@ -44,6 +49,22 @@ export default function ProfilePage() {
     const handleUpdateProfile = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsLoading(true);
+
+        const fullName = `${formData.first_name} ${formData.last_name}`.trim();
+        const nameParts = fullName.split(/\s+/).filter(p => p.length > 0);
+        const hasSymbols = /[!@#$%^&*(),.?":{}|<>0-9]/.test(fullName);
+
+        if (nameParts.length < 2) {
+            toast.error("O nome completo deve conter pelo menos duas palavras.");
+            setIsLoading(false);
+            return;
+        }
+
+        if (hasSymbols) {
+            toast.error("O nome não pode conter símbolos ou números.");
+            setIsLoading(false);
+            return;
+        }
 
         try {
             const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/profile`, {
@@ -135,13 +156,40 @@ export default function ProfilePage() {
                                 </label>
                             </div>
                             <div className="text-center sm:text-left space-y-1">
-                                <h3 className="text-2xl font-bold">{session?.user?.username}</h3>
+                                <h3 className="text-2xl font-bold">{(session?.user as any).first_name ? `${(session?.user as any).first_name} ${(session?.user as any).last_name}` : session?.user?.username}</h3>
                                 <p className="text-muted-foreground">{session?.user?.email}</p>
+                                {(!(session?.user as any).first_name || !(session?.user as any).last_name || !session?.user?.avatar) && (
+                                    <p className="text-xs text-orange-500 font-medium animate-pulse">
+                                        Por favor, complete o seu perfil (nome e foto) para continuar.
+                                    </p>
+                                )}
                             </div>
                         </div>
 
                         <form onSubmit={handleUpdateProfile} className="space-y-4 mt-4">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="first_name">Nome</Label>
+                                    <Input
+                                        id="first_name"
+                                        placeholder="Seu primeiro nome"
+                                        value={formData.first_name}
+                                        onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
+                                        className="bg-muted/30 focus:border-cyan-500"
+                                        required
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="last_name">Apelido (Sobrenome)</Label>
+                                    <Input
+                                        id="last_name"
+                                        placeholder="Seu sobrenome"
+                                        value={formData.last_name}
+                                        onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
+                                        className="bg-muted/30 focus:border-cyan-500"
+                                        required
+                                    />
+                                </div>
                                 <div className="space-y-2">
                                     <Label htmlFor="username">Nome de utilizador</Label>
                                     <Input

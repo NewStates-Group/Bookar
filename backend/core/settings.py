@@ -53,7 +53,7 @@ ASGI_APPLICATION = "core.asgi.application"
 SITE_URL = env("SITE_URL", default="")
 
 DATABASES = {
-    "default": env.db("DATABASE_URL", default=f"sqlite:///{BASE_DIR}/db.sqlite3"),
+    "default": env.db("DATABASE_URL", default="sqlite:///:memory:"),
 }
 
 AUTH_USER_MODEL = "accounts.User"

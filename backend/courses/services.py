@@ -1,5 +1,5 @@
 import logging
-
+from django.conf import settings
 from django.db.models import Prefetch
 from django.db.models.query import QuerySet
 from ninja.errors import HttpError
@@ -9,6 +9,7 @@ from .tasks import (
     create_course_details,
     generate_lesson,
     generate_next_module,
+    generate_certificate_task,
 )
 
 logger = logging.getLogger(__name__)
@@ -260,56 +261,36 @@ class CourseService:
         except Course.DoesNotExist:
             raise HttpError(404, "Curso não encontrado")
 
-    def generate_certificate(self, user, course_id: int, full_name: str = None):
+    def get_certificate_info(self, user, course_id: int):
         course = Course.objects.get(pk=course_id, user=user)
         
         # Verify completion
         if not course.is_fully_completed:
             raise HttpError(400, "O curso ainda não foi totalmente concluído.")
 
-        # Determine the name to show on the certificate
+        # If READY, return the URL
+        if course.certificate_status == "READY" and course.certificate_file:
+            return {
+                "status": "READY",
+                "message": "Certificado pronto.",
+                "certificate_url": f"{settings.MEDIA_URL}{course.certificate_file}"
+            }
+
+        # If PROCESSING, just return status
+        if course.certificate_status == "PROCESSING":
+            return {"status": "PROCESSING", "message": "Seu certificado está sendo gerado."}
+
+        # If NOT_GENERATED, trigger generation
+        full_name = f"{user.first_name} {user.last_name}".strip()
         if not full_name:
-            full_name = f"{user.first_name} {user.last_name}".strip()
-            if not full_name:
-                full_name = user.username
+            full_name = user.username
 
-        # Generate PDF
-        from reportlab.pdfgen import canvas
-        from reportlab.lib.pagesizes import letter
-        from reportlab.lib.units import inch
-        import io
+        course.certificate_status = "PROCESSING"
+        course.save()
         
-        buffer = io.BytesIO()
-        c = canvas.Canvas(buffer, pagesize=letter)
-        width, height = letter
-        
-        # Draw some simple certificate content
-        c.setFont("Helvetica-Bold", 30)
-        c.drawCentredString(width / 2, height - 2 * inch, "CERTIFICADO DE CONCLUSÃO")
-        
-        c.setFont("Helvetica", 20)
-        c.drawCentredString(width / 2, height - 3.5 * inch, f"Certificamos que")
-        
-        c.setFont("Helvetica-Bold", 24)
-        c.drawCentredString(width / 2, height - 4.5 * inch, f"{full_name}")
-        
-        c.setFont("Helvetica", 20)
-        c.drawCentredString(width / 2, height - 5.5 * inch, f"concluiu com êxito o curso")
-        
-        c.setFont("Helvetica-Bold", 24)
-        c.drawCentredString(width / 2, height - 6.5 * inch, f"{course.title}")
-        
-        c.showPage()
-        c.save()
-        
-        from core.mail import send_certificate_email
-        try:
-            send_certificate_email(user, course)
-        except Exception as e:
-            logger.error(f"Failed to send certificate email: {e}")
+        generate_certificate_task.delay(user.id, course.id, full_name)
 
-        buffer.seek(0)
-        return buffer
+        return {"status": "PROCESSING", "message": "Solicitação iniciada. Você receberá um e-mail em breve."}
 
 
 class LessonService:

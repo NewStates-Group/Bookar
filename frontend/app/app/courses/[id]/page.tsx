@@ -51,7 +51,6 @@ export default function CoursePage() {
   const [isGeneratingModule, setIsGeneratingModule] = useState(false);
   const [finished, setFinished] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [showNameModal, setShowNameModal] = useState(false);
   const [fullName, setFullName] = useState("");
   const [isDownloading, setIsDownloading] = useState(false);
 
@@ -113,48 +112,31 @@ export default function CoursePage() {
     }
   };
 
-  const downloadCertificate = async (name?: string) => {
+  const handleCertificateClick = async () => {
     setIsDownloading(true);
     try {
-      const queryParams = name ? `?full_name=${encodeURIComponent(name)}` : '';
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/courses/${course?.id}/certificate${queryParams}`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/courses/${course?.id}/certificate`, {
         headers: {
           Authorization: `Bearer ${(session as any)?.accessToken}`,
         },
       });
 
       if (res.ok) {
-        const blob = await res.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `Certificado_${course?.title}.pdf`;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-        toast.success("Certificado baixado com sucesso!");
-        setShowNameModal(false);
+        const data = await res.json();
+        if (data.status === "READY" && data.certificate_url) {
+          window.open(`http://localhost:8000${data.certificate_url}`, '_blank');
+        } else {
+          toast.success(data.message || "Solicitação iniciada!");
+          fetchCourse(); // Refresh to update status
+        }
       } else {
         const error = await res.json();
-        toast.error(error.message || "Erro ao baixar certificado");
+        toast.error(error.message || "Erro ao processar certificado");
       }
     } catch (e) {
-      toast.error("Erro ao baixar certificado");
+      toast.error("Erro ao processar certificado");
     } finally {
       setIsDownloading(false);
-    }
-  };
-
-  const handleCertificateClick = () => {
-    // Check if user has a name in session/profile
-    // @ts-ignore
-    const sessionName = session?.user?.name || (session as any)?.user?.full_name;
-
-    if (sessionName) {
-      downloadCertificate(sessionName);
-    } else {
-      setShowNameModal(true);
     }
   };
 
@@ -294,15 +276,23 @@ export default function CoursePage() {
                   }
                 </span>
               </Button>
-              {course.is_fully_completed && (
+              {course?.is_fully_completed && (
                 <Button
-                  variant="outline"
-                  className="border-cyan-500 text-cyan-500 hover:bg-cyan-50 gap-2 h-11"
                   onClick={handleCertificateClick}
-                  disabled={isDownloading}
+                  variant="outline"
+                   size="lg"
+                  disabled={isDownloading || course?.certificate_status === "PROCESSING"}
+                  className="px-8 rounded-full border-cyan-500 text-cyan-500 hover:bg-cyan-500 hover:text-white"
                 >
-                  {isDownloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Award className="w-4 h-4" />}
-                  Gerar Certificado
+                  {isDownloading || course?.certificate_status === "PROCESSING" ? (
+                    <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                  ) : course?.certificate_status === "READY" ? (
+                    <FileDown className="w-5 h-5 mr-2" />
+                  ) : (
+                    <Award className="w-5 h-5 mr-2" />
+                  )}
+                  {course?.certificate_status === "READY" ? "Ver Certificado" :
+                    course?.certificate_status === "PROCESSING" ? "Gerando..." : "Emitir Certificado"}
                 </Button>
               )}
             </div>
@@ -363,71 +353,6 @@ export default function CoursePage() {
           </div>
         </div>
       </div>
-
-      {showNameModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] backdrop-blur-sm">
-          <div className="bg-card border border-border rounded-2xl max-w-md w-full mx-4 p-8 shadow-2xl scale-in-center">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-3">
-                <div className="bg-cyan-500/10 p-2 rounded-lg">
-                  <Award className="w-6 h-6 text-cyan-500" />
-                </div>
-                <h2 className="text-2xl font-bold text-foreground">Certificado</h2>
-              </div>
-              <button
-                onClick={() => setShowNameModal(false)}
-                className="text-foreground/40 hover:text-foreground hover:bg-muted p-1 rounded-full transition-colors"
-                disabled={isDownloading}
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <p className="text-foreground/70 mb-6 leading-relaxed">
-              Parabéns! Para gerar seu certificado, precisamos que confirme o seu <strong>nome completo</strong>.
-            </p>
-
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <label htmlFor="full-name" className="text-sm font-medium text-foreground/60 ml-1">Nome Completo</label>
-                <input
-                  id="full-name"
-                  type="text"
-                  placeholder="Seu nome para o certificado"
-                  autoFocus
-                  className="w-full bg-muted border border-border rounded-xl p-4 h-12 text-foreground placeholder-foreground/30 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 focus:border-cyan-500 transition-all"
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && fullName.trim() && !isDownloading) {
-                      downloadCertificate(fullName);
-                    }
-                  }}
-                />
-              </div>
-
-              <div className="flex gap-3 pt-4">
-                <Button
-                  variant="outline"
-                  onClick={() => setShowNameModal(false)}
-                  className="flex-1 py-6 rounded-xl border-border hover:bg-muted font-semibold"
-                  disabled={isDownloading}
-                >
-                  Cancelar
-                </Button>
-                <Button
-                  onClick={() => downloadCertificate(fullName)}
-                  className="flex-1 h-12 rounded-xl bg-cyan-500 hover:bg-cyan-600 text-white font-bold shadow-lg shadow-cyan-500/20"
-                  disabled={!fullName.trim() || isDownloading}
-                >
-                  {isDownloading ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <FileDown className="w-5 h-5 mr-2" />}
-                  Download PDF
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

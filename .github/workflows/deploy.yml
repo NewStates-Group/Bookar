@@ -1,0 +1,116 @@
+name: Deploy to AWS Fargate
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  AWS_REGION: eu-north-1
+  BACKEND_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/django-backend
+  FRONTEND_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/nextjs-frontend
+  ECS_CLUSTER: Bookar
+  ECS_SERVICE_BACKEND: django-backend-service
+  ECS_SERVICE_FRONTEND: nextjs-frontend-service
+  ECS_SERVICE_WORKER: celery-worker-service
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install backend dependencies
+        run: |
+          cd backend
+          pip install -r requirements.txt
+
+      - name: Run Django tests
+        run: |
+          cd backend
+          python manage.py test
+
+  build-and-deploy:
+    needs: test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # -----------------------------
+      # Docker Hub login
+      # -----------------------------
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3  
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD }}
+
+      # -----------------------------
+      # Build & push backend
+      # -----------------------------
+      - name: Build backend image
+        run: docker build -t $BACKEND_IMAGE:${{ github.sha }} ./backend
+
+      - name: Push backend image
+        run: docker push $BACKEND_IMAGE:${{ github.sha }}
+
+      # -----------------------------
+      # Build & push frontend
+      # -----------------------------
+      - name: Build frontend image
+        run: docker build -t $FRONTEND_IMAGE:${{ github.sha }} ./frontend
+
+      - name: Push frontend image
+        run: docker push $FRONTEND_IMAGE:${{ github.sha }}
+
+      # -----------------------------
+      # Build & push worker
+      # -----------------------------
+      - name: Build worker image
+        run: docker build -t $BACKEND_IMAGE:${{ github.sha }} ./backend
+
+      - name: Push worker image
+        run: docker push $BACKEND_IMAGE:${{ github.sha }}
+
+      # -----------------------------
+      # AWS credentials
+      # -----------------------------
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # -----------------------------
+      # Force ECS redeploy
+      # -----------------------------
+      - name: Deploy backend service
+        run: |
+          aws ecs update-service \
+            --cluster $ECS_CLUSTER \
+            --service $ECS_SERVICE_BACKEND \
+            --force-new-deployment
+
+      - name: Deploy frontend service
+        run: |
+          aws ecs update-service \
+            --cluster $ECS_CLUSTER \
+            --service $ECS_SERVICE_FRONTEND \
+            --force-new-deployment
+
+      - name: Deploy worker service
+        run: |
+          aws ecs update-service \
+            --cluster $ECS_CLUSTER \
+            --service $ECS_SERVICE_WORKER \
+            --force-new-deployment

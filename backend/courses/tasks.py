@@ -10,19 +10,27 @@ from pathlib import Path
 from typing import List, Optional
 from celery import shared_task
 from django.conf import settings
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import landscape, A4
+from reportlab.lib import colors
+from reportlab.lib.units import cm
+from core.mail import send_certificate_email
+import os
+import io
 from django.core.files.base import ContentFile
+from django.contrib.auth import get_user_model
+
 from django.core.files.storage import default_storage
 from google.genai import types
 from PIL import Image, ImageDraw, UnidentifiedImageError
 
-from .exceptions import CourseCreationError, LessonDoesNotExist, ThumbnailCreationError
+from .exceptions import LessonDoesNotExist, ThumbnailCreationError
 from .models import Choice, Course, Lesson, Module, Question, Quiz
 from .utils import (
     extract_json,
     get_genai_client,
     genai_chat,
 )
-
 logger = logging.getLogger(__name__)
 
 
@@ -631,4 +639,109 @@ def create_course_thumb(course_pk: str, prompt: str):
     except Exception as e:
         logger.error(f"Thumbnail creation failed: {e}")
         Course.objects.filter(pk=course_pk).update(status="FAILED")
-        raise ThumbnailCreationError(f"Erro ao criar thumbnail: {str(e)}")
+        raise ThumbnailCreationError(f"Erro ao criar thumbnail: {str(e)}") 
+@shared_task
+def generate_certificate_task(user_id: int, course_id: int, full_name: str):
+    User = get_user_model()
+    try:
+        user = User.objects.get(pk=user_id)
+        course = Course.objects.get(pk=course_id)
+        
+        buffer = io.BytesIO()
+        c = canvas.Canvas(buffer, pagesize=landscape(A4))
+        width, height = landscape(A4)
+        
+        # --- Background and Decorations ---
+        c.setFillColor(colors.whitesmoke)
+        c.rect(0, 0, width, height, fill=1, stroke=0)
+        
+        c.setStrokeColor(colors.transparent)
+        c.setFillColor(colors.HexColor("#bbdefb", hasAlpha=True)) # Light Blue
+        
+        # Wave 1
+        p = c.beginPath()
+        p.moveTo(0, 0)
+        p.lineTo(0, 3*cm)
+        p.curveTo(width/4, 5*cm, 3*width/4, 1*cm, width, 3*cm)
+        p.lineTo(width, 0)
+        p.close()
+        c.drawPath(p, fill=1, stroke=0)
+        
+        # Wave 2
+        c.setFillColor(colors.HexColor("#64b5f6", hasAlpha=True))
+        p = c.beginPath()
+        p.moveTo(0, 0)
+        p.lineTo(0, 2*cm)
+        p.curveTo(width/3, 4*cm, 2*width/3, 0.5*cm, width, 2*cm)
+        p.lineTo(width, 0)
+        p.close()
+        c.drawPath(p, fill=1, stroke=0)
+
+        # --- Logo ---
+        logo_path = os.path.join(settings.BASE_DIR, "static", "logo.png")
+        if os.path.exists(logo_path):
+            # Centered logo with better sizing
+            c.drawImage(logo_path, width/2 - 2*cm, height - 4*cm, width=4*cm, preserveAspectRatio=True)
+        
+        # --- Text Content ---
+        c.setFont("Helvetica-Bold", 14)
+        c.setFillColor(colors.HexColor("#1a237e"))
+        c.drawCentredString(width/2, height - 4.8*cm, "BOOKAR")
+
+        c.setFont("Helvetica-Bold", 42)
+        c.setFillColor(colors.HexColor("#1a237e"))
+        c.drawCentredString(width/2, height - 7*cm, "CERTIFICADO DE CONCLUSÃO")
+        
+        c.setFont("Helvetica", 18)
+        c.setFillColor(colors.black)
+        c.drawCentredString(width/2, height - 9*cm, "Certificamos que o aluno(a)")
+        
+        c.setFont("Helvetica-Bold", 36)
+        c.setFillColor(colors.HexColor("#0d47a1"))
+        c.drawCentredString(width/2, height - 11*cm, full_name.upper())
+        
+        c.setFont("Helvetica", 18)
+        c.setFillColor(colors.black)
+        c.drawCentredString(width/2, height - 13*cm, "concluiu com êxito e dedicação o curso de")
+        
+        c.setFont("Helvetica-Bold", 24)
+        c.drawCentredString(width/2, height - 14.5*cm, course.title)
+        
+        from datetime import datetime
+        emission_date = datetime.now().strftime("%d de %B de %Y")
+        months = {
+            "January": "Janeiro", "February": "Fevereiro", "March": "Março", "April": "Abril",
+            "May": "Maio", "June": "Junho", "July": "Julho", "August": "Agosto",
+            "September": "Setembro", "October": "Outubro", "November": "Novembro", "December": "Dezembro"
+        }
+        for eng, pt in months.items():
+            emission_date = emission_date.replace(eng, pt)
+
+        c.setFont("Helvetica-Oblique", 12)
+        c.drawCentredString(width/2, 4*cm, f"Emitido em {emission_date}")
+
+        c.setStrokeColor(colors.HexColor("#1a237e"))
+        c.setLineWidth(2)
+        c.rect(1*cm, 1*cm, width - 2*cm, height - 2*cm, fill=0, stroke=1)
+        
+        c.showPage()
+        c.save()
+
+        # Save the file
+        filename = f"certificates/cert_{course.id}_{user.id}_{uuid.uuid4().hex[:8]}.pdf"
+        file_path = default_storage.save(filename, ContentFile(buffer.getvalue()))
+        
+        # Update course
+        course.certificate_file = file_path
+        course.certificate_status = "READY"
+        course.save()
+
+        # Send email
+        try:
+            send_certificate_email(user, course)
+        except Exception as e:
+            logger.error(f"Failed to send certificate email for course {course_id}: {e}")
+
+    except Exception as e:
+        logger.error(f"Error generating certificate for course {course_id}: {e}")
+        Course.objects.filter(pk=course_id).update(certificate_status="NOT_GENERATED")

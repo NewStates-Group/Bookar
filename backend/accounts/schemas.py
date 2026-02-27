@@ -44,6 +44,8 @@ class RegisterOut(Schema):
     id: int
     username: str
     email: str
+    first_name: str = ""
+    last_name: str = ""
     bio: str = ""
     avatar: str | None = None
     stats: UserStatsSchema | None = None
@@ -57,6 +59,8 @@ class RegisterOut(Schema):
 class ProfileUpdateIn(Schema):
     username: str = None
     email: EmailStr = None
+    first_name: str = None
+    last_name: str = None
     bio: str = None
 
 class GoogleLoginIn(Schema):

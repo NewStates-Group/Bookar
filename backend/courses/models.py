@@ -10,6 +10,12 @@ class CourseStatus(models.TextChoices):
     FAILED = "FAILED", "Falhou"
 
 
+class CertificateStatus(models.TextChoices):
+    NOT_GENERATED = "NOT_GENERATED", "Não Gerado"
+    PROCESSING = "PROCESSING", "Processando"
+    READY = "READY", "Pronto"
+
+
 class LessonStatus(models.TextChoices):
     PENDING = "PENDING", "Pendente"
     PROCESSING = "PROCESSING", "Processando"
@@ -50,6 +56,14 @@ class Course(models.Model):
     thumb = models.TextField(null=True, blank=True)
     deleted = models.BooleanField(default=False, null=True, blank=True)
     max_modules = models.PositiveIntegerField(null=True, blank=True, default=5)
+    
+    certificate_file = models.CharField(max_length=255, null=True, blank=True)
+    certificate_status = models.CharField(
+        max_length=20,
+        choices=CertificateStatus.choices,
+        default=CertificateStatus.NOT_GENERATED,
+    )
+    
     created_at = models.DateTimeField(auto_now_add=True)
 
     @property
