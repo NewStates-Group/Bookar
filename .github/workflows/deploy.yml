@@ -73,15 +73,6 @@ jobs:
         run: docker push $FRONTEND_IMAGE:${{ github.sha }}
 
       # -----------------------------
-      # Build & push worker
-      # -----------------------------
-      - name: Build worker image
-        run: docker build -t $BACKEND_IMAGE:${{ github.sha }} ./backend
-
-      - name: Push worker image
-        run: docker push $BACKEND_IMAGE:${{ github.sha }}
-
-      # -----------------------------
       # AWS credentials
       # -----------------------------
       - name: Configure AWS credentials
