@@ -11,6 +11,7 @@ anyio==4.11.0
     #   backend (pyproject.toml)
     #   google-genai
     #   httpx
+    #   watchfiles
 asgiref==3.9.2
     # via
     #   backend (pyproject.toml)
@@ -67,6 +68,7 @@ click==8.3.1
     #   click-plugins
     #   click-repl
     #   typer-slim
+    #   uvicorn
 click-didyoumean==0.3.1
     # via celery
 click-plugins==1.1.1.2
@@ -159,6 +161,7 @@ h11==0.16.0
     # via
     #   backend (pyproject.toml)
     #   httpcore
+    #   uvicorn
 hf-xet==1.2.0
     # via
     #   backend (pyproject.toml)
@@ -167,6 +170,8 @@ httpcore==1.0.9
     # via
     #   backend (pyproject.toml)
     #   httpx
+httptools==0.7.1
+    # via uvicorn
 httpx==0.28.1
     # via
     #   backend (pyproject.toml)
@@ -318,6 +323,7 @@ python-dotenv==1.2.1
     # via
     #   backend (pyproject.toml)
     #   moviepy
+    #   uvicorn
 pyttsx3==2.99
     # via backend (pyproject.toml)
 pytz==2025.2
@@ -328,6 +334,7 @@ pyyaml==6.0.3
     #   huggingface-hub
     #   langchain
     #   langchain-core
+    #   uvicorn
 redis==7.1.0
     # via backend (pyproject.toml)
 replicate==1.0.7
@@ -433,11 +440,17 @@ urllib3==2.5.0
     # via
     #   backend (pyproject.toml)
     #   requests
+uvicorn==0.41.0
+    # via backend (pyproject.toml)
+uvloop==0.22.1
+    # via uvicorn
 vine==5.1.0
     # via
     #   amqp
     #   celery
     #   kombu
+watchfiles==1.1.1
+    # via uvicorn
 wcwidth==0.2.14
     # via prompt-toolkit
 websockets==15.0.1
@@ -446,6 +459,7 @@ websockets==15.0.1
     #   elevenlabs
     #   google-genai
     #   gradio-client
+    #   uvicorn
 zope-interface==8.0.1
     # via
     #   backend (pyproject.toml)

@@ -1,16 +1,23 @@
+# backend/Dockerfile.prod
 FROM python:3.12-alpine
 
 WORKDIR /app
 
-RUN apk add --no-cache ffmpeg
+# Dependências do sistema
+RUN apk add --no-cache ffmpeg build-base libffi-dev musl-dev postgresql-dev
 
-COPY requirements.txt ./
+# Copia requirements
+COPY requirements.txt .
 
-RUN pip install --no-cache-dir uv && \
-    uv pip install --system -r requirements.txt
+# Instala dependências Python e Uvicorn
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
 
+# Copia o código
 COPY . .
 
+# Porta que o backend vai expor
 EXPOSE 8000
 
-CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+# CMD padrão para produção (Uvicorn)
+CMD ["uvicorn", "core.asgi:application", "--host", "0.0.0.0", "--port", "8000", "--workers", "3"]

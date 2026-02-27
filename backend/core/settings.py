@@ -15,7 +15,6 @@ DEBUG = True
 ALLOWED_HOSTS = ["*"]
 
 INSTALLED_APPS = [
-    "daphne",
     "ninja_extra",
     "ninja_jwt",
     "ninja_jwt.token_blacklist",
