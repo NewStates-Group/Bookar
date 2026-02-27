@@ -66,14 +66,14 @@ jobs:
       - name: Build frontend image
         run: |
           IMAGE_TAG=${{ github.sha }}
-          docker build -f ./frontend/Dockerfile.prod -t kiluzx/$FRONTEND_IMAGE:$IMAGE_TAG ./frontend
-          docker tag kiluzx/$FRONTEND_IMAGE:$IMAGE_TAG kiluzx/$FRONTEND_IMAGE:latest
+          docker build -f ./frontend/Dockerfile.prod -t $FRONTEND_IMAGE:$IMAGE_TAG ./frontend
+          docker tag $FRONTEND_IMAGE:$IMAGE_TAG $FRONTEND_IMAGE:latest
 
       - name: Push frontend image
         run: |
           IMAGE_TAG=${{ github.sha }}
-          docker push kiluzx/$FRONTEND_IMAGE:$IMAGE_TAG
-          docker push kiluzx/$FRONTEND_IMAGE:latest
+          docker push $FRONTEND_IMAGE:$IMAGE_TAG
+          docker push $FRONTEND_IMAGE:latest
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
