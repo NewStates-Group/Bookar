@@ -67,6 +67,14 @@ services:
       AUTH_TRUST_HOST: 
     depends_on:
       - backend
+  flower:
+    image: backend
+    command: sh -c "celery -A core --broker=redis://redis:6379/0 flower --port=5555"
+    ports:
+      - "5555:5555"
+    depends_on:
+      - redis
+      - worker
   adminer:
     image: adminer
     restart: unless-stopped
