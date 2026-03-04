@@ -63,6 +63,7 @@ services:
       GOOGLE_CLIENT_ID: 88572783054-i4pesjt105o1bq83ne3grt9sjss4m616.apps.googleusercontent.com
       GOOGLE_CLIENT_SECRET: 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
       NEXTAUTH_URL: http://localhost:3000
+      AUTH_TRUST_HOST: 
     depends_on:
       - backend
   adminer:
