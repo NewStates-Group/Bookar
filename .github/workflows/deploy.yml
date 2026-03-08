@@ -70,6 +70,7 @@ jobs:
           docker push $FRONTEND_IMAGE:$IMAGE_TAG
           docker push $FRONTEND_IMAGE:latest
   deploy:
+    needs: build-and-push
     runs-on: ubuntu-latest
 
     steps:
