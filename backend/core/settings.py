@@ -3,16 +3,22 @@ from pathlib import Path
 
 import environ
 
-env = environ.Env()
+env = environ.Env(
+    SECRET_KEY=(str, "django-example-secret-key"),
+    DEBUG=(bool, False),
+    SITE_URL=(str, "http://localhost:3000"),
+    DATABASE_URL=(str, "sqlite:///:memory:"),
+    REDIS_URL=(str, "redis://redis:6379/0"),
+)
 environ.Env.read_env()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = "django-insecure-a7ht-+08f*@^n7%xe=9fm*u+1ga-+!kc#bdt%+ir(k^-qc1eyg"
+SECRET_KEY = env("SECRET_KEY")
 
-DEBUG = env("DEBUG", default=False)
+DEBUG = env("DEBUG")
 
-ALLOWED_HOSTS = ["*"]
+ALLOWED_HOSTS = env.list("ALLOWED_HOSTS")
 
 INSTALLED_APPS = [
     "ninja_extra",
@@ -49,10 +55,10 @@ TEMPLATES = [
 
 ASGI_APPLICATION = "core.asgi.application"
 
-SITE_URL = env("SITE_URL", default="")
+SITE_URL = env("SITE_URL")
 
 DATABASES = {
-    "default": env.db("DATABASE_URL", default="sqlite:///:memory:"),
+    "default": env.db(),
 }
 
 AUTH_USER_MODEL = "accounts.User"
@@ -63,12 +69,7 @@ NINJA_JWT = {
     "BLACKLIST_AFTER_ROTATION": True,
 }
 
-CACHES = {
-    "default": {
-        "BACKEND": "django.core.cache.backends.redis.RedisCache",
-        "LOCATION": env("REDIS_URL", default="redis://redis:6379/0"),
-    }
-}
+CACHES = {"default": env.cache_url("REDIS_URL")}
 
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -98,29 +99,28 @@ MEDIA_ROOT = BASE_DIR.joinpath("media")
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-CORS_ALLOW_CREDENTIALS = True
-CORS_ORIGIN_ALLOW_ALL = True
-
-CELERY_BROKER_URL = env("CELERY_BROKER_URL", default="")
-CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND", default="")
+CELERY_BROKER_URL = env("REDIS_URL")
+CELERY_RESULT_BACKEND = env("REDIS_URL")
 CELERY_TIMEZONE = TIME_ZONE
 
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS")
+
 AI = {
-    "OLLAMA_KEY": env("OLLAMA_KEY", default=""),
-    "GENAI_KEY": env("GENAI_KEY", default=""),
-    "OLLAMA_MODEL_TEXT": "gpt-oss:120b-cloud",
-    "GENAI_MODEL_IMAGE": "gemini-2.5-flash-image",
-    "GENAI_MODEL_AUDIO": "gemini-2.5-flash-preview-tts",
-    "GENAI_MODEL_TEXT": "gemini-2.0-flash",
+    "OLLAMA_KEY": env("OLLAMA_KEY"),
+    "GENAI_KEY": env("GENAI_KEY"),
+    "OLLAMA_MODEL_TEXT": env("OLLAMA_MODEL_TEXT"),
+    "GENAI_MODEL_IMAGE": env("GENAI_MODEL_IMAGE"),
+    "GENAI_MODEL_AUDIO": env("GENAI_MODEL_AUDIO"),
+    "GENAI_MODEL_TEXT": env("GENAI_MODEL_TEXT"),
 }
 
-GOOGLE_CLIENT_ID = env("GOOGLE_CLIENT_ID", default="")
+GOOGLE_CLIENT_ID = env("GOOGLE_CLIENT_ID")
 
-# Email Configuration
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 EMAIL_HOST = "smtp.gmail.com"
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
 EMAIL_HOST_USER = "newstates.bookar@gmail.com"
-EMAIL_HOST_PASSWORD = env("EMAIL_PASSWORD", default="")
+EMAIL_HOST_PASSWORD = env("EMAIL_PASSWORD")
 DEFAULT_FROM_EMAIL = f"Bookar <{EMAIL_HOST_USER}>"

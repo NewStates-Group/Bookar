@@ -1,4 +1,4 @@
-name: Deploy to AWS Fargate
+name: Deploy to AWS EC2
 
 on:
   push:
@@ -6,13 +6,8 @@ on:
       - main
 
 env:
-  AWS_REGION: eu-north-1
-  BACKEND_IMAGE: ${{ secrets.DOCKER_USERNAME }}/django-backend
-  FRONTEND_IMAGE: ${{ secrets.DOCKER_USERNAME }}/nextjs-frontend
-  ECS_CLUSTER: Bookar
-  ECS_SERVICE_BACKEND: django-backend-service
-  ECS_SERVICE_FRONTEND: nextjs-frontend-service
-  ECS_SERVICE_WORKER: celery-worker-service
+  BACKEND_IMAGE: ${{ secrets.DOCKER_USERNAME }}/bookar-backend
+  FRONTEND_IMAGE: ${{ secrets.DOCKER_USERNAME }}/bookar-frontend
 
 jobs:
   test:
@@ -37,7 +32,7 @@ jobs:
           cd backend
           python manage.py test || echo "Failed"
 
-  build-and-deploy:
+  build-and-push:
     needs: test
     runs-on: ubuntu-latest
 
@@ -74,31 +69,28 @@ jobs:
           IMAGE_TAG=${{ github.sha }}
           docker push $FRONTEND_IMAGE:$IMAGE_TAG
           docker push $FRONTEND_IMAGE:latest
+  deploy:
+    runs-on: ubuntu-latest
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Deploy backend service
+      - name: Setup SSH
         run: |
-          aws ecs update-service \
-            --cluster $ECS_CLUSTER \
-            --service $ECS_SERVICE_BACKEND \
-            --force-new-deployment
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
 
-      - name: Deploy frontend service
+      - name: Syncronize files
         run: |
-          aws ecs update-service \
-            --cluster $ECS_CLUSTER \
-            --service $ECS_SERVICE_FRONTEND \
-            --force-new-deployment
+          rsync -avz --exclude 'backend/' --exclude 'frontend/' --exclude '.git/' --exclude '.env' \
+            ./ ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:~/Bookar/
 
-      - name: Deploy worker service
+      - name: Run deploy
         run: |
-          aws ecs update-service \
-            --cluster $ECS_CLUSTER \
-            --service $ECS_SERVICE_WORKER \
-            --force-new-deployment
+          ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} "
+            cd ~/Bookar &&
+            ./deploy.sh
+          "

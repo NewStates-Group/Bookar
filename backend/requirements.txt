@@ -157,6 +157,8 @@ greenlet==3.2.4
     # via
     #   backend (pyproject.toml)
     #   sqlalchemy
+gunicorn==25.1.0
+    # via backend (pyproject.toml)
 h11==0.16.0
     # via
     #   backend (pyproject.toml)
@@ -259,6 +261,7 @@ packaging==25.0
     # via
     #   backend (pyproject.toml)
     #   gradio-client
+    #   gunicorn
     #   huggingface-hub
     #   kombu
     #   langchain-core
