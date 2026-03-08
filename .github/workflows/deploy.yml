@@ -86,7 +86,7 @@ jobs:
 
       - name: Syncronize files
         run: |
-          rsync -avz --exclude 'backend/' --exclude 'frontend/' --exclude '.git/' --exclude '.env' \
+          rsync -avz --exclude 'backend/' --exclude 'frontend/' --exclude '.git/' --exclude '.env' --exclude 'docker-compose.yml' \
             ./ ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:~/Bookar/
 
       - name: Run deploy
