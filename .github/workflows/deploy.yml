@@ -93,5 +93,6 @@ jobs:
         run: |
           ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} "
             cd ~/Bookar &&
+            chmod +x deploy.sh &&
             ./deploy.sh
           "
