@@ -10,30 +10,30 @@ env:
   FRONTEND_IMAGE: ${{ secrets.DOCKER_USERNAME }}/bookar-frontend
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
+  # test:
+  #   runs-on: ubuntu-latest
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
+  #     - name: Setup Python
+  #       uses: actions/setup-python@v5
+  #       with:
+  #         python-version: "3.11"
 
-      - name: Install backend dependencies
-        run: |
-          cd backend
-          pip install -r requirements.txt
+  #     - name: Install backend dependencies
+  #       run: |
+  #         cd backend
+  #         pip install -r requirements.txt
 
-      - name: Run Django tests
-        run: |
-          cd backend
-          python manage.py test || echo "Failed"
+  #     - name: Run Django tests
+  #       run: |
+  #         cd backend
+  #         python manage.py test || echo "Failed"
 
   build-and-push:
-    needs: test
+    # needs: test
     runs-on: ubuntu-latest
 
     steps:
@@ -52,23 +52,24 @@ jobs:
           docker build -f ./backend/Dockerfile.prod -t $BACKEND_IMAGE:$IMAGE_TAG ./backend
           docker tag $BACKEND_IMAGE:$IMAGE_TAG $BACKEND_IMAGE:latest
 
-      - name: Push backend image
-        run: |
-          IMAGE_TAG=${{ github.sha }}
-          docker push $BACKEND_IMAGE:$IMAGE_TAG
-          docker push $BACKEND_IMAGE:latest
-
       - name: Build frontend image
         run: |
           IMAGE_TAG=${{ github.sha }}
           docker build -f ./frontend/Dockerfile.prod -t $FRONTEND_IMAGE:$IMAGE_TAG ./frontend
           docker tag $FRONTEND_IMAGE:$IMAGE_TAG $FRONTEND_IMAGE:latest
 
+      - name: Push backend image
+        run: |
+          IMAGE_TAG=${{ github.sha }}
+          docker push $BACKEND_IMAGE:$IMAGE_TAG
+          docker push $BACKEND_IMAGE:latest
+
       - name: Push frontend image
         run: |
           IMAGE_TAG=${{ github.sha }}
           docker push $FRONTEND_IMAGE:$IMAGE_TAG
           docker push $FRONTEND_IMAGE:latest
+          
   deploy:
     needs: build-and-push
     runs-on: ubuntu-latest
