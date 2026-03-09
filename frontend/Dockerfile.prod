@@ -7,8 +7,7 @@ RUN npm ci --legacy-peer-deps
 
 COPY . .
 
-ARG NEXT_PUBLIC_API_URL
-ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_API_URL http://api.bookar.study/api
 ENV NODE_ENV=production
 
 RUN npm run build
@@ -25,8 +24,5 @@ COPY --from=builder /app/public ./public
 COPY --from=builder /app/node_modules ./node_modules
 
 EXPOSE 3000
-
-ENV PORT=3000
-ENV HOSTNAME="0.0.0.0"
 
 CMD ["npm", "run", "start"]
