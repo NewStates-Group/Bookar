@@ -44,7 +44,77 @@ class AuthService:
             "certificates_issued": len(finished_ids), # Assuming 1:1 for now
         }
 
+    def get_google_auth_url(self):
+        from django.conf import settings
+        import urllib.parse
+        
+        params = {
+            "client_id": settings.GOOGLE_CLIENT_ID,
+            "redirect_uri": f"{settings.SITE_URL}/auth/google/callback",
+            "response_type": "code",
+            "scope": "openid email profile",
+            "access_type": "offline",
+            "prompt": "select_account",
+        }
+        return f"https://accounts.google.com/o/oauth2/v2/auth?{urllib.parse.urlencode(params)}"
+
+    def google_callback(self, code):
+        from django.conf import settings
+        import httpx
+        from ninja_jwt.tokens import RefreshToken
+        import random
+        import string
+
+        # 1. Exchange code for tokens
+        token_url = "https://oauth2.googleapis.com/token"
+        data = {
+            "code": code,
+            "client_id": settings.GOOGLE_CLIENT_ID,
+            "client_secret": settings.GOOGLE_CLIENT_SECRET,
+            "redirect_uri": f"{settings.SITE_URL}/auth/google/callback",
+            "grant_type": "authorization_code",
+        }
+
+        with httpx.Client() as client:
+            res = client.post(token_url, data=data)
+            if not res.is_success:
+                raise HttpError(400, f"Failed to exchange Google code: {res.text}")
+            tokens = res.json()
+
+        id_token_str = tokens.get("id_token")
+        if not id_token_str:
+            raise HttpError(400, "No id_token returned from Google")
+
+        # 2. Verify token and get user
+        from google.oauth2 import id_token
+        from google.auth.transport import requests
+        
+        try:
+            id_info = id_token.verify_oauth2_token(
+                id_token_str, 
+                requests.Request(), 
+                settings.GOOGLE_CLIENT_ID,
+                clock_skew=10
+            )
+
+            email = id_info.get('email')
+            user, created = User.objects.get_or_create(email=email, defaults={
+                'username': email.split('@')[0] + ''.join(random.choices(string.digits, k=4)),
+                'is_active': True
+            })
+
+            refresh = RefreshToken.for_user(user)
+            return {
+                'access': str(refresh.access_token),
+                'refresh': str(refresh),
+            }
+
+        except Exception as e:
+            print(f"Google Token Verification Error: {str(e)}")
+            raise HttpError(400, f"Erro na verificação do token Google: {str(e)}")
+
     def google_login(self, id_token_str):
+        # Kept for backward compatibility if needed, but redesigned for better use
         from google.oauth2 import id_token
         from google.auth.transport import requests
         from django.conf import settings
@@ -53,17 +123,22 @@ class AuthService:
         import string
 
         try:
-            # Verify the ID token
+            # Verify the ID token with clock skew handling
             id_info = id_token.verify_oauth2_token(
                 id_token_str, 
                 requests.Request(), 
-                settings.GOOGLE_CLIENT_ID
+                settings.GOOGLE_CLIENT_ID,
+                clock_skew=10 # Allow 10 seconds of clock skew
             )
 
-            if id_info['iss'] not in ['accounts.google.com', 'https://accounts.google.com']:
-                raise ValueError('Wrong issuer.')
+            iss = id_info.get('iss')
+            if iss not in ['accounts.google.com', 'https://accounts.google.com']:
+                raise ValueError(f'Wrong issuer: {iss}')
 
-            email = id_info['email']
+            email = id_info.get('email')
+            if not email:
+                raise ValueError('Email not found in Google Token')
+
             user, created = User.objects.get_or_create(email=email, defaults={
                 'username': email.split('@')[0] + ''.join(random.choices(string.digits, k=4)),
                 'is_active': True
@@ -77,7 +152,9 @@ class AuthService:
             }
 
         except Exception as e:
-            raise HttpError(400, f"Invalid Google Token: {str(e)}")
+            # Provide more detailed error message for easier debugging
+            print(f"Google Token Verification Error: {str(e)}")
+            raise HttpError(400, f"Erro na verificação do token Google: {str(e)}")
 
     def request_password_reset(self, email):
         try:

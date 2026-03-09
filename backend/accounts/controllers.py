@@ -49,6 +49,21 @@ class AuthController(NinjaJWTDefaultController):
             "refresh": result['refresh'],
         }
 
+    @route.get("google/login")
+    def google_login_init(self, request):
+        from django.shortcuts import redirect
+        return redirect(self.auth_service.get_google_auth_url())
+
+    @route.get("google/callback")
+    def google_callback_handler(self, request, code: str):
+        from django.shortcuts import redirect
+        from django.conf import settings
+        try:
+            tokens = self.auth_service.google_callback(code)
+            return redirect(f"{settings.SITE_URL}/auth/callback?access={tokens['access']}&refresh={tokens['refresh']}")
+        except Exception as e:
+            return redirect(f"{settings.SITE_URL}/login?error={str(e)}")
+
     @route.post("password-reset/request")
     def password_reset_request(self, data: PasswordResetRequestIn):
         return self.auth_service.request_password_reset(data.email)

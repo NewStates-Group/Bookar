@@ -1,40 +1,10 @@
 import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
-import GoogleProvider from "next-auth/providers/google";
 
 
 async function getMe(accessToken: string) {
-    const res = await fetch(`${process.env.AUTH_URL}/auth/me`, {
-        headers: {
-            Authorization: `Bearer ${accessToken}`,
-            "Content-Type": "application/json",
-        },
-    });
-
-    if (!res.ok) {
-        throw new Error("Failed to fetch /me");
-    }
-
-    return res.json();
-}
-
-async function googleLoginHelper(idToken: string) {
-    const res = await fetch(`${process.env.AUTH_URL}/auth/google`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id_token: idToken }),
-    });
-
-    if (!res.ok) {
-        throw new Error("Failed to exchange Google token");
-    }
-
-    return res.json();
-}
-
-async function refreshAccessToken(token: any) {
     try {
-        const res = await fetch(`${process.env.AUTH_URL}/auth/refresh`, {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/refresh`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -90,11 +60,19 @@ export const authOptions: NextAuthOptions = {
             },
 
             async authorize(credentials) {
+                // Support passing tokens directly (for Google callback flow)
+                if (credentials?.accessToken && credentials?.refreshToken) {
+                    return {
+                        accessToken: credentials.accessToken,
+                        refreshToken: credentials.refreshToken,
+                    } as any;
+                }
+
                 if (!credentials?.username || !credentials?.password) {
                     return null;
                 }
 
-                const res = await fetch(`${process.env.AUTH_URL}/auth/pair`, {
+                const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/pair`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
@@ -118,35 +96,8 @@ export const authOptions: NextAuthOptions = {
     ],
 
     callbacks: {
-        async jwt({ token, user, account, trigger }) {
-            // Initial Google sign-in
-            if (account?.provider === "google" && account.id_token) {
-                try {
-                    const data = await googleLoginHelper(account.id_token);
-                    const profile = await getMe(data.access);
-
-                    return {
-                        accessToken: data.access,
-                        refreshToken: data.refresh,
-                        accessTokenExpires: Date.now() + 30 * 60 * 1000,
-                        user: {
-                            id: profile.id,
-                            username: profile.username,
-                            email: profile.email,
-                            first_name: profile.first_name,
-                            last_name: profile.last_name,
-                            bio: profile.bio,
-                            avatar: profile.avatar,
-                            stats: profile.stats,
-                        },
-                    };
-                } catch (error) {
-                    console.error("Google login error:", error);
-                    return { ...token, error: "GoogleLoginError" };
-                }
-            }
-
-            // Initial Credentials sign-in
+        async jwt({ token, user, trigger }) {
+            // Initial sign-in (Credentials or Direct Tokens)
             if (user) {
                 const profile = await getMe(user.accessToken);
 
