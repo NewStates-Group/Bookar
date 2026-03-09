@@ -87,13 +87,13 @@ jobs:
 
       - name: Syncronize files
         run: |
-          rsync -avz --exclude 'backend/' --exclude 'frontend/' --exclude '.git/' --exclude '.env' --exclude 'docker-compose.yml' \
+          rsync -avz  --include 'deploy/***' --exclude '*' \
             ./ ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:~/Bookar/
 
       - name: Run deploy
         run: |
           ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} "
-            cd ~/Bookar &&
+            cd ~/Bookar/deploy &&
             chmod +x deploy.sh &&
             ./deploy.sh
           "
