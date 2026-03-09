@@ -204,7 +204,7 @@ export default function LoginPage() {
             type="button"
             variant="outline"
             className="w-full h-12 text-base font-medium bg-background hover:bg-muted/50 transition-colors flex items-center justify-center gap-3 border-muted-foreground/20"
-            onClick={() => window.location.href = `${process.env.NEXT_PUBLIC_API_URL}/auth/google/login`}
+            onClick={() => signIn("google", { callbackUrl: "/app" })}
           >
             <svg className="w-5 h-5" viewBox="0 0 24 24">
               <path

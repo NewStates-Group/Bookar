@@ -1,31 +1,14 @@
 'use client'
 
 import { useState } from 'react'
-import { BookOpen, GraduationCap, User, LogOut, Settings } from 'lucide-react'
+import { BookOpen, GraduationCap, User, LogOut } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { signOut, useSession } from "next-auth/react"
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import {
-    Avatar,
-    AvatarFallback,
-    AvatarImage,
-} from "@/components/ui/avatar"
 
 export function FloatingNavbar() {
-    const { data: session } = useSession()
     const [showCursosText, setShowCursosText] = useState(false)
     const [showTutorText, setShowTutorText] = useState(false)
-
-    const userInitials = session?.user?.username?.slice(0, 2).toUpperCase() || 'U'
-    const avatarUrl = session?.user?.avatar ? `${process.env.NEXT_PUBLIC_API_URL}${session.user.avatar}` : ""
+    const [showContaText, setShowContaText] = useState(false)
 
     return (
         <nav className="w-full bg-white border sticky top-0 z-50">
@@ -76,43 +59,9 @@ export function FloatingNavbar() {
                     </Link>
                 </div>
 
-                <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <button className="flex items-center justify-center w-10 h-10 rounded-full border cursor-pointer hover:bg-muted/50 transition-colors overflow-hidden">
-                            <Avatar className="h-full w-full">
-                                <AvatarImage src={avatarUrl} alt={session?.user?.username || 'User'} />
-                                <AvatarFallback className="bg-cyan-500/10 text-cyan-700 font-medium">
-                                    {userInitials}
-                                </AvatarFallback>
-                            </Avatar>
-                        </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-56 mt-2">
-                        <DropdownMenuLabel className="font-normal">
-                            <div className="flex flex-col space-y-1">
-                                <p className="text-sm font-medium leading-none">{session?.user?.username}</p>
-                                <p className="text-xs leading-none text-muted-foreground">
-                                    {session?.user?.email}
-                                </p>
-                            </div>
-                        </DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem asChild>
-                            <Link href="/app/profile" className="flex items-center cursor-pointer">
-                                <User className="mr-2 h-4 w-4" />
-                                <span>Perfil</span>
-                            </Link>
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                            className="flex items-center cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50"
-                            onClick={() => signOut({ callbackUrl: '/login' })}
-                        >
-                            <LogOut className="mr-2 h-4 w-4" />
-                            <span>Sair</span>
-                        </DropdownMenuItem>
-                    </DropdownMenuContent>
-                </DropdownMenu>
+                <Link href="/app/profile" className="flex items-center justify-center w-10 h-10 rounded-full border cursor-pointer">
+                    <User className="w-5 h-5  group-hover:text-cyan-300 transition-colors" />
+                </Link>
             </div>
         </nav>
     )
