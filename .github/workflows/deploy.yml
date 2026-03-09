@@ -87,13 +87,12 @@ jobs:
 
       - name: Syncronize files
         run: |
-          rsync -avz  --include 'deploy/***' --exclude '*' \
-            ./ ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:~/Bookar/
+          rsync -avz deploy/ ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:~/Bookar/
 
       - name: Run deploy
         run: |
           ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} "
-            cd ~/Bookar/deploy &&
+            cd ~/Bookar &&
             chmod +x deploy.sh &&
             ./deploy.sh
           "
