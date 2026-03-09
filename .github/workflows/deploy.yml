@@ -55,7 +55,7 @@ jobs:
       - name: Build frontend image
         run: |
           IMAGE_TAG=${{ github.sha }}
-          docker build -f ./frontend/Dockerfile.prod -t $FRONTEND_IMAGE:$IMAGE_TAG ./frontend
+          docker build -f ./frontend/Dockerfile.prod --build-arg NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL }} -t $FRONTEND_IMAGE:$IMAGE_TAG ./frontend
           docker tag $FRONTEND_IMAGE:$IMAGE_TAG $FRONTEND_IMAGE:latest
 
       - name: Push backend image
