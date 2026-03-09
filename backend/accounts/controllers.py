@@ -10,7 +10,7 @@ from .services import AuthService
 
 from ninja import File, Form
 from ninja.files import UploadedFile
-from .schemas import RegisterIn, RegisterOut, ProfileUpdateIn
+from .schemas import RegisterIn, RegisterOut, ProfileUpdateIn, PasswordResetRequestIn, PasswordResetConfirmIn
 
 
 @api_controller("auth/", tags=["Auth"])
@@ -48,3 +48,11 @@ class AuthController(NinjaJWTDefaultController):
             "access": result['access'],
             "refresh": result['refresh'],
         }
+
+    @route.post("password-reset/request")
+    def password_reset_request(self, data: PasswordResetRequestIn):
+        return self.auth_service.request_password_reset(data.email)
+
+    @route.post("password-reset/confirm")
+    def password_reset_confirm(self, data: PasswordResetConfirmIn):
+        return self.auth_service.confirm_password_reset(data.token, data.new_password)

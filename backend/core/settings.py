@@ -9,6 +9,7 @@ env = environ.Env(
     SITE_URL=(str, "http://localhost:3000"),
     DATABASE_URL=(str, "sqlite:///:memory:"),
     REDIS_URL=(str, "redis://redis:6379/0"),
+    ALLOWED_HOSTS=(list, ["*"])
 )
 environ.Env.read_env()
 

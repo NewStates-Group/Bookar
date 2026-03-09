@@ -1,6 +1,7 @@
 from django.contrib.auth import get_user_model
+from django.core.signing import TimestampSigner, BadSignature, SignatureExpired
 from ninja.errors import HttpError
-from core.mail import send_welcome_email
+from core.mail import send_welcome_email, send_password_reset_email
 
 User = get_user_model()
 
@@ -77,3 +78,28 @@ class AuthService:
 
         except Exception as e:
             raise HttpError(400, f"Invalid Google Token: {str(e)}")
+
+    def request_password_reset(self, email):
+        try:
+            user = User.objects.get(email=email)
+            signer = TimestampSigner()
+            token = signer.sign(user.email)
+            send_password_reset_email(user, token)
+        except User.DoesNotExist:
+            # We don't reveal if user exists for security, but we don't send anything
+            pass
+        return {"message": "Se o e-mail existir no nosso sistema, você receberá um link de recuperação."}
+
+    def confirm_password_reset(self, token, new_password):
+        signer = TimestampSigner()
+        try:
+            # Token expires in 1 hour (3600 seconds)
+            email = signer.unsign(token, max_age=3600)
+            user = User.objects.get(email=email)
+            user.set_password(new_password)
+            user.save()
+            return {"message": "Senha redefinida com sucesso!"}
+        except (BadSignature, SignatureExpired):
+            raise HttpError(400, "Token inválido ou expirado.")
+        except User.DoesNotExist:
+            raise HttpError(404, "Usuário não encontrado.")

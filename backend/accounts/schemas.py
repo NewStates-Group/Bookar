@@ -65,3 +65,17 @@ class ProfileUpdateIn(Schema):
 
 class GoogleLoginIn(Schema):
     id_token: str
+
+class PasswordResetRequestIn(Schema):
+    email: EmailStr
+
+class PasswordResetConfirmIn(Schema):
+    token: str
+    new_password: str
+
+    @field_validator("new_password", mode="after")
+    @classmethod
+    def validate_password(cls, value: str) -> str:
+        if len(value) < 12:
+            raise ValueError("PASSWORD_TOO_SHORT")
+        return value

@@ -21,10 +21,10 @@ def send_html_email(subject, template_name, context, recipient_list):
     )
 
 def send_welcome_email(user):
-    subject = "Bem-vindo ao Bookar! 🚀"
+    subject = "Bem-vindo ao Bookar!"
     context = {
         "username": user.username,
-        "site_url": settings.SITE_URL or "http://localhost:3000"
+        "site_url": settings.SITE_URL
     }
     send_html_email(
         subject,
@@ -38,12 +38,27 @@ def send_certificate_email(user, course):
     context = {
         "username": user.username,
         "course_title": course.title,
-        "site_url": settings.SITE_URL or "http://localhost:3000",
-        "certificate_url": f"{settings.SITE_URL or 'http://localhost:3000'}/app/courses/{course.id}"
+        "site_url": settings.SITE_URL,
+        "certificate_url": f"{settings.SITE_URL}/app/courses/{course.id}"
     }
     send_html_email(
         subject,
         "emails/certificate.html",
+        context,
+        [user.email]
+    )
+
+def send_password_reset_email(user, token):
+    subject = "Recuperação de Senha - Bookar"
+    reset_url = f"{settings.SITE_URL}/reset-password?token={token}"
+    context = {
+        "username": user.username,
+        "reset_url": reset_url,
+        "site_url": settings.SITE_URL
+    }
+    send_html_email(
+        subject,
+        "emails/password_reset.html",
         context,
         [user.email]
     )
