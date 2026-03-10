@@ -1,9 +1,23 @@
 import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
-import GoogleProvider from "next-auth/providers/google";
 
 
 async function getMe(accessToken: string) {
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/me`, {
+        headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+        },
+    });
+
+    if (!res.ok) {
+        throw new Error("Failed to fetch /me");
+    }
+
+    return res.json();
+}
+
+async function refreshAccessToken(token: any) {
     try {
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/refresh`, {
             method: "POST",
@@ -40,18 +54,6 @@ export const authOptions: NextAuthOptions = {
     },
 
     providers: [
-        GoogleProvider({
-            clientId: process.env.GOOGLE_CLIENT_ID as string,
-            clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
-            authorization: {
-                params: {
-                    prompt: "consent",
-                    access_type: "offline",
-                    response_type: "code"
-                }
-            },
-            checks: ['none']
-        }),
         CredentialsProvider({
             name: "Credentials",
 
@@ -60,7 +62,7 @@ export const authOptions: NextAuthOptions = {
                 password: { label: "Password", type: "password" },
             },
 
-            async authorize(credentials) {
+            async authorize(credentials: any) {
                 // Support passing tokens directly (for Google callback flow)
                 if (credentials?.accessToken && credentials?.refreshToken) {
                     return {
@@ -97,27 +99,38 @@ export const authOptions: NextAuthOptions = {
     ],
 
     callbacks: {
-        async jwt({ token, user, trigger }) {
+        async jwt({ token, user, trigger }: any) {
             // Initial sign-in (Credentials or Direct Tokens)
             if (user) {
-                const profile = await getMe(user.accessToken);
+                try {
+                    const profile = await getMe(user.accessToken);
 
-                return {
-                    accessToken: user.accessToken,
-                    refreshToken: user.refreshToken,
-                    accessTokenExpires: Date.now() + 30 * 60 * 1000,
+                    return {
+                        accessToken: user.accessToken,
+                        refreshToken: user.refreshToken,
+                        accessTokenExpires: Date.now() + 30 * 60 * 1000,
 
-                    user: {
-                        id: profile.id,
-                        username: profile.username,
-                        email: profile.email,
-                        first_name: profile.first_name,
-                        last_name: profile.last_name,
-                        bio: profile.bio,
-                        avatar: profile.avatar,
-                        stats: profile.stats,
-                    },
-                };
+                        user: {
+                            id: profile.id,
+                            username: profile.username,
+                            email: profile.email,
+                            first_name: profile.first_name,
+                            last_name: profile.last_name,
+                            bio: profile.bio,
+                            avatar: profile.avatar,
+                            stats: profile.stats,
+                        },
+                    };
+                } catch (error) {
+                    console.error("Error fetching user profile:", error);
+                    // At least return what we have
+                    return {
+                        accessToken: user.accessToken,
+                        refreshToken: user.refreshToken,
+                        accessTokenExpires: Date.now() + 30 * 60 * 1000,
+                        user: {},
+                    };
+                }
             }
 
             // Handle manual update from client
@@ -157,24 +170,28 @@ export const authOptions: NextAuthOptions = {
                 };
             }
 
-            const profile = await getMe(refreshed.accessToken);
+            try {
+                const profile = await getMe(refreshed.accessToken);
 
-            return {
-                ...refreshed,
-                user: {
-                    id: profile.id,
-                    username: profile.username,
-                    email: profile.email,
-                    first_name: profile.first_name,
-                    last_name: profile.last_name,
-                    bio: profile.bio,
-                    avatar: profile.avatar,
-                    stats: profile.stats,
-                },
-            };
+                return {
+                    ...refreshed,
+                    user: {
+                        id: profile.id,
+                        username: profile.username,
+                        email: profile.email,
+                        first_name: profile.first_name,
+                        last_name: profile.last_name,
+                        bio: profile.bio,
+                        avatar: profile.avatar,
+                        stats: profile.stats,
+                    },
+                };
+            } catch (error) {
+                return refreshed;
+            }
         },
 
-        async session({ session, token }) {
+        async session({ session, token }: any) {
             session.accessToken = token.accessToken as string;
             session.error = token.error;
 
@@ -188,5 +205,5 @@ export const authOptions: NextAuthOptions = {
         signIn: "/login",
     },
 
-    secret: process.env.AUTH_SECRET as string,
+    secret: process.env.AUTH_SECRET,
 };

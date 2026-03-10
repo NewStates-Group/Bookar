@@ -50,7 +50,7 @@ class AuthService:
         
         params = {
             "client_id": settings.GOOGLE_CLIENT_ID,
-            "redirect_uri": f"{settings.SITE_URL}/auth/google/callback",
+            "redirect_uri": f"{settings.SITE_URL}/auth/callback",
             "response_type": "code",
             "scope": "openid email profile",
             "access_type": "offline",
@@ -71,7 +71,7 @@ class AuthService:
             "code": code,
             "client_id": settings.GOOGLE_CLIENT_ID,
             "client_secret": settings.GOOGLE_CLIENT_SECRET,
-            "redirect_uri": f"{settings.SITE_URL}/auth/google/callback",
+            "redirect_uri": f"{settings.SITE_URL}/auth/callback",
             "grant_type": "authorization_code",
         }
 

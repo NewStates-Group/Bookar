@@ -41,28 +41,16 @@ class AuthController(NinjaJWTDefaultController):
         user.stats = self.auth_service.get_user_stats(user)
         return user
 
-    @route.post("google")
-    def google_auth(self, data: GoogleLoginIn):
-        result = self.auth_service.google_login(data.id_token)
-        return {
-            "access": result['access'],
-            "refresh": result['refresh'],
-        }
+    @route.get("google/url")
+    def get_google_url(self, request):
+        return {"url": self.auth_service.get_google_auth_url()}
 
-    @route.get("google/login")
-    def google_login_init(self, request):
-        from django.shortcuts import redirect
-        return redirect(self.auth_service.get_google_auth_url())
-
-    @route.get("google/callback")
-    def google_callback_handler(self, request, code: str):
-        from django.shortcuts import redirect
-        from django.conf import settings
-        try:
-            tokens = self.auth_service.google_callback(code)
-            return redirect(f"{settings.SITE_URL}/auth/callback?access={tokens['access']}&refresh={tokens['refresh']}")
-        except Exception as e:
-            return redirect(f"{settings.SITE_URL}/login?error={str(e)}")
+    @route.post("google/callback")
+    def google_callback(self, data: GoogleLoginIn):
+        # We reuse GoogleLoginIn schema which has 'id_token', let's just treat it as 'code' for now 
+        # or better, update the schema if needed. Actually, let's just use data.id_token as the code.
+        tokens = self.auth_service.google_callback(data.id_token)
+        return tokens
 
     @route.post("password-reset/request")
     def password_reset_request(self, data: PasswordResetRequestIn):
