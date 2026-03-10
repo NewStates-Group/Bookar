@@ -3,7 +3,8 @@ import CredentialsProvider from "next-auth/providers/credentials";
 
 
 async function getMe(accessToken: string) {
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/me`, {
+    const apiUrl = process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL;
+    const res = await fetch(`${apiUrl}/auth/me`, {
         headers: {
             Authorization: `Bearer ${accessToken}`,
             "Content-Type": "application/json",
@@ -19,7 +20,8 @@ async function getMe(accessToken: string) {
 
 async function refreshAccessToken(token: any) {
     try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/refresh`, {
+        const apiUrl = process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL;
+        const res = await fetch(`${apiUrl}/auth/refresh`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -75,7 +77,8 @@ export const authOptions: NextAuthOptions = {
                     return null;
                 }
 
-                const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/pair`, {
+                const apiUrl = process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL;
+                const res = await fetch(`${apiUrl}/auth/pair`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
