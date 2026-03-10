@@ -1,9 +1,26 @@
+import logging
+import os
+import random
+import string
+import urllib.parse
+import uuid
+
+import httpx
+from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.core.files.base import ContentFile
 from django.core.signing import TimestampSigner, BadSignature, SignatureExpired
+from django.db import transaction, IntegrityError
+from google.auth.transport import requests
+from google.oauth2 import id_token
 from ninja.errors import HttpError
+from ninja_jwt.tokens import RefreshToken
+
 from core.mail import send_welcome_email, send_password_reset_email
+from courses.models import Course
 
 User = get_user_model()
+logger = logging.getLogger(__name__)
 
 
 class AuthService:
@@ -31,8 +48,6 @@ class AuthService:
         return user
 
     def get_user_stats(self, user):
-        from courses.models import Course
-        
         all_courses = Course.objects.filter(user=user, deleted=False)
         
         # This is a bit expensive if many courses, but okay for MVP
@@ -45,9 +60,6 @@ class AuthService:
         }
 
     def get_google_auth_url(self):
-        from django.conf import settings
-        import urllib.parse
-        
         params = {
             "client_id": settings.GOOGLE_CLIENT_ID,
             "redirect_uri": f"{settings.SITE_URL}/auth/callback",
@@ -59,12 +71,6 @@ class AuthService:
         return f"https://accounts.google.com/o/oauth2/v2/auth?{urllib.parse.urlencode(params)}"
 
     def google_callback(self, code):
-        from django.conf import settings
-        import httpx
-        from ninja_jwt.tokens import RefreshToken
-        import random
-        import string
-
         # 1. Exchange code for tokens
         token_url = "https://oauth2.googleapis.com/token"
         data = {
@@ -86,9 +92,6 @@ class AuthService:
             raise HttpError(400, "No id_token returned from Google")
 
         # 2. Verify token and get user
-        from google.oauth2 import id_token
-        from google.auth.transport import requests
-        
         try:
             id_info = id_token.verify_oauth2_token(
                 id_token_str, 
@@ -100,44 +103,60 @@ class AuthService:
             first_name = id_info.get('given_name', '')
             last_name = id_info.get('family_name', '')
             
-            user = User.objects.filter(email__iexact=email).first()
+            print(f">>> GOOGLE LOGIN DEBUG: email='{email}', first='{first_name}', last='{last_name}'")
+            
+            # Normalize email for common providers if needed (e.g. Gmail dots)
+            lookup_email = email.lower()
+            
+            user = User.objects.filter(email__iexact=lookup_email).first()
+            if user:
+                print(f">>> DEBUG: Found user by email: ID={user.id}, Username='{user.username}'")
             
             if not user:
-                # Create new user
-                base_username = email.split('@')[0]
+                print(f">>> DEBUG: No user found for '{lookup_email}', checking all users...")
+                # Create or find
+                base_username = email.split('@')[0].replace('.', '').replace('-', '_') # Simple normalization
                 username = base_username
                 
-                # Ensure unique username with a robust loop
-                counter = 1
-                while User.objects.filter(username=username).exists():
-                    import random
-                    import string
-                    suffix = ''.join(random.choices(string.digits, k=4))
-                    username = f"{base_username}{suffix}"
-                    # Safety break
-                    counter += 1
-                    if counter > 10:
-                        import uuid
-                        username = f"{base_username}_{uuid.uuid4().hex[:8]}"
-                        break
+                # Check if username exists independently of email
+                existing_by_uname = User.objects.filter(username__iexact=username).first()
+                if existing_by_uname:
+                    print(f">>> DEBUG: Username '{username}' taken by user with email '{existing_by_uname.email}'")
+                    # Try to find again by that email to see if they match (paranoid)
+                    if existing_by_uname.email.lower() == lookup_email:
+                        user = existing_by_uname
+                    else:
+                        # Collision: Generate new one
+                        counter = 1
+                        while User.objects.filter(username=username).exists():
+                            username = f"{base_username}{''.join(random.choices(string.digits, k=4))}"
+                            counter += 1
+                            if counter > 5:
+                                username = f"{base_username}_{uuid.uuid4().hex[:6]}"
+                                break
                 
-                from django.db import IntegrityError
-                try:
-                    user = User.objects.create_user(
-                        email=email,
-                        username=username,
-                        first_name=first_name,
-                        last_name=last_name,
-                        is_active=True
-                    )
-                except IntegrityError:
-                    # Final fallback if a race condition happened
-                    user = User.objects.filter(email__iexact=email).first()
-                    if not user:
-                        # If still not found by email, maybe username collided
-                        user = User.objects.filter(username=username).first()
+                if not user:
+                    print(f">>> DEBUG: Proceeding to create user with username='{username}'")
+                    try:
+                        with transaction.atomic():
+                            user = User.objects.create_user(
+                                email=email,
+                                username=username,
+                                first_name=first_name,
+                                last_name=last_name,
+                                is_active=True
+                            )
+                        print(f">>> DEBUG: User created: ID={user.id}")
+                    except Exception as e:
+                        print(f">>> DEBUG: Creation failed: {type(e).__name__}: {e}")
+                        # Final, final fallback
+                        user = User.objects.filter(email__iexact=lookup_email).first()
                         if not user:
-                            raise
+                            user = User.objects.filter(username=username).first()
+                        
+                        if not user:
+                            print(">>> DEBUG: CRITICAL FAILURE: Could not find or create user.")
+                            raise e
             else:
                 # Update existing user profile if fields are empty
                 updated = False
@@ -155,9 +174,6 @@ class AuthService:
             picture_url = id_info.get('picture')
             if picture_url and not user.avatar:
                 try:
-                    from django.core.files.base import ContentFile
-                    import os
-                    
                     with httpx.Client() as client:
                         resp = client.get(picture_url)
                         if resp.is_success:
@@ -174,17 +190,12 @@ class AuthService:
 
         except Exception as e:
             print(f"Google Token Verification Error: {str(e)}")
+            if isinstance(e, HttpError):
+                raise e
             raise HttpError(400, f"Erro na verificação do token Google: {str(e)}")
 
     def google_login(self, id_token_str):
         # Kept for backward compatibility if needed, but redesigned for better use
-        from google.oauth2 import id_token
-        from google.auth.transport import requests
-        from django.conf import settings
-        from ninja_jwt.tokens import RefreshToken
-        import random
-        import string
-
         try:
             id_info = id_token.verify_oauth2_token(
                 id_token_str, 
@@ -210,7 +221,6 @@ class AuthService:
                     username = f"{base_username}{''.join(random.choices(string.digits, k=4))}"
                     counter += 1
                     if counter > 10:
-                        import uuid
                         username = f"{base_username}_{uuid.uuid4().hex[:8]}"
                         break
 
@@ -230,6 +240,8 @@ class AuthService:
         except Exception as e:
             # Provide more detailed error message for easier debugging
             print(f"Google Token Verification Error: {str(e)}")
+            if isinstance(e, HttpError):
+                raise e
             raise HttpError(400, f"Erro na verificação do token Google: {str(e)}")
 
     def request_password_reset(self, email):
