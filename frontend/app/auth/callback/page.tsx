@@ -18,11 +18,10 @@ function AuthCallbackContent() {
         const handleCallback = async () => {
             if (code) {
                 try {
-                    // 1. Exchange code for tokens via our backend
                     const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/google/callback`, {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ id_token: code }), // We send 'code' in the 'id_token' field as per our Schema
+                        body: JSON.stringify({ id_token: code }),
                     });
 
                     if (!res.ok) {
@@ -32,40 +31,45 @@ function AuthCallbackContent() {
 
                     const tokens = await res.json();
 
-                    // 2. Sign in with the received tokens
-                    const result = await signIn("credentials", {
-                        username: "google-user", // Dummy, backend ignores it if tokens are present or we use a custom authorize
-                        password: "google-password", // Dummy
-                        accessToken: tokens.access,
-                        refreshToken: tokens.refresh,
-                        redirect: false,
-                    });
-
-                    if (result?.error) {
-                        throw new Error(result.error);
+                    // Notify opener and close
+                    if (window.opener) {
+                        window.opener.postMessage({
+                            type: "AUTH_SUCCESS",
+                            access: tokens.access,
+                            refresh: tokens.refresh
+                        }, window.location.origin);
+                        window.close();
+                    } else {
+                        // Fallback if not in a popup
+                        await signIn("credentials", {
+                            accessToken: tokens.access,
+                            refreshToken: tokens.refresh,
+                            callbackUrl: "/app/courses",
+                        });
                     }
-
-                    router.push("/app/courses");
                 } catch (error: any) {
                     console.error("Google Auth Error:", error);
-                    toast.error(error.message || "Erro ao processar login com Google");
-                    router.push("/login?error=GoogleAuthFailed");
-                }
-            } else if (access && refresh) {
-                // Compatibility with old flow just in case
-                signIn("credentials", {
-                    accessToken: access,
-                    refreshToken: refresh,
-                    redirect: false,
-                }).then((result) => {
-                    if (result?.error) {
-                        router.push(`/login?error=${encodeURIComponent(result.error)}`);
+                    if (window.opener) {
+                        window.opener.postMessage({
+                            type: "AUTH_ERROR",
+                            message: error.message
+                        }, window.location.origin);
+                        window.close();
                     } else {
-                        router.push("/app/courses");
+                        toast.error(error.message || "Erro ao processar login com Google");
+                        router.push("/login?error=GoogleAuthFailed");
                     }
-                });
+                }
             } else {
-                router.push("/login?error=MissingParams");
+                if (window.opener) {
+                    window.opener.postMessage({
+                        type: "AUTH_ERROR",
+                        message: "Código de autenticação ausente"
+                    }, window.location.origin);
+                    window.close();
+                } else {
+                    router.push("/login?error=MissingParams");
+                }
             }
         };
 

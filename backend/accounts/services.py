@@ -114,19 +114,30 @@ class AuthService:
                     import string
                     suffix = ''.join(random.choices(string.digits, k=4))
                     username = f"{base_username}{suffix}"
-                    # Safety break to avoid infinite loop (though very unlikely with random suffix)
+                    # Safety break
                     counter += 1
                     if counter > 10:
-                        username = f"{base_username}{''.join(random.choices(string.ascii_lowercase + string.digits, k=8))}"
+                        import uuid
+                        username = f"{base_username}_{uuid.uuid4().hex[:8]}"
                         break
                 
-                user = User.objects.create_user(
-                    email=email,
-                    username=username,
-                    first_name=first_name,
-                    last_name=last_name,
-                    is_active=True
-                )
+                from django.db import IntegrityError
+                try:
+                    user = User.objects.create_user(
+                        email=email,
+                        username=username,
+                        first_name=first_name,
+                        last_name=last_name,
+                        is_active=True
+                    )
+                except IntegrityError:
+                    # Final fallback if a race condition happened
+                    user = User.objects.filter(email__iexact=email).first()
+                    if not user:
+                        # If still not found by email, maybe username collided
+                        user = User.objects.filter(username=username).first()
+                        if not user:
+                            raise
             else:
                 # Update existing user profile if fields are empty
                 updated = False
@@ -138,6 +149,7 @@ class AuthService:
                     updated = True
                 if updated:
                     user.save()
+
 
             # 3. Save profile picture from Google if available and user doesn't have one
             picture_url = id_info.get('picture')
@@ -193,15 +205,20 @@ class AuthService:
                 base_username = email.split('@')[0]
                 username = base_username
                 
+                counter = 1
                 while User.objects.filter(username=username).exists():
                     username = f"{base_username}{''.join(random.choices(string.digits, k=4))}"
+                    counter += 1
+                    if counter > 10:
+                        import uuid
+                        username = f"{base_username}_{uuid.uuid4().hex[:8]}"
+                        break
 
                 user = User.objects.create_user(
                     email=email,
                     username=username,
                     is_active=True
                 )
-            created = False # get_or_create replacement logic
 
             refresh = RefreshToken.for_user(user)
             return {

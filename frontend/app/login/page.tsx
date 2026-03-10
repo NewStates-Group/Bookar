@@ -72,6 +72,57 @@ export default function LoginPage() {
     }
   };
 
+  const handleGoogleLogin = () => {
+    const width = 500;
+    const height = 600;
+    const left = window.screenX + (window.outerWidth - width) / 2;
+    const top = window.screenY + (window.outerHeight - height) / 2;
+
+    const popup = window.open(
+      "/auth/login/google",
+      "google-login",
+      `width=${width},height=${height},left=${left},top=${top}`
+    );
+
+    if (!popup) {
+      toast.error("Por favor, permita popups para este site.");
+      return;
+    }
+
+    const handleMessage = async (event: MessageEvent) => {
+      // Basic security check (optional, but recommended in production)
+      // if (event.origin !== window.location.origin) return;
+
+      if (event.data?.type === "AUTH_SUCCESS") {
+        setIsLoading(true);
+        try {
+          const result = await signIn("credentials", {
+            accessToken: event.data.access,
+            refreshToken: event.data.refresh,
+            redirect: false,
+          });
+
+          if (result?.error) {
+            toast.error(result.error);
+          } else {
+            toast.success("Login com Google efetuado!");
+            router.push("/app/courses");
+          }
+        } catch (err) {
+          toast.error("Erro ao finalizar autenticação.");
+        } finally {
+          setIsLoading(false);
+          window.removeEventListener("message", handleMessage);
+        }
+      } else if (event.data?.type === "AUTH_ERROR") {
+        toast.error(event.data.message || "Erro na autenticação com Google");
+        window.removeEventListener("message", handleMessage);
+      }
+    };
+
+    window.addEventListener("message", handleMessage);
+  };
+
   return (
     <div className="min-h-screen w-full flex">
       {/* Left Side - Image/Branding */}
@@ -103,7 +154,6 @@ export default function LoginPage() {
           </motion.div>
         </div>
       </motion.div>
-
       {/* Right Side - Form */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-background">
         <motion.div
@@ -204,8 +254,10 @@ export default function LoginPage() {
             type="button"
             variant="outline"
             className="w-full h-12 text-base font-medium bg-background hover:bg-muted/50 transition-colors flex items-center justify-center gap-3 border-muted-foreground/20"
-            onClick={() => window.location.href = "/auth/login/google"}
+            onClick={handleGoogleLogin}
+            disabled={isLoading}
           >
+
             <svg className="w-5 h-5" viewBox="0 0 24 24">
               <path
                 d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
