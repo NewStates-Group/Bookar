@@ -100,16 +100,25 @@ class AuthService:
             first_name = id_info.get('given_name', '')
             last_name = id_info.get('family_name', '')
             
-            user = User.objects.filter(email=email).first()
+            user = User.objects.filter(email__iexact=email).first()
             
             if not user:
                 # Create new user
-                username = email.split('@')[0]
-                # Ensure unique username
-                if User.objects.filter(username=username).exists():
+                base_username = email.split('@')[0]
+                username = base_username
+                
+                # Ensure unique username with a robust loop
+                counter = 1
+                while User.objects.filter(username=username).exists():
                     import random
                     import string
-                    username = f"{username}{''.join(random.choices(string.digits, k=4))}"
+                    suffix = ''.join(random.choices(string.digits, k=4))
+                    username = f"{base_username}{suffix}"
+                    # Safety break to avoid infinite loop (though very unlikely with random suffix)
+                    counter += 1
+                    if counter > 10:
+                        username = f"{base_username}{''.join(random.choices(string.ascii_lowercase + string.digits, k=8))}"
+                        break
                 
                 user = User.objects.create_user(
                     email=email,
@@ -179,10 +188,20 @@ class AuthService:
             if not email:
                 raise ValueError('Email not found in Google Token')
 
-            user, created = User.objects.get_or_create(email=email, defaults={
-                'username': email.split('@')[0] + ''.join(random.choices(string.digits, k=4)),
-                'is_active': True
-            })
+            user = User.objects.filter(email__iexact=email).first()
+            if not user:
+                base_username = email.split('@')[0]
+                username = base_username
+                
+                while User.objects.filter(username=username).exists():
+                    username = f"{base_username}{''.join(random.choices(string.digits, k=4))}"
+
+                user = User.objects.create_user(
+                    email=email,
+                    username=username,
+                    is_active=True
+                )
+            created = False # get_or_create replacement logic
 
             refresh = RefreshToken.for_user(user)
             return {
