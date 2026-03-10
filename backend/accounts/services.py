@@ -93,15 +93,57 @@ class AuthService:
             id_info = id_token.verify_oauth2_token(
                 id_token_str, 
                 requests.Request(), 
-                settings.GOOGLE_CLIENT_ID,
-                clock_skew=10
+                settings.GOOGLE_CLIENT_ID
             )
 
             email = id_info.get('email')
-            user, created = User.objects.get_or_create(email=email, defaults={
-                'username': email.split('@')[0] + ''.join(random.choices(string.digits, k=4)),
-                'is_active': True
-            })
+            first_name = id_info.get('given_name', '')
+            last_name = id_info.get('family_name', '')
+            
+            user = User.objects.filter(email=email).first()
+            
+            if not user:
+                # Create new user
+                username = email.split('@')[0]
+                # Ensure unique username
+                if User.objects.filter(username=username).exists():
+                    import random
+                    import string
+                    username = f"{username}{''.join(random.choices(string.digits, k=4))}"
+                
+                user = User.objects.create_user(
+                    email=email,
+                    username=username,
+                    first_name=first_name,
+                    last_name=last_name,
+                    is_active=True
+                )
+            else:
+                # Update existing user profile if fields are empty
+                updated = False
+                if not user.first_name and first_name:
+                    user.first_name = first_name
+                    updated = True
+                if not user.last_name and last_name:
+                    user.last_name = last_name
+                    updated = True
+                if updated:
+                    user.save()
+
+            # 3. Save profile picture from Google if available and user doesn't have one
+            picture_url = id_info.get('picture')
+            if picture_url and not user.avatar:
+                try:
+                    from django.core.files.base import ContentFile
+                    import os
+                    
+                    with httpx.Client() as client:
+                        resp = client.get(picture_url)
+                        if resp.is_success:
+                            ext = os.path.splitext(picture_url.split('?')[0])[1] or '.jpg'
+                            user.avatar.save(f"{user.username}_google{ext}", ContentFile(resp.content), save=True)
+                except Exception as img_err:
+                    print(f"Failed to save Google profile picture: {img_err}")
 
             refresh = RefreshToken.for_user(user)
             return {
@@ -123,12 +165,10 @@ class AuthService:
         import string
 
         try:
-            # Verify the ID token with clock skew handling
             id_info = id_token.verify_oauth2_token(
                 id_token_str, 
                 requests.Request(), 
-                settings.GOOGLE_CLIENT_ID,
-                clock_skew=10 # Allow 10 seconds of clock skew
+                settings.GOOGLE_CLIENT_ID
             )
 
             iss = id_info.get('iss')
