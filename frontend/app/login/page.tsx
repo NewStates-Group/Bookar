@@ -291,6 +291,11 @@ export default function LoginPage() {
                         autoFocus
                       />
                     </div>
+                    {errors.password?.map((err, i) => (
+                      <p key={i} className="text-sm text-red-500 flex items-center gap-1 mt-1">
+                        <AlertCircle className="w-4 h-4" /> {err}
+                      </p>
+                    ))}
                     <div className="flex justify-end pt-1">
                       <Button
                         type="button"
@@ -301,11 +306,6 @@ export default function LoginPage() {
                         Esqueceu a palavra-passe?
                       </Button>
                     </div>
-                    {errors.password?.map((err, i) => (
-                      <p key={i} className="text-sm text-red-500 flex items-center gap-1 mt-1">
-                        <AlertCircle className="w-4 h-4" /> {err}
-                      </p>
-                    ))}
                   </motion.div>
                 )}
 
