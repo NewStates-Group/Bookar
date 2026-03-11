@@ -1,29 +1,87 @@
 <!DOCTYPE html>
 <html>
+
 <head>
+    <meta charset="UTF-8">
     <style>
-        .container { font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; }
-        .header { background: #000; color: #fff; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
-        .content { padding: 30px; border: 1px solid #eee; border-top: none; border-radius: 0 0 8px 8px; }
-        .code-box { background: #f4f4f4; padding: 20px; text-align: center; font-size: 32px; font-weight: bold; letter-spacing: 5px; margin: 20px 0; border-radius: 4px; border: 1px dashed #ccc; }
-        .footer { margin-top: 20px; text-align: center; color: #888; font-size: 12px; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            margin: 0;
+            padding: 0;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            border: 1px solid #eee;
+            border-radius: 10px;
+        }
+
+        .header {
+            text-align: center;
+            padding: 20px 0;
+            border-bottom: 2px solid #06b6d4;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .code-box {
+            background: #fdfdfd;
+            padding: 30px;
+            text-align: center;
+            font-size: 40px;
+            font-weight: bold;
+            letter-spacing: 10px;
+            color: #06b6d4;
+            margin: 25px 0;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+        }
+
+        .footer {
+            text-align: center;
+            font-size: 12px;
+            color: #777;
+            padding: 20px;
+        }
+
+        .badge {
+            display: inline-block;
+            background-color: rgba(6, 182, 212, 0.1);
+            color: #06b6d4;
+            padding: 4px 12px;
+            border-radius: 9999px;
+            font-weight: 600;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
     </style>
 </head>
+
 <body>
     <div class="container">
         <div class="header">
-            <h1>Verificação Bookar</h1>
+            <h1 style="color: #06b6d4; margin: 0;">Verificação de Conta</h1>
         </div>
         <div class="content">
             <p>Olá,</p>
+            <div class="badge">Segurança</div>
             <p>Seu código de verificação para concluir seu registo no Bookar é:</p>
             <div class="code-box">{{ code }}</div>
-            <p>Este código expira em 10 minutos. Se você não solicitou este código, ignore este e-mail.</p>
+            <p>Este código expira em <strong>10 minutos</strong>. Se você não solicitou este código, ignore este e-mail
+                com segurança.</p>
             <p>Bons estudos!<br>Equipe Bookar</p>
         </div>
         <div class="footer">
-            <p>&copy; 2026 Bookar. Todos os direitos reservados.</p>
+            &copy; 2026 Bookar Platform. Todos os direitos reservados.
         </div>
     </div>
 </body>
+
 </html>
