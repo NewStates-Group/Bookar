@@ -220,7 +220,7 @@ export default function SignupPage() {
             <h2 className="text-3xl font-bold tracking-tight">Criar Conta</h2>
             <p className="text-muted-foreground mt-2">
               {step === "email" && "Preencha o seu e-mail para começar."}
-              {step === "verification" && "Verificamos que é humano. Introduza o código enviado para o seu e-mail."}
+              {step === "verification" && "Você realmente é humano? Então insira o código enviado para o seu e-mail."}
               {step === "details" && "Agora, complete os seus dados pessoais."}
             </p>
           </div>

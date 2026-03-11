@@ -79,7 +79,6 @@ export default function LoginPage() {
       if (result?.error) {
         setErrors({ password: ["Palavra-passe incorreta"] });
       } else {
-        toast.success("Login efetuado com sucesso!");
         router.push("/app/courses");
       }
     } catch (error) {

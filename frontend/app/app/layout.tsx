@@ -19,7 +19,7 @@ export default function AppLayout({
   useEffect(() => {
     if (status === "authenticated" && session?.user) {
       const user = session.user as any;
-      const isProfileIncomplete = !user.first_name || !user.last_name || !user.avatar;
+      const isProfileIncomplete = !user.first_name || !user.last_name;
 
       if (isProfileIncomplete && pathname !== "/app/profile") {
         router.push("/app/profile");

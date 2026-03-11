@@ -18,6 +18,7 @@ from ninja_jwt.tokens import RefreshToken
 
 from .tasks import send_verification_email_task, send_welcome_email_task, send_password_reset_email_task
 from .models import EmailVerificationCode
+from courses.models import Course
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
