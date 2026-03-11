@@ -10,6 +10,7 @@ class RegisterIn(Schema):
     last_name: str
     email: EmailStr
     password: str
+    code: str
 
     @field_validator("email", mode="after")
     @classmethod
@@ -76,3 +77,7 @@ class PasswordResetConfirmIn(Schema):
         if len(value) < 12:
             raise ValueError("PASSWORD_TOO_SHORT")
         return value
+
+
+class SendVerificationIn(Schema):
+    email: EmailStr

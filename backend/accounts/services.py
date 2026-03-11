@@ -16,15 +16,19 @@ from google.oauth2 import id_token
 from ninja.errors import HttpError
 from ninja_jwt.tokens import RefreshToken
 
-from core.mail import send_welcome_email, send_password_reset_email
+from core.mail import send_welcome_email, send_password_reset_email, send_verification_email
 from courses.models import Course
+from .models import EmailVerificationCode
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
 
 
 class AuthService:
-    def create_user(self, first_name, last_name, email, password):
+    def create_user(self, first_name, last_name, email, password, code):
+        if not self.verify_verification_code(email, code):
+            raise HttpError(400, "Código de verificação inválido ou expirado.")
+
         user = User.objects.create_user(
             email=email,
             password=password,
@@ -36,7 +40,33 @@ class AuthService:
             send_welcome_email(user)
         except Exception as e:
             print(f"Failed to send welcome email: {e}")
+        
+        # Success, clear code
+        EmailVerificationCode.objects.filter(email=email).delete()
+        
         return user
+
+    def generate_verification_code(self, email):
+        code = "".join(random.choices(string.digits, k=6))
+        EmailVerificationCode.objects.update_or_create(
+            email=email,
+            defaults={"code": code}
+        )
+        send_verification_email(email, code)
+        return True
+
+    def verify_verification_code(self, email, code):
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        # Expire after 10 minutes
+        ten_minutes_ago = timezone.now() - timedelta(minutes=10)
+        
+        return EmailVerificationCode.objects.filter(
+            email=email, 
+            code=code, 
+            created_at__gte=ten_minutes_ago
+        ).exists()
 
     def user_exists(self, email):
         return User.objects.filter(email=email).exists()

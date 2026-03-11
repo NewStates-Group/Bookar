@@ -62,3 +62,17 @@ def send_password_reset_email(user, token):
         context,
         [user.email]
     )
+
+
+def send_verification_email(email, code):
+    subject = f"Seu código de verificação: {code}"
+    context = {
+        "code": code,
+        "site_url": settings.SITE_URL
+    }
+    send_html_email(
+        subject,
+        "emails/verification_code.html",
+        context,
+        [email]
+    )

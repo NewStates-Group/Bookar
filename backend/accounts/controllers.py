@@ -13,7 +13,7 @@ from ninja.files import UploadedFile
 from .schemas import (
     RegisterIn, RegisterOut, ProfileUpdateIn, 
     PasswordResetRequestIn, PasswordResetConfirmIn,
-    EmailCheckIn, EmailCheckOut
+    EmailCheckIn, EmailCheckOut, SendVerificationIn
 )
 
 
@@ -26,6 +26,11 @@ class AuthController(NinjaJWTDefaultController):
     @route.post("signup", response=RegisterOut)
     def signup(self, data: RegisterIn):
         return self.auth_service.create_user(**data.dict())
+
+    @route.post("send-verification")
+    def send_verification(self, data: SendVerificationIn):
+        self.auth_service.generate_verification_code(data.email)
+        return {"message": "Código enviado para o seu e-mail."}
 
     @route.post("check-email", response=EmailCheckOut)
     def check_email(self, data: EmailCheckIn):
