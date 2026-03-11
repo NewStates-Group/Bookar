@@ -11,9 +11,10 @@ env = environ.Env(
     REDIS_URL=(str, "redis://redis:6379/0"),
     ALLOWED_HOSTS=(list, ["*"])
 )
-environ.Env.read_env()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# environ.Env.read_env(BASE_DIR.parent / ".env")
 
 SECRET_KEY = env("SECRET_KEY")
 

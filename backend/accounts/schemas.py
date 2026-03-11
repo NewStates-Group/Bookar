@@ -6,19 +6,10 @@ User = get_user_model()
 
 
 class RegisterIn(Schema):
-    username: str
+    first_name: str
+    last_name: str
     email: EmailStr
     password: str
-
-    @field_validator("username", mode="after")
-    @classmethod
-    def validate_username(cls, value: str) -> str:
-        username = value.strip()
-        if len(username) < 3:
-            raise ValueError("USERNAME_TOO_SHORT")
-        if User.objects.filter(username=value).exists():
-            raise ValueError("USERNAME_TAKEN")
-        return username
 
     @field_validator("email", mode="after")
     @classmethod
@@ -42,7 +33,6 @@ class UserStatsSchema(Schema):
 
 class RegisterOut(Schema):
     id: int
-    username: str
     email: str
     first_name: str = ""
     last_name: str = ""
@@ -57,7 +47,6 @@ class RegisterOut(Schema):
         return None
 
 class ProfileUpdateIn(Schema):
-    username: str = None
     email: EmailStr = None
     first_name: str = None
     last_name: str = None
@@ -68,6 +57,14 @@ class GoogleLoginIn(Schema):
 
 class PasswordResetRequestIn(Schema):
     email: EmailStr
+
+
+class EmailCheckIn(Schema):
+    email: EmailStr
+
+
+class EmailCheckOut(Schema):
+    exists: bool
 
 class PasswordResetConfirmIn(Schema):
     token: str

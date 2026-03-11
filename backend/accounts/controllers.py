@@ -10,7 +10,11 @@ from .services import AuthService
 
 from ninja import File, Form
 from ninja.files import UploadedFile
-from .schemas import RegisterIn, RegisterOut, ProfileUpdateIn, PasswordResetRequestIn, PasswordResetConfirmIn
+from .schemas import (
+    RegisterIn, RegisterOut, ProfileUpdateIn, 
+    PasswordResetRequestIn, PasswordResetConfirmIn,
+    EmailCheckIn, EmailCheckOut
+)
 
 
 @api_controller("auth/", tags=["Auth"])
@@ -22,6 +26,11 @@ class AuthController(NinjaJWTDefaultController):
     @route.post("signup", response=RegisterOut)
     def signup(self, data: RegisterIn):
         return self.auth_service.create_user(**data.dict())
+
+    @route.post("check-email", response=EmailCheckOut)
+    def check_email(self, data: EmailCheckIn):
+        exists = self.auth_service.user_exists(data.email)
+        return {"exists": exists}
 
     @route.get("me", response=RegisterOut, auth=JWTAuth())
     def me(self, request):

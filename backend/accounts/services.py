@@ -24,17 +24,22 @@ logger = logging.getLogger(__name__)
 
 
 class AuthService:
-    def create_user(self, username, email, password):
+    def create_user(self, first_name, last_name, email, password):
         user = User.objects.create_user(
-            username=username,
             email=email,
             password=password,
+            username=email.split('@')[0],  # Default username from email
+            first_name=first_name,
+            last_name=last_name,
         )
         try:
             send_welcome_email(user)
         except Exception as e:
             print(f"Failed to send welcome email: {e}")
         return user
+
+    def user_exists(self, email):
+        return User.objects.filter(email=email).exists()
 
     def update_profile(self, user, data: dict, avatar=None):
         for attr, value in data.items():
@@ -141,7 +146,7 @@ class AuthService:
                         with transaction.atomic():
                             user = User.objects.create_user(
                                 email=email,
-                                username=username,
+                                username=email.split('@')[0], # Default username
                                 first_name=first_name,
                                 last_name=last_name,
                                 is_active=True

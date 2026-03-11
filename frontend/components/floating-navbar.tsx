@@ -76,8 +76,8 @@ export function FloatingNavbar() {
                         <div className="flex items-center justify-center w-10 h-10 rounded-full border cursor-pointer overflow-hidden bg-muted">
                             {user?.avatar ? (
                                 <Avatar className="w-10 h-10">
-                                    <AvatarImage src={user.avatar} alt={user.username} />
-                                    <AvatarFallback>{user.username?.[0]?.toUpperCase()}</AvatarFallback>
+                                    <AvatarImage src={user.avatar} alt={user.first_name || user.email} />
+                                    <AvatarFallback>{(user.first_name || user.email || "U")[0]?.toUpperCase()}</AvatarFallback>
                                 </Avatar>
                             ) : (
                                 <User className="w-5 h-5 text-muted-foreground" />
@@ -87,7 +87,7 @@ export function FloatingNavbar() {
                     <DropdownMenuContent align="end" className="w-56">
                         <DropdownMenuLabel>
                             <div className="flex flex-col">
-                                <span className="font-semibold">{user?.username}</span>
+                                <span className="font-semibold">{user?.first_name ? `${user.first_name} ${user.last_name || ""}` : user?.email}</span>
                                 <span className="text-xs text-muted-foreground">{user?.email}</span>
                             </div>
                         </DropdownMenuLabel>

@@ -19,7 +19,6 @@ export default function ProfilePage() {
     const hasFetched = useRef(false);
 
     const [formData, setFormData] = useState({
-        username: "",
         email: "",
         first_name: "",
         last_name: "",
@@ -27,9 +26,8 @@ export default function ProfilePage() {
     });
 
     useEffect(() => {
-        if (session?.user && !formData.username) {
+        if (session?.user && !formData.email) {
             setFormData({
-                username: session.user.username || "",
                 email: session.user.email || "",
                 first_name: (session.user as any).first_name || "",
                 last_name: (session.user as any).last_name || "",
@@ -145,7 +143,7 @@ export default function ProfilePage() {
                             <div className="relative">
                                 <Avatar className="h-32 w-32 border-2 border-cyan-500/20">
                                     <AvatarImage src={session?.user?.avatar ? `http://localhost:8000${session.user.avatar}` : ""} />
-                                    <AvatarFallback className="text-2xl">{session?.user?.username?.slice(0, 2).toUpperCase()}</AvatarFallback>
+                                    <AvatarFallback className="text-2xl">{(session?.user?.first_name || session?.user?.email || "U").slice(0, 2).toUpperCase()}</AvatarFallback>
                                 </Avatar>
                                 <label
                                     htmlFor="avatar-upload"
@@ -156,7 +154,7 @@ export default function ProfilePage() {
                                 </label>
                             </div>
                             <div className="text-center sm:text-left space-y-1">
-                                <h3 className="text-2xl font-bold">{(session?.user as any).first_name ? `${(session?.user as any).first_name} ${(session?.user as any).last_name}` : session?.user?.username}</h3>
+                                <h3 className="text-2xl font-bold">{(session?.user as any).first_name ? `${(session?.user as any).first_name} ${(session?.user as any).last_name}` : session?.user?.email}</h3>
                                 <p className="text-muted-foreground">{session?.user?.email}</p>
                                 {(!(session?.user as any).first_name || !(session?.user as any).last_name || !session?.user?.avatar) && (
                                     <p className="text-xs text-orange-500 font-medium animate-pulse">
@@ -191,15 +189,6 @@ export default function ProfilePage() {
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="username">Nome de utilizador</Label>
-                                    <Input
-                                        id="username"
-                                        value={formData.username}
-                                        onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                                        className="bg-muted/30 focus:border-cyan-500"
-                                    />
-                                </div>
-                                <div className="space-y-2">
                                     <Label htmlFor="email">E-mail</Label>
                                     <Input
                                         id="email"
@@ -207,6 +196,7 @@ export default function ProfilePage() {
                                         value={formData.email}
                                         onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                                         className="bg-muted/30 focus:border-cyan-500"
+                                        disabled
                                     />
                                 </div>
                             </div>

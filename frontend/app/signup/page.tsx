@@ -26,7 +26,8 @@ const ERROR_MESSAGES: Record<string, string> = {
 };
 
 export default function SignupPage() {
-  const [username, setUsername] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [errors, setErrors] = useState<ValidationErrors>({});
@@ -35,7 +36,8 @@ export default function SignupPage() {
 
   const validateForm = () => {
     const newErrors: Record<string, string[]> = {};
-    if (!username.trim()) newErrors.username = ["O nome de usuário é obrigatório"];
+    if (!firstName.trim()) newErrors.first_name = ["O primeiro nome é obrigatório"];
+    if (!lastName.trim()) newErrors.last_name = ["O último nome é obrigatório"];
     if (!email.trim()) {
       newErrors.email = ["O e-mail é obrigatório"];
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -60,7 +62,12 @@ export default function SignupPage() {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/signup`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, email, password }),
+        body: JSON.stringify({
+          first_name: firstName,
+          last_name: lastName,
+          email,
+          password
+        }),
       });
 
       const data = await res.json();
@@ -149,25 +156,39 @@ export default function SignupPage() {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="space-y-2">
-              <Label htmlFor="username">Nome de usuário</Label>
-              <div className="relative group">
-                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground group-focus-within:text-cyan-500 transition-colors" />
-                <Input
-                  id="username"
-                  type="text"
-                  placeholder="Seu nome de usuário"
-                  className={`pl-10 h-12 bg-muted/30 border-muted-foreground/20 focus:border-cyan-500 transition-all ${errors.username ? "border-red-500 focus:border-red-500" : ""}`}
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                // Removing native validation to show custom errors nicely, or keep it as backup
-                />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="first_name">Primeiro Nome</Label>
+                <div className="relative group">
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground group-focus-within:text-cyan-500 transition-colors" />
+                  <Input
+                    id="first_name"
+                    placeholder="João"
+                    className={`pl-10 h-12 bg-muted/30 border-muted-foreground/20 focus:border-cyan-500 transition-all ${errors.first_name ? "border-red-500 focus:border-red-500" : ""}`}
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                  />
+                </div>
+                {errors.first_name && (
+                  <p className="text-sm text-red-500 mt-1">{errors.first_name[0]}</p>
+                )}
               </div>
-              {errors.username && (
-                <p className="text-sm text-red-500 flex items-center gap-1 mt-1">
-                  <AlertCircle className="w-4 h-4" /> {errors.username[0]}
-                </p>
-              )}
+              <div className="space-y-2">
+                <Label htmlFor="last_name">Último Nome</Label>
+                <div className="relative group">
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground group-focus-within:text-cyan-500 transition-colors" />
+                  <Input
+                    id="last_name"
+                    placeholder="Silva"
+                    className={`pl-10 h-12 bg-muted/30 border-muted-foreground/20 focus:border-cyan-500 transition-all ${errors.last_name ? "border-red-500 focus:border-red-500" : ""}`}
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                  />
+                </div>
+                {errors.last_name && (
+                  <p className="text-sm text-red-500 mt-1">{errors.last_name[0]}</p>
+                )}
+              </div>
             </div>
 
             <div className="space-y-2">

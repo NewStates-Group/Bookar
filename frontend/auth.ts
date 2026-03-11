@@ -60,7 +60,7 @@ export const authOptions: NextAuthOptions = {
             name: "Credentials",
 
             credentials: {
-                username: { label: "Username", type: "text" },
+                email: { label: "Email", type: "email" },
                 password: { label: "Password", type: "password" },
             },
 
@@ -73,7 +73,7 @@ export const authOptions: NextAuthOptions = {
                     } as any;
                 }
 
-                if (!credentials?.username || !credentials?.password) {
+                if (!credentials?.email || !credentials?.password) {
                     return null;
                 }
 
@@ -82,7 +82,7 @@ export const authOptions: NextAuthOptions = {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
-                        username: credentials.username,
+                        username: credentials.email,
                         password: credentials.password,
                     }),
                 });
@@ -115,7 +115,6 @@ export const authOptions: NextAuthOptions = {
 
                         user: {
                             id: profile.id,
-                            username: profile.username,
                             email: profile.email,
                             first_name: profile.first_name,
                             last_name: profile.last_name,
@@ -144,7 +143,6 @@ export const authOptions: NextAuthOptions = {
                         ...token,
                         user: {
                             id: profile.id,
-                            username: profile.username,
                             email: profile.email,
                             first_name: profile.first_name,
                             last_name: profile.last_name,
@@ -180,7 +178,6 @@ export const authOptions: NextAuthOptions = {
                     ...refreshed,
                     user: {
                         id: profile.id,
-                        username: profile.username,
                         email: profile.email,
                         first_name: profile.first_name,
                         last_name: profile.last_name,
