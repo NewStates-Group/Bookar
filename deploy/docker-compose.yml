@@ -12,11 +12,22 @@ services:
         condition: service_healthy
       flower:
         condition: service_healthy
+  redis:
+    image: redis:7-alpine
+    env_file: ".env"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
   worker:
     image: ${BACKEND_IMAGE}
     env_file: ".env"
     entrypoint: "" 
     command: celery -A core worker -l info
+    depends_on:
+      redis:
+        condition: service_healthy
   backend:
     image: ${BACKEND_IMAGE}
     env_file: ".env"
@@ -26,6 +37,9 @@ services:
       timeout: 5s
       retries: 3
       start_period: 30s
+    depends_on:
+      redis:
+        condition: service_healthy
   frontend:
     image: ${FRONTEND_IMAGE}
     env_file: ".env"
