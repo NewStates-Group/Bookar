@@ -16,8 +16,7 @@ from google.oauth2 import id_token
 from ninja.errors import HttpError
 from ninja_jwt.tokens import RefreshToken
 
-from core.mail import send_welcome_email, send_password_reset_email, send_verification_email
-from courses.models import Course
+from .tasks import send_verification_email_task, send_welcome_email_task, send_password_reset_email_task
 from .models import EmailVerificationCode
 
 User = get_user_model()
@@ -37,9 +36,9 @@ class AuthService:
             last_name=last_name,
         )
         try:
-            send_welcome_email(user)
+            send_welcome_email_task.delay(user.id)
         except Exception as e:
-            print(f"Failed to send welcome email: {e}")
+            print(f"Failed to queue welcome email: {e}")
         
         # Success, clear code
         EmailVerificationCode.objects.filter(email=email).delete()
@@ -52,7 +51,7 @@ class AuthService:
             email=email,
             defaults={"code": code}
         )
-        send_verification_email(email, code)
+        send_verification_email_task.delay(email, code)
         return True
 
     def verify_verification_code(self, email, code):
@@ -284,7 +283,7 @@ class AuthService:
             user = User.objects.get(email=email)
             signer = TimestampSigner()
             token = signer.sign(user.email)
-            send_password_reset_email(user, token)
+            send_password_reset_email_task.delay(user.id, token)
         except User.DoesNotExist:
             # We don't reveal if user exists for security, but we don't send anything
             pass
