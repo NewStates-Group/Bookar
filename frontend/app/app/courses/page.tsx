@@ -26,6 +26,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import Link from "next/link";
+import { motion } from "framer-motion";
 
 interface Course {
   id: Number;
@@ -59,6 +60,10 @@ export default function CoursesPage() {
 
   const pollingRefs = useRef<Set<Number>>(new Set());
 
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
+  const [profileNames, setProfileNames] = useState({ firstName: "", lastName: "" });
+
   const levelConfig = {
     B: { label: "Iniciante", color: "bg-emerald-100 text-emerald-700 border-emerald-200" },
     IT: { label: "Intermediário", color: "bg-blue-100 text-blue-700 border-blue-200" },
@@ -68,6 +73,19 @@ export default function CoursesPage() {
   useEffect(() => {
     if (session?.accessToken) {
       fetchCourses();
+
+      // Check if profile needs completion
+      const user = session.user as any;
+      if (user && (!user.first_name || !user.last_name)) {
+        setShowNameModal(true);
+      }
+
+      // Check if first time (simple check: if courses count is 0 after delay or using a local flag)
+      // For now, let's just show it if they have 0 courses and haven't seen it this session
+      const hasSeenOnboarding = localStorage.getItem("hasSeenOnboarding");
+      if (!hasSeenOnboarding) {
+        setShowOnboarding(true);
+      }
     }
   }, [session]);
 
@@ -111,6 +129,43 @@ export default function CoursesPage() {
       setStep(2);
     } else if (step === 2) {
       setStep(1);
+    }
+  };
+
+  const handleProfileUpdate = async () => {
+    if (!profileNames.firstName || !profileNames.lastName) {
+      toast.error("Por favor, preencha o nome e sobrenome.");
+      return;
+    }
+
+    setIsUpdatingProfile(true);
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/profile`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session?.accessToken}`,
+        },
+        body: JSON.stringify({
+          first_name: profileNames.firstName,
+          last_name: profileNames.lastName,
+        }),
+      });
+
+      if (res.ok) {
+        toast.success("Perfil atualizado com sucesso!");
+        setShowNameModal(false);
+        // Refresh session to update UI
+        // @ts-ignore
+        const { update } = (await import("next-auth/react"));
+        update();
+      } else {
+        toast.error("Erro ao atualizar perfil.");
+      }
+    } catch (err) {
+      toast.error("Erro de conexão.");
+    } finally {
+      setIsUpdatingProfile(false);
     }
   };
 
@@ -327,6 +382,117 @@ export default function CoursesPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 md:px-8 py-3">
+      {/* Onboarding Guide */}
+      {showOnboarding && (
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-8 relative overflow-hidden rounded-2xl bg-gradient-to-r from-cyan-600 to-blue-700 p-8 text-white shadow-xl"
+        >
+          <button
+            onClick={() => {
+              setShowOnboarding(false);
+              localStorage.setItem("hasSeenOnboarding", "true");
+            }}
+            className="absolute top-4 right-4 text-white/80 hover:text-white"
+          >
+            <X className="w-6 h-6" />
+          </button>
+
+          <div className="flex flex-col md:flex-row items-center gap-8">
+            <div className="flex-1 space-y-4 text-center md:text-left">
+              <h2 className="text-3xl font-bold flex items-center gap-2 justify-center md:justify-start">
+                <Sparkles className="w-8 h-8 text-cyan-300" />
+                Bem-vindo ao Bookar!
+              </h2>
+              <p className="text-lg text-cyan-50/90 leading-relaxed">
+                Transforme qualquer tema em um curso personalizado com a nossa IA.
+                Nunca foi tão fácil aprender algo novo!
+              </p>
+              <div className="flex flex-wrap gap-4 pt-2 justify-center md:justify-start">
+                <div className="flex items-center gap-2 bg-white/10 px-3 py-1.5 rounded-full text-sm">
+                  <span className="bg-cyan-500 text-white w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold">1</span>
+                  Descreva o tema
+                </div>
+                <div className="flex items-center gap-2 bg-white/10 px-3 py-1.5 rounded-full text-sm">
+                  <span className="bg-cyan-500 text-white w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold">2</span>
+                  Escolha o nível
+                </div>
+                <div className="flex items-center gap-2 bg-white/10 px-3 py-1.5 rounded-full text-sm">
+                  <span className="bg-cyan-500 text-white w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold">3</span>
+                  Aprenda com IA
+                </div>
+              </div>
+            </div>
+            <div className="hidden lg:block relative w-48 h-48">
+              <div className="absolute inset-0 bg-cyan-400 blur-3xl opacity-20 animate-pulse" />
+              <GraduationCap className="w-full h-full text-cyan-200 relative z-10" />
+            </div>
+          </div>
+        </motion.div>
+      )}
+
+      {/* Profile Completion Modal */}
+      <Dialog open={showNameModal} onOpenChange={(val) => {
+        // Prevent closing if names are missing
+        const user = session?.user as any;
+        if (user && user.first_name && user.last_name) {
+          setShowNameModal(val);
+        }
+      }}>
+        <DialogContent className="sm:max-w-[450px]">
+          <div className="text-center space-y-4 pt-4">
+            <div className="w-16 h-16 bg-cyan-500/10 rounded-full flex items-center justify-center mx-auto">
+              <Sparkles className="w-8 h-8 text-cyan-500" />
+            </div>
+            <DialogTitle className="text-2xl font-bold">Complete seu Perfil</DialogTitle>
+            <DialogDescription className="text-base text-muted-foreground">
+              Para uma melhor experiência (e para que o seu certificado seja válido), precisamos do seu nome completo.
+            </DialogDescription>
+          </div>
+
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="firstName">Primeiro Nome</Label>
+              <Input
+                id="firstName"
+                placeholder="Ex: João"
+                value={profileNames.firstName}
+                onChange={(e) => setProfileNames({ ...profileNames, firstName: e.target.value })}
+                className="h-11"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="lastName">Apelido (Sobrenome)</Label>
+              <Input
+                id="lastName"
+                placeholder="Ex: Silva"
+                value={profileNames.lastName}
+                onChange={(e) => setProfileNames({ ...profileNames, lastName: e.target.value })}
+                className="h-11"
+              />
+            </div>
+          </div>
+
+          <div className="pb-4">
+            <Button
+              className="w-full h-11 bg-cyan-500 hover:bg-cyan-600 font-semibold"
+              onClick={handleProfileUpdate}
+              disabled={isUpdatingProfile}
+            >
+              {isUpdatingProfile ? (
+                <>
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                  Atualizando...
+                </>
+              ) : (
+                "Finalizar Registo"
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <div className="flex justify-between items-center mb-8">
         <div>
           <h1 className="text-3xl font-bold">Cursos</h1>

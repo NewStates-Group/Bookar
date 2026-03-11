@@ -116,21 +116,22 @@ export const authOptions: NextAuthOptions = {
                         user: {
                             id: profile.id,
                             email: profile.email,
-                            first_name: profile.first_name,
-                            last_name: profile.last_name,
-                            bio: profile.bio,
-                            avatar: profile.avatar,
-                            stats: profile.stats,
+                            first_name: profile.first_name || "",
+                            last_name: profile.last_name || "",
+                            bio: profile.bio || "",
+                            avatar: profile.avatar || null,
+                            stats: profile.stats || null,
                         },
                     };
                 } catch (error) {
-                    console.error("Error fetching user profile:", error);
-                    // At least return what we have
+                    console.error("Error fetching user profile at login:", error);
+                    // Return tokens so they can at least try to refresh or logout, but avoid empty user if possible
                     return {
                         accessToken: user.accessToken,
                         refreshToken: user.refreshToken,
                         accessTokenExpires: Date.now() + 30 * 60 * 1000,
-                        user: {},
+                        user: null, // Change to null to indicate no profile
+                        error: "FetchProfileError"
                     };
                 }
             }
