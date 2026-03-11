@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import Image from "next/image";
-import { User, Mail, Lock, Loader2, ArrowRight, AlertCircle } from "lucide-react";
+import { User, Mail, Lock, Loader2, ArrowRight, AlertCircle, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
@@ -30,7 +30,8 @@ export default function SignupPage() {
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [step, setStep] = useState<"email" | "details">("email");
+  const [code, setCode] = useState("");
+  const [step, setStep] = useState<"email" | "verification" | "details">("email");
   const [errors, setErrors] = useState<ValidationErrors>({});
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
@@ -62,14 +63,46 @@ export default function SignupPage() {
       const data = await res.json();
 
       if (!data.exists) {
-        setStep("details");
+        // Send verification code
+        await handleSendVerification();
       } else {
         setErrors({ email: ["Este e-mail já está em uso."] });
       }
     } catch (error) {
       toast.error("Erro ao verificar e-mail.");
     } finally {
+      setIsLoading(true); // Keep loading state until handleSendVerification finishes or we set step
+    }
+  };
+
+  const handleSendVerification = async () => {
+    setIsLoading(true);
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/send-verification`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+
+      if (res.ok) {
+        toast.info("Código de verificação enviado!");
+        setStep("verification");
+      } else {
+        toast.error("Erro ao enviar código de verificação.");
+      }
+    } catch (error) {
+      toast.error("Erro ao conectar com o servidor.");
+    } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleVerifyCode = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (code.length === 6) {
+      setStep("details");
+    } else {
+      toast.error("O código deve ter 6 dígitos.");
     }
   };
 
@@ -100,7 +133,8 @@ export default function SignupPage() {
           first_name: firstName,
           last_name: lastName,
           email,
-          password
+          password,
+          code
         }),
       });
 
@@ -121,6 +155,9 @@ export default function SignupPage() {
             toast.error(message);
           }
           setErrors(newErrors);
+        } else if (res.status === 400) {
+          toast.error(data.detail || "Código de verificação inválido.");
+          setStep("verification");
         } else {
           toast.error(data.detail || "Erro ao criar conta.");
         }
@@ -182,14 +219,14 @@ export default function SignupPage() {
             </Link>
             <h2 className="text-3xl font-bold tracking-tight">Criar Conta</h2>
             <p className="text-muted-foreground mt-2">
-              {step === "email"
-                ? "Preencha o seu e-mail para começar."
-                : "Agora, complete os seus dados pessoais."}
+              {step === "email" && "Preencha o seu e-mail para começar."}
+              {step === "verification" && "Verificamos que é humano. Introduza o código enviado para o seu e-mail."}
+              {step === "details" && "Agora, complete os seus dados pessoais."}
             </p>
           </div>
 
-          <form onSubmit={step === "email" ? handleNextStep : handleSubmit} className="space-y-6">
-            {step === "email" ? (
+          <form onSubmit={step === "email" ? handleNextStep : step === "verification" ? handleVerifyCode : handleSubmit} className="space-y-6">
+            {step === "email" && (
               <motion.div
                 key="email-step"
                 initial={{ opacity: 0, y: 10 }}
@@ -214,12 +251,14 @@ export default function SignupPage() {
                   </p>
                 )}
               </motion.div>
-            ) : (
+            )}
+
+            {step === "verification" && (
               <motion.div
-                key="details-step"
+                key="verification-step"
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="space-y-6"
+                className="space-y-4"
               >
                 <div className="flex items-center justify-between gap-4">
                   <Button
@@ -231,6 +270,60 @@ export default function SignupPage() {
                     Alterar e-mail
                   </Button>
                   <span className="text-xs text-muted-foreground truncate">{email}</span>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="code">Código de Verificação</Label>
+                  <div className="relative group">
+                    <ShieldCheck className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground group-focus-within:text-cyan-500 transition-colors" />
+                    <Input
+                      id="code"
+                      placeholder="000000"
+                      maxLength={6}
+                      className="pl-10 h-12 bg-muted/30 border-muted-foreground/20 focus:border-cyan-500 transition-all text-center text-xl tracking-[0.5em] font-mono"
+                      value={code}
+                      onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
+                      autoFocus
+                    />
+                  </div>
+                  <div className="flex justify-center pt-2">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="text-xs text-cyan-500 hover:text-cyan-600"
+                      onClick={handleSendVerification}
+                      disabled={isLoading}
+                    >
+                      Reenviar código
+                    </Button>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {step === "details" && (
+              <motion.div
+                key="details-step"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="space-y-6"
+              >
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex flex-col">
+                    <span className="text-xs text-muted-foreground truncate">{email}</span>
+                    <span className="text-[10px] text-green-500 flex items-center gap-1">
+                      <ShieldCheck className="w-3 h-3" /> E-mail verificado
+                    </span>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="link"
+                    className="h-auto p-0 text-xs text-muted-foreground hover:text-cyan-500"
+                    onClick={() => setStep("verification")}
+                  >
+                    Voltar
+                  </Button>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
@@ -299,11 +392,11 @@ export default function SignupPage() {
               {isLoading ? (
                 <>
                   <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                  {step === "email" ? "Verificando..." : "Criando conta..."}
+                  {step === "email" ? "Verificando..." : step === "verification" ? "Aguarde..." : "Criando conta..."}
                 </>
               ) : (
                 <>
-                  {step === "email" ? "Continuar" : "Criar conta"}
+                  {step === "email" ? "Continuar" : step === "verification" ? "Verificar Código" : "Criar conta"}
                   <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
                 </>
               )}
@@ -341,7 +434,7 @@ export default function SignupPage() {
                     fill="#FBBC05"
                   />
                   <path
-                    d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                    d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
                     fill="#EA4335"
                   />
                 </svg>
