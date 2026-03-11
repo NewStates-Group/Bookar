@@ -71,7 +71,7 @@ export default function SignupPage() {
     } catch (error) {
       toast.error("Erro ao verificar e-mail.");
     } finally {
-      setIsLoading(true); // Keep loading state until handleSendVerification finishes or we set step
+      setIsLoading(false);
     }
   };
 
