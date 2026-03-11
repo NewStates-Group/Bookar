@@ -1,5 +1,6 @@
 services:
   nginx:
+    container_name: "nginx"
     image: nginx:stable
     ports:
       - "80:80"
@@ -13,6 +14,7 @@ services:
       flower:
         condition: service_healthy
   redis:
+    container_name: "redis"
     image: redis:7-alpine
     env_file: ".env"
     healthcheck:
@@ -21,6 +23,7 @@ services:
       timeout: 3s
       retries: 5
   worker:
+    container_name: "worker"
     image: ${BACKEND_IMAGE}
     env_file: ".env"
     entrypoint: "" 
@@ -29,6 +32,7 @@ services:
       redis:
         condition: service_healthy
   backend:
+    container_name: "backend"
     image: ${BACKEND_IMAGE}
     env_file: ".env"
     healthcheck:
@@ -41,6 +45,7 @@ services:
       redis:
         condition: service_healthy
   frontend:
+    container_name: "frontend"
     image: ${FRONTEND_IMAGE}
     env_file: ".env"
     healthcheck:
@@ -53,6 +58,7 @@ services:
       backend:
         condition: service_healthy
   flower:
+    container_name: "flower"
     image: ${BACKEND_IMAGE}
     env_file: ".env"
     entrypoint: "" 

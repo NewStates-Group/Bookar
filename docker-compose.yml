@@ -1,5 +1,6 @@
 services:
   nginx:
+     container_name: "nginx"
     image: nginx:stable-alpine
     ports:
       - "80:80"
@@ -13,6 +14,7 @@ services:
       flower:
         condition: service_healthy
   worker:
+    container_name: "worker"
     image: backend
     env_file: ".env"
     entrypoint: "" 
@@ -25,6 +27,7 @@ services:
       redis:
         condition: service_healthy
   db:
+    container_name: "postgres"
     image: postgres:17-alpine
     env_file: ".env"
     volumes:
@@ -36,6 +39,7 @@ services:
       retries: 5
       start_period: 10s
   redis:
+    container_name: "redis"
     image: redis:7-alpine
     env_file: ".env"
     healthcheck:
@@ -44,6 +48,7 @@ services:
       timeout: 3s
       retries: 5
   backend:
+    container_name: "backend"
     build: ./backend
     image: backend
     env_file: ".env"
@@ -61,6 +66,7 @@ services:
       redis:
         condition: service_healthy
   frontend:
+    container_name: "frontend"
     build: ./frontend
     env_file: ".env"
     volumes:
@@ -76,6 +82,7 @@ services:
       backend:
         condition: service_healthy
   flower:
+    container_name: "flower"
     image: backend
     env_file: ".env"
     entrypoint: "" 
@@ -92,6 +99,7 @@ services:
       worker:
         condition: service_started
   adminer:
+    container_name: "adminer"
     image: adminer
     restart: unless-stopped
     ports:
