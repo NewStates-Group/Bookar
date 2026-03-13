@@ -585,6 +585,7 @@ def create_course_thumb(course_pk: str, prompt: str):
     """
 
     try:
+        course = Course.objects.get(pk=course_pk)
         response = client.models.generate_content(
             model=settings.AI.get("GENAI_MODEL_IMAGE", "gemini-2.5-flash-image"),
             contents=[ai_prompt],
@@ -629,15 +630,13 @@ def create_course_thumb(course_pk: str, prompt: str):
         image = image.convert("RGB")
 
         buffer = BytesIO()
-        filename = f"thumbs/{uuid.uuid4()}.jpg"
         image.save(buffer, format="JPEG", quality=90)
         buffer.seek(0)
 
-        lesson_filename = f"{uuid.uuid4()}.jpg"
-        course.thumb.save(lesson_filename, ContentFile(buffer.read()), save=False)
-        Course.objects.filter(pk=course_pk).update(status="READY") # Status updated to READY
+        thumb_filename = f"{uuid.uuid4()}.jpg"
+        course.thumb.save(thumb_filename, ContentFile(buffer.read()), save=False)
+        course.status = "READY"
         course.save()
-        course = Course.objects.get(pk=course_pk)
         generate_next_module.delay(course.user.pk, course_pk)
     except Exception as e:
         logger.error(f"Thumbnail creation failed: {e}")
