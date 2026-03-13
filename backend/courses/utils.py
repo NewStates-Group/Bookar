@@ -29,7 +29,7 @@ class RateLimiter:
             time.sleep(self.min_interval - elapsed)
         self.last_call = time.time()
 
-limiter = RateLimiter(min_interval=settings.AI.get("GENAI_RATE_LIMIT", 1.0))
+limiter = RateLimiter(min_interval=settings.AI.get("GENAI_RATE_LIMIT", 5.0))
 
 def is_retryable_error(exception):
     """Check if the error is 429 Resource Exhausted."""
@@ -41,7 +41,7 @@ def is_retryable_error(exception):
 
 @retry(
     retry=retry_if_exception_type(ClientError),
-    wait=wait_exponential(multiplier=1, min=4, max=60),
+    wait=wait_exponential(multiplier=2, min=15, max=120),
     stop=stop_after_attempt(5),
     reraise=True,
 )

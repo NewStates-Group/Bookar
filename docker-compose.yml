@@ -18,7 +18,7 @@ services:
     image: backend
     env_file: ".env"
     entrypoint: ""
-    command: celery -A core worker -l info
+    command: celery -A core worker -l info --concurrency=1
     volumes:
       - ./backend:/app
     dns:
