@@ -187,8 +187,8 @@ def _process_segment(i, segment, client, temp_dir):
     return video
 
 
-@shared_task
-def generate_lesson(user_id, lesson_id: int):
+@shared_task(bind=True, autoretry_for=(Exception,), retry_backoff=True, retry_kwargs={'max_retries': 3}, default_retry_delay=40)
+def generate_lesson(self, user_id, lesson_id: int):
     lesson = Lesson.objects.filter(id=lesson_id).first()
     if not lesson:
         raise LessonDoesNotExist()
@@ -328,8 +328,8 @@ def generate_lesson(user_id, lesson_id: int):
         shutil.rmtree(temp_dir, ignore_errors=True)
 
 
-@shared_task
-def generate_next_module(user_pk: int, course_pk: int, module_pk: int = None):
+@shared_task(bind=True, autoretry_for=(Exception,), retry_backoff=True, retry_kwargs={'max_retries': 3}, default_retry_delay=40)
+def generate_next_module(self, user_pk: int, course_pk: int, module_pk: int = None):
     try:
         course = Course.objects.get(pk=course_pk)
     except Course.DoesNotExist:
@@ -435,7 +435,7 @@ def generate_next_module(user_pk: int, course_pk: int, module_pk: int = None):
             Course.objects.filter(pk=course_pk).update(status="READY")
 
 
-@shared_task
+@shared_task(autoretry_for=(Exception,), retry_backoff=True, retry_kwargs={'max_retries': 3}, default_retry_delay=40)
 def generate_module_quiz(module_id: int):
     module_object = Module.objects.filter(pk=module_id).first()
     if not module_object:
@@ -507,7 +507,7 @@ def generate_module_quiz(module_id: int):
 
 
 
-@shared_task
+@shared_task(autoretry_for=(Exception,), retry_backoff=True, retry_kwargs={'max_retries': 3}, default_retry_delay=40)
 def create_course_details(course_pk: int, prompt: str, level: str):
     ai_prompt = f"""
     You are an AI that outputs STRICT JSON.
@@ -562,7 +562,7 @@ def create_course_details(course_pk: int, prompt: str, level: str):
     create_course_thumb.delay(course_pk, prompt)
 
 
-@shared_task
+@shared_task(autoretry_for=(Exception,), retry_backoff=True, retry_kwargs={'max_retries': 3}, default_retry_delay=40)
 def create_course_thumb(course_pk: str, prompt: str):
     client = get_genai_client()
     ai_prompt = f"""
@@ -642,7 +642,7 @@ def create_course_thumb(course_pk: str, prompt: str):
         logger.error(f"Thumbnail creation failed: {e}")
         Course.objects.filter(pk=course_pk).update(status="FAILED")
         raise ThumbnailCreationError(f"Erro ao criar thumbnail: {str(e)}") 
-@shared_task
+@shared_task(autoretry_for=(Exception,), retry_backoff=True, retry_kwargs={'max_retries': 3}, default_retry_delay=40)
 def generate_certificate_task(user_id: int, course_id: int, full_name: str):
     User = get_user_model()
     try:
