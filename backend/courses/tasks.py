@@ -295,10 +295,9 @@ def generate_lesson(self, user_id, lesson_id: int):
             timeout=15*60,
         )
 
-        # Final step: Save to Django storage (Cloudinary)
         final_filename = f"{uuid.uuid4()}.mp4"
         with final_temp_output.open("rb") as f:
-            lesson.lesson_file.save(final_filename, ContentFile(f.read()), save=False)
+            lesson.lesson_file.save(final_filename, ContentFile(f.read(), name=final_filename), save=False)
         
         lesson.status = "READY"
         lesson.save()
@@ -592,10 +591,10 @@ def create_course_thumb(course_pk: str, prompt: str):
             raise ThumbnailCreationError("IA não retornou uma imagem válida")
 
         try:
-            bytes_data = BytesIO(image_part.data)  # NOQA
-            image = Image.open(bytes_data)
+            # Re-read the data into a fresh BytesIO for each operation to be safe
+            image = Image.open(BytesIO(image_part.data))
             image.verify()
-            image = Image.open(bytes_data).convert("RGBA")
+            image = Image.open(BytesIO(image_part.data)).convert("RGBA")
         except UnidentifiedImageError:
             raise ThumbnailCreationError("Conteúdo retornado não é uma imagem")
 
@@ -619,7 +618,8 @@ def create_course_thumb(course_pk: str, prompt: str):
         buffer.seek(0)
 
         thumb_filename = f"{uuid.uuid4()}.jpg"
-        course.thumb.save(thumb_filename, ContentFile(buffer.getvalue()), save=True)
+        # Passing name to ContentFile is good practice for some storage backends
+        course.thumb.save(thumb_filename, ContentFile(buffer.getvalue(), name=thumb_filename), save=True)
         course.status = "READY"
         course.save()
         generate_next_module.delay(course.user.pk, course_pk)
@@ -716,7 +716,7 @@ def generate_certificate_task(user_id: int, course_id: int, full_name: str):
 
         # Save the file
         cert_filename = f"cert_{course.id}_{user.id}_{uuid.uuid4().hex[:8]}.pdf"
-        course.certificate_file.save(cert_filename, ContentFile(buffer.getvalue()), save=False)
+        course.certificate_file.save(cert_filename, ContentFile(buffer.getvalue(), name=cert_filename), save=False)
         
         # Update course
         course.certificate_status = "READY"
