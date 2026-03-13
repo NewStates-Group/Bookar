@@ -21,6 +21,9 @@ services:
     command: celery -A core worker -l info
     volumes:
       - ./backend:/app
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
     depends_on:
       backend:
         condition: service_healthy
@@ -54,6 +57,9 @@ services:
     env_file: ".env"
     volumes:
       - ./backend:/app
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/healthcheck/"]
       interval: 10s
