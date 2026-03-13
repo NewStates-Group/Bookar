@@ -53,11 +53,11 @@ class Course(models.Model):
         choices=CourseStatus.choices,
         default=CourseStatus.PROCESSING,
     )
-    thumb = models.TextField(null=True, blank=True)
+    thumb = models.ImageField(upload_to="courses/thumbs/", null=True, blank=True)
     deleted = models.BooleanField(default=False, null=True, blank=True)
     max_modules = models.PositiveIntegerField(null=True, blank=True, default=5)
     
-    certificate_file = models.CharField(max_length=255, null=True, blank=True)
+    certificate_file = models.FileField(upload_to="courses/certificates/", null=True, blank=True)
     certificate_status = models.CharField(
         max_length=20,
         choices=CertificateStatus.choices,
@@ -160,7 +160,7 @@ class Lesson(models.Model):
         choices=LessonStatus.choices,
         default=LessonStatus.PENDING,
     )
-    lesson_file = models.CharField(max_length=150, null=True, blank=True)
+    lesson_file = models.FileField(upload_to="courses/lessons/", null=True, blank=True)
     narration = models.TextField(null=True, blank=True)
     key_points = models.CharField(max_length=150, null=True, blank=True)
     scene_suggestion = models.TextField(null=True, blank=True)
