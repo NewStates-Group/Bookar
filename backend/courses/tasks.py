@@ -117,21 +117,47 @@ def _create_fallback_image(prompt, output_path):
 def _generate_image(client, prompt, output_path, timeout=30):
     try:
         img_prompt = f"Hand-drawn whiteboard animation style, minimalist black marker on white board: {prompt}. Any visible text MUST be in Portuguese."
+        model_name = settings.AI.get("GENAI_MODEL_IMAGE", "gemini-2.0-flash")
+        
+        # Log the attempt
+        logger.info(f"Generating image with model {model_name} for prompt: {prompt[:50]}...")
+        
         response = safe_gemini_call(
             client.models.generate_content,
-            model=settings.AI.get("GENAI_MODEL_IMAGE", "gemini-2.5-flash-image"),
+            model=model_name,
             contents=img_prompt,
             config=types.GenerateContentConfig(
                 image_config=types.ImageConfig(aspect_ratio="16:9")
             ),
         )
+        
+        if not response or not response.parts:
+            raise ValueError("Empty response from Gemini")
+            
         for part in response.parts:
             if part.inline_data:
                 output_path.write_bytes(part.inline_data.data)
                 return True
-        raise ValueError("No image data")
+        raise ValueError("No image part in response")
     except Exception as e:
-        logger.warning(f"Image failed, using fallback: {e}")
+        logger.warning(f"Image generation failed for '{prompt[:50]}...': {str(e)}")
+        # If it's a BadRequest, it might be the config. Let's try once without image_config as a last resort
+        if "BadRequest" in str(e) or "400" in str(e):
+             try:
+                logger.info("Retrying without image_config...")
+                response = safe_gemini_call(
+                    client.models.generate_content,
+                    model=model_name,
+                    contents=img_prompt,
+                )
+                for part in response.parts:
+                    if part.inline_data:
+                        output_path.write_bytes(part.inline_data.data)
+                        return True
+             except Exception as retry_e:
+                logger.warning(f"Retry without config also failed: {retry_e}")
+
+        logger.info("Using fallback image.")
         return _create_fallback_image(prompt, output_path)
 
 

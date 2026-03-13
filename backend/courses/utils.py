@@ -33,10 +33,11 @@ limiter = RateLimiter(min_interval=settings.AI.get("GENAI_RATE_LIMIT", 1.0))
 
 def is_retryable_error(exception):
     """Check if the error is 429 Resource Exhausted."""
+    exc_str = str(exception).upper()
     if isinstance(exception, ClientError):
         # The error message usually contains 429 or RESOURCE_EXHAUSTED
-        return "429" in str(exception) or "RESOURCE_EXHAUSTED" in str(exception)
-    return False
+        return "429" in exc_str or "RESOURCE_EXHAUSTED" in exc_str
+    return "429" in exc_str or "RESOURCE_EXHAUSTED" in exc_str
 
 @retry(
     retry=retry_if_exception_type(ClientError),
@@ -60,14 +61,41 @@ def safe_gemini_call(method, *args, **kwargs):
         raise e
 
 def extract_json(response: str, isList: bool = False):
+    if not response:
+        return None
+        
     cleaned = response.strip()
+    
+    # Remove markdown code blocks if present
+    if "```" in cleaned:
+        import re
+        # Try to find content between ```json and ```
+        match = re.search(r"```(?:json)?\s*([\s\S]*?)```", cleaned)
+        if match:
+            cleaned = match.group(1).strip()
+            
     try:
-        start_bracket = cleaned.index("{" if not isList else "[")
-        end_bracket = cleaned.rindex("}" if not isList else "]")
-        cleaned = cleaned[start_bracket : end_bracket + 1]
-        return orjson.loads(cleaned)
-    except (ValueError, orjson.JSONDecodeError) as e:
+        start_bracket = cleaned.find("{" if not isList else "[")
+        end_bracket = cleaned.rfind("}" if not isList else "]")
+        
+        if start_bracket == -1 or end_bracket == -1:
+            logger.error(f"Brackets not found in response: {cleaned[:100]}...")
+            return None
+            
+        json_str = cleaned[start_bracket : end_bracket + 1]
+        
+        # Try orjson first for speed
+        try:
+            return orjson.loads(json_str)
+        except orjson.JSONDecodeError:
+            # Fallback to standard json which is sometimes more lenient with trailing commans in some setups
+            # or just to provide a second chance
+            import json
+            return json.loads(json_str)
+            
+    except Exception as e:
         logger.error(f"Failed to extract JSON from response: {e}")
+        logger.debug(f"Raw response for failure: {response}")
         return None
 
 
