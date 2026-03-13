@@ -269,12 +269,6 @@ class CourseService:
             raise HttpError(400, "O curso ainda não foi totalmente concluído.")
 
         # If READY, return the URL
-        if course.certificate_status == "READY" and course.certificate_file:
-            return {
-                "status": "READY",
-                "message": "Certificado pronto.",
-                "certificate_url": f"{settings.MEDIA_URL}{course.certificate_file}"
-            }
 
         # If PROCESSING, just return status
         if course.certificate_status == "PROCESSING":

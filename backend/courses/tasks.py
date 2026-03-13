@@ -313,7 +313,8 @@ def generate_lesson(user_id, lesson_id: int):
         )
 
 
-        lesson.lesson_file = f"courses/lessons/{temp_output.name}"
+        with temp_output.open("rb") as f:
+            lesson.lesson_file.save(temp_output.name, ContentFile(f.read()), save=False)
         lesson.status = "READY"
         lesson.save()
 
@@ -632,8 +633,10 @@ def create_course_thumb(course_pk: str, prompt: str):
         image.save(buffer, format="JPEG", quality=90)
         buffer.seek(0)
 
-        default_storage.save(filename, ContentFile(buffer.read()))
-        Course.objects.filter(pk=course_pk).update(thumb=filename)
+        lesson_filename = f"{uuid.uuid4()}.jpg"
+        course.thumb.save(lesson_filename, ContentFile(buffer.read()), save=False)
+        Course.objects.filter(pk=course_pk).update(status="READY") # Status updated to READY
+        course.save()
         course = Course.objects.get(pk=course_pk)
         generate_next_module.delay(course.user.pk, course_pk)
     except Exception as e:
@@ -728,11 +731,10 @@ def generate_certificate_task(user_id: int, course_id: int, full_name: str):
         c.save()
 
         # Save the file
-        filename = f"certificates/cert_{course.id}_{user.id}_{uuid.uuid4().hex[:8]}.pdf"
-        file_path = default_storage.save(filename, ContentFile(buffer.getvalue()))
+        cert_filename = f"cert_{course.id}_{user.id}_{uuid.uuid4().hex[:8]}.pdf"
+        course.certificate_file.save(cert_filename, ContentFile(buffer.getvalue()), save=False)
         
         # Update course
-        course.certificate_file = file_path
         course.certificate_status = "READY"
         course.save()
 
