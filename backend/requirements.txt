@@ -11,6 +11,7 @@ anyio==4.11.0
     #   watchfiles
 asgiref==3.9.2
     # via
+    #   channels
     #   django
     #   django-cors-headers
     #   django-ninja-extra
@@ -30,6 +31,8 @@ certifi==2025.8.3
     #   requests
 cffi==2.0.0
     # via cryptography
+channels==4.3.2
+    # via backend (pyproject.toml)
 charset-normalizer==3.4.3
     # via
     #   reportlab
@@ -58,6 +61,7 @@ cryptography==46.0.3
 django==5.2.7
     # via
     #   backend (pyproject.toml)
+    #   channels
     #   django-cors-headers
     #   django-ninja
     #   django-ninja-extra
