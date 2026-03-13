@@ -253,35 +253,12 @@ def generate_lesson(self, user_id, lesson_id: int):
 
         list_file = temp_dir / "list.txt"
         list_file.write_text("\n".join(f"file '{v}'" for v in videos))
-        output_dir = Path(settings.MEDIA_ROOT) / "courses/lessons"
-        output_dir.mkdir(parents=True, exist_ok=True)
-        output = output_dir / f"{uuid.uuid4()}.mp4"
-        temp_output = output_dir / f"temp_{uuid.uuid4()}.mp4"
+        
+        # Keep everything in temp_dir to avoid polluting MEDIA_ROOT/Cloudinary
+        concat_output = temp_dir / "concat_output.mp4"
+        final_temp_output = temp_dir / "final_output.mp4"
 
-        # subprocess.run(
-        #     [
-        #         "ffmpeg",
-        #         "-y",
-        #         "-f",
-        #         "concat",
-        #         "-safe",
-        #         "0",
-        #         "-i",
-        #         str(list_file),
-        #         "-c:v",
-        #         "libx264",
-        #         "-preset",
-        #         "veryfast",
-        #         "-pix_fmt",
-        #         "yuv420p",
-        #         "-c:a",
-        #         "aac",
-        #         str(output),
-        #     ],
-        #     check=True,
-        #     timeout=300,
-        # )
-
+        # Step 1: Concatenate segments
         subprocess.run(
             [
                 "ffmpeg",
@@ -293,17 +270,18 @@ def generate_lesson(self, user_id, lesson_id: int):
                 "-preset", "veryfast",
                 "-pix_fmt", "yuv420p",
                 "-c:a", "aac",
-                str(output),
+                str(concat_output),
             ],
             check=True,
             timeout=15*60,
         )
 
+        # Step 2: Add logo overlay
         subprocess.run(
             [
                 "ffmpeg",
                 "-y",
-                "-i", str(output),
+                "-i", str(concat_output),
                 "-i", str(logo_path),
                 "-filter_complex", "[1:v]scale=iw*0.08:-1[logo];[logo]format=rgba[logo];[0:v][logo]overlay=20:20",
                 "-c:v", "libx264",
@@ -311,20 +289,21 @@ def generate_lesson(self, user_id, lesson_id: int):
                 "-pix_fmt", "yuv420p",
                 "-c:a", "aac",
                 "-b:a", "128k",
-                str(temp_output),
+                str(final_temp_output),
             ],
             check=True,
             timeout=15*60,
         )
 
-
-        with temp_output.open("rb") as f:
-            lesson.lesson_file.save(temp_output.name, ContentFile(f.read()), save=False)
+        # Final step: Save to Django storage (Cloudinary)
+        final_filename = f"{uuid.uuid4()}.mp4"
+        with final_temp_output.open("rb") as f:
+            lesson.lesson_file.save(final_filename, ContentFile(f.read()), save=False)
+        
         lesson.status = "READY"
         lesson.save()
 
-        return lesson.lesson_file
-        return f"Video generated: {lesson.lesson_file}"
+        return lesson.lesson_file.url if lesson.lesson_file else None
     except Exception as e:
         lesson.status = "ERROR"
         lesson.save(update_fields=["status"])
