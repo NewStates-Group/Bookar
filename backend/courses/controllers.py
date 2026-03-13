@@ -71,6 +71,10 @@ class CourseController:
     def submit_quiz(self, request, quiz_id: int, data: QuizSubmission):
         return self.course_service.submit_quiz(request.user, quiz_id, data.answers)
 
+    @route.post("{course_id}/cancel")
+    def cancel_course(self, request, course_id: int):
+        return self.course_service.cancel_course(request.user, course_id)
+
 
 @api_controller("lessons", tags=["Lesson"], auth=JWTAuth())
 class LessonController:

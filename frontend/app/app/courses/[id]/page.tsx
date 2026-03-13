@@ -53,6 +53,28 @@ export default function CoursePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [fullName, setFullName] = useState("");
   const [isDownloading, setIsDownloading] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
+
+  const handleCancel = async () => {
+    if (!window.confirm("Tem certeza que deseja cancelar a geração deste curso?")) return;
+    setIsCancelling(true);
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/courses/${course?.id}/cancel`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${(session as any)?.accessToken}` }
+      });
+      if (res.ok) {
+        toast.success("Geração cancelada.");
+        fetchCourse();
+      } else {
+        toast.error("Erro ao cancelar geração.");
+      }
+    } catch (e) {
+      toast.error("Erro de conexão.");
+    } finally {
+      setIsCancelling(false);
+    }
+  };
 
   const handleGenerateModule = async () => {
     setIsGeneratingModule(true);
@@ -263,6 +285,14 @@ export default function CoursePage() {
                   {isGeneratingModule ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
                   <span className="hidden md:block">
                     Novo Módulo
+                  </span>
+                </Button>
+              )}
+              {course.status === 'PROCESSING' && (
+                <Button variant="outline" size="lg" className="rounded-full px-8 border-red-200 hover:bg-red-50" onClick={handleCancel} disabled={isCancelling}>
+                  {isCancelling ? <Loader2 className="w-4 h-4 animate-spin text-red-500" /> : <X className="w-4 h-4 text-red-500" />}
+                  <span className="text-red-500 hidden md:block ml-2">
+                    Cancelar Geração
                   </span>
                 </Button>
               )}

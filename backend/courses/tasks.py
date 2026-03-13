@@ -235,6 +235,12 @@ def generate_lesson(self, user_id, lesson_id: int):
     lesson.status = "PROCESSING"
     lesson.save(update_fields=["status"])
 
+    # Check for cancellation before starting heavy work
+    lesson.refresh_from_db()
+    if lesson.status == "CANCELLED" or lesson.module.course.status == "CANCELLED":
+        logger.info(f"Lesson {lesson_id} generation cancelled early.")
+        return None
+
     temp_dir = Path(tempfile.mkdtemp())
     client = get_genai_client()
     try:

@@ -8,6 +8,7 @@ class CourseStatus(models.TextChoices):
     PROCESSING = "PROCESSING", "Processando"
     READY = "READY", "Pronto"
     FAILED = "FAILED", "Falhou"
+    CANCELLED = "CANCELLED", "Cancelado"
 
 
 class CertificateStatus(models.TextChoices):
@@ -21,12 +22,14 @@ class LessonStatus(models.TextChoices):
     PROCESSING = "PROCESSING", "Processando"
     READY = "READY", "Pronto"
     ERROR = "ERROR", "Erro"
+    CANCELLED = "CANCELLED", "Cancelado"
 
 
 class ModuleStatus(models.TextChoices):
     PROCESSING = "PROCESSING", "Processando"
     READY = "READY", "Pronto"
     FAILED = "FAILED", "Falhou"
+    CANCELLED = "CANCELLED", "Cancelado"
 
 
 class CourseLevel(models.TextChoices):
