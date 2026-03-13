@@ -30,6 +30,7 @@ from .utils import (
     extract_json,
     get_genai_client,
     genai_chat,
+    safe_gemini_call,
 )
 logger = logging.getLogger(__name__)
 
@@ -75,7 +76,8 @@ def _normalize_audio(input_path, output_path):
 
 def _generate_audio(client, text, output_path):
     try:
-        response = client.models.generate_content(
+        response = safe_gemini_call(
+            client.models.generate_content,
             model=settings.AI.get("GENAI_MODEL_AUDIO", "gemini-2.5-flash-preview-tts"),
             contents=text,
             config=types.GenerateContentConfig(
@@ -115,7 +117,8 @@ def _create_fallback_image(prompt, output_path):
 def _generate_image(client, prompt, output_path, timeout=30):
     try:
         img_prompt = f"Hand-drawn whiteboard animation style, minimalist black marker on white board: {prompt}. Any visible text MUST be in Portuguese."
-        response = client.models.generate_content(
+        response = safe_gemini_call(
+            client.models.generate_content,
             model=settings.AI.get("GENAI_MODEL_IMAGE", "gemini-2.5-flash-image"),
             contents=img_prompt,
             config=types.GenerateContentConfig(
@@ -174,7 +177,8 @@ def _process_segment(i, segment, client, temp_dir):
     image = temp_dir / f"s{i}.png"
     video = temp_dir / f"s{i}.mp4"
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+    # Concurrency reduced to 1 for AI calls within segments to respect rate limits
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
         audio_future = pool.submit(_generate_audio, client, narration, audio)
         image_future = pool.submit(_generate_image, client, visual, image)
 
@@ -231,7 +235,8 @@ def generate_lesson(self, user_id, lesson_id: int):
             raise ValueError("No segments generated")
 
         videos = []
-        with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+        # Concurrency reduced to 2 for segment processing
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
             futures = [
                 executor.submit(_process_segment, i, s, client, temp_dir)
                 for i, s in enumerate(segments)
@@ -586,7 +591,8 @@ def create_course_thumb(course_pk: str, prompt: str):
 
     try:
         course = Course.objects.get(pk=course_pk)
-        response = client.models.generate_content(
+        response = safe_gemini_call(
+            client.models.generate_content,
             model=settings.AI.get("GENAI_MODEL_IMAGE", "gemini-2.5-flash-image"),
             contents=[ai_prompt],
             config=types.GenerateContentConfig(

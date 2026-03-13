@@ -1,17 +1,71 @@
+import logging
+import time
 import orjson
 from django.conf import settings
 from google import genai
+from google.genai.errors import ClientError
 from ollama import Client as OllamaClient
+from tenacity import (
+    retry,
+    stop_after_attempt,
+    wait_exponential,
+    retry_if_exception_type,
+)
 
 from .models import Lesson
 
+logger = logging.getLogger(__name__)
+
+# Simple rate limiter state
+class RateLimiter:
+    def __init__(self, min_interval=1.0):
+        self.min_interval = min_interval
+        self.last_call = 0
+
+    def wait(self):
+        now = time.time()
+        elapsed = now - self.last_call
+        if elapsed < self.min_interval:
+            time.sleep(self.min_interval - elapsed)
+        self.last_call = time.time()
+
+limiter = RateLimiter(min_interval=settings.AI.get("GENAI_RATE_LIMIT", 1.0))
+
+def is_retryable_error(exception):
+    """Check if the error is 429 Resource Exhausted."""
+    if isinstance(exception, ClientError):
+        # The error message usually contains 429 or RESOURCE_EXHAUSTED
+        return "429" in str(exception) or "RESOURCE_EXHAUSTED" in str(exception)
+    return False
+
+@retry(
+    retry=retry_if_exception_type(ClientError),
+    wait=wait_exponential(multiplier=1, min=4, max=60),
+    stop=stop_after_attempt(5),
+    reraise=True,
+)
+def safe_gemini_call(method, *args, **kwargs):
+    """
+    Safe wrapper for Gemini API calls with rate limiting and exponential backoff.
+    """
+    limiter.wait()
+    try:
+        return method(*args, **kwargs)
+    except Exception as e:
+        if is_retryable_error(e):
+            logger.warning(f"Gemini API rate limit hit, retrying: {e}")
+        raise e
 
 def extract_json(response: str, isList: bool = False):
     cleaned = response.strip()
-    start_bracket = cleaned.index("{" if not isList else "[")
-    end_bracket = cleaned.rindex("}" if not isList else "]")
-    cleaned = cleaned[start_bracket : end_bracket + 1]
-    return orjson.loads(cleaned)
+    try:
+        start_bracket = cleaned.index("{" if not isList else "[")
+        end_bracket = cleaned.rindex("}" if not isList else "]")
+        cleaned = cleaned[start_bracket : end_bracket + 1]
+        return orjson.loads(cleaned)
+    except (ValueError, orjson.JSONDecodeError) as e:
+        logger.error(f"Failed to extract JSON from response: {e}")
+        return None
 
 
 def get_ollama_client():
@@ -43,7 +97,8 @@ def genai_chat(messages, model=None):
     else:
         prompt = str(messages)
 
-    response = client.models.generate_content(
+    response = safe_gemini_call(
+        client.models.generate_content,
         model=model,
         contents=prompt,
     )
