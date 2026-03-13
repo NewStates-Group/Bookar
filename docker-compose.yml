@@ -1,6 +1,6 @@
 services:
   nginx:
-     container_name: "nginx"
+    container_name: "nginx"
     image: nginx:stable-alpine
     ports:
       - "80:80"
@@ -17,7 +17,7 @@ services:
     container_name: "worker"
     image: backend
     env_file: ".env"
-    entrypoint: "" 
+    entrypoint: ""
     command: celery -A core worker -l info
     volumes:
       - ./backend:/app
@@ -85,7 +85,7 @@ services:
     container_name: "flower"
     image: backend
     env_file: ".env"
-    entrypoint: "" 
+    entrypoint: ""
     command: sh -c "celery -A core --broker=${REDIS_URL} flower --address=0.0.0.0 --port=5555 --basic-auth=${FLOWER_USER}:${FLOWER_PASSWORD}"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5555/healthcheck"]
