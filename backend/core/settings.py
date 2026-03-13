@@ -104,7 +104,14 @@ USE_TZ = True
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR.joinpath("media")
 
-DEFAULT_FILE_STORAGE = "cloudinary_storage.storage.MediaCloudinaryStorage"
+STORAGES = {
+    "default": {
+        "BACKEND": "cloudinary_storage.storage.MediaCloudinaryStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+    },
+}
 
 CLOUDINARY_STORAGE = {
     "CLOUD_NAME": env("CLOUDINARY_CLOUD_NAME"),

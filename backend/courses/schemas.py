@@ -26,35 +26,54 @@ class CourseOut(ModelSchema):
             "certificate_status",
         ]
 
+    @staticmethod
+    def resolve_thumb(obj):
+        if obj.thumb:
+            try:
+                return obj.thumb.url
+            except Exception:
+                return str(obj.thumb)
+        return None
 
-LessonSchema = create_schema(
-    Lesson,
-    fields=[
-        "id",
-        "module",
-        "title",
-        "desc",
-        "duration",
-        "watched",
-        "delivered",
-        "lesson_file",
-        "narration",
-        "key_points",
-        "scene_suggestion",
-        "created_at",
-        "status",
-    ],
-)
 
-GetNextLessonSchema = create_schema(
-    Lesson,
-    fields=[
-        "id",
-        "module",
-        "watched",
-        "status",
-    ],
-)
+class LessonSchema(ModelSchema):
+    class Meta:
+        model = Lesson
+        fields = [
+            "id",
+            "module",
+            "title",
+            "desc",
+            "duration",
+            "watched",
+            "delivered",
+            "lesson_file",
+            "narration",
+            "key_points",
+            "scene_suggestion",
+            "created_at",
+            "status",
+        ]
+
+    @staticmethod
+    def resolve_lesson_file(obj):
+        if obj.lesson_file:
+            try:
+                return obj.lesson_file.url
+            except Exception:
+                return str(obj.lesson_file)
+        return None
+
+
+class GetNextLessonSchema(ModelSchema):
+    class Meta:
+        model = Lesson
+        fields = [
+            "id",
+            "module",
+            "watched",
+            "status",
+        ]
 ModuleSchema = create_schema(Module, fields=["id", "name", "desc"])
 
 

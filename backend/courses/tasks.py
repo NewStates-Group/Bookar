@@ -640,7 +640,7 @@ def create_course_thumb(course_pk: str, prompt: str):
         buffer.seek(0)
 
         thumb_filename = f"{uuid.uuid4()}.jpg"
-        course.thumb.save(thumb_filename, ContentFile(buffer.read()), save=False)
+        course.thumb.save(thumb_filename, ContentFile(buffer.getvalue()), save=True)
         course.status = "READY"
         course.save()
         generate_next_module.delay(course.user.pk, course_pk)

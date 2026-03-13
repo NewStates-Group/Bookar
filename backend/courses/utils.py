@@ -50,10 +50,13 @@ def safe_gemini_call(method, *args, **kwargs):
     """
     limiter.wait()
     try:
+        # If it's the generate_content method, it might be bound to the model
         return method(*args, **kwargs)
     except Exception as e:
         if is_retryable_error(e):
             logger.warning(f"Gemini API rate limit hit, retrying: {e}")
+        # Re-raise as a standard Exception if needed to avoid unpickleable ClientError in Celery
+        # if though we want to keep it if we catch it later
         raise e
 
 def extract_json(response: str, isList: bool = False):
