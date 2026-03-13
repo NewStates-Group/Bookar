@@ -4,7 +4,7 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { BookOpen, Plus, Loader2, ArrowRight, ArrowUp, ImageOff, Sparkles, GraduationCap, Award, FileDown, X } from "lucide-react";
+import { BookOpen, Plus, Loader2, ArrowRight, ArrowUp, ImageOff, Sparkles, GraduationCap, Award, FileDown, X, Trash2 } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
 import { Label } from "@/components/ui/label";
 import {
@@ -35,7 +35,7 @@ interface Course {
   desc: string;
   level: string;
   thumb: string;
-  status: "PROCESSING" | "READY" | "ERROR";
+  status: "PROCESSING" | "READY" | "FAILED" | "ERROR" | "CANCELLED";
   created_at: string;
   max_modules?: number;
   is_fully_completed: boolean;
@@ -52,6 +52,28 @@ export default function CoursesPage() {
   const [fullName, setFullName] = useState("");
   const [isDownloading, setIsDownloading] = useState(false);
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
+  const [isDeletingCourse, setIsDeletingCourse] = useState<number | null>(null);
+
+  const handleDeleteCourse = async (courseId: Number) => {
+    if (!window.confirm("Tem certeza que deseja eliminar este curso?")) return;
+    setIsDeletingCourse(courseId as number);
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/courses/${courseId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${session?.accessToken}` },
+      });
+      if (res.ok) {
+        setCourses(prev => prev.filter(c => c.id !== courseId));
+        toast.success("Curso eliminado.");
+      } else {
+        toast.error("Erro ao eliminar curso.");
+      }
+    } catch {
+      toast.error("Erro de conexão.");
+    } finally {
+      setIsDeletingCourse(null);
+    }
+  };
 
   const [step, setStep] = useState(1);
   const [prompt, setPrompt] = useState("");
@@ -585,11 +607,33 @@ export default function CoursesPage() {
               className="group md:max-w-sm p-4 border overflow-hidden shadow-none bg-transparent hover:bg-gray-50 transition-all duration-300 gap-0"
             >
               {course.status === "PROCESSING" ? (
-                <div className="flex flex-col items-center justify-center h-full rounded-lg">
+                <div className="flex flex-col items-center justify-center h-full rounded-lg py-8">
                   <Loader2 className="w-12 h-12 text-slate-600 animate-spin" />
-                  <span className="text-gray-500">
-                    Gerando curso...
-                  </span>
+                  <span className="text-gray-500 mt-2">Gerando curso...</span>
+                </div>
+              ) : course.status === "FAILED" || course.status === "ERROR" ? (
+                <div className="flex flex-col items-center justify-center h-full rounded-lg py-8 gap-3">
+                  <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center">
+                    <X className="w-6 h-6 text-red-500" />
+                  </div>
+                  <div className="text-center">
+                    <p className="font-semibold text-red-600">Geração Falhou</p>
+                    <p className="text-sm text-gray-400 mt-1">{course.title || "Curso sem título"}</p>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="border-red-200 text-red-500 hover:bg-red-50 gap-2"
+                    onClick={() => handleDeleteCourse(course.id)}
+                    disabled={isDeletingCourse === course.id}
+                  >
+                    {isDeletingCourse === course.id ? (
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                    ) : (
+                      <Trash2 className="w-3 h-3" />
+                    )}
+                    Eliminar Curso
+                  </Button>
                 </div>
               ) : (
                 <>
