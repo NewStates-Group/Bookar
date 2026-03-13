@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, Suspense } from "react";
+import { useEffect, Suspense, useRef } from "react";
 import { signIn } from "next-auth/react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
@@ -9,14 +9,18 @@ import { toast } from "sonner";
 function AuthCallbackContent() {
     const searchParams = useSearchParams();
     const router = useRouter();
+    const called = useRef(false);
 
     useEffect(() => {
         const code = searchParams.get("code");
+
+        if (called.current) return;
         const access = searchParams.get("access");
         const refresh = searchParams.get("refresh");
 
         const handleCallback = async () => {
             if (code) {
+                called.current = true;
                 try {
                     const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/google/callback`, {
                         method: "POST",

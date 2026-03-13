@@ -117,8 +117,10 @@ class AuthService:
         }
 
         with httpx.Client() as client:
+            logger.info(f"Exchanging code for tokens with redirect_uri: {data['redirect_uri']}")
             res = client.post(token_url, data=data)
             if not res.is_success:
+                logger.error(f"Google Token Exchange Error: {res.text}. Redirect URI used: {data['redirect_uri']}")
                 raise HttpError(400, f"Failed to exchange Google code: {res.text}")
             tokens = res.json()
 
