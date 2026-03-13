@@ -599,7 +599,7 @@ export default function CoursesPage() {
                     }
                   }}>
                     {course.thumb ? (
-                      <img src={"http://localhost:8000/media/" + course.thumb} alt={course.title} className="rounded-xl object-cover w-full h-full" />
+                      <img src={course.thumb.startsWith('http') ? course.thumb : "http://localhost:8000/media/" + course.thumb} alt={course.title} className="rounded-xl object-cover w-full h-full" />
                     ) : (
                       <div className="flex flex-col items-center justify-center h-full border rounded-lg">
                         <ImageOff className="w-12 h-12 text-slate-400" />

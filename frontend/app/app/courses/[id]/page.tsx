@@ -124,7 +124,7 @@ export default function CoursePage() {
       if (res.ok) {
         const data = await res.json();
         if (data.status === "READY" && data.certificate_url) {
-          window.open(`http://localhost:8000${data.certificate_url}`, '_blank');
+          window.open(data.certificate_url.startsWith('http') ? data.certificate_url : data.certificate_url, '_blank');
         } else {
           toast.success(data.message || "Solicitação iniciada!");
           fetchCourse(); // Refresh to update status
@@ -218,7 +218,7 @@ export default function CoursePage() {
 
         <div className="relative aspect-video rounded-xl overflow-hidden bg-muted shadow-lg">
           {course.thumb ? (
-            <img src={"http://localhost:8000/media/" + course.thumb} alt={course.title} className="object-cover w-full h-full" />
+            <img src={course.thumb} alt={course.title} className="object-cover w-full h-full" />
           ) : (
             <div className="flex flex-col items-center justify-center h-full border rounded-lg">
               <ImageOff className="w-12 h-12 text-slate-400" />
@@ -280,7 +280,7 @@ export default function CoursePage() {
                 <Button
                   onClick={handleCertificateClick}
                   variant="outline"
-                   size="lg"
+                  size="lg"
                   disabled={isDownloading || course?.certificate_status === "PROCESSING"}
                   className="px-8 rounded-full border-cyan-500 text-cyan-500 hover:bg-cyan-500 hover:text-white"
                 >
