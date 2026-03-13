@@ -9,7 +9,10 @@ env = environ.Env(
     SITE_URL=(str, "http://localhost:3000"),
     DATABASE_URL=(str, "sqlite:///:memory:"),
     REDIS_URL=(str, "redis://redis:6379/0"),
-    ALLOWED_HOSTS=(list, ["*"])
+    ALLOWED_HOSTS=(list, ["*"]),
+    CLOUDINARY_CLOUD_NAME=(str, ""),
+    CLOUDINARY_API_KEY=(str, ""),
+    CLOUDINARY_API_SECRET=(str, ""),
 )
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -27,8 +30,10 @@ INSTALLED_APPS = [
     "ninja_jwt",
     "ninja_jwt.token_blacklist",
     "corsheaders",
+    "cloudinary_storage",
     "django.contrib.auth",
     "django.contrib.contenttypes",
+    "cloudinary",
     "courses",
     "accounts",
 ]
@@ -98,6 +103,14 @@ USE_TZ = True
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR.joinpath("media")
+
+DEFAULT_FILE_STORAGE = "cloudinary_storage.storage.MediaCloudinaryStorage"
+
+CLOUDINARY_STORAGE = {
+    "CLOUD_NAME": env("CLOUDINARY_CLOUD_NAME"),
+    "API_KEY": env("CLOUDINARY_API_KEY"),
+    "API_SECRET": env("CLOUDINARY_API_SECRET"),
+}
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
