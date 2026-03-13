@@ -250,33 +250,75 @@ def generate_lesson(self, user_id, lesson_id: int):
         Context: {lesson.narration}
         **USE PORTUGUESE ON THE JSON VALUES**
         **KEYS MUST KEEP THE ORIGINAL ENGLISH NAMES**
-        A narration deve ser suficiente para cobrir 7 a 12 minutos de aula
+        Generate EXACTLY 4 or 5 segments (no more, no less). Quality over quantity.
+        Each narration should cover 1-3 minutes of content.
         Generate a JSON list of segments:
         [
         {{
             "narration": "...",
-            "visual_prompt": "..."
+            "visual_prompt": "A simple image scene description for this part..."
         }}
         ]
         """
 
         response = genai_chat([{"role": "user", "content": plan_prompt}])
-        segments = extract_json(response, isList=True) or []
+        segments = (extract_json(response, isList=True) or [])[:5]  # hard cap at 5
 
         if not segments:
             raise ValueError("No segments generated")
 
+        # --- OPTIMIZATION: Single TTS call for all narration ---
+        # Instead of 1 TTS call per segment (N calls), we generate ONE audio for all.
+        full_narration = "\n\n".join(
+            s.get("narration", "") for s in segments if s.get("narration")
+        )
+        full_audio_path = temp_dir / "full_narration.wav"
+        if not _generate_audio(client, full_narration, full_audio_path):
+            raise RuntimeError("Failed to generate full narration audio")
+
+        # --- OPTIMIZATION: Sequential image generation with cooldown ---
+        # Avoids concurrent bursts that exhaust quota instantly.
+        image_paths = []
+        for i, seg in enumerate(segments):
+            img_path = temp_dir / f"s{i}.png"
+            _generate_image(client, seg.get("visual_prompt", ""), img_path)
+            image_paths.append(img_path if img_path.exists() else None)
+            if i < len(segments) - 1:
+                time.sleep(5)  # cooldown between image calls
+
+        # --- Build slideshow: split audio evenly across images ---
+        valid_images = [p for p in image_paths if p and p.exists()]
+        if not valid_images:
+            raise RuntimeError("No images generated for lesson")
+
+        # Calculate audio duration via ffprobe
+        probe = subprocess.run(
+            ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+             "-of", "default=noprint_wrappers=1:nokey=1", str(full_audio_path)],
+            capture_output=True, text=True
+        )
+        total_duration = float(probe.stdout.strip() or 0)
+        duration_per_slide = max(total_duration / len(valid_images), 5.0)
+
         videos = []
-        # Concurrency reduced to 2 for segment processing
-        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
-            futures = [
-                executor.submit(_process_segment, i, s, client, temp_dir)
-                for i, s in enumerate(segments)
-            ]
-            for f in concurrent.futures.as_completed(futures):
-                result = f.result()
-                if result:
-                    videos.append(result)
+        for i, img_path in enumerate(valid_images):
+            seg_video = temp_dir / f"slide_{i}.mp4"
+            start_time = i * duration_per_slide
+            subprocess.run([
+                "ffmpeg", "-y",
+                "-ss", str(start_time),
+                "-t", str(duration_per_slide),
+                "-i", str(full_audio_path),
+                "-loop", "1", "-i", str(img_path),
+                "-filter_complex", "[0:a]anull[a]",
+                "-map", "1:v", "-map", "[a]",
+                "-c:v", "libx264", "-tune", "stillimage",
+                "-c:a", "aac", "-b:a", "128k",
+                "-pix_fmt", "yuv420p",
+                "-shortest",
+                str(seg_video)
+            ], check=True, timeout=300)
+            videos.append(seg_video)
 
         if not videos:
             raise RuntimeError("No video segments created")

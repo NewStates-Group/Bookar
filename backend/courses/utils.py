@@ -137,6 +137,24 @@ def genai_chat(messages, model=None):
     return response.text
 
 
+def cached_genai_call(prompt: str, ttl: int = 86400) -> str:
+    """
+    Cache Gemini text responses in Redis for 24h.
+    Prevents re-generating identical content (same topic, same lesson structure).
+    """
+    import hashlib
+    from django.core.cache import cache
+
+    key = "genai:" + hashlib.md5(prompt.encode()).hexdigest()
+    cached = cache.get(key)
+    if cached:
+        logger.info("Cache HIT for Gemini prompt")
+        return cached
+    result = genai_chat([{"role": "user", "content": prompt}])
+    cache.set(key, result, ttl)
+    return result
+
+
 def get_next_lesson(course_pk: int) -> Lesson | None:
     return (
         Lesson.objects.filter(module__course_id=course_pk, watched=False)
