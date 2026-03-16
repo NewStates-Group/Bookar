@@ -17,4 +17,7 @@ docker compose pull
 echo "Starting containers..."
 docker compose up -d --build
 
+echo "Restarting Nginx"
+sudo systemctl reload nginx
+
 echo "Deploy finished!"
