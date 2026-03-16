@@ -17,7 +17,9 @@ export default function AppLayout({
   const router = useRouter();
 
   useEffect(() => {
-    if (status === "authenticated" && session?.user) {
+    if (status === "unauthenticated" || session?.error === "RefreshAccessTokenError") {
+      router.push("/login");
+    } else if (status === "authenticated" && session?.user) {
       const user = session.user as any;
       const isProfileIncomplete = !user.first_name || !user.last_name;
 
