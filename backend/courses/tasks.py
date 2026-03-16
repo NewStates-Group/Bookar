@@ -17,6 +17,7 @@ from reportlab.lib.units import cm
 from core.mail import send_certificate_email
 import os
 import io
+import time
 from django.core.files.base import ContentFile
 from django.contrib.auth import get_user_model
 
