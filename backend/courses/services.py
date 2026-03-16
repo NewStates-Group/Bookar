@@ -153,10 +153,22 @@ class CourseService:
         try:
             course = Course.objects.get(pk=course_id, user=user)
             course.deleted = True
-            course.save(update_fields=["deleted"])
+            if course.status == "PROCESSING":
+                course.status = "CANCELLED"
+            course.save(update_fields=["deleted", "status"])
             return {"success": True}
         except Course.DoesNotExist:
             raise HttpError(404, "Curso não encontrado ou sem permissão")
+
+    def cancel_course(self, user, course_id: int):
+        try:
+            course = Course.objects.get(pk=course_id, user=user)
+            course.status = "CANCELLED"
+            course.deleted = True
+            course.save(update_fields=["status", "deleted"])
+            return {"success": True, "message": "Curso cancelado e removido."}
+        except Course.DoesNotExist:
+            raise HttpError(404, "Curso não encontrado")
 
     def get_next_lesson(self, user, course_id: int, current_lesson: int = 0):
         if current_lesson:

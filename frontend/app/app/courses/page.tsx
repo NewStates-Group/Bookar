@@ -607,7 +607,20 @@ export default function CoursesPage() {
               className="group md:max-w-sm p-4 border overflow-hidden shadow-none bg-transparent hover:bg-gray-50 transition-all duration-300 gap-0"
             >
               {course.status === "PROCESSING" ? (
-                <div className="flex flex-col items-center justify-center h-full rounded-lg py-8">
+                <div className="flex flex-col items-center justify-center h-full rounded-lg py-8 relative">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="absolute top-0 right-0 text-gray-400 hover:text-red-500 hover:bg-red-50"
+                    onClick={() => handleDeleteCourse(course.id)}
+                    disabled={isDeletingCourse === course.id}
+                  >
+                    {isDeletingCourse === course.id ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <X className="w-4 h-4" />
+                    )}
+                  </Button>
                   <Loader2 className="w-12 h-12 text-slate-600 animate-spin" />
                   <span className="text-gray-500 mt-2">Gerando curso...</span>
                 </div>

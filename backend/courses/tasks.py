@@ -389,6 +389,9 @@ def generate_lesson(self, user_id, lesson_id: int):
 def generate_next_module(self, user_pk: int, course_pk: int, module_pk: int = None):
     try:
         course = Course.objects.get(pk=course_pk)
+        if course.status == "CANCELLED" or course.deleted:
+            logger.info(f"Course {course_pk} next module generation cancelled.")
+            return
     except Course.DoesNotExist:
         logger.error(f"Course {course_pk} not found for module generation")
         return
@@ -596,6 +599,11 @@ def create_course_details(course_pk: int, prompt: str, level: str):
 
     course_outline = None
     try:
+        course = Course.objects.get(pk=course_pk)
+        if course.status == "CANCELLED" or course.deleted:
+            logger.info(f"Course {course_pk} generation cancelled.")
+            return
+
         response = genai_chat([{"role": "user", "content": ai_prompt}])
         course_outline = extract_json(response)
     except Exception as e:
@@ -643,6 +651,10 @@ def create_course_thumb(course_pk: str, prompt: str):
 
     try:
         course = Course.objects.get(pk=course_pk)
+        if course.status == "CANCELLED" or course.deleted:
+            logger.info(f"Course {course_pk} thumbnail generation cancelled.")
+            return
+
         response = safe_gemini_call(
             client.models.generate_content,
             model=settings.AI.get("GENAI_MODEL_IMAGE", "gemini-2.5-flash-image"),
