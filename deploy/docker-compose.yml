@@ -18,7 +18,7 @@ services:
         condition: service_healthy
       flower:
         condition: service_healthy
-    command: /bin/sh -c "sh -c 'sleep 5m; nginx -s reload' & while :; do sleep 12h & wait $${!}; nginx -s reload; done & nginx -g 'daemon off;'"
+    command: /bin/sh -c "sh -c 'sleep 1m; nginx -s reload; sleep 2m; nginx -s reload' & while :; do sleep 12h & wait $${!}; nginx -s reload; done & nginx -g 'daemon off;'"
   cert-init:
     image: certbot/certbot
     volumes:
