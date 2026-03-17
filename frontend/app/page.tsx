@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import Image from "next/image";
 import Link from "next/link";
 import { useState, useEffect } from "react";
-import { motion, useSpring, useTransform, animate } from "framer-motion";
+import { motion, useSpring, useTransform } from "framer-motion";
 import { toast } from "sonner";
 
 function AnimatedCounter({ value }: { value: number }) {
@@ -24,16 +24,82 @@ function AnimatedCounter({ value }: { value: number }) {
   return <motion.span>{display}</motion.span>;
 }
 
+function CountdownTimer() {
+  const [timeLeft, setTimeLeft] = useState({
+    days: 0,
+    hours: 0,
+    minutes: 0,
+    seconds: 0
+  });
+
+  useEffect(() => {
+    const targetDate = new Date();
+    targetDate.setDate(targetDate.getDate() + 14);
+
+    const timer = setInterval(() => {
+      const now = new Date().getTime();
+      const distance = targetDate.getTime() - now;
+
+      if (distance < 0) {
+        clearInterval(timer);
+        return;
+      }
+
+      setTimeLeft({
+        days: Math.floor(distance / (1000 * 60 * 60 * 24)),
+        hours: Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)),
+        minutes: Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60)),
+        seconds: Math.floor((distance % (1000 * 60)) / 1000)
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, []);
+
+  const TimeUnit = ({ value, label }: { value: number, label: string }) => (
+    <div className="flex flex-col items-center min-w-[60px] md:min-w-[80px]">
+      <div className="text-4xl md:text-6xl font-medium tracking-tight tabular-nums text-white">
+        {value.toString().padStart(2, '0')}
+      </div>
+      <div className="text-[10px] md:text-xs font-bold text-cyan-400 uppercase tracking-widest mt-1 opacity-80">
+        {label}
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="flex gap-4 md:gap-6 justify-center items-center py-8">
+      <TimeUnit value={timeLeft.days} label="Dias" />
+      <div className="text-3xl md:text-5xl font-extralight text-white/20">:</div>
+      <TimeUnit value={timeLeft.hours} label="Horas" />
+      <div className="text-3xl md:text-5xl font-extralight text-white/20">:</div>
+      <TimeUnit value={timeLeft.minutes} label="Min" />
+      <div className="text-3xl md:text-5xl font-extralight text-white/20">:</div>
+      <TimeUnit value={timeLeft.seconds} label="Seg" />
+    </div>
+  );
+}
+
 export default function HomePage() {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
-  const [waitingCount, setWaitingCount] = useState(1240); // Initial placeholder count
+  const [waitingCount, setWaitingCount] = useState(0);
 
   useEffect(() => {
-    // Simulate some activity/growth
-    const interval = setInterval(() => {
-      setWaitingCount(prev => prev + Math.floor(Math.random() * 3));
-    }, 5000);
+    const fetchCount = async () => {
+      try {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+        const response = await fetch(`${apiUrl}/api/auth/waitlist/count`);
+        if (response.ok) {
+          const data = await response.json();
+          setWaitingCount(data.count + 1200);
+        }
+      } catch (error) {
+        setWaitingCount(1243);
+      }
+    };
+    fetchCount();
+    const interval = setInterval(fetchCount, 30000);
     return () => clearInterval(interval);
   }, []);
 
@@ -43,14 +109,15 @@ export default function HomePage() {
 
     setLoading(true);
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/auth/waitlist`, {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const response = await fetch(`${apiUrl}/api/auth/waitlist`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
       });
 
       if (response.ok) {
-        toast.success("Inscrito na lista de espera com sucesso! Avisaremos em breve.");
+        toast.success("Boas-vindas à lista de espera! Avisaremos em breve.");
         setEmail("");
         setWaitingCount(prev => prev + 1);
       } else {
@@ -58,111 +125,95 @@ export default function HomePage() {
         toast.error(data.message || "Erro ao se inscrever. Tente novamente.");
       }
     } catch (error) {
-      toast.error("Ocorreu um erro. Verifique sua conexão.");
+      toast.error("Ocorreu um erro de ligação.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-background relative overflow-hidden">
-      <div className="absolute inset-0 z-0 text-primary/5 select-none pointer-events-none flex items-center justify-center opacity-[0.03]">
-        <span className="text-[20vw] font-black uppercase tracking-tighter">Bookar</span>
+    <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-black text-white selection:bg-cyan-500/30">
+      {/* Discreet Logo */}
+      <div className="absolute top-8 left-8">
+        <div className="flex items-center gap-2">
+          <Image src="/logo.png" alt="Logo" width={28} height={28} className="brightness-110" />
+          <span className="text-lg font-bold tracking-tighter uppercase">Bookar</span>
+        </div>
       </div>
 
-      <div className="absolute inset-0 z-0">
-        <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] rounded-full bg-primary/20 blur-[120px]" />
-        <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] rounded-full bg-blue-500/10 blur-[120px]" />
-      </div>
-
-      <div className="absolute top-6 right-6 z-20 flex gap-4">
+      <div className="absolute top-8 right-8 flex items-center gap-4">
         <Link href="/login">
-          <Button variant="ghost" size="sm" className="hover:bg-primary/10">
+          <Button variant="ghost" className="text-white/60 hover:text-white hover:bg-white/5 font-medium">
             Entrar
           </Button>
         </Link>
-        <div className="w-[1px] h-8 bg-border"></div>
         <Link href="/signup">
-          <Button size="sm" variant={"outline"} className="border-primary/20 hover:border-primary/50">Registar-se</Button>
+          <Button className="bg-white text-black hover:bg-white/90 rounded-sm font-bold px-6">
+            Aceder
+          </Button>
         </Link>
       </div>
 
-      <div className="z-10 text-center max-w-3xl space-y-8 animate-in fade-in slide-in-from-bottom-8 duration-1000">
+      <main className="z-10 text-center max-w-4xl w-full space-y-12">
         <div className="space-y-4">
-          <motion.div
-            initial={{ scale: 0.8, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ duration: 0.5 }}
-            className="flex justify-center items-center gap-3"
-          >
-            <Image
-              src={"/logo.png"}
-              alt="Logo"
-              width={60}
-              height={60}
-              className="drop-shadow-2xl"
-            />
-            <h1 className="text-6xl md:text-8xl font-bold tracking-tighter text-balance bg-clip-text text-transparent bg-gradient-to-b from-foreground to-foreground/70">
-              Bookar
-            </h1>
-          </motion.div>
+          <div className="inline-block px-3 py-1 rounded-sm bg-cyan-500/10 border border-cyan-500/20 mb-2">
+            <span className="text-[10px] uppercase tracking-[0.2em] font-bold text-cyan-400">Em Breve</span>
+          </div>
 
-          <p className="text-xl md:text-2xl text-muted-foreground max-w-2xl mx-auto text-balance font-light leading-relaxed">
-            A melhor plataforma de aprendizado baseado em IA.
-            Crie cursos personalizados em segundos.
+          <h1 className="text-5xl md:text-8xl font-bold tracking-tight leading-none text-balance">
+            Domina o conhecimento com IA
+          </h1>
+
+          <p className="text-lg md:text-xl text-white/50 max-w-xl mx-auto font-light">
+            Cria cursos imersivos e ultra-personalizados em segundos.
           </p>
         </div>
 
-        <div className="flex flex-col items-center gap-6 py-4">
-          <div className="flex flex-col items-center gap-2">
-            <div className="text-4xl md:text-5xl font-mono font-bold text-primary flex items-center gap-2">
-              <AnimatedCounter value={waitingCount} />
-              <div className="flex -space-x-3 overflow-hidden p-1">
-                {[1, 2, 3, 4].map((i) => (
-                  <div key={i} className="inline-block h-8 w-8 rounded-full ring-2 ring-background bg-muted overflow-hidden">
+        <div className="py-4 border-y border-white/5">
+          <CountdownTimer />
+        </div>
+
+        <div className="flex flex-col items-center gap-8">
+          <div className="w-full max-w-md">
+            <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-0 group border border-white/10 focus-within:border-cyan-500/50 transition-colors">
+              <Input
+                type="email"
+                placeholder="Introduz o teu e-mail"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                className="h-14 md:h-16 rounded-none border-none bg-white/[0.02] px-6 text-lg focus-visible:ring-0 placeholder:text-white/20"
+              />
+              <Button
+                type="submit"
+                disabled={loading}
+                className="h-14 md:h-16 rounded-none px-8 bg-cyan-500 hover:bg-cyan-400 text-black font-black transition-all"
+              >
+                {loading ? "..." : "Entrar na Lista"}
+              </Button>
+            </form>
+          </div>
+
+          <div className="flex flex-col items-center gap-3">
+            <div className="flex items-center gap-2">
+              <div className="flex -space-x-2 overflow-hidden py-1">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="inline-block h-6 w-6 rounded-full border border-black bg-neutral-900 overflow-hidden grayscale opacity-70">
                     <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${i + waitingCount}`} alt="" />
                   </div>
                 ))}
               </div>
+              <p className="text-xs font-medium text-white/40">
+                <span className="text-white"><AnimatedCounter value={waitingCount} /></span> pioneiros à espera
+              </p>
             </div>
-            <p className="text-sm font-medium text-muted-foreground uppercase tracking-widest">Pessoas na lista de espera</p>
           </div>
-
-          <form onSubmit={handleSubmit} className="w-full max-w-md flex flex-col sm:flex-row gap-2">
-            <Input
-              type="email"
-              placeholder="teu@email.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              className="h-12 rounded-full border-primary/20 bg-background/50 backdrop-blur-sm px-6 text-lg focus-visible:ring-primary/50"
-            />
-            <Button
-              type="submit"
-              size="lg"
-              disabled={loading}
-              className="rounded-full px-8 text-lg h-12 bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20 whitespace-nowrap"
-            >
-              {loading ? "Entrando..." : "Entrar na Lista"}
-            </Button>
-          </form>
-
-          <p className="text-xs text-muted-foreground opacity-50">
-            Faremos o anúncio assim que a plataforma for totalmente liberada.
-          </p>
         </div>
+      </main>
 
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
-          <Link href="/signup">
-            <Button size="lg" variant={"outline"} className="rounded-full px-8 text-lg h-12 hover:bg-muted/50 transition-colors">
-              Explorar demonstração
-            </Button>
-          </Link>
-        </div>
-      </div>
-
-      <footer className="absolute bottom-6 z-10 text-muted-foreground text-sm font-medium opacity-60">
-        <p>&copy; Bookar 2026</p>
+      <footer className="absolute bottom-8 z-10 w-full px-12 flex justify-between items-center opacity-20 text-[9px] font-bold uppercase tracking-widest leading-none">
+        <p>Bookar &copy; 2026</p>
+        <p>Built with IA</p>
       </footer>
     </div>
   );
