@@ -147,18 +147,21 @@ export default function HomePage() {
 
       <main className="flex-1 flex flex-col items-center justify-center p-6 text-center space-y-12 pb-24">
         {/* Hero Section */}
-        <div className="space-y-4">
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="flex flex-col items-center gap-4"
-          >
-            <Image src="/logo.png" alt="Logo" width={64} height={64} className="md:w-20 md:h-20" />
-            <h1 className="text-5xl md:text-8xl font-bold tracking-tighter">Bookar</h1>
-          </motion.div>
-          <p className="text-lg md:text-2xl font-medium text-black/50 tracking-tight">
-            A melhor plataforma de aprendizado baseado em IA.
-          </p>
+        <div className="z-10 text-center max-w-3xl space-y-3 animate-in fade-in slide-in-from-bottom-8 duration-1000">
+        <div className="flex justify-center items-center gap-1">
+          <Image
+            src={"/logo.png"}
+            alt="Logo"
+            width={80}
+            height={80}
+          />
+        <h1 className="text-6xl md:text-8xl font-bold tracking-tighter text-balance bg-clip-text text-transparent bg-gradient-to-b from-foreground to-foreground/70">
+          Bookar
+        </h1>
+        </div>
+        <p className="text-xl md:text-2xl text-muted-foreground max-w-2xl mx-auto text-balance font-light">
+          A melhor plataforma de aprendizado baseado em IA.
+        </p>
         </div>
 
         {/* Dynamic Features Integration */}
