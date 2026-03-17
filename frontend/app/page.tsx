@@ -147,24 +147,22 @@ export default function HomePage() {
       </div>
 
       <main className="z-10 text-center max-w-4xl w-full space-y-12">
-        <div className="space-y-6 flex flex-col items-center">
-          {/* Logo and Name moved to the center */}
+        <div className="space-y-8 flex flex-col items-center">
+          {/* Enlarged Logo and Name */}
           <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="flex items-center gap-2 mb-2"
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="flex flex-col items-center gap-4 mb-2"
           >
-            <Image src="/logo.png" alt="Logo" width={32} height={32} />
-            <span className="text-2xl font-semibold tracking-tighter uppercase">Bookar</span>
+            <Image src="/logo.png" alt="Logo" width={64} height={64} className="md:w-20 md:h-20" />
+            <span className="text-3xl md:text-5xl font-bold tracking-tighter uppercase">Bookar</span>
           </motion.div>
 
           <h1 className="text-4xl md:text-7xl font-bold tracking-tight text-balance leading-tight">
             Aprende tudo o que <br className="hidden md:block" /> quiseres, com IA.
           </h1>
 
-          <p className="text-lg md:text-xl text-muted-foreground max-w-xl mx-auto font-medium">
-            Cria cursos ultra-personalizados em segundos e domina qualquer tema com interatividade total.
-          </p>
+          {/* Secondary description removed for a more minimalist look */}
         </div>
 
         <div className="py-6 border-y border-border/50">
