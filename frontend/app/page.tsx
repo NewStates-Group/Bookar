@@ -57,24 +57,24 @@ function CountdownTimer() {
   }, []);
 
   const TimeUnit = ({ value, label }: { value: number, label: string }) => (
-    <div className="flex flex-col items-center min-w-[60px] md:min-w-[90px]">
-      <div className="text-4xl md:text-6xl font-bold tracking-tight tabular-nums text-foreground">
+    <div className="flex flex-col items-center min-w-[50px] md:min-w-[70px]">
+      <div className="text-3xl md:text-5xl font-bold tracking-tight tabular-nums text-foreground">
         {value.toString().padStart(2, '0')}
       </div>
-      <div className="text-[10px] md:text-xs font-semibold text-cyan-600 uppercase tracking-widest mt-1">
+      <div className="text-[9px] md:text-[10px] font-semibold text-muted-foreground uppercase tracking-widest mt-1">
         {label}
       </div>
     </div>
   );
 
   return (
-    <div className="flex gap-4 md:gap-8 justify-center items-center py-6">
+    <div className="flex gap-3 md:gap-5 justify-center items-center py-4">
       <TimeUnit value={timeLeft.days} label="Dias" />
-      <div className="text-3xl md:text-5xl font-extralight text-muted-foreground/30 self-start mt-1">:</div>
+      <div className="text-2xl md:text-4xl font-extralight text-muted-foreground/30 self-start mt-1">:</div>
       <TimeUnit value={timeLeft.hours} label="Horas" />
-      <div className="text-3xl md:text-5xl font-extralight text-muted-foreground/30 self-start mt-1">:</div>
+      <div className="text-2xl md:text-4xl font-extralight text-muted-foreground/30 self-start mt-1">:</div>
       <TimeUnit value={timeLeft.minutes} label="Min" />
-      <div className="text-3xl md:text-5xl font-extralight text-muted-foreground/30 self-start mt-1">:</div>
+      <div className="text-2xl md:text-4xl font-extralight text-muted-foreground/30 self-start mt-1">:</div>
       <TimeUnit value={timeLeft.seconds} label="Seg" />
     </div>
   );
@@ -117,98 +117,95 @@ export default function HomePage() {
       });
 
       if (response.ok) {
-        toast.success("Inscrito com sucesso! Avisaremos assim que estivermos prontos.");
+        toast.success("Inscrito na lista de espera! Avisaremos em breve.");
         setEmail("");
         setWaitingCount(prev => prev + 1);
       } else {
         const data = await response.json();
-        toast.error(data.message || "Erro ao inscrever. Tenta novo.");
+        toast.error(data.message || "Algo correu mal. Tenta de novo.");
       }
     } catch (error) {
-      toast.error("Ocorreu um erro. Verifica a tua ligação.");
+      toast.error("Erro de ligação. Verifica a tua internet.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-white text-foreground selection:bg-cyan-100 selection:text-cyan-900">
-      <div className="absolute top-8 right-8 flex items-center gap-4">
-        <Link href="/login">
-          <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
-            Entrar
-          </Button>
+    <div className="min-h-screen flex flex-col bg-white text-[#111] font-sans">
+      {/* Header mapped from bookar.study */}
+      <header className="p-6 md:p-10 flex justify-end gap-6 items-center">
+        <Link href="/login" className="text-sm font-medium hover:text-black/60 transition-colors">
+          Entrar
         </Link>
         <Link href="/signup">
-          <Button size="sm" variant="outline" className="border-border hover:bg-muted font-medium">
-            Criar conta
+          <Button variant="outline" className="rounded-full border-[#111] text-[#111] hover:bg-[#111] hover:text-white px-6">
+            Registar-se
           </Button>
         </Link>
-      </div>
+      </header>
 
-      <main className="z-10 text-center max-w-4xl w-full space-y-12">
-        <div className="space-y-8 flex flex-col items-center">
-          {/* Enlarged Logo and Name */}
+      <main className="flex-1 flex flex-col items-center justify-center p-6 text-center space-y-12 pb-24">
+        {/* Hero Section */}
+        <div className="space-y-4">
           <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="flex flex-col items-center gap-4 mb-2"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex flex-col items-center gap-4"
           >
             <Image src="/logo.png" alt="Logo" width={64} height={64} className="md:w-20 md:h-20" />
-            <span className="text-3xl md:text-5xl font-bold tracking-tighter uppercase">Bookar</span>
+            <h1 className="text-5xl md:text-8xl font-bold tracking-tighter">Bookar</h1>
           </motion.div>
-
-          <h1 className="text-4xl md:text-7xl font-bold tracking-tight text-balance leading-tight">
-            Aprende tudo o que <br className="hidden md:block" /> quiseres, com IA.
-          </h1>
-
-          {/* Secondary description removed for a more minimalist look */}
+          <p className="text-lg md:text-2xl font-medium text-black/50 tracking-tight">
+            A melhor plataforma de aprendizado baseado em IA.
+          </p>
         </div>
 
-        <div className="py-6 border-y border-border/50">
-          <CountdownTimer />
-        </div>
+        {/* Dynamic Features Integration */}
+        <div className="w-full max-w-xl space-y-10">
+          <div className="py-4 border-y border-black/[0.05]">
+            <CountdownTimer />
+          </div>
 
-        <div className="flex flex-col items-center gap-6">
-          <div className="flex flex-col items-center gap-3">
+          <div className="flex flex-col items-center gap-6 mt-4">
+            {/* Waitlist Count */}
             <div className="flex items-center gap-3">
               <div className="flex -space-x-2">
                 {[1, 2, 3].map((i) => (
-                  <div key={i} className="inline-block h-8 w-8 rounded-full border-2 border-white bg-muted overflow-hidden">
+                  <div key={i} className="inline-block h-8 w-8 rounded-full border-2 border-white bg-neutral-100 overflow-hidden">
                     <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${i + waitingCount}`} alt="" />
                   </div>
                 ))}
               </div>
-              <p className="text-sm font-medium text-muted-foreground">
-                <span className="text-foreground font-bold"><AnimatedCounter value={waitingCount} /></span> pessoas já estão na lista
+              <p className="text-sm font-semibold text-black/40">
+                <span className="text-black font-bold"><AnimatedCounter value={waitingCount} /></span> pessoas já estão na lista
               </p>
             </div>
-          </div>
 
-          <div className="w-full max-w-md">
-            <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-2">
+            {/* Email Form */}
+            <form onSubmit={handleSubmit} className="w-full flex flex-col sm:flex-row gap-2 max-w-md">
               <Input
                 type="email"
-                placeholder="Introduz o teu e-mail"
+                placeholder="teu@email.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="h-12 border-border bg-white rounded-lg px-4 text-base focus-visible:ring-cyan-500/20 focus-visible:border-cyan-500"
+                className="h-12 border-black/10 bg-neutral-50 rounded-xl px-4 text-base focus-visible:ring-black/5 focus-visible:border-black/20"
               />
               <Button
                 type="submit"
                 disabled={loading}
-                className="h-12 bg-cyan-500 hover:bg-cyan-600 text-white font-bold px-8 shadow-sm transition-all rounded-lg"
+                className="h-12 bg-black hover:bg-black/90 text-white font-bold px-8 rounded-xl transition-all"
               >
-                {loading ? "..." : "Reservar Acesso"}
+                {loading ? "..." : "Reservar Lugar"}
               </Button>
             </form>
           </div>
         </div>
       </main>
 
-      <footer className="absolute bottom-8 w-full flex justify-center opacity-40 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-        <p>Bookar &copy; 2026</p>
+      <footer className="p-10 flex justify-center text-sm font-medium text-black/30">
+        <p>© Bookar 2026</p>
       </footer>
     </div>
   );
