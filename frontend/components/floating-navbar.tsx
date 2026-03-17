@@ -76,7 +76,7 @@ export function FloatingNavbar() {
                         <div className="flex items-center justify-center w-10 h-10 rounded-full border cursor-pointer overflow-hidden bg-muted">
                             {user?.avatar ? (
                                 <Avatar className="w-10 h-10">
-                                    <AvatarImage src={user.avatar} alt={user.first_name || user.email} />
+                                    <AvatarImage src={user.avatar.startsWith('http') ? user.avatar : `${process.env.NEXT_PUBLIC_API_URL}${user.avatar}`} alt={user.first_name || user.email} />
                                     <AvatarFallback>{(user.first_name || user.email || "U")[0]?.toUpperCase()}</AvatarFallback>
                                 </Avatar>
                             ) : (

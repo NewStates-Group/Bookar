@@ -43,9 +43,9 @@ class RegisterOut(Schema):
 
     @staticmethod
     def resolve_avatar(obj):
-        if obj.avatar:
+        if hasattr(obj, 'avatar') and obj.avatar:
             return obj.avatar.url
-        return None
+        return f"https://api.dicebear.com/7.x/avataaars/svg?seed={obj.id}"
 
 class ProfileUpdateIn(Schema):
     email: EmailStr = None

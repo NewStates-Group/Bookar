@@ -142,7 +142,7 @@ export default function ProfilePage() {
                         <div className="flex flex-col items-center space-y-4 sm:flex-row sm:space-y-0 sm:space-x-6 pb-6 border-b border-muted">
                             <div className="relative">
                                 <Avatar className="h-32 w-32 border-2 border-cyan-500/20">
-                                    <AvatarImage src={session?.user?.avatar ? `http://localhost:8000${session.user.avatar}` : ""} />
+                                    <AvatarImage src={session?.user?.avatar ? (session.user.avatar.startsWith('http') ? session.user.avatar : `${process.env.NEXT_PUBLIC_API_URL}${session.user.avatar}`) : ""} />
                                     <AvatarFallback className="text-2xl">{(session?.user?.first_name || session?.user?.email || "U").slice(0, 2).toUpperCase()}</AvatarFallback>
                                 </Avatar>
                                 <label

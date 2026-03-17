@@ -39,7 +39,7 @@ export function NavUser() {
                             className="cursor-pointer data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
                         >
                             <Avatar className="h-8 w-8 rounded-lg grayscale">
-                                <AvatarImage src={session?.user?.avatar ? `${process.env.NEXT_PUBLIC_API_URL}${session.user.avatar}` : ""} alt={session?.user?.first_name || session?.user?.email} />
+                                <AvatarImage src={session?.user?.avatar ? (session.user.avatar.startsWith('http') ? session.user.avatar : `${process.env.NEXT_PUBLIC_API_URL}${session.user.avatar}`) : ""} alt={session?.user?.first_name || session?.user?.email} />
                                 <AvatarFallback className="rounded-lg">{(session?.user?.first_name || session?.user?.email || "U").slice(0, 2).toUpperCase()}</AvatarFallback>
                             </Avatar>
                             <div className="grid flex-1 text-left text-sm leading-tight">
@@ -59,7 +59,7 @@ export function NavUser() {
                         <DropdownMenuLabel className="p-0 font-normal">
                             <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
                                 <Avatar className="h-8 w-8 rounded-lg">
-                                    <AvatarImage src={session?.user?.avatar ? `${process.env.NEXT_PUBLIC_API_URL}${session.user.avatar}` : ""} alt={session?.user?.first_name || session?.user?.email} />
+                                    <AvatarImage src={session?.user?.avatar ? (session.user.avatar.startsWith('http') ? session.user.avatar : `${process.env.NEXT_PUBLIC_API_URL}${session.user.avatar}`) : ""} alt={session?.user?.first_name || session?.user?.email} />
                                     <AvatarFallback className="rounded-lg">{(session?.user?.first_name || session?.user?.email || "U").slice(0, 2).toUpperCase()}</AvatarFallback>
                                 </Avatar>
                                 <div className="grid flex-1 text-left text-sm leading-tight">
