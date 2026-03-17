@@ -122,7 +122,7 @@ export default function HomePage() {
         setWaitingCount(prev => prev + 1);
       } else {
         const data = await response.json();
-        toast.error(data.message || "Erro ao inscrever. Tente novo.");
+        toast.error(data.message || "Erro ao inscrever. Tenta novo.");
       }
     } catch (error) {
       toast.error("Ocorreu um erro. Verifica a tua ligação.");
@@ -133,14 +133,6 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-white text-foreground selection:bg-cyan-100 selection:text-cyan-900">
-      {/* Discreet Logo/Navigation */}
-      <div className="absolute top-8 left-8">
-        <div className="flex items-center gap-2">
-          <Image src="/logo.png" alt="Logo" width={24} height={24} />
-          <span className="text-xl font-semibold tracking-tighter uppercase">Bookar</span>
-        </div>
-      </div>
-
       <div className="absolute top-8 right-8 flex items-center gap-4">
         <Link href="/login">
           <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
@@ -155,7 +147,17 @@ export default function HomePage() {
       </div>
 
       <main className="z-10 text-center max-w-4xl w-full space-y-12">
-        <div className="space-y-4">
+        <div className="space-y-6 flex flex-col items-center">
+          {/* Logo and Name moved to the center */}
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex items-center gap-2 mb-2"
+          >
+            <Image src="/logo.png" alt="Logo" width={32} height={32} />
+            <span className="text-2xl font-semibold tracking-tighter uppercase">Bookar</span>
+          </motion.div>
+
           <h1 className="text-4xl md:text-7xl font-bold tracking-tight text-balance leading-tight">
             Aprende tudo o que <br className="hidden md:block" /> quiseres, com IA.
           </h1>
@@ -170,7 +172,6 @@ export default function HomePage() {
         </div>
 
         <div className="flex flex-col items-center gap-6">
-          {/* Reordered: Count ABOVE Input */}
           <div className="flex flex-col items-center gap-3">
             <div className="flex items-center gap-3">
               <div className="flex -space-x-2">
