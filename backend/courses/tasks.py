@@ -118,7 +118,7 @@ def _create_fallback_image(prompt, output_path):
 def _generate_image(client, prompt, output_path, timeout=30):
     try:
         img_prompt = f"Hand-drawn whiteboard animation style, minimalist black marker on white board: {prompt}. Any visible text MUST be in Portuguese."
-        model_name = settings.AI.get("GENAI_MODEL_IMAGE", "gemini-2.0-flash")
+        model_name = settings.AI.get("GENAI_MODEL_IMAGE", "gemini-2.5-flash-lite")
         
         # Log the attempt
         logger.info(f"Generating image with model {model_name} for prompt: {prompt[:50]}...")
@@ -139,6 +139,13 @@ def _generate_image(client, prompt, output_path, timeout=30):
             if part.inline_data:
                 output_path.write_bytes(part.inline_data.data)
                 return True
+            # Some versions might return just 'image' or similar, though SDK usually gives inline_data
+            if hasattr(part, 'image'):
+                 # Check if part.image is bytes or have .data
+                 data = part.image if isinstance(part.image, bytes) else getattr(part.image, 'data', None)
+                 if data:
+                     output_path.write_bytes(data)
+                     return True
         raise ValueError("No image part in response")
     except Exception as e:
         logger.warning(f"Image generation failed for '{prompt[:50]}...': {str(e)}")
@@ -623,46 +630,49 @@ def create_course_thumb(course_pk: str, prompt: str):
 
         response = safe_gemini_call(
             client.models.generate_content,
-            model=settings.AI.get("GENAI_MODEL_IMAGE", "gemini-2.5-flash-image"),
+            model=settings.AI.get("GENAI_MODEL_IMAGE", "gemini-2.5-flash-lite"),
             contents=[ai_prompt],
             config=types.GenerateContentConfig(
                 image_config=types.ImageConfig(aspect_ratio="16:9")
             ),
         )
 
-        image_part = next(
-            (
-                part.inline_data
-                for part in response.parts
-                if part.inline_data is not None
-            ),
-            None,
-        )
+        image_data = None
+        for part in response.parts:
+            if part.inline_data:
+                image_data = part.inline_data.data
+                break
+            if hasattr(part, 'image'):
+                image_data = part.image if isinstance(part.image, bytes) else getattr(part.image, 'data', None)
+                if image_data: break
 
-        if not image_part or not image_part.mime_type.startswith("image/"):  # NOQA
+        if not image_data:
             raise ThumbnailCreationError("IA não retornou uma imagem válida")
 
         try:
-            # Re-read the data into a fresh BytesIO for each operation to be safe
-            image = Image.open(BytesIO(image_part.data))
+            image = Image.open(BytesIO(image_data))
             image.verify()
-            image = Image.open(BytesIO(image_part.data)).convert("RGBA")
-        except UnidentifiedImageError:
-            raise ThumbnailCreationError("Conteúdo retornado não é uma imagem")
+            image = Image.open(BytesIO(image_data)).convert("RGBA")
+        except Exception as e:
+            logger.error(f"Image processing error: {e}")
+            raise ThumbnailCreationError("Conteúdo retornado não é uma imagem válida")
 
         logo_path = settings.BASE_DIR / "static" / "logo.png"
-        logo = Image.open(logo_path).convert("RGBA")
-        img_width, img_height = image.size
-        logo_width = int(img_width * 0.08)
-        logo_ratio = logo_width / logo.width
-        logo_height = int(logo.height * logo_ratio)
+        if logo_path.exists():
+            logo = Image.open(logo_path).convert("RGBA")
+            img_width, img_height = image.size
+            logo_width = int(img_width * 0.08)
+            logo_ratio = logo_width / logo.width
+            logo_height = int(logo.height * logo_ratio)
 
-        logo = logo.resize((logo_width, logo_height), Image.Resampling.LANCZOS)
+            logo = logo.resize((logo_width, logo_height), Image.Resampling.LANCZOS)
 
-        margin = int(img_width * 0.03)
-        position = (margin, margin)
+            margin = int(img_width * 0.03)
+            position = (margin, margin)
 
-        image.paste(logo, position, logo)
+            image.paste(logo, position, logo)
+        else:
+            logger.warning(f"Logo not found at {logo_path}, skipping overlay")
         image = image.convert("RGB")
 
         buffer = BytesIO()

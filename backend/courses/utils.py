@@ -16,18 +16,22 @@ from .models import Lesson
 
 logger = logging.getLogger(__name__)
 
+import threading
+
 # Simple rate limiter state
 class RateLimiter:
     def __init__(self, min_interval=1.0):
         self.min_interval = min_interval
         self.last_call = 0
+        self._lock = threading.Lock()
 
     def wait(self):
-        now = time.time()
-        elapsed = now - self.last_call
-        if elapsed < self.min_interval:
-            time.sleep(self.min_interval - elapsed)
-        self.last_call = time.time()
+        with self._lock:
+            now = time.time()
+            elapsed = now - self.last_call
+            if elapsed < self.min_interval:
+                time.sleep(self.min_interval - elapsed)
+            self.last_call = time.time()
 
 limiter = RateLimiter(min_interval=settings.AI.get("GENAI_RATE_LIMIT", 5.0))
 
@@ -120,7 +124,7 @@ def get_genai_client():
 def genai_chat(messages, model=None):
     client = get_genai_client()
     if model is None:
-        model = settings.AI.get("GENAI_MODEL_TEXT", "gemini-2.0-flash")
+        model = settings.AI.get("GENAI_MODEL_TEXT", "gemini-2.5-flash-lite")
     
     # Extract content from the last message if it's a list of dicts (Ollama style)
     if isinstance(messages, list) and len(messages) > 0 and isinstance(messages[-1], dict):

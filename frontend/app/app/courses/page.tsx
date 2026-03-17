@@ -598,7 +598,11 @@ export default function CoursesPage() {
                     onClick={() => router.push('/app/courses/' + course.id)}
                   >
                     {course.thumb ? (
-                      <img src={course.thumb.startsWith('http') ? course.thumb : "http://localhost:8000/media/" + course.thumb} alt={course.title} className="rounded-xl object-cover w-full h-full" />
+                      <img
+                        src={course.thumb.startsWith('http') ? course.thumb : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/media/${course.thumb}`}
+                        alt={course.title}
+                        className="rounded-xl object-cover w-full h-full"
+                      />
                     ) : (
                       <div className="flex flex-col items-center justify-center h-full border rounded-lg">
                         <ImageOff className="w-12 h-12 text-slate-400" />

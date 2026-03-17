@@ -393,7 +393,7 @@ export default function WatchPage() {
                             {lesson?.status === "READY" && viewMode === "video" && lesson?.lesson_file && (
                                 <div className="w-full max-w-5xl aspect-video bg-card rounded-xl overflow-hidden shadow-2xl relative group border border-border">
                                     <video
-                                        src={lesson.lesson_file.startsWith('http') ? lesson.lesson_file : `http://localhost:8000/media/${lesson.lesson_file}`}
+                                        src={lesson.lesson_file.startsWith('http') ? lesson.lesson_file : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/media/${lesson.lesson_file}`}
                                         controls
                                         className="w-full h-full"
                                         onContextMenu={(e) => e.preventDefault()}
