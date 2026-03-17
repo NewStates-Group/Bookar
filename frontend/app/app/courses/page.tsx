@@ -548,7 +548,8 @@ export default function CoursesPage() {
               key={`${course.id}`}
               className="group md:max-w-sm p-4 border overflow-hidden shadow-none bg-transparent hover:bg-gray-50 transition-all duration-300 gap-0"
             >
-              {course.status === "PROCESSING" ? (
+              {/* Early PROCESSING: no title or thumb yet — show spinner */}
+              {course.status === "PROCESSING" && !course.title && !course.thumb ? (
                 <div className="flex flex-col items-center justify-center h-full rounded-lg py-8 relative">
                   <Button
                     variant="ghost"
@@ -592,11 +593,10 @@ export default function CoursesPage() {
                 </div>
               ) : (
                 <>
-                  <div className={`aspect-video mb-3 ${course.status === "READY" ? 'cursor-pointer' : "coursor-default"}`} onClick={() => {
-                    if (course.status === "READY") {
-                      router.push('/app/courses/' + course.id)
-                    }
-                  }}>
+                  <div
+                    className="aspect-video mb-3 cursor-pointer"
+                    onClick={() => router.push('/app/courses/' + course.id)}
+                  >
                     {course.thumb ? (
                       <img src={course.thumb.startsWith('http') ? course.thumb : "http://localhost:8000/media/" + course.thumb} alt={course.title} className="rounded-xl object-cover w-full h-full" />
                     ) : (
@@ -608,11 +608,17 @@ export default function CoursesPage() {
                       </div>
                     )}
                   </div>
-                  <h1 className="text-lg mb-1">{course.title}</h1>
+                  <div className="flex items-center justify-between mb-1">
+                    <h1 className="text-lg">{course.title}</h1>
+                    {course.status === "PROCESSING" && (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">
+                        <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                        A gerar
+                      </span>
+                    )}
+                  </div>
                   <p className="line-clamp-2 text-gray-600 text-base">{course.desc}</p>
-                  {course.status === "READY" && (
-                    <Link href={'/app/courses/' + course.id} className="text-blue-600 mt-2 mb-4">Veja mais</Link>
-                  )}
+                  <Link href={'/app/courses/' + course.id} className="text-blue-600 mt-2 mb-4">Veja mais</Link>
                   <div className="flex items-center justify-between mt-auto">
                     <div className="flex items-center gap-2">
                       <span className="inline-flex items-center rounded-md bg-cyan-300/10 px-2 py-1 text-xs font-medium text-blue-400 inset-ring inset-ring-blue-300/30">
@@ -641,6 +647,7 @@ export default function CoursesPage() {
                   </div>
                 </>
               )}
+
             </Card>
           ))}
         </div>

@@ -190,7 +190,7 @@ export default function CoursePage() {
         }
       );
       if (res.ok) {
-        router.push('/app')
+        router.replace('/app/courses')
       }
     } catch (e) {
       toast.error("Erro de conexão");
