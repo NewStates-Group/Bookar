@@ -61,7 +61,7 @@ function CountdownTimer() {
       <div className="text-3xl md:text-5xl font-bold tracking-tight tabular-nums text-foreground">
         {value.toString().padStart(2, '0')}
       </div>
-      <div className="text-[9px] md:text-[10px] font-semibold text-muted-foreground uppercase tracking-widest mt-1">
+      <div className="text-[9px] md:text-[10px] font-bold text-cyan-600/80 uppercase tracking-widest mt-1">
         {label}
       </div>
     </div>
@@ -147,21 +147,24 @@ export default function HomePage() {
 
       <main className="flex-1 flex flex-col items-center justify-center p-6 text-center space-y-12 pb-24">
         {/* Hero Section */}
-        <div className="z-10 text-center max-w-3xl space-y-3 animate-in fade-in slide-in-from-bottom-8 duration-1000">
-        <div className="flex justify-center items-center gap-1">
-          <Image
-            src={"/logo.png"}
-            alt="Logo"
-            width={80}
-            height={80}
-          />
-        <h1 className="text-6xl md:text-8xl font-bold tracking-tighter text-balance bg-clip-text text-transparent bg-gradient-to-b from-foreground to-foreground/70">
-          Bookar
-        </h1>
-        </div>
-        <p className="text-xl md:text-2xl text-muted-foreground max-w-2xl mx-auto text-balance font-light">
-          A melhor plataforma de aprendizado baseado em IA.
-        </p>
+        <div className="z-10 text-center max-w-3xl space-y-3 animate-in fade-in slide-in-from-bottom-8 duration-1000 relative">
+          {/* Subtle Cyan Glow behind logo */}
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-32 bg-cyan-400/10 blur-[60px] -z-10 rounded-full"></div>
+
+          <div className="flex justify-center items-center gap-1">
+            <Image
+              src={"/logo.png"}
+              alt="Logo"
+              width={80}
+              height={80}
+            />
+            <h1 className="text-6xl md:text-8xl font-bold tracking-tighter text-balance bg-clip-text text-transparent bg-gradient-to-b from-foreground to-foreground/70">
+              Bookar
+            </h1>
+          </div>
+          <p className="text-xl md:text-2xl text-muted-foreground max-w-2xl mx-auto text-balance font-light">
+            A melhor plataforma de aprendizado baseado em IA.
+          </p>
         </div>
 
         {/* Dynamic Features Integration */}
