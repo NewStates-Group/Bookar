@@ -310,3 +310,7 @@ class AuthService:
         from .models import Waitlist
         Waitlist.objects.update_or_create(email=email)
         return {"message": "Inscrito na lista de espera com sucesso!"}
+
+    def get_waitlist_count(self):
+        from .models import Waitlist
+        return {"count": Waitlist.objects.count()}
