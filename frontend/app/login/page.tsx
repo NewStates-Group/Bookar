@@ -70,15 +70,20 @@ export default function LoginPage() {
 
     setIsLoading(true);
     try {
+      console.log("[Login] Attempting credentials login for:", email);
       const result = await signIn("credentials", {
         email: email,
         password,
         redirect: false,
       });
 
+      console.log("[Login] signIn result:", result);
+
       if (result?.error) {
+        console.error("[Login] signIn error:", result.error);
         setErrors({ password: ["Palavra-passe incorreta"] });
       } else {
+        console.log("[Login] Login successful, redirecting to /app/courses");
         router.push("/app/courses");
       }
     } catch (error) {
@@ -129,6 +134,7 @@ export default function LoginPage() {
 
     const handleMessage = async (event: MessageEvent) => {
       if (event.data?.type === "AUTH_SUCCESS") {
+        console.log("[Login] Google AUTH_SUCCESS received:", event.data);
         setIsLoading(true);
         try {
           const result = await signIn("credentials", {
@@ -137,9 +143,13 @@ export default function LoginPage() {
             redirect: false,
           });
 
+          console.log("[Login] Google signIn result:", result);
+
           if (result?.error) {
+            console.error("[Login] Google signIn error:", result.error);
             toast.error(result.error);
           } else {
+            console.log("[Login] Google login successful, redirecting to /app/courses");
             toast.success("Login com Google efetuado!");
             router.push("/app/courses");
           }

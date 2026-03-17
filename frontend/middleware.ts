@@ -5,6 +5,7 @@ export default withAuth(
     function middleware(req) {
         const token = req.nextauth.token;
         const { pathname } = req.nextUrl;
+        console.log("[Middleware] Pathname:", pathname, "Token exists:", !!token);
 
         const isPublic =
             pathname === "/" ||
@@ -23,6 +24,7 @@ export default withAuth(
         }
 
         if (token && isPublic) {
+            console.log("[Middleware] Authenticated user on public page, redirecting to /app");
             return NextResponse.redirect(new URL("/app", req.url));
         }
 

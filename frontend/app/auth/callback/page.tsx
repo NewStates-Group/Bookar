@@ -13,10 +13,11 @@ function AuthCallbackContent() {
 
     useEffect(() => {
         const code = searchParams.get("code");
-
-        if (called.current) return;
         const access = searchParams.get("access");
         const refresh = searchParams.get("refresh");
+        console.log("[GoogleCallback] Received params - code:", !!code, "access:", !!access, "refresh:", !!refresh);
+
+        if (called.current) return;
 
         const handleCallback = async () => {
             if (code) {
@@ -37,6 +38,7 @@ function AuthCallbackContent() {
 
                     // Notify opener and close
                     if (window.opener) {
+                        console.log("[GoogleCallback] Notifying opener with tokens");
                         window.opener.postMessage({
                             type: "AUTH_SUCCESS",
                             access: tokens.access,
