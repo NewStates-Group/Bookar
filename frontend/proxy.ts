@@ -6,26 +6,27 @@ export default withAuth(
         const token = req.nextauth.token;
         const { pathname } = req.nextUrl;
 
-        const isPublic =
-            pathname === "/" ||
-            pathname.startsWith("/login") ||
-            pathname.startsWith("/signup");
+        const publicRoutes = ["/", "/login", "/signup"];
+        const isPublic = publicRoutes.some(route =>
+            pathname === route || pathname.startsWith(route)
+        );
 
-        if (token?.error === "RefreshAccessTokenError") {
-            if (!isPublic) {
-                return NextResponse.redirect(new URL("/login", req.url));
-            }
-            return NextResponse.next();
-        }
+        // if (token?.error === "RefreshAccessTokenError") {
+        //     console.log("TOKEN ERROR")
+        //     return NextResponse.redirect(new URL("/login?error=session", req.url));
+        // }
 
-        if (!token && !isPublic) {
-            return NextResponse.redirect(new URL("/login", req.url));
-        }
+        // if (!token && !isPublic) {
+        //     console.log("NOT TOKEN AND NOT PUBLIC")    
+        //     return NextResponse.redirect(new URL("/login", req.url));
+        // }
 
-        if (token && isPublic) {
-            return NextResponse.redirect(new URL("/app", req.url));
-        }
+        // if (token && isPublic) {
+        //     console.log("PUBLIC AND TOKEN")
+        //     return NextResponse.redirect(new URL("/app", req.url));
+        // }
 
+        console.log("NEXT")
         return NextResponse.next();
     },
     {
@@ -34,7 +35,3 @@ export default withAuth(
         },
     }
 );
-
-export const config = {
-    matcher: ["/app/:path*", "/login", "/signup", "/"],
-};
