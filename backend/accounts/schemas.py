@@ -45,7 +45,7 @@ class RegisterOut(Schema):
     def resolve_avatar(obj):
         if obj.avatar:
             return obj.avatar.url
-        return None
+        return f"https://api.dicebear.com/7.x/avataaars/svg?seed={obj.id}"
 
 class ProfileUpdateIn(Schema):
     email: EmailStr = None

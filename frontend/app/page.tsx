@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import Image from "next/image";
 import Link from "next/link";
 import { useState, useEffect } from "react";
-import { motion, useSpring, useTransform, animate } from "framer-motion";
+import { motion, useSpring, useTransform, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 
 function AnimatedCounter({ value }: { value: number }) {
@@ -24,16 +24,88 @@ function AnimatedCounter({ value }: { value: number }) {
   return <motion.span>{display}</motion.span>;
 }
 
+function CountdownTimer() {
+  const [timeLeft, setTimeLeft] = useState({
+    days: 0,
+    hours: 0,
+    minutes: 0,
+    seconds: 0
+  });
+
+  useEffect(() => {
+    // Target date: 2 weeks from now (relative to a fixed reference for better UX)
+    // For demo/launch purposes, we fix it to a specific date if possible, 
+    // but here we follow "2 weeks from now" as requested.
+    const targetDate = new Date();
+    targetDate.setDate(targetDate.getDate() + 14);
+
+    const timer = setInterval(() => {
+      const now = new Date().getTime();
+      const distance = targetDate.getTime() - now;
+
+      if (distance < 0) {
+        clearInterval(timer);
+        return;
+      }
+
+      setTimeLeft({
+        days: Math.floor(distance / (1000 * 60 * 60 * 24)),
+        hours: Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)),
+        minutes: Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60)),
+        seconds: Math.floor((distance % (1000 * 60)) / 1000)
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, []);
+
+  const TimeUnit = ({ value, label }: { value: number, label: string }) => (
+    <div className="flex flex-col items-center">
+      <div className="text-4xl md:text-6xl font-bold tracking-tighter tabular-nums text-primary">
+        {value.toString().padStart(2, '0')}
+      </div>
+      <div className="text-[10px] md:text-xs font-medium text-muted-foreground uppercase tracking-widest mt-1">
+        {label}
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="flex gap-4 md:gap-8 justify-center py-6">
+      <TimeUnit value={timeLeft.days} label="Dias" />
+      <div className="text-4xl md:text-6xl font-light text-muted-foreground/30 self-start mt-1">:</div>
+      <TimeUnit value={timeLeft.hours} label="Horas" />
+      <div className="text-4xl md:text-6xl font-light text-muted-foreground/30 self-start mt-1">:</div>
+      <TimeUnit value={timeLeft.minutes} label="Min" />
+      <div className="text-4xl md:text-6xl font-light text-muted-foreground/30 self-start mt-1">:</div>
+      <TimeUnit value={timeLeft.seconds} label="Seg" />
+    </div>
+  );
+}
+
 export default function HomePage() {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
-  const [waitingCount, setWaitingCount] = useState(1240); // Initial placeholder count
+  const [waitingCount, setWaitingCount] = useState(0);
 
   useEffect(() => {
-    // Simulate some activity/growth
-    const interval = setInterval(() => {
-      setWaitingCount(prev => prev + Math.floor(Math.random() * 3));
-    }, 5000);
+    const fetchCount = async () => {
+      try {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+        const response = await fetch(`${apiUrl}/api/auth/waitlist/count`);
+        if (response.ok) {
+          const data = await response.json();
+          // We add a base social proof offset but make it feel dynamic
+          setWaitingCount(data.count + 1200);
+        }
+      } catch (error) {
+        console.error("Failed to fetch count", error);
+        setWaitingCount(1243); // Fallback
+      }
+    };
+    fetchCount();
+
+    const interval = setInterval(fetchCount, 30000);
     return () => clearInterval(interval);
   }, []);
 
@@ -43,7 +115,8 @@ export default function HomePage() {
 
     setLoading(true);
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/auth/waitlist`, {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const response = await fetch(`${apiUrl}/api/auth/waitlist`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
@@ -87,82 +160,85 @@ export default function HomePage() {
         </Link>
       </div>
 
-      <div className="z-10 text-center max-w-3xl space-y-8 animate-in fade-in slide-in-from-bottom-8 duration-1000">
+      <div className="z-10 text-center max-w-4xl w-full space-y-12 animate-in fade-in slide-in-from-bottom-8 duration-1000">
         <div className="space-y-4">
           <motion.div
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ duration: 0.5 }}
-            className="flex justify-center items-center gap-3"
+            className="flex justify-center items-center gap-3 mb-2"
           >
             <Image
               src={"/logo.png"}
               alt="Logo"
-              width={60}
-              height={60}
+              width={50}
+              height={50}
               className="drop-shadow-2xl"
             />
-            <h1 className="text-6xl md:text-8xl font-bold tracking-tighter text-balance bg-clip-text text-transparent bg-gradient-to-b from-foreground to-foreground/70">
+            <h1 className="text-5xl md:text-7xl font-bold tracking-tighter text-balance bg-clip-text text-transparent bg-gradient-to-b from-foreground to-foreground/70">
               Bookar
             </h1>
           </motion.div>
 
-          <p className="text-xl md:text-2xl text-muted-foreground max-w-2xl mx-auto text-balance font-light leading-relaxed">
-            A melhor plataforma de aprendizado baseado em IA.
-            Crie cursos personalizados em segundos.
-          </p>
+          <h2 className="text-2xl md:text-4xl font-bold tracking-tight text-balance">
+            O futuro do aprendizado chega em:
+          </h2>
+
+          <CountdownTimer />
         </div>
 
-        <div className="flex flex-col items-center gap-6 py-4">
-          <div className="flex flex-col items-center gap-2">
-            <div className="text-4xl md:text-5xl font-mono font-bold text-primary flex items-center gap-2">
-              <AnimatedCounter value={waitingCount} />
-              <div className="flex -space-x-3 overflow-hidden p-1">
-                {[1, 2, 3, 4].map((i) => (
-                  <div key={i} className="inline-block h-8 w-8 rounded-full ring-2 ring-background bg-muted overflow-hidden">
-                    <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${i + waitingCount}`} alt="" />
-                  </div>
-                ))}
+        <div className="flex flex-col items-center gap-8 py-4">
+          <div className="w-full max-w-md space-y-4">
+            <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-2">
+              <Input
+                type="email"
+                placeholder="teu@email.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                className="h-12 rounded-full border-primary/20 bg-background/50 backdrop-blur-sm px-6 text-lg focus-visible:ring-primary/50"
+              />
+              <Button
+                type="submit"
+                size="lg"
+                disabled={loading}
+                className="rounded-full px-8 text-lg h-12 bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20 whitespace-nowrap"
+              >
+                {loading ? "Entrando..." : "Garantir Acesso"}
+              </Button>
+            </form>
+
+            <div className="flex flex-col items-center gap-3">
+              <div className="flex items-center gap-2 text-muted-foreground/60">
+                <div className="flex -space-x-2 overflow-hidden py-1">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="inline-block h-6 w-6 rounded-full ring-2 ring-background bg-muted overflow-hidden opacity-80">
+                      <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${i + waitingCount}`} alt="" />
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs font-medium">
+                  <AnimatedCounter value={waitingCount} /> pessoas já estão na lista
+                </p>
               </div>
+              <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground opacity-40">
+                Acesso gratuito para os primeiros inscritos
+              </p>
             </div>
-            <p className="text-sm font-medium text-muted-foreground uppercase tracking-widest">Pessoas na lista de espera</p>
           </div>
-
-          <form onSubmit={handleSubmit} className="w-full max-w-md flex flex-col sm:flex-row gap-2">
-            <Input
-              type="email"
-              placeholder="teu@email.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              className="h-12 rounded-full border-primary/20 bg-background/50 backdrop-blur-sm px-6 text-lg focus-visible:ring-primary/50"
-            />
-            <Button
-              type="submit"
-              size="lg"
-              disabled={loading}
-              className="rounded-full px-8 text-lg h-12 bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20 whitespace-nowrap"
-            >
-              {loading ? "Entrando..." : "Entrar na Lista"}
-            </Button>
-          </form>
-
-          <p className="text-xs text-muted-foreground opacity-50">
-            Faremos o anúncio assim que a plataforma for totalmente liberada.
-          </p>
         </div>
 
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
+        <div className="pt-4">
           <Link href="/signup">
-            <Button size="lg" variant={"outline"} className="rounded-full px-8 text-lg h-12 hover:bg-muted/50 transition-colors">
-              Explorar demonstração
+            <Button size="sm" variant={"ghost"} className="text-muted-foreground hover:text-foreground transition-colors group">
+              Ainda queres explorar? <span className="ml-1 group-hover:translate-x-1 transition-transform">→</span>
             </Button>
           </Link>
         </div>
       </div>
 
-      <footer className="absolute bottom-6 z-10 text-muted-foreground text-sm font-medium opacity-60">
-        <p>&copy; Bookar 2026</p>
+      <footer className="absolute bottom-6 z-10 text-muted-foreground text-[10px] uppercase tracking-widest font-medium opacity-40">
+        <p>&copy; Bookar 2026 • Made with IA</p>
       </footer>
     </div>
   );
