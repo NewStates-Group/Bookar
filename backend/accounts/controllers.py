@@ -78,3 +78,7 @@ class AuthController(NinjaJWTDefaultController):
     @route.post("waitlist")
     def register_waitlist(self, data: WaitlistEmailIn):
         return self.auth_service.register_waitlist(data.email)
+
+    @route.get("waitlist/count")
+    def get_waitlist_count(self):
+        return self.auth_service.get_waitlist_count()
