@@ -85,8 +85,8 @@ class CourseIn(Schema):
 
 class ModuleDetailSchema(ModuleSchema):
     lessons: List[LessonSchema]
-    quiz_id: int = None
-    quiz_title: str = None
+    quiz_id: Optional[int] = None
+    quiz_title: Optional[str] = None
     last_quiz_score: Optional[float] = None
     last_quiz_passed: Optional[bool] = None
 

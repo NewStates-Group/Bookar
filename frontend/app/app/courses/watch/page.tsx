@@ -91,6 +91,12 @@ export default function WatchPage() {
     }
 
     const getLesson = async () => {
+        if (!lessonID || lessonID === "undefined" || lessonID === "null") {
+            setError("ID de aula inválido");
+            setLoading(false);
+            return;
+        }
+
         if (lessonID === "quiz") {
             setLesson({ title: "Quiz do Módulo", desc: "Complete o quiz para avançar" } as Lesson); // Dummy lesson for title
             setViewMode("quiz");
@@ -111,8 +117,14 @@ export default function WatchPage() {
                 setLoading(false);
                 setViewMode("video");
             } else {
-                const errorData = await res.json();
-                setError(errorData.message || "Erro ao carregar aula");
+                if (res.status === 404) {
+                    setError("Esta aula ainda não existe ou não tens acesso.");
+                } else if (res.status === 422) {
+                    setError("Erro de comunicação com o servidor (422). Redirecionando...");
+                } else {
+                    const errorData = await res.json().catch(() => ({}));
+                    setError(errorData.message || "Erro ao carregar aula");
+                }
                 setLoading(false);
             }
         } catch (e) {
@@ -164,8 +176,8 @@ export default function WatchPage() {
     };
 
     useEffect(() => {
-        if (!lessonID || !courseID) {
-            router.back()
+        if (!lessonID || !courseID || lessonID === "undefined" || courseID === "undefined" || lessonID === "null" || courseID === "null") {
+            router.push('/app/courses')
             return
         }
         // @ts-ignore

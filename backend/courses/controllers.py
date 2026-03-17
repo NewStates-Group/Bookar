@@ -86,7 +86,8 @@ class LessonController:
     def get_lesson(self, request, lesson_id: int):
         lesson = self.lesson_service.get_lesson(request.user, lesson_id)
         if not lesson:
-            return {"error": "Você ainda não criou esta aula"}
+            from ninja.errors import HttpError
+            raise HttpError(404, "Você ainda não criou esta aula")
         return lesson
 
     @route.put("{lesson_id}/mark-watched")

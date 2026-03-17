@@ -171,10 +171,19 @@ export default function CoursePage() {
       });
       if (res.ok) {
         const data = await res.json();
-        router.push(`/app/courses/watch?l=${data.id}&c=${course?.id}`)
+        if (data.finished) {
+          toast.success("Curso finalizado! Podes gerar novos módulos ou rever aulas anteriores.");
+          return;
+        }
+
+        if (data.id) {
+          router.push(`/app/courses/watch?l=${data.id}&c=${course?.id}`)
+        } else {
+          toast.error("Não foi possível encontrar a próxima aula.");
+        }
       }
     } catch (error) {
-      toast.error('Erro desconhecido, aguarde ' + error)
+      toast.error('Erro de conexão, aguarde.')
     }
   }
 

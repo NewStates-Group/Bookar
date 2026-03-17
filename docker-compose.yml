@@ -89,7 +89,7 @@ services:
     image: backend
     env_file: ".env"
     entrypoint: ""
-    command: sh -c "celery -A core --broker=${REDIS_URL} flower --address=0.0.0.0 --port=5555 --basic-auth=${FLOWER_USER}:${FLOWER_PASSWORD}"
+    command: sh -c "celery -A core --broker=${REDIS_URL} flower --address=0.0.0.0"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5555/healthcheck"]
       interval: 10s
