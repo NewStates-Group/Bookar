@@ -201,7 +201,7 @@ export default function HomePage() {
               <Button
                 type="submit"
                 disabled={loading}
-                className="h-12 bg-black hover:bg-black/90 text-white font-bold px-8 rounded-xl transition-all"
+                className="h-12 bg-cyan-500 hover:bg-cyan-600 text-black font-bold px-8 rounded-xl shadow-sm transition-all"
               >
                 {loading ? "..." : "Reservar Lugar"}
               </Button>
