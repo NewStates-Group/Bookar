@@ -81,3 +81,6 @@ class PasswordResetConfirmIn(Schema):
 
 class SendVerificationIn(Schema):
     email: EmailStr
+
+class WaitlistEmailIn(Schema):
+    email: EmailStr

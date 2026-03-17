@@ -204,8 +204,8 @@ def _process_segment(i, segment, client, temp_dir):
     image = temp_dir / f"s{i}.png"
     video = temp_dir / f"s{i}.mp4"
 
-    # Concurrency reduced to 1 for AI calls within segments to respect rate limits
-    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+    # Concurrency restored to 2 for parallel audio/image generation
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
         audio_future = pool.submit(_generate_audio, client, narration, audio)
         image_future = pool.submit(_generate_image, client, visual, image)
 
@@ -268,58 +268,23 @@ def generate_lesson(self, user_id, lesson_id: int):
         if not segments:
             raise ValueError("No segments generated")
 
-        # --- OPTIMIZATION: Single TTS call for all narration ---
-        # Instead of 1 TTS call per segment (N calls), we generate ONE audio for all.
-        full_narration = "\n\n".join(
-            s.get("narration", "") for s in segments if s.get("narration")
-        )
-        full_audio_path = temp_dir / "full_narration.wav"
-        if not _generate_audio(client, full_narration, full_audio_path):
-            raise RuntimeError("Failed to generate full narration audio")
-
-        # --- OPTIMIZATION: Sequential image generation with cooldown ---
-        # Avoids concurrent bursts that exhaust quota instantly.
-        image_paths = []
-        for i, seg in enumerate(segments):
-            img_path = temp_dir / f"s{i}.png"
-            _generate_image(client, seg.get("visual_prompt", ""), img_path)
-            image_paths.append(img_path if img_path.exists() else None)
-            if i < len(segments) - 1:
-                time.sleep(5)  # cooldown between image calls
-
-        # --- Build slideshow: split audio evenly across images ---
-        valid_images = [p for p in image_paths if p and p.exists()]
-        if not valid_images:
-            raise RuntimeError("No images generated for lesson")
-
-        # Calculate audio duration via ffprobe
-        probe = subprocess.run(
-            ["ffprobe", "-v", "error", "-show_entries", "format=duration",
-             "-of", "default=noprint_wrappers=1:nokey=1", str(full_audio_path)],
-            capture_output=True, text=True
-        )
-        total_duration = float(probe.stdout.strip() or 0)
-        duration_per_slide = max(total_duration / len(valid_images), 5.0)
-
+        # --- RESTORED PARALLEL PROCESSING ---
         videos = []
-        for i, img_path in enumerate(valid_images):
-            seg_video = temp_dir / f"slide_{i}.mp4"
-            start_time = i * duration_per_slide
-            subprocess.run([
-                "ffmpeg", "-y",
-                "-ss", str(start_time),
-                "-t", str(duration_per_slide),
-                "-i", str(full_audio_path),
-                "-loop", "1", "-i", str(img_path),
-                "-filter_complex", "[0:a]anull[a]",
-                "-map", "1:v", "-map", "[a]",
-                "-c:v", "libx264", "-tune", "stillimage",
-                "-c:a", "aac", "-b:a", "128k",
-                "-pix_fmt", "yuv420p",
-                "-shortest",
-                str(seg_video)
-            ], check=True, timeout=300)
-            videos.append(seg_video)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+            futures = [
+                executor.submit(_process_segment, i, seg, client, temp_dir)
+                for i, seg in enumerate(segments)
+            ]
+            for future in concurrent.futures.as_completed(futures):
+                try:
+                    video_path = future.result()
+                    if video_path:
+                        videos.append(video_path)
+                except Exception as e:
+                    logger.error(f"Segment processing failed: {e}")
+
+        # Sort videos by segment index (s0.mp4, s1.mp4, etc.)
+        videos.sort(key=lambda x: int(x.stem[1:]) if x.stem.startswith('s') else 999)
 
         if not videos:
             raise RuntimeError("No video segments created")

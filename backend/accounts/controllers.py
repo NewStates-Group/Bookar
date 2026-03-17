@@ -13,7 +13,8 @@ from ninja.files import UploadedFile
 from .schemas import (
     RegisterIn, RegisterOut, ProfileUpdateIn, 
     PasswordResetRequestIn, PasswordResetConfirmIn,
-    EmailCheckIn, EmailCheckOut, SendVerificationIn
+    EmailCheckIn, EmailCheckOut, SendVerificationIn,
+    WaitlistEmailIn
 )
 
 
@@ -73,3 +74,7 @@ class AuthController(NinjaJWTDefaultController):
     @route.post("password-reset/confirm")
     def password_reset_confirm(self, data: PasswordResetConfirmIn):
         return self.auth_service.confirm_password_reset(data.token, data.new_password)
+
+    @route.post("waitlist")
+    def register_waitlist(self, data: WaitlistEmailIn):
+        return self.auth_service.register_waitlist(data.email)

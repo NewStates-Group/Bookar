@@ -305,3 +305,8 @@ class AuthService:
             raise HttpError(400, "Token inválido ou expirado.")
         except User.DoesNotExist:
             raise HttpError(404, "Usuário não encontrado.")
+
+    def register_waitlist(self, email):
+        from .models import Waitlist
+        Waitlist.objects.update_or_create(email=email)
+        return {"message": "Inscrito na lista de espera com sucesso!"}

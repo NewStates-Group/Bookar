@@ -82,7 +82,6 @@ export default function CoursesPage() {
 
   const pollingRefs = useRef<Set<Number>>(new Set());
 
-  const [showOnboarding, setShowOnboarding] = useState(false);
   const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
   const [profileNames, setProfileNames] = useState({ firstName: "", lastName: "" });
 
@@ -100,13 +99,6 @@ export default function CoursesPage() {
       const user = session.user as any;
       if (user && (!user.first_name || !user.last_name)) {
         setShowNameModal(true);
-      }
-
-      // Check if first time (simple check: if courses count is 0 after delay or using a local flag)
-      // For now, let's just show it if they have 0 courses and haven't seen it this session
-      const hasSeenOnboarding = localStorage.getItem("hasSeenOnboarding");
-      if (!hasSeenOnboarding) {
-        setShowOnboarding(true);
       }
     }
   }, [session]);
@@ -404,56 +396,6 @@ export default function CoursesPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 md:px-8 py-3">
-      {/* Onboarding Guide */}
-      {showOnboarding && (
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-8 relative overflow-hidden rounded-2xl bg-gradient-to-r from-cyan-600 to-blue-700 p-8 text-white shadow-xl"
-        >
-          <button
-            onClick={() => {
-              setShowOnboarding(false);
-              localStorage.setItem("hasSeenOnboarding", "true");
-            }}
-            className="absolute top-4 right-4 text-white/80 hover:text-white"
-          >
-            <X className="w-6 h-6" />
-          </button>
-
-          <div className="flex flex-col md:flex-row items-center gap-8">
-            <div className="flex-1 space-y-4 text-center md:text-left">
-              <h2 className="text-3xl font-bold flex items-center gap-2 justify-center md:justify-start">
-                <Sparkles className="w-8 h-8 text-cyan-300" />
-                Bem-vindo ao Bookar!
-              </h2>
-              <p className="text-lg text-cyan-50/90 leading-relaxed">
-                Transforme qualquer tema em um curso personalizado com a nossa IA.
-                Nunca foi tão fácil aprender algo novo!
-              </p>
-              <div className="flex flex-wrap gap-4 pt-2 justify-center md:justify-start">
-                <div className="flex items-center gap-2 bg-white/10 px-3 py-1.5 rounded-full text-sm">
-                  <span className="bg-cyan-500 text-white w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold">1</span>
-                  Descreva o tema
-                </div>
-                <div className="flex items-center gap-2 bg-white/10 px-3 py-1.5 rounded-full text-sm">
-                  <span className="bg-cyan-500 text-white w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold">2</span>
-                  Escolha o nível
-                </div>
-                <div className="flex items-center gap-2 bg-white/10 px-3 py-1.5 rounded-full text-sm">
-                  <span className="bg-cyan-500 text-white w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold">3</span>
-                  Aprenda com IA
-                </div>
-              </div>
-            </div>
-            <div className="hidden lg:block relative w-48 h-48">
-              <div className="absolute inset-0 bg-cyan-400 blur-3xl opacity-20 animate-pulse" />
-              <GraduationCap className="w-full h-full text-cyan-200 relative z-10" />
-            </div>
-          </div>
-        </motion.div>
-      )}
-
       {/* Profile Completion Modal */}
       <Dialog open={showNameModal} onOpenChange={(val) => {
         // Prevent closing if names are missing
