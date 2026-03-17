@@ -57,24 +57,24 @@ function CountdownTimer() {
   }, []);
 
   const TimeUnit = ({ value, label }: { value: number, label: string }) => (
-    <div className="flex flex-col items-center min-w-[60px] md:min-w-[80px]">
-      <div className="text-4xl md:text-6xl font-medium tracking-tight tabular-nums text-white">
+    <div className="flex flex-col items-center min-w-[60px] md:min-w-[90px]">
+      <div className="text-4xl md:text-6xl font-bold tracking-tight tabular-nums text-foreground">
         {value.toString().padStart(2, '0')}
       </div>
-      <div className="text-[10px] md:text-xs font-bold text-cyan-400 uppercase tracking-widest mt-1 opacity-80">
+      <div className="text-[10px] md:text-xs font-semibold text-cyan-600 uppercase tracking-widest mt-1">
         {label}
       </div>
     </div>
   );
 
   return (
-    <div className="flex gap-4 md:gap-6 justify-center items-center py-8">
+    <div className="flex gap-4 md:gap-8 justify-center items-center py-6">
       <TimeUnit value={timeLeft.days} label="Dias" />
-      <div className="text-3xl md:text-5xl font-extralight text-white/20">:</div>
+      <div className="text-3xl md:text-5xl font-extralight text-muted-foreground/30 self-start mt-1">:</div>
       <TimeUnit value={timeLeft.hours} label="Horas" />
-      <div className="text-3xl md:text-5xl font-extralight text-white/20">:</div>
+      <div className="text-3xl md:text-5xl font-extralight text-muted-foreground/30 self-start mt-1">:</div>
       <TimeUnit value={timeLeft.minutes} label="Min" />
-      <div className="text-3xl md:text-5xl font-extralight text-white/20">:</div>
+      <div className="text-3xl md:text-5xl font-extralight text-muted-foreground/30 self-start mt-1">:</div>
       <TimeUnit value={timeLeft.seconds} label="Seg" />
     </div>
   );
@@ -117,103 +117,99 @@ export default function HomePage() {
       });
 
       if (response.ok) {
-        toast.success("Boas-vindas à lista de espera! Avisaremos em breve.");
+        toast.success("Inscrito com sucesso! Avisaremos assim que estivermos prontos.");
         setEmail("");
         setWaitingCount(prev => prev + 1);
       } else {
         const data = await response.json();
-        toast.error(data.message || "Erro ao se inscrever. Tente novamente.");
+        toast.error(data.message || "Erro ao inscrever. Tente novo.");
       }
     } catch (error) {
-      toast.error("Ocorreu um erro de ligação.");
+      toast.error("Ocorreu um erro. Verifica a tua ligação.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-black text-white selection:bg-cyan-500/30">
-      {/* Discreet Logo */}
+    <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-white text-foreground selection:bg-cyan-100 selection:text-cyan-900">
+      {/* Discreet Logo/Navigation */}
       <div className="absolute top-8 left-8">
         <div className="flex items-center gap-2">
-          <Image src="/logo.png" alt="Logo" width={28} height={28} className="brightness-110" />
-          <span className="text-lg font-bold tracking-tighter uppercase">Bookar</span>
+          <Image src="/logo.png" alt="Logo" width={24} height={24} />
+          <span className="text-xl font-semibold tracking-tighter uppercase">Bookar</span>
         </div>
       </div>
 
       <div className="absolute top-8 right-8 flex items-center gap-4">
         <Link href="/login">
-          <Button variant="ghost" className="text-white/60 hover:text-white hover:bg-white/5 font-medium">
+          <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
             Entrar
           </Button>
         </Link>
         <Link href="/signup">
-          <Button className="bg-white text-black hover:bg-white/90 rounded-sm font-bold px-6">
-            Aceder
+          <Button size="sm" variant="outline" className="border-border hover:bg-muted font-medium">
+            Criar conta
           </Button>
         </Link>
       </div>
 
       <main className="z-10 text-center max-w-4xl w-full space-y-12">
         <div className="space-y-4">
-          <div className="inline-block px-3 py-1 rounded-sm bg-cyan-500/10 border border-cyan-500/20 mb-2">
-            <span className="text-[10px] uppercase tracking-[0.2em] font-bold text-cyan-400">Em Breve</span>
-          </div>
-
-          <h1 className="text-5xl md:text-8xl font-bold tracking-tight leading-none text-balance">
-            Domina o conhecimento com IA
+          <h1 className="text-4xl md:text-7xl font-bold tracking-tight text-balance leading-tight">
+            Aprende tudo o que <br className="hidden md:block" /> quiseres, com IA.
           </h1>
 
-          <p className="text-lg md:text-xl text-white/50 max-w-xl mx-auto font-light">
-            Cria cursos imersivos e ultra-personalizados em segundos.
+          <p className="text-lg md:text-xl text-muted-foreground max-w-xl mx-auto font-medium">
+            Cria cursos ultra-personalizados em segundos e domina qualquer tema com interatividade total.
           </p>
         </div>
 
-        <div className="py-4 border-y border-white/5">
+        <div className="py-6 border-y border-border/50">
           <CountdownTimer />
         </div>
 
-        <div className="flex flex-col items-center gap-8">
+        <div className="flex flex-col items-center gap-6">
+          {/* Reordered: Count ABOVE Input */}
+          <div className="flex flex-col items-center gap-3">
+            <div className="flex items-center gap-3">
+              <div className="flex -space-x-2">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="inline-block h-8 w-8 rounded-full border-2 border-white bg-muted overflow-hidden">
+                    <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${i + waitingCount}`} alt="" />
+                  </div>
+                ))}
+              </div>
+              <p className="text-sm font-medium text-muted-foreground">
+                <span className="text-foreground font-bold"><AnimatedCounter value={waitingCount} /></span> pessoas já estão na lista
+              </p>
+            </div>
+          </div>
+
           <div className="w-full max-w-md">
-            <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-0 group border border-white/10 focus-within:border-cyan-500/50 transition-colors">
+            <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-2">
               <Input
                 type="email"
                 placeholder="Introduz o teu e-mail"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="h-14 md:h-16 rounded-none border-none bg-white/[0.02] px-6 text-lg focus-visible:ring-0 placeholder:text-white/20"
+                className="h-12 border-border bg-white rounded-lg px-4 text-base focus-visible:ring-cyan-500/20 focus-visible:border-cyan-500"
               />
               <Button
                 type="submit"
                 disabled={loading}
-                className="h-14 md:h-16 rounded-none px-8 bg-cyan-500 hover:bg-cyan-400 text-black font-black transition-all"
+                className="h-12 bg-cyan-500 hover:bg-cyan-600 text-white font-bold px-8 shadow-sm transition-all rounded-lg"
               >
-                {loading ? "..." : "Entrar na Lista"}
+                {loading ? "..." : "Reservar Acesso"}
               </Button>
             </form>
-          </div>
-
-          <div className="flex flex-col items-center gap-3">
-            <div className="flex items-center gap-2">
-              <div className="flex -space-x-2 overflow-hidden py-1">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="inline-block h-6 w-6 rounded-full border border-black bg-neutral-900 overflow-hidden grayscale opacity-70">
-                    <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${i + waitingCount}`} alt="" />
-                  </div>
-                ))}
-              </div>
-              <p className="text-xs font-medium text-white/40">
-                <span className="text-white"><AnimatedCounter value={waitingCount} /></span> pioneiros à espera
-              </p>
-            </div>
           </div>
         </div>
       </main>
 
-      <footer className="absolute bottom-8 z-10 w-full px-12 flex justify-between items-center opacity-20 text-[9px] font-bold uppercase tracking-widest leading-none">
+      <footer className="absolute bottom-8 w-full flex justify-center opacity-40 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
         <p>Bookar &copy; 2026</p>
-        <p>Built with IA</p>
       </footer>
     </div>
   );
