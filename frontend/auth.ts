@@ -103,11 +103,9 @@ export const authOptions: NextAuthOptions = {
 
     callbacks: {
         async jwt({ token, user, trigger }: any) {
-            console.log("[Auth] jwt callback - trigger:", trigger, "user present:", !!user);
             // Initial sign-in (Credentials or Direct Tokens)
             if (user) {
                 try {
-                    console.log("[Auth] Fetching user profile for initial sign-in");
                     const profile = await getMe(user.accessToken);
                     console.log("[Auth] Profile fetched successfully:", profile.email);
 
@@ -196,7 +194,6 @@ export const authOptions: NextAuthOptions = {
         },
 
         async session({ session, token }: any) {
-            console.log("[Auth] session callback - user in token:", !!token.user);
             session.accessToken = token.accessToken as string;
             session.error = token.error;
 

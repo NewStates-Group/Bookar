@@ -11,7 +11,9 @@ const _geistMono = Geist_Mono({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: 'Bookar',
   description: 'Aprenda utilizando IA',
-
+  icons: {
+    icon: "/logo.png",
+  },
 }
 
 export default function RootLayout({
