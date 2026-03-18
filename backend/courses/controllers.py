@@ -34,8 +34,12 @@ class CourseController:
             request.user, data.prompt, data.level, data.num_modules
         )
 
-    @route.get("{course_id}", response=CourseDetailSchema)
-    def get_course(self, request, course_id: int):
+    @route.get("{course_id}", response=CourseOut) # Use CourseOut for base data, detail has modules
+    def get_course_base(self, request, course_id: int):
+        return self.course_service.get_course(course_id, request.user)
+
+    @route.get("{course_id}/detail", response=CourseDetailSchema)
+    def get_course_detail(self, request, course_id: int):
         return self.course_service.get_course(course_id, request.user)
 
     @route.delete("{course_id}")

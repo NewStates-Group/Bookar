@@ -26,7 +26,7 @@ from google.genai import types
 from PIL import Image, ImageDraw, UnidentifiedImageError
 
 from .exceptions import LessonDoesNotExist, ThumbnailCreationError
-from .models import Choice, Course, Lesson, Module, Question, Quiz
+from .models import Choice, Course, Lesson, Module, Question, Quiz, CourseGenerationContext
 from .utils import (
     extract_json,
     get_genai_client,
@@ -596,6 +596,16 @@ def create_course_details(course_pk: int, prompt: str, level: str):
 
     Course.objects.filter(pk=course_pk).update(
         desc=course_desc, title=course_title, max_modules=max_modules, status="PROCESSING"
+    )
+
+    # Save generation context for future reuse
+    CourseGenerationContext.objects.update_or_create(
+        course=course,
+        defaults={
+            "prompt": prompt,
+            "system_prompt": ai_prompt,
+            "response": response
+        }
     )
     
     # Trigger thumbnail and module generation in parallel

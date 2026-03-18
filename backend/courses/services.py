@@ -3,8 +3,9 @@ from django.conf import settings
 from django.db.models import Prefetch
 from django.db.models.query import QuerySet
 from ninja.errors import HttpError
+from django.utils import timezone
 
-from .models import Choice, Course, Lesson, Question, Quiz, QuizAttempt, Module
+from .models import Choice, Course, Lesson, Question, Quiz, QuizAttempt, Module, CourseEnrollment, LessonProgress
 from .tasks import (
     create_course_details,
     generate_lesson,
@@ -17,7 +18,18 @@ logger = logging.getLogger(__name__)
 
 class CourseService:
     def list_courses(self, user) -> QuerySet[Course]:
-        return Course.objects.filter(user=user, deleted=False).order_by("-created_at")
+        # Return courses owned by user OR courses user is enrolled in
+        owned_ids = (
+            Course.objects.filter(user=user, deleted=False)
+            .values_list("id", flat=True)
+        )
+        enrolled_ids = (
+            CourseEnrollment.objects.filter(user=user)
+            .values_list("course_id", flat=True)
+        )
+        all_ids = set(owned_ids) | set(enrolled_ids)
+        
+        return Course.objects.filter(id__in=all_ids, deleted=False).order_by("-created_at")
 
     def get_course(self, id: int, user=None) -> Course:
         try:
@@ -31,6 +43,11 @@ class CourseService:
             ).get(pk=id)
 
             if user:
+                # Update last_accessed_at on enrollment
+                CourseEnrollment.objects.filter(course=course, user=user).update(
+                    last_accessed_at=timezone.now()
+                )
+
                 for module in course.modules.all():
                     if hasattr(module, "quiz"):
                         last_attempt = (
@@ -47,110 +64,42 @@ class CourseService:
             raise HttpError(404, "Curso não encontrado")
 
     def create_course(self, user, prompt: str, level: str, num_modules: int = None) -> Course:
-        # Check if a course with this prompt already exists and is READY
+        # 1. Check if the current user already has this course (same prompt and level)
         from .models import CourseGenerationContext
+        user_existing_course = Course.objects.filter(
+            user=user,
+            level=level,
+            generation_context__prompt=prompt,
+            deleted=False
+        ).first()
+        
+        if user_existing_course:
+            logger.info(f"User {user.id} already has course {user_existing_course.id} for prompt '{prompt}'")
+            return user_existing_course
+
+        # 2. Check if ANY course with this prompt already exists and is READY
         existing_context = CourseGenerationContext.objects.filter(
             prompt=prompt, 
             course__level=level, 
             course__status="READY"
-        ).first()
+        ).order_by("-created_at").first()
 
         if existing_context:
             existing_course = existing_context.course
             logger.info(f"Reusing existing course {existing_course.id} for prompt '{prompt}'")
             
-            # Create new course for current user
-            new_course = Course.objects.create(
-                user=user,
-                title=existing_course.title,
-                desc=existing_course.desc,
-                level=existing_course.level,
-                thumb=existing_course.thumb,
-                max_modules=existing_course.max_modules,
-                status="READY"
-            )
+            # Instead of duplicating, just enroll the user in the existing course
+            self.enroll_course(user, existing_course.id)
+            return existing_course
 
-            # Duplicate Modules
-            for module in existing_course.modules.all():
-                new_module = Module.objects.create(
-                    course=new_course,
-                    name=module.name,
-                    desc=module.desc,
-                    created_at=module.created_at
-                )
-
-                # Duplicate Lessons
-                for lesson in module.lessons.all():
-                    new_lesson = Lesson.objects.create(
-                        module=new_module,
-                        title=lesson.title,
-                        desc=lesson.desc,
-                        duration=lesson.duration,
-                        status="READY", # Ensure ready
-                        lesson_file=lesson.lesson_file,
-                        narration=lesson.narration,
-                        key_points=lesson.key_points,
-                        scene_suggestion=lesson.scene_suggestion,
-                        created_at=lesson.created_at,
-                        delivered=True # Since it's ready
-                    )
-                    
-                    # Duplicate Quiz for Lesson if exists
-                    if hasattr(lesson, 'quiz'):
-                        original_quiz = lesson.quiz
-                        new_quiz = Quiz.objects.create(
-                            lesson=new_lesson,
-                            title=original_quiz.title,
-                            description=original_quiz.description
-                        )
-                        # Duplicate Questions
-                        for question in original_quiz.questions.all():
-                            new_question = Question.objects.create(
-                                quiz=new_quiz,
-                                text=question.text,
-                                explanation=question.explanation
-                            )
-                            # Duplicate Choices
-                            for choice in question.choices.all():
-                                Choice.objects.create(
-                                    question=new_question,
-                                    text=choice.text,
-                                    is_correct=choice.is_correct
-                                )
-
-                # Duplicate Quiz for Module if exists
-                if hasattr(module, 'quiz'):
-                    original_quiz = module.quiz
-                    new_quiz = Quiz.objects.create(
-                        module=new_module,
-                        title=original_quiz.title,
-                        description=original_quiz.description
-                    )
-                    # Duplicate Questions
-                    for question in original_quiz.questions.all():
-                        new_question = Question.objects.create(
-                            quiz=new_quiz,
-                            text=question.text,
-                            explanation=question.explanation
-                        )
-                        # Duplicate Choices
-                        for choice in question.choices.all():
-                            Choice.objects.create(
-                                question=new_question,
-                                text=choice.text,
-                                is_correct=choice.is_correct
-                            )
-            
-            return new_course
-
-        # If no existing course, create new one
-        # If num_modules is None, default to 5, but task will update it
+        # 3. If no existing course, create new one
         course = Course.objects.create(user=user, level=level, max_modules=num_modules or 5)
         create_course_details.delay(course.pk, prompt, course.get_level_display())
         return course
 
     def delete_course(self, course_id: int, user):
         try:
+            # If the user is the owner, we can mark as deleted
             course = Course.objects.get(pk=course_id, user=user)
             course.deleted = True
             if course.status == "PROCESSING":
@@ -158,7 +107,13 @@ class CourseService:
             course.save(update_fields=["deleted", "status"])
             return {"success": True}
         except Course.DoesNotExist:
-            raise HttpError(404, "Curso não encontrado ou sem permissão")
+            # If the user is just enrolled, they can remove the enrollment
+            enrollment = CourseEnrollment.objects.filter(course_id=course_id, user=user).first()
+            if enrollment:
+                enrollment.delete()
+                return {"success": True}
+            else:
+                raise HttpError(404, "Curso não encontrado ou sem permissão")
 
     def cancel_course(self, user, course_id: int):
         try:
@@ -168,7 +123,34 @@ class CourseService:
             course.save(update_fields=["status", "deleted"])
             return {"success": True, "message": "Curso cancelado e removido."}
         except Course.DoesNotExist:
+            # Try to just remove enrollment
+            enrollment = CourseEnrollment.objects.filter(course_id=course_id, user=user).first()
+            if enrollment:
+                enrollment.delete()
+                return {"success": True, "message": "Matrícula removida."}
             raise HttpError(404, "Curso não encontrado")
+
+    def enroll_course(self, user, course_id: int) -> CourseEnrollment:
+        try:
+            course = Course.objects.get(pk=course_id)
+            enrollment, created = CourseEnrollment.objects.get_or_create(
+                user=user, course=course
+            )
+            return enrollment
+        except Course.DoesNotExist:
+            raise HttpError(404, "Curso não encontrado")
+
+    def mark_lesson_watched(self, user, lesson_id: int):
+        try:
+            lesson = Lesson.objects.get(pk=lesson_id)
+            LessonProgress.objects.update_or_create(
+                user=user, 
+                lesson=lesson,
+                defaults={"watched": True}
+            )
+            return {"success": True}
+        except Lesson.DoesNotExist:
+            raise HttpError(404, "Lição não encontrada")
 
     def get_next_lesson(self, user, course_id: int, current_lesson: int = 0):
         if current_lesson:
@@ -179,14 +161,18 @@ class CourseService:
                 .filter(id__gt=current_lesson)
                 .first()
             )
-        return (
-            Lesson.objects.filter(
-                module__course__user=user, module__course_id=course_id, watched=False
-            )
-            .only("module", "id", "status")
-            .order_by("module__created_at", "module__id", "id")
-            .first()
-        )
+        
+        # Get all lessons for the course
+        all_lessons = Lesson.objects.filter(
+            module__course_id=course_id
+        ).order_by("module__created_at", "module__id", "id")
+        
+        # Find the first one not watched by the user
+        for lesson in all_lessons:
+            if not LessonProgress.objects.filter(user=user, lesson=lesson, watched=True).exists():
+                return lesson
+        
+        return None
 
     def get_quiz(self, lesson_id: int) -> Quiz:
         try:
@@ -194,9 +180,21 @@ class CourseService:
         except Quiz.DoesNotExist:
             raise HttpError(404, "Quiz ainda não disponível")
 
-    def get_module_quiz(self, module_id: int) -> Quiz:
+    def get_module_quiz(self, user, module_id: int) -> Quiz:
         try:
+            module = Module.objects.prefetch_related("lessons").get(pk=module_id)
+            # Check if all lessons are watched by this user
+            total_lessons = module.lessons.count()
+            watched_count = LessonProgress.objects.filter(
+                lesson__module=module, user=user, watched=True
+            ).count()
+            
+            if watched_count < total_lessons:
+                raise HttpError(400, "Você precisa assistir a todas as aulas antes de iniciar o quiz.")
+            
             return Quiz.objects.get(module_id=module_id)
+        except Module.DoesNotExist:
+            raise HttpError(404, "Módulo não encontrado")
         except Quiz.DoesNotExist:
             raise HttpError(404, "Quiz ainda não disponível")
 
@@ -239,6 +237,8 @@ class CourseService:
         return {"score": score, "passed": passed, "correct_answers": list(all_correct)}
 
     def trigger_next_module(self, user_pk, course_id: int):
+        from accounts.models import User
+        user = User.objects.get(pk=user_pk)
         try:
             course = Course.objects.get(pk=course_id)
             current_module_count = course.modules.count()
@@ -246,20 +246,29 @@ class CourseService:
             if course.max_modules and current_module_count >= course.max_modules:
                 raise HttpError(400, f"Limite de módulos atingido ({course.max_modules})")
 
-            # Check if the previous module's quiz is passed
+            # Check if the previous module is completed for this user
             last_module = course.modules.order_by("id").last()
             if last_module:
+                # Check lessons watched by consumer
+                total_lessons = last_module.lessons.count()
+                watched_count = LessonProgress.objects.filter(
+                    lesson__module=last_module, user=user, watched=True
+                ).count()
+                
+                if watched_count < total_lessons:
+                    raise HttpError(400, "Você precisa assistir a todas as aulas do módulo anterior para avançar.")
+                
                 try:
-                    # Assuming simple check: did the user pass *any* attempt for this quiz?
+                    # Check if the module quiz is passed
                     quiz = last_module.quiz
                     if quiz:
                         passed = QuizAttempt.objects.filter(
-                            user_id=user_pk, quiz=quiz, passed=True
+                            user=user, quiz=quiz, passed=True
                         ).exists()
                         if not passed:
                             raise HttpError(400, "Você precisa passar no quiz do módulo anterior para avançar.")
                 except Quiz.DoesNotExist:
-                    pass # No quiz for previous module, allow proceed (or maybe generate one?)
+                    pass # No quiz for previous module, allow proceed
             
             # Pre-create the module in PROCESSING status
             new_module = Module.objects.create(
@@ -274,15 +283,21 @@ class CourseService:
             raise HttpError(404, "Curso não encontrado")
 
     def get_certificate_info(self, user, course_id: int):
-        course = Course.objects.get(pk=course_id, user=user)
+        course = Course.objects.get(pk=course_id)
         
-        # Verify completion
-        if not course.is_fully_completed:
+        # Verify completion for THIS user
+        if not course.is_fully_completed(user):
             raise HttpError(400, "O curso ainda não foi totalmente concluído.")
 
-        # If READY, return the URL
-
         # If PROCESSING, just return status
+        if course.certificate_status == "READY":
+             # We should probably have a Certificate model if multiple users can get it for same course
+             # For now, if Course record is shared, the certificate_file on Course model is problematic.
+             # USER said "reaproveitar curso ... com metadados como data de criacao".
+             # This implies CourseEnrollment is the "record".
+             # So maybe the certificate should be tracked on enrollment.
+             pass
+
         if course.certificate_status == "PROCESSING":
             return {"status": "PROCESSING", "message": "Seu certificado está sendo gerado."}
 
@@ -301,16 +316,23 @@ class CourseService:
 
 class LessonService:
     def get_lesson(self, user, lesson_id: int):
-        return Lesson.objects.filter(id=lesson_id, module__course__user=user).first()
+        # Allow access if user owns or is enrolled
+        lesson = Lesson.objects.select_related("module__course").get(id=lesson_id)
+        course = lesson.module.course
+        if course.user == user or CourseEnrollment.objects.filter(course=course, user=user).exists():
+            return lesson
+        return None
 
     def mark_watched(self, user, lesson_id: int):
         try:
-            lesson = Lesson.objects.get(id=lesson_id, module__course__user=user)
-            if not lesson.watched:
-                lesson.watched = True
-                lesson.save(update_fields=["watched"])
-                return {"success": True}
-            return {"error": "Já foi assistida"}
+            lesson = Lesson.objects.get(id=lesson_id)
+            from .models import LessonProgress
+            progress, created = LessonProgress.objects.update_or_create(
+                user=user,
+                lesson=lesson,
+                defaults={"watched": True}
+            )
+            return {"success": True}
         except Lesson.DoesNotExist:
             raise HttpError(404, "Lição não encontrada")
 

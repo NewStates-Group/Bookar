@@ -5,7 +5,7 @@ from ninja import ModelSchema, Schema
 from ninja.orm import create_schema
 from pydantic import Field
 
-from .models import Choice, Course, CourseLevel, Lesson, Module, Question, Quiz
+from .models import Choice, Course, CourseEnrollment, CourseLevel, Lesson, Module, Question, Quiz
 
 
 class CourseOut(ModelSchema):
@@ -35,8 +35,20 @@ class CourseOut(ModelSchema):
                 return str(obj.thumb)
         return None
 
+    @staticmethod
+    def resolve_is_fully_completed(obj, context):
+        user = context.get("request").user
+        return obj.is_fully_completed(user)
+
+    @staticmethod
+    def resolve_is_completed(obj, context):
+        user = context.get("request").user
+        return obj.is_completed(user)
+
 
 class LessonSchema(ModelSchema):
+    watched: bool = False
+
     class Meta:
         model = Lesson
         fields = [
@@ -45,7 +57,6 @@ class LessonSchema(ModelSchema):
             "title",
             "desc",
             "duration",
-            "watched",
             "delivered",
             "lesson_file",
             "narration",
@@ -54,6 +65,11 @@ class LessonSchema(ModelSchema):
             "created_at",
             "status",
         ]
+
+    @staticmethod
+    def resolve_watched(obj, context):
+        user = context.get("request").user
+        return obj.progress.filter(user=user, watched=True).exists()
 
     @staticmethod
     def resolve_lesson_file(obj):
@@ -66,14 +82,20 @@ class LessonSchema(ModelSchema):
 
 
 class GetNextLessonSchema(ModelSchema):
+    watched: bool = False
+
     class Meta:
         model = Lesson
         fields = [
             "id",
             "module",
-            "watched",
             "status",
         ]
+
+    @staticmethod
+    def resolve_watched(obj, context):
+        user = context.get("request").user
+        return obj.progress.filter(user=user, watched=True).exists()
 ModuleSchema = create_schema(Module, fields=["id", "name", "desc"])
 
 
@@ -151,3 +173,17 @@ class QuizResult(Schema):
 
 class MessageSchema(Schema):
     msg: str = ""
+
+
+class EnrollmentOut(ModelSchema):
+    class Meta:
+        model = CourseEnrollment
+        fields = [
+            "id",
+            "course",
+            "user",
+            "status",
+            "enrolled_at",
+            "last_accessed_at",
+            "completed_at",
+        ]

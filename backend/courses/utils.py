@@ -159,9 +159,4 @@ def cached_genai_call(prompt: str, ttl: int = 86400) -> str:
     return result
 
 
-def get_next_lesson(course_pk: int) -> Lesson | None:
-    return (
-        Lesson.objects.filter(module__course_id=course_pk, watched=False)
-        .order_by("module__created_at", "module__id", "id")
-        .first()
-    )
+

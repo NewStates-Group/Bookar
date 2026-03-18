@@ -71,7 +71,7 @@ export function CourseWatchSidebar({ course, onClose }: { course: CourseData | n
                     </button>
                 </div>
                 <p className="text-xs text-foreground/50 mt-1">
-                    {course?.modules.length || 0} módulos • {watchedLessons} de {totalLessons} visto
+                    {course?.modules.length || 0} módulos • {watchedLessons}/{totalLessons} aulas
                 </p>
                 <div className="mt-3 bg-muted rounded-full h-2 overflow-hidden border border-border">
                     <div
@@ -188,6 +188,13 @@ export function CourseWatchSidebar({ course, onClose }: { course: CourseData | n
                                                                     <div className="flex items-center gap-2">
                                                                         <p className="truncate text-sm">{module.name}</p>
                                                                     </div>
+                                                                    
+                                                                </div>
+                                                                <div className="flex items-center gap-2">
+                                                                    <p className="text-xs text-foreground/40">
+                                                                        Exercício Prático
+                                                                    </p>
+                                                                    {!allWatched && <span className="text-xs font-semibold text-foreground/60">(Bloqueado)</span>}
                                                                     {module.last_quiz_score !== undefined && module.last_quiz_score !== null && (
                                                                         <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${module.last_quiz_passed
                                                                             ? "bg-green-500/20 text-green-600"
@@ -196,12 +203,7 @@ export function CourseWatchSidebar({ course, onClose }: { course: CourseData | n
                                                                             {module.last_quiz_score.toFixed(1)}
                                                                         </span>
                                                                     )}
-                                                                </div>
-                                                                <div className="flex items-center gap-2">
-                                                                    <p className="text-xs text-foreground/40">
-                                                                        Exercício Prático
-                                                                    </p>
-                                                                    {!allWatched && <span className="text-xs font-semibold text-foreground/60">(Bloqueado)</span>}
+
                                                                 </div>
                                                             </div>
                                                         </button>

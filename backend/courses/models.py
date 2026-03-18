@@ -70,73 +70,51 @@ class Course(models.Model):
     
     created_at = models.DateTimeField(auto_now_add=True)
 
-    @property
-    def is_completed(self):
-        # Check if all lessons are watched
+    def is_completed(self, user):
+        # Check if all lessons are watched for this specific user
         total_lessons = Lesson.objects.filter(module__course=self).count()
         if total_lessons == 0:
             return False
-        watched_lessons = Lesson.objects.filter(module__course=self, watched=True).count()
+        watched_lessons = LessonProgress.objects.filter(
+            lesson__module__course=self, user=user, watched=True
+        ).count()
         if watched_lessons < total_lessons:
             return False
 
-        # Check quizzes
-        for module in self.modules.all():
-            if hasattr(module, 'quiz'):
-                # We need to import QuizAttempt inside method to avoid circular import if define elsewhere
-                # But models.py defines all. We need to make sure QuizAttempt is available or use strict relation
-                # QuizAttempt is defined below. Python resolves at runtime, so it should be fine if defined in same file.
-                # However, QuizAttempt is usually defined AFTER Course.
-                # Use string reference or import locally?
-                # Actually, QuizAttempt is defined in same file, likely below. 
-                # Let's check where QuizAttempt is defined.
-                pass
-        
-        # Re-implementing with lookup that doesn't depend on order if possible, or just moving class?
-        # Better: use reverse relation if available.
-        # QuizAttempt has 'quiz' FK.
-        # Quiz has 'module' OneToOne.
-        # So module.quiz.attempts.filter(user=self.user, passed=True).exists()
-        
-        # But wait, Course.user is the owner.
-        return self._check_completion()
+        return self._check_completion(user)
 
-    def _check_completion(self):
-        # We use runtime lookup because QuizAttempt is defined below
+    def _check_completion(self, user):
         for module in self.modules.all():
-            if hasattr(module, 'quiz'):
-                # Check if passed attempt exists
-                if not module.quiz.attempts.filter(passed=True).exists():
+            if hasattr(module, "quiz"):
+                if not module.quiz.attempts.filter(user=user, passed=True).exists():
                     return False
         return True
 
-    @property
-    def is_fully_completed(self):
+    def is_fully_completed(self, user):
         """
         Comprehensive completion check:
         - All modules generated (reached max_modules)
-        - All lessons in all modules are watched
-        - All module quizzes are passed
+        - All lessons in all modules are watched by the user
+        - All module quizzes are passed by the user
         """
-        # 1. Check if all modules are generated
         if self.max_modules and self.modules.count() < self.max_modules:
             return False
-        
-        # 2. Check if all lessons are watched and ready
+
         total_lessons = Lesson.objects.filter(module__course=self).count()
         if total_lessons == 0:
             return False
-            
-        watched_lessons = Lesson.objects.filter(module__course=self, watched=True, status="READY").count()
+
+        watched_lessons = LessonProgress.objects.filter(
+            lesson__module__course=self, user=user, watched=True, lesson__status="READY"
+        ).count()
         if watched_lessons < total_lessons:
             return False
-            
-        # 3. Check if all module quizzes are passed
+
         for module in self.modules.all():
-            if hasattr(module, 'quiz'):
-                if not module.quiz.attempts.filter(passed=True).exists():
+            if hasattr(module, "quiz"):
+                if not module.quiz.attempts.filter(user=user, passed=True).exists():
                     return False
-        
+
         return True
 
 
@@ -157,7 +135,6 @@ class Lesson(models.Model):
     title = models.CharField(max_length=150)
     desc = models.TextField()
     duration = models.PositiveIntegerField(default=0)
-    watched = models.BooleanField(default=False)
     delivered = models.BooleanField(default=False, null=True, blank=True)
     status = models.CharField(
         max_length=20,
@@ -169,6 +146,16 @@ class Lesson(models.Model):
     key_points = models.CharField(max_length=150, null=True, blank=True)
     scene_suggestion = models.TextField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)
+
+
+class LessonProgress(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="lesson_progress")
+    lesson = models.ForeignKey(Lesson, on_delete=models.CASCADE, related_name="progress")
+    watched = models.BooleanField(default=False)
+    watched_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ("user", "lesson")
 
 
 class CourseGenerationContext(models.Model):
@@ -222,3 +209,37 @@ class QuizAttempt(models.Model):
     score = models.FloatField()
     passed = models.BooleanField(default=False)
     completed_at = models.DateTimeField(auto_now_add=True)
+
+
+class EnrollmentStatus(models.TextChoices):
+    ACTIVE = "ACTIVE", "Ativo"
+    PAUSED = "PAUSED", "Pausado"
+    FINISHED = "FINISHED", "Concluído"
+
+
+class CourseEnrollment(models.Model):
+    """
+    Links a Course to a User (for course reuse / sharing).
+    The course owner is still tracked by Course.user.
+    """
+    course = models.ForeignKey(
+        Course, on_delete=models.CASCADE, related_name="enrollments"
+    )
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="enrollments"
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=EnrollmentStatus.choices,
+        default=EnrollmentStatus.ACTIVE,
+    )
+    enrolled_at = models.DateTimeField(auto_now_add=True)
+    last_accessed_at = models.DateTimeField(null=True, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    notes = models.TextField(null=True, blank=True)
+
+    class Meta:
+        unique_together = ("course", "user")
+
+    def __str__(self):
+        return f"Enrollment: {self.user} → {self.course}"
