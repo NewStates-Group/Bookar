@@ -12,6 +12,7 @@ class CourseOut(ModelSchema):
     is_fully_completed: bool = False
     is_completed: bool = False
     certificate_status: str = "NOT_GENERATED"
+    certificate_url: Optional[str] = None
 
     class Meta:
         model = Course
@@ -50,6 +51,17 @@ class CourseOut(ModelSchema):
         user = context.get("request").user
         enrollment = obj.enrollments.filter(user=user).first()
         return enrollment.certificate_status if enrollment else "NOT_GENERATED"
+
+    @staticmethod
+    def resolve_certificate_url(obj, context):
+        user = context.get("request").user
+        enrollment = obj.enrollments.filter(user=user).first()
+        if enrollment and enrollment.certificate_status == "READY" and enrollment.certificate_file:
+            try:
+                return enrollment.certificate_file.url
+            except Exception:
+                return None
+        return None
 
 
 class LessonSchema(ModelSchema):

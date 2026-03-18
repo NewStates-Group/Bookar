@@ -83,15 +83,22 @@ class AuthService:
         return user
 
     def get_user_stats(self, user):
-        all_courses = Course.objects.filter(user=user, deleted=False)
+        from courses.models import CourseEnrollment
+        active_enrollments = CourseEnrollment.objects.filter(user=user, deleted=False)
         
         # This is a bit expensive if many courses, but okay for MVP
-        finished_ids = [c.id for c in all_courses if c.is_fully_completed]
+        finished_count = 0
+        for enrollment in active_enrollments:
+            # Check completion for this user
+            if enrollment.course.is_fully_completed(user):
+                finished_count += 1
+        
+        total_count = active_enrollments.count()
         
         return {
-            "ongoing_courses": all_courses.count() - len(finished_ids),
-            "finished_courses": len(finished_ids),
-            "certificates_issued": len(finished_ids), # Assuming 1:1 for now
+            "ongoing_courses": total_count - finished_count,
+            "finished_courses": finished_count,
+            "certificates_issued": finished_count,
         }
 
     def get_google_auth_url(self):

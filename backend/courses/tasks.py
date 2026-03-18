@@ -13,7 +13,8 @@ from django.conf import settings
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import landscape, A4
 from reportlab.lib import colors
-from reportlab.lib.units import cm
+from reportlab.lib.units import mm
+from pypdf import PdfReader, PdfWriter
 from core.mail import send_certificate_email
 import os
 import io
@@ -362,7 +363,7 @@ def generate_lesson(self, user_id, lesson_id: int):
 def generate_next_module(self, user_pk: int, course_pk: int, module_pk: int = None):
     try:
         course = Course.objects.get(pk=course_pk)
-        if course.status == "CANCELLED" or course.deleted:
+        if course.status == "CANCELLED":
             logger.info(f"Course {course_pk} next module generation cancelled.")
             return
     except Course.DoesNotExist:
@@ -443,10 +444,10 @@ def generate_next_module(self, user_pk: int, course_pk: int, module_pk: int = No
             )
         Lesson.objects.bulk_create(lessons_to_create)
         
-        # Generate all lessons in the module simultaneously
-        pending_lessons = Lesson.objects.filter(module=module_object, status="PENDING")
-        for l in pending_lessons:
-            generate_lesson.delay(user_pk, l.id)
+        # Generate only the first lesson of the module; others will be triggered sequentially
+        first_lesson = Lesson.objects.filter(module=module_object, status="PENDING").order_by("id").first()
+        if first_lesson:
+             generate_lesson.delay(user_pk, first_lesson.id)
 
         # For the first module, mark course as READY to show in dashboard
         if course.modules.count() == 1:
@@ -573,7 +574,7 @@ def create_course_details(user_id: int, course_pk: int, prompt: str, level: str)
     course_outline = None
     try:
         course = Course.objects.get(pk=course_pk)
-        if course.status == "CANCELLED" or course.deleted:
+        if course.status == "CANCELLED":
             logger.info(f"Course {course_pk} generation cancelled.")
             return
 
@@ -593,6 +594,10 @@ def create_course_details(user_id: int, course_pk: int, prompt: str, level: str)
         max_modules = 3
     if max_modules > 5:
         max_modules = 5
+
+    Course.objects.filter(pk=course_pk).update(
+        desc=course_desc, title=course_title, max_modules=max_modules, status="PROCESSING"
+    )
 
     Course.objects.filter(pk=course_pk).update(
         desc=course_desc, title=course_title, max_modules=max_modules, status="PROCESSING"
@@ -637,7 +642,7 @@ def create_course_thumb(course_pk: str, prompt: str):
 
     try:
         course = Course.objects.get(pk=course_pk)
-        if course.status == "CANCELLED" or course.deleted:
+        if course.status == "CANCELLED":
             logger.info(f"Course {course_pk} thumbnail generation cancelled.")
             return
 
@@ -703,131 +708,133 @@ def create_course_thumb(course_pk: str, prompt: str):
         logger.error(f"Thumbnail creation failed: {e}")
         Course.objects.filter(pk=course_pk).update(status="FAILED")
         raise ThumbnailCreationError(f"Erro ao criar thumbnail: {str(e)}") 
+def get_certificate_base_layer():
+    """Generates the static background layer of the certificate."""
+    buffer = io.BytesIO()
+    c = canvas.Canvas(buffer, pagesize=landscape(A4))
+    width, height = landscape(A4)
+    
+    # --- Background ---
+    bg_path = os.path.join(settings.BASE_DIR, "static", "BG.png")
+    if os.path.exists(bg_path):
+        c.drawImage(bg_path, 0, 0, width=width, height=height)
+    else:
+        c.setFillColor(colors.white)
+        c.rect(0, 0, width, height, fill=1, stroke=0)
+
+    # Logo
+    logo_path = os.path.join(settings.BASE_DIR, "static", "logo.png")
+    if os.path.exists(logo_path):
+        c.drawImage(logo_path, width/2 - 15*mm, height - 35*mm, width=30*mm, preserveAspectRatio=True)
+    
+    # Title
+    c.setFont("Helvetica-Bold", 14)
+    c.setFillColor(colors.black)
+    c.drawCentredString(width/2, height - 45*mm, "BOOKAR")
+
+    # Certificate Name
+    c.setFont("Helvetica-Bold", 28)
+    c.drawCentredString(width/2, height - 60*mm, "CERTIFICADO DE CONCLUSÃO")
+    
+    # Static footer parts
+    footer_y = 25*mm
+    
+    # Sign line
+    c.setStrokeColor(colors.black)
+    c.setLineWidth(0.5)
+    c.line(25*mm, footer_y + 12*mm, 85*mm, footer_y + 12*mm)
+    c.setFont("Helvetica-Bold", 10)
+    c.drawString(25*mm, footer_y + 8*mm, "ASSINATURA BOOKAR")
+    c.setFont("Helvetica", 7)
+    c.setFillColor(colors.gray)
+    c.drawString(25*mm, footer_y + 4*mm, "PLATAFORMA DE ENSINO INTELIGENTE")
+    
+    # Authenticity
+    c.setFont("Helvetica", 9)
+    c.setFillColor(colors.gray)
+    c.drawCentredString(width/2, footer_y + 8*mm, "AUTENTICIDADE GARANTIDA")
+    c.setFillColor(colors.black)
+    c.drawCentredString(width/2, footer_y + 4*mm, "bookar.ai/verify")
+    
+    # Seal
+    c.setStrokeColor(colors.black)
+    c.setLineWidth(1.5)
+    c.circle(width - 40*mm, footer_y + 12*mm, 15*mm, fill=0, stroke=1)
+    c.setFont("Helvetica-Bold", 24)
+    c.drawCentredString(width - 40*mm, footer_y + 8*mm, "B")
+    
+    c.showPage()
+    c.save()
+    buffer.seek(0)
+    return buffer
+
 @shared_task(autoretry_for=(Exception,), retry_backoff=True, retry_kwargs={'max_retries': 3}, default_retry_delay=40)
 def generate_certificate_task(user_id: int, course_id: int, full_name: str):
+    from .models import Course, CourseEnrollment
     User = get_user_model()
     try:
         user = User.objects.get(pk=user_id)
         course = Course.objects.get(pk=course_id)
         
-        buffer = io.BytesIO()
-        c = canvas.Canvas(buffer, pagesize=landscape(A4))
+        # 1. Generate text layer (Transparent)
+        text_buffer = io.BytesIO()
+        c = canvas.Canvas(text_buffer, pagesize=landscape(A4))
         width, height = landscape(A4)
         
-        # --- Background and Decorations ---
-        c.setFillColor(colors.whitesmoke)
-        c.rect(0, 0, width, height, fill=1, stroke=0)
+        c.setFont("Helvetica", 12)
+        c.setFillColor(colors.gray)
+        c.drawCentredString(width/2, height - 80*mm, "CERTIFICAMOS QUE")
         
-        c.setStrokeColor(colors.transparent)
-        c.setFillColor(colors.HexColor("#bbdefb", hasAlpha=True)) # Light Blue
-        
-        # Wave 1
-        p = c.beginPath()
-        p.moveTo(0, 0)
-        p.lineTo(0, 3*cm)
-        p.curveTo(width/4, 5*cm, 3*width/4, 1*cm, width, 3*cm)
-        p.lineTo(width, 0)
-        p.close()
-        c.drawPath(p, fill=1, stroke=0)
-        
-        # Wave 2
-        c.setFillColor(colors.HexColor("#64b5f6", hasAlpha=True))
-        p = c.beginPath()
-        p.moveTo(0, 0)
-        p.lineTo(0, 2*cm)
-        p.curveTo(width/3, 4*cm, 2*width/3, 0.5*cm, width, 2*cm)
-        p.lineTo(width, 0)
-        p.close()
-        c.drawPath(p, fill=1, stroke=0)
-
-        # --- Logo ---
-        logo_path = os.path.join(settings.BASE_DIR, "static", "logo.png")
-        if os.path.exists(logo_path):
-            # Centered logo with better sizing
-            c.drawImage(logo_path, width/2 - 2*cm, height - 4*cm, width=4*cm, preserveAspectRatio=True)
-        
-        # --- Text Content ---
-        c.setFont("Helvetica-Bold", 14)
-        c.setFillColor(colors.HexColor("#1a237e"))
-        c.drawCentredString(width/2, height - 4.8*cm, "BOOKAR")
-
         c.setFont("Helvetica-Bold", 42)
-        c.setFillColor(colors.HexColor("#1a237e"))
-        c.drawCentredString(width/2, height - 7*cm, "CERTIFICADO DE CONCLUSÃO")
-        
-        c.setFont("Helvetica", 18)
         c.setFillColor(colors.black)
-        c.drawCentredString(width/2, height - 9*cm, "Certificamos que o aluno(a)")
+        c.drawCentredString(width/2, height - 105*mm, full_name.upper())
         
-        c.setFont("Helvetica-Bold", 36)
-        c.setFillColor(colors.HexColor("#0d47a1"))
-        c.drawCentredString(width/2, height - 11*cm, full_name.upper())
-        
-        c.setFont("Helvetica", 18)
-        c.setFillColor(colors.black)
-        c.drawCentredString(width/2, height - 13*cm, "concluiu com êxito e dedicação o curso de")
-        
-        c.setFont("Helvetica-Bold", 24)
-        c.drawCentredString(width/2, height - 14.5*cm, course.title)
+        c.setFont("Helvetica", 16)
+        c.setFillColor(colors.gray)
+        c.drawCentredString(width/2, height - 120*mm, f"Concluiu com aproveitamento o curso de {course.title}")
+        c.drawCentredString(width/2, height - 130*mm, "ministrado pela plataforma Bookar, com carga horária de 24 horas")
         
         from datetime import datetime
         emission_date = datetime.now().strftime("%d de %B de %Y")
-        months = {
-            "January": "Janeiro", "February": "Fevereiro", "March": "Março", "April": "Abril",
-            "May": "Maio", "June": "Junho", "July": "Julho", "August": "Agosto",
-            "September": "Setembro", "October": "Outubro", "November": "Novembro", "December": "Dezembro"
-        }
-        for eng, pt in months.items():
-            emission_date = emission_date.replace(eng, pt)
-
-        c.setFont("Helvetica-Oblique", 12)
-        c.drawCentredString(width/2, 4*cm, f"Emitido em {emission_date}")
-
-        c.setStrokeColor(colors.HexColor("#1a237e"))
-        c.setLineWidth(2)
-        c.rect(1*cm, 1*cm, width - 2*cm, height - 2*cm, fill=0, stroke=1)
+        months = {"January": "Janeiro", "February": "Fevereiro", "March": "Março", "April": "Abril", "May": "Maio", "June": "Junho", "July": "Julho", "August": "Agosto", "September": "Setembro", "October": "Outubro", "November": "Novembro", "December": "Dezembro"}
+        for eng, pt in months.items(): emission_date = emission_date.replace(eng, pt)
+        
+        c.setFont("Helvetica", 10)
+        c.drawCentredString(width/2, height - 150*mm, f"EMITIDO EM {emission_date.upper()}")
+        
+        # Signature name
+        c.setFont("Helvetica-Oblique", 18)
+        c.setFillColor(colors.gray)
+        c.drawString(25*mm, 25*mm + 15*mm, "Bookar.")
         
         c.showPage()
         c.save()
-
-        # Save the file to Enrollment instead of Course
-        from .models import CourseEnrollment
+        text_buffer.seek(0)
+        
+        # 2. Merge Layers
+        base_buffer = get_certificate_base_layer()
+        reader_base = PdfReader(base_buffer)
+        reader_text = PdfReader(text_buffer)
+        writer = PdfWriter()
+        
+        page = reader_base.pages[0]
+        page.merge_page(reader_text.pages[0])
+        writer.add_page(page)
+        
+        final_buffer = io.BytesIO()
+        writer.write(final_buffer)
+        
+        # 3. Save
         enrollment = CourseEnrollment.objects.get(course=course, user=user)
-        
         cert_filename = f"cert_{course.id}_{user.id}_{uuid.uuid4().hex[:8]}.pdf"
-        enrollment.certificate_file.save(
-            cert_filename, ContentFile(buffer.getvalue(), name=cert_filename), save=False
-        )
-        
-        # Update enrollment status
+        enrollment.certificate_file.save(cert_filename, ContentFile(final_buffer.getvalue(), name=cert_filename), save=False)
         enrollment.certificate_status = "READY"
         enrollment.save()
         
-        # We can also update the course.certificate_status if we want a global record,
-        # but the request was to make it per-user.
-        
-        # Send Email
-        send_certificate_email(user, enrollment.certificate_file.url)
-        
+        send_certificate_email(user, course, enrollment.certificate_file.url)
         return enrollment.certificate_file.url
     except Exception as e:
         logger.error(f"Certificate generation failed: {e}")
-        # Try to set enrollment status to FAILED if possible
-        try:
-            from .models import CourseEnrollment
-            CourseEnrollment.objects.filter(course_id=course_id, user_id=user_id).update(
-                certificate_status="FAILED"
-            )
-        except:
-            pass
+        try: CourseEnrollment.objects.filter(course_id=course_id, user_id=user_id).update(certificate_status="FAILED")
+        except: pass
         raise e
-
-        # Send email
-        try:
-            send_certificate_email(user, course)
-        except Exception as e:
-            logger.error(f"Failed to send certificate email for course {course_id}: {e}")
-
-    except Exception as e:
-        logger.error(f"Error generating certificate for course {course_id}: {e}")
-        Course.objects.filter(pk=course_id).update(certificate_status="NOT_GENERATED")

@@ -26,15 +26,13 @@ DEBUG = env("DEBUG")
 ALLOWED_HOSTS = env.list("ALLOWED_HOSTS")
 
 INSTALLED_APPS = [
-    "daphne",
     "ninja_extra",
     "ninja_jwt",
     "ninja_jwt.token_blacklist",
     "corsheaders",
-    "cloudinary_storage",
     "django.contrib.auth",
     "django.contrib.contenttypes",
-    "channels",
+    "cloudinary_storage",
     "cloudinary",
     "courses",
     "accounts",

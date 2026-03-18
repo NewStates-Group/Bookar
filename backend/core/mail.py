@@ -33,13 +33,13 @@ def send_welcome_email(user):
         [user.email]
     )
 
-def send_certificate_email(user, course):
+def send_certificate_email(user, course, certificate_url):
     subject = f"Seu Certificado do curso {course.title} está disponível! 🎓"
     context = {
         "username": user.username,
         "course_title": course.title,
         "site_url": settings.SITE_URL,
-        "certificate_url": f"{settings.SITE_URL}/app/courses/{course.id}"
+        "certificate_url": certificate_url
     }
     send_html_email(
         subject,

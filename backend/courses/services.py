@@ -284,7 +284,7 @@ class CourseService:
             raise HttpError(400, "O curso ainda não foi totalmente concluído.")
 
         if enrollment.certificate_status == "READY":
-             return {"status": "READY", "file_url": enrollment.certificate_file.url}
+             return {"status": "READY", "certificate_url": enrollment.certificate_file.url}
 
         if enrollment.certificate_status == "PROCESSING":
             return {"status": "PROCESSING", "message": "Seu certificado está sendo gerado."}
@@ -299,7 +299,7 @@ class CourseService:
         
         generate_certificate_task.delay(user.id, course.id, full_name)
 
-        return {"status": "PROCESSING", "message": "Solicitação iniciada. Você receberá um e-mail em breve."}
+        return {"status": "PROCESSING", "message": "Certificado está a ser gerado. Enviaremos um e-mail brevemente."}
 
 
 class LessonService:

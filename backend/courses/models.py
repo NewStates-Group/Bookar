@@ -228,7 +228,7 @@ class CourseEnrollment(models.Model):
         upload_to="courses/certificates/",
         null=True,
         blank=True,
-        storage=RawMediaCloudinaryStorage(),
+        storage=MediaCloudinaryStorage(),
     )
     certificate_status = models.CharField(
         max_length=20,
