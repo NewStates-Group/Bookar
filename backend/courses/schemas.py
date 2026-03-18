@@ -11,6 +11,7 @@ from .models import Choice, Course, CourseEnrollment, CourseLevel, Lesson, Modul
 class CourseOut(ModelSchema):
     is_fully_completed: bool = False
     is_completed: bool = False
+    certificate_status: str = "NOT_GENERATED"
 
     class Meta:
         model = Course
@@ -23,7 +24,6 @@ class CourseOut(ModelSchema):
             "created_at",
             "status",
             "max_modules",
-            "certificate_status",
         ]
 
     @staticmethod
@@ -44,6 +44,12 @@ class CourseOut(ModelSchema):
     def resolve_is_completed(obj, context):
         user = context.get("request").user
         return obj.is_completed(user)
+
+    @staticmethod
+    def resolve_certificate_status(obj, context):
+        user = context.get("request").user
+        enrollment = obj.enrollments.filter(user=user).first()
+        return enrollment.certificate_status if enrollment else "NOT_GENERATED"
 
 
 class LessonSchema(ModelSchema):

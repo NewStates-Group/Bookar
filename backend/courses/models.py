@@ -40,13 +40,6 @@ class CourseLevel(models.TextChoices):
 
 
 class Course(models.Model):
-    user = models.ForeignKey(
-        User,
-        on_delete=models.CASCADE,
-        related_name="courses",
-        null=True,
-        blank=True,
-    )
     title = models.CharField(max_length=80, null=True, blank=True)
     desc = models.TextField(null=True, blank=True)
     level = models.CharField(
@@ -58,17 +51,14 @@ class Course(models.Model):
         default=CourseStatus.PROCESSING,
     )
     thumb = models.ImageField(upload_to="courses/thumbs/", null=True, blank=True, storage=MediaCloudinaryStorage())
-    deleted = models.BooleanField(default=False, null=True, blank=True)
     max_modules = models.PositiveIntegerField(null=True, blank=True, default=5)
-    
-    certificate_file = models.FileField(upload_to="courses/certificates/", null=True, blank=True, storage=RawMediaCloudinaryStorage())
-    certificate_status = models.CharField(
-        max_length=20,
-        choices=CertificateStatus.choices,
-        default=CertificateStatus.NOT_GENERATED,
-    )
-    
     created_at = models.DateTimeField(auto_now_add=True)
+
+    @property
+    def creator(self):
+        # find the creator as the first user enrolled
+        enrollment = self.enrollments.order_by("enrolled_at").first()
+        return enrollment.user if enrollment else None
 
     def is_completed(self, user):
         # Check if all lessons are watched for this specific user
@@ -232,6 +222,18 @@ class CourseEnrollment(models.Model):
         max_length=20,
         choices=EnrollmentStatus.choices,
         default=EnrollmentStatus.ACTIVE,
+    )
+    deleted = models.BooleanField(default=False)
+    certificate_file = models.FileField(
+        upload_to="courses/certificates/",
+        null=True,
+        blank=True,
+        storage=RawMediaCloudinaryStorage(),
+    )
+    certificate_status = models.CharField(
+        max_length=20,
+        choices=CertificateStatus.choices,
+        default=CertificateStatus.NOT_GENERATED,
     )
     enrolled_at = models.DateTimeField(auto_now_add=True)
     last_accessed_at = models.DateTimeField(null=True, blank=True)

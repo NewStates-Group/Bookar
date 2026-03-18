@@ -18,18 +18,12 @@ logger = logging.getLogger(__name__)
 
 class CourseService:
     def list_courses(self, user) -> QuerySet[Course]:
-        # Return courses owned by user OR courses user is enrolled in
-        owned_ids = (
-            Course.objects.filter(user=user, deleted=False)
-            .values_list("id", flat=True)
-        )
+        # Return courses user is enrolled in and HAS NOT DELETED
         enrolled_ids = (
-            CourseEnrollment.objects.filter(user=user)
+            CourseEnrollment.objects.filter(user=user, deleted=False)
             .values_list("course_id", flat=True)
         )
-        all_ids = set(owned_ids) | set(enrolled_ids)
-        
-        return Course.objects.filter(id__in=all_ids, deleted=False).order_by("-created_at")
+        return Course.objects.filter(id__in=enrolled_ids).order_by("-created_at")
 
     def get_course(self, id: int, user=None) -> Course:
         try:
@@ -64,20 +58,20 @@ class CourseService:
             raise HttpError(404, "Curso não encontrado")
 
     def create_course(self, user, prompt: str, level: str, num_modules: int = None) -> Course:
-        # 1. Check if the current user already has this course (same prompt and level)
-        from .models import CourseGenerationContext
-        user_existing_course = Course.objects.filter(
+        # 1. Check if the current user already has this course (enrolled and not deleted)
+        user_enrollment = CourseEnrollment.objects.filter(
             user=user,
-            level=level,
-            generation_context__prompt=prompt,
+            course__level=level,
+            course__generation_context__prompt=prompt,
             deleted=False
         ).first()
         
-        if user_existing_course:
-            logger.info(f"User {user.id} already has course {user_existing_course.id} for prompt '{prompt}'")
-            return user_existing_course
+        if user_enrollment:
+            logger.info(f"User {user.id} already has enrollment in course {user_enrollment.course_id}")
+            return user_enrollment.course
 
         # 2. Check if ANY course with this prompt already exists and is READY
+        from .models import CourseGenerationContext
         existing_context = CourseGenerationContext.objects.filter(
             prompt=prompt, 
             course__level=level, 
@@ -93,41 +87,37 @@ class CourseService:
             return existing_course
 
         # 3. If no existing course, create new one
-        course = Course.objects.create(user=user, level=level, max_modules=num_modules or 5)
-        create_course_details.delay(course.pk, prompt, course.get_level_display())
+        # Course no longer has 'user' (owner) field. First enrollment identifies creator.
+        course = Course.objects.create(level=level, max_modules=num_modules or 5)
+        # Owner must be enrolled
+        self.enroll_course(user, course.id)
+        
+        create_course_details.delay(user.id, course.pk, prompt, course.get_level_display())
         return course
 
     def delete_course(self, course_id: int, user):
         try:
-            # If the user is the owner, we can mark as deleted
-            course = Course.objects.get(pk=course_id, user=user)
-            course.deleted = True
-            if course.status == "PROCESSING":
-                course.status = "CANCELLED"
-            course.save(update_fields=["deleted", "status"])
+            # We "soft delete" the enrollment instead of the course itself
+            enrollment = CourseEnrollment.objects.get(course_id=course_id, user=user)
+            enrollment.deleted = True
+            enrollment.save()
             return {"success": True}
-        except Course.DoesNotExist:
-            # If the user is just enrolled, they can remove the enrollment
-            enrollment = CourseEnrollment.objects.filter(course_id=course_id, user=user).first()
-            if enrollment:
-                enrollment.delete()
-                return {"success": True}
-            else:
-                raise HttpError(404, "Curso não encontrado ou sem permissão")
+        except CourseEnrollment.DoesNotExist:
+             raise HttpError(404, "Curso não encontrado ou sem permissão")
 
     def cancel_course(self, user, course_id: int):
+        # Cancel is usually for when it's still PROCESSING
         try:
-            course = Course.objects.get(pk=course_id, user=user)
-            course.status = "CANCELLED"
-            course.deleted = True
-            course.save(update_fields=["status", "deleted"])
+            # Check if this user is the "creator" (first enrolled)
+            course = Course.objects.get(pk=course_id)
+            if course.creator == user:
+                course.status = "CANCELLED"
+                course.save(update_fields=["status"])
+            
+            # Always mark user's enrollment as deleted
+            CourseEnrollment.objects.filter(course=course, user=user).update(deleted=True)
             return {"success": True, "message": "Curso cancelado e removido."}
         except Course.DoesNotExist:
-            # Try to just remove enrollment
-            enrollment = CourseEnrollment.objects.filter(course_id=course_id, user=user).first()
-            if enrollment:
-                enrollment.delete()
-                return {"success": True, "message": "Matrícula removida."}
             raise HttpError(404, "Curso não encontrado")
 
     def enroll_course(self, user, course_id: int) -> CourseEnrollment:
@@ -136,6 +126,9 @@ class CourseService:
             enrollment, created = CourseEnrollment.objects.get_or_create(
                 user=user, course=course
             )
+            if enrollment.deleted:
+                enrollment.deleted = False
+                enrollment.save()
             return enrollment
         except Course.DoesNotExist:
             raise HttpError(404, "Curso não encontrado")
@@ -284,21 +277,16 @@ class CourseService:
 
     def get_certificate_info(self, user, course_id: int):
         course = Course.objects.get(pk=course_id)
+        enrollment = CourseEnrollment.objects.get(course=course, user=user)
         
         # Verify completion for THIS user
         if not course.is_fully_completed(user):
             raise HttpError(400, "O curso ainda não foi totalmente concluído.")
 
-        # If PROCESSING, just return status
-        if course.certificate_status == "READY":
-             # We should probably have a Certificate model if multiple users can get it for same course
-             # For now, if Course record is shared, the certificate_file on Course model is problematic.
-             # USER said "reaproveitar curso ... com metadados como data de criacao".
-             # This implies CourseEnrollment is the "record".
-             # So maybe the certificate should be tracked on enrollment.
-             pass
+        if enrollment.certificate_status == "READY":
+             return {"status": "READY", "file_url": enrollment.certificate_file.url}
 
-        if course.certificate_status == "PROCESSING":
+        if enrollment.certificate_status == "PROCESSING":
             return {"status": "PROCESSING", "message": "Seu certificado está sendo gerado."}
 
         # If NOT_GENERATED, trigger generation
@@ -306,8 +294,8 @@ class CourseService:
         if not full_name:
             full_name = user.username
 
-        course.certificate_status = "PROCESSING"
-        course.save()
+        enrollment.certificate_status = "PROCESSING"
+        enrollment.save()
         
         generate_certificate_task.delay(user.id, course.id, full_name)
 
@@ -316,10 +304,10 @@ class CourseService:
 
 class LessonService:
     def get_lesson(self, user, lesson_id: int):
-        # Allow access if user owns or is enrolled
+        # Allow access if user is enrolled
         lesson = Lesson.objects.select_related("module__course").get(id=lesson_id)
         course = lesson.module.course
-        if course.user == user or CourseEnrollment.objects.filter(course=course, user=user).exists():
+        if CourseEnrollment.objects.filter(course=course, user=user, deleted=False).exists():
             return lesson
         return None
 
@@ -338,7 +326,13 @@ class LessonService:
 
     def mark_delivered(self, user, lesson_id: int):
         try:
-            lesson = Lesson.objects.get(id=lesson_id, module__course__user=user)
+             # Ownership check for delivery: only a user enrolled in the course should be able to trigger this?
+             # Or only the "creator"? 
+            lesson = Lesson.objects.get(id=lesson_id)
+            course = lesson.module.course
+            if not CourseEnrollment.objects.filter(course=course, user=user).exists():
+                raise HttpError(403, "Sem permissão")
+
             if not lesson.delivered:
                 lesson.delivered = True
                 lesson.save(update_fields=["delivered"])
@@ -346,7 +340,6 @@ class LessonService:
                 course_id = lesson.module.course_id
                 next_undelivered_lesson = (
                     Lesson.objects.filter(
-                        module__course__user=user,
                         module__course_id=course_id,
                         delivered=False,
                     )

@@ -541,7 +541,7 @@ def generate_module_quiz(module_id: int):
 
 
 @shared_task(autoretry_for=(Exception,), retry_backoff=True, retry_kwargs={'max_retries': 3}, default_retry_delay=40)
-def create_course_details(course_pk: int, prompt: str, level: str):
+def create_course_details(user_id: int, course_pk: int, prompt: str, level: str):
     ai_prompt = f"""
     You are an AI that outputs STRICT JSON.
 
@@ -610,7 +610,7 @@ def create_course_details(course_pk: int, prompt: str, level: str):
     
     # Trigger thumbnail and module generation in parallel
     create_course_thumb.delay(course_pk, prompt)
-    generate_next_module.delay(course.user.pk, course_pk)
+    generate_next_module.delay(user_id, course_pk)
 
 
 @shared_task(autoretry_for=(Exception,), retry_backoff=True, retry_kwargs={'max_retries': 3}, default_retry_delay=40)
@@ -790,13 +790,37 @@ def generate_certificate_task(user_id: int, course_id: int, full_name: str):
         c.showPage()
         c.save()
 
-        # Save the file
-        cert_filename = f"cert_{course.id}_{user.id}_{uuid.uuid4().hex[:8]}.pdf"
-        course.certificate_file.save(cert_filename, ContentFile(buffer.getvalue(), name=cert_filename), save=False)
+        # Save the file to Enrollment instead of Course
+        from .models import CourseEnrollment
+        enrollment = CourseEnrollment.objects.get(course=course, user=user)
         
-        # Update course
-        course.certificate_status = "READY"
-        course.save()
+        cert_filename = f"cert_{course.id}_{user.id}_{uuid.uuid4().hex[:8]}.pdf"
+        enrollment.certificate_file.save(
+            cert_filename, ContentFile(buffer.getvalue(), name=cert_filename), save=False
+        )
+        
+        # Update enrollment status
+        enrollment.certificate_status = "READY"
+        enrollment.save()
+        
+        # We can also update the course.certificate_status if we want a global record,
+        # but the request was to make it per-user.
+        
+        # Send Email
+        send_certificate_email(user, enrollment.certificate_file.url)
+        
+        return enrollment.certificate_file.url
+    except Exception as e:
+        logger.error(f"Certificate generation failed: {e}")
+        # Try to set enrollment status to FAILED if possible
+        try:
+            from .models import CourseEnrollment
+            CourseEnrollment.objects.filter(course_id=course_id, user_id=user_id).update(
+                certificate_status="FAILED"
+            )
+        except:
+            pass
+        raise e
 
         # Send email
         try:

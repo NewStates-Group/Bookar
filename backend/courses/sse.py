@@ -45,7 +45,7 @@ async def course_sse_stream(request, course_id):
                 course = await sync_to_async(
                     lambda: Course.objects.prefetch_related(
                         'modules__lessons'
-                    ).get(pk=course_id, user=user)
+                    ).get(pk=course_id, enrollments__user=user, enrollments__deleted=False)
                 )()
                 
                 # Serialize to dict
@@ -66,7 +66,6 @@ async def course_sse_stream(request, course_id):
                                         'title': l.title,
                                         'desc': l.desc,
                                         'status': l.status,
-                                        'watched': l.watched,
                                         'duration': l.duration,
                                     }
                                     for l in m.lessons.all()
@@ -123,7 +122,8 @@ async def lesson_sse_stream(request, lesson_id):
                 lesson = await sync_to_async(
                     lambda: Lesson.objects.select_related('module__course').get(
                         pk=lesson_id,
-                        module__course__user=user
+                        module__course__enrollments__user=user,
+                        module__course__enrollments__deleted=False
                     )
                 )()
                 
@@ -132,7 +132,6 @@ async def lesson_sse_stream(request, lesson_id):
                     'title': lesson.title,
                     'desc': lesson.desc,
                     'status': lesson.status,
-                    'watched': lesson.watched,
                     'delivered': lesson.delivered,
                     'lesson_file': lesson.lesson_file,
                     'duration': lesson.duration,
