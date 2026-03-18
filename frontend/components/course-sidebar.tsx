@@ -1,11 +1,12 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import { ChevronDown, PlayCircle, Loader2, CheckCircle2, X, ChevronLeft } from "lucide-react";
+import { ChevronDown, PlayCircle, Loader2, CheckCircle2, X, ChevronLeft, Lock } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { CourseData, Module } from "@/app/app/courses/watch/page";
 import Image from "next/image";
+import { toast } from "sonner";
 
 const LessonStatusIcon = ({ status }: { status: string }) => {
     switch (status) {
@@ -14,9 +15,9 @@ const LessonStatusIcon = ({ status }: { status: string }) => {
         case "PROCESSING":
             return <Loader2 className="w-4 h-4 flex-shrink-0 animate-spin" />;
         case "ERROR":
-            return <div className="w-4 h-4 rounded-full bg-destructive/50 flex-shrink-0" />;
+            return <X className="w-4 h-4 flex-shrink-0 text-destructive" />;
         default:
-            return <div className="w-4 h-4 rounded-full border border-border flex-shrink-0" />;
+            return <Lock className="w-4 h-4 flex-shrink-0 text-foreground/50" />;
     }
 }
 
@@ -128,8 +129,8 @@ export function CourseWatchSidebar({ course, onClose }: { course: CourseData | n
                                                 >
                                                     <LessonStatusIcon status={lesson.status} />
                                                     <div className="flex-1 text-left min-w-0">
-                                                        <p className="truncate text-xs">{lesson.title}</p>
-                                                        <p className="text-xs text-foreground/40">
+                                                        <p className="truncate text-sm">{lesson.title}</p>
+                                                        <p className="text-[11px] text-foreground/40">
                                                             {Math.floor(lesson.duration / 60)} min
                                                         </p>
                                                     </div>
@@ -153,43 +154,61 @@ export function CourseWatchSidebar({ course, onClose }: { course: CourseData | n
                                             );
                                         })}
                                         {/* @ts-ignore */}
-                                        {module.quiz_id && (
-                                            <div className="mt-1">
-                                                <Link
-                                                    href={`/app/courses/watch?l=quiz&id=${module.id}&c=${course.id}`}
-                                                >
-                                                    <button
-                                                        // @ts-ignore
-                                                        className={`cursor-pointer w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-all ${
-                                                            // @ts-ignore
-                                                            searchParams.get("l") === "quiz" && searchParams.get("id") == module.id
-                                                                ? "bg-cyan-300/10 text-primary border-l-2 border-cyan-600"
-                                                                : "text-foreground/60 hover:bg-muted hover:text-foreground/80"
-                                                            }`}
+                                        {module.quiz_id && (() => {
+                                            const allWatched = module.lessons.every(l => l.watched);
+                                            return (
+                                                <div className="mt-1">
+                                                    <Link
+                                                        href={allWatched ? `/app/courses/watch?l=quiz&id=${module.id}&c=${course.id}` : "#"}
+                                                        onClick={(e) => {
+                                                            if (!allWatched) {
+                                                                e.preventDefault();
+                                                                toast.info("Você precisa assistir a todas as aulas antes de iniciar o quiz.");
+                                                            }
+                                                        }}
                                                     >
-                                                        <div className="w-4 h-4 rounded-full border border-border flex-shrink-0 flex items-center justify-center bg-primary/10">
-                                                            <span className="text-[10px] font-bold text-primary">?</span>
-                                                        </div>
-                                                        <div className="flex-1 text-left min-w-0">
-                                                            <div className="flex justify-between items-center pr-1">
-                                                                <p className="truncate text-xs">{module.name}</p>
-                                                                {module.last_quiz_score !== undefined && module.last_quiz_score !== null && (
-                                                                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${module.last_quiz_passed
-                                                                            ? "bg-green-500/20 text-green-600"
-                                                                            : "bg-red-500/20 text-red-600"
-                                                                        }`}>
-                                                                        {module.last_quiz_score.toFixed(1)}
-                                                                    </span>
+                                                        <button
+                                                            // @ts-ignore
+                                                            className={`cursor-pointer w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-all ${
+                                                                // @ts-ignore
+                                                                searchParams.get("l") === "quiz" && searchParams.get("id") == module.id
+                                                                    ? "bg-cyan-300/10 text-primary border-l-2 border-cyan-600"
+                                                                    : "text-foreground/60 hover:bg-muted hover:text-foreground/80"
+                                                                }`}
+                                                        >
+                                                            <div className={`w-4 h-4 rounded-full border border-border flex-shrink-0 flex items-center justify-center ${allWatched ? 'bg-primary/10' : 'bg-muted'}`}>
+                                                                {allWatched ? (
+                                                                    <span className="text-[10px] font-bold text-primary">?</span>
+                                                                ) : (
+                                                                    <Lock className="w-2.5 h-2.5 text-foreground/40" />
                                                                 )}
                                                             </div>
-                                                            <p className="text-xs text-foreground/40">
-                                                                Exercício Prático
-                                                            </p>
-                                                        </div>
-                                                    </button>
-                                                </Link>
-                                            </div>
-                                        )}
+                                                            <div className="flex-1 text-left min-w-0">
+                                                                <div className="flex justify-between items-center pr-1">
+                                                                    <div className="flex items-center gap-2">
+                                                                        <p className="truncate text-sm">{module.name}</p>
+                                                                    </div>
+                                                                    {module.last_quiz_score !== undefined && module.last_quiz_score !== null && (
+                                                                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${module.last_quiz_passed
+                                                                            ? "bg-green-500/20 text-green-600"
+                                                                            : "bg-red-500/20 text-red-600"
+                                                                            }`}>
+                                                                            {module.last_quiz_score.toFixed(1)}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                                <div className="flex items-center gap-2">
+                                                                    <p className="text-xs text-foreground/40">
+                                                                        Exercício Prático
+                                                                    </p>
+                                                                    {!allWatched && <span className="text-xs font-semibold text-foreground/60">(Bloqueado)</span>}
+                                                                </div>
+                                                            </div>
+                                                        </button>
+                                                    </Link>
+                                                </div>
+                                            );
+                                        })()}
                                     </div>
                                 )}
                             </div>

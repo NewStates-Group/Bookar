@@ -8,7 +8,7 @@ import { Loader2, Play, ArrowLeft, Plus, ImageOff, PlayCircle, Trash } from "luc
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Award, FileDown, X } from "lucide-react";
+import { Award, FileDown, X, HelpCircle, CheckCircle2, XCircle, Lock } from "lucide-react";
 
 interface Course {
   id: number;
@@ -36,6 +36,7 @@ interface Module {
   lessons: Lesson[];
   last_quiz_score?: number;
   last_quiz_passed?: boolean;
+  quiz_id?: number;
 }
 
 interface CourseDetail extends Course {
@@ -79,14 +80,19 @@ export default function CoursePage() {
   const handleGenerateModule = async () => {
     setIsGeneratingModule(true);
     try {
-      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/courses/${course?.id}/generate-module`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/courses/${course?.id}/generate-module`, {
         method: "POST",
         headers: { Authorization: `Bearer ${(session as any)?.accessToken}` }
       });
-      toast.success("Gerando novo módulo em segundo plano...");
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.detail || error.message || "Erro ao solicitar módulo");
+      }
+
       fetchCourse();
-    } catch (e) {
-      toast.error("Erro ao solicitar módulo");
+    } catch (e: any) {
+      toast.error(e.message || "Erro ao solicitar módulo");
     } finally {
       setIsGeneratingModule(false);
     }
@@ -387,6 +393,54 @@ export default function CoursePage() {
                     </div>
                   ))}
                 </div>
+                {module.quiz_id && (() => {
+                  const allWatched = module.lessons.every(l => l.watched);
+                  return (
+                    <div className="p-4 bg-muted/20 flex items-center justify-between border-t border-dashed">
+                      <div className="flex items-center gap-3">
+                        <HelpCircle className="w-5 h-5 text-cyan-500" />
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium text-sm">Quiz do Módulo</p>
+                            {!allWatched && (
+                              <span className="text-[10px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded flex items-center gap-1 uppercase font-bold tracking-wider"><Lock className="w-2.5 h-2.5" /> Bloqueado</span>
+                            )}
+                          </div>
+                          {module.last_quiz_score !== undefined && module.last_quiz_score !== null && (
+                            <p className="text-xs text-muted-foreground">
+                              Última pontuação: {module.last_quiz_score.toFixed(1)} / 10.0
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="text-xs">
+                        <Link
+                          href={allWatched ? `/app/courses/watch?l=quiz&id=${module.id}&c=${course.id}` : "#"}
+                          onClick={(e) => {
+                            if (!allWatched) {
+                              e.preventDefault();
+                              toast.info("Você precisa assistir a todas as aulas antes de iniciar o quiz.");
+                            }
+                          }}
+                        >
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className={`h-8 gap-1 ${!allWatched ? 'opacity-50 cursor-not-allowed' : ''}`}
+                          >
+                            {module.last_quiz_passed ? (
+                              <span className="text-green-600 flex items-center gap-1 font-medium"><CheckCircle2 className="w-4 h-4" /> Passou</span>
+                            ) : module.last_quiz_score !== undefined && module.last_quiz_score !== null && allWatched ? (
+                              <span className="text-red-600 flex items-center gap-1 font-medium"><XCircle className="w-4 h-4" /> Repetir</span>
+                            ) : (
+                              <span className={`${allWatched ? 'text-cyan-600' : 'text-gray-400'} flex items-center gap-1 font-medium`}><PlayCircle className="w-4 h-4" /> Iniciar</span>
+                            )}
+                          </Button>
+                        </Link>
+                      </div>
+                    </div>
+                  );
+                })()}
               </Card>
             ))}
           </div>

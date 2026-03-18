@@ -65,7 +65,8 @@ export function QuizView({
                 const data = await res.json();
                 setQuiz(data);
             } else {
-                toast.error("Erro ao carregar quiz");
+                const errorData = await res.json().catch(() => ({}));
+                toast.error(errorData.detail || errorData.message || "Erro ao carregar quiz");
             }
         } catch (error) {
             console.error(error);

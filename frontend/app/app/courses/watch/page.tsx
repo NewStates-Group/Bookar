@@ -86,7 +86,8 @@ export default function WatchPage() {
                     Authorization: `Bearer ${(session as any)?.accessToken}`,
                 },
             });
-            lesson.watched = true
+            lesson.watched = true;
+            fetchCourse(); // refresh sidebar progress bar
         }
     }
 
@@ -305,7 +306,7 @@ export default function WatchPage() {
 
     return (
         <div className="flex h-screen bg-background overflow-hidden">
-            <div className={`fixed min-h-screen z-[100] md:static transition-all duration-300 overflow-hidden ${sidebarOpen ? "w-90" : "w-0"} bg-card border-r border-border `}>
+            <div className={`fixed min-h-screen z-[100] md:static transition-all duration-300 overflow-hidden ${sidebarOpen ? "w-[22rem]" : "w-0"} bg-card border-r border-border `}>
                 {sidebarOpen && <CourseWatchSidebar course={course} onClose={() => setSidebarOpen(!sidebarOpen)} />}
             </div>
 
@@ -324,10 +325,23 @@ export default function WatchPage() {
                         onClick={() => setSidebarOpen(!sidebarOpen)}
                         className="flex gap-1 items-center justify-center border-r cursor-pointer hover:bg-muted transition-colors"
                     >
-                        {sidebarOpen ? <X className="w-5 h-5 text-foreground/70" /> : <Menu className="w-5 h-5 text-foreground/70" />}
-                        <span className="hidden md:block">
-                            Abrir Menu
-                        </span>
+                        {sidebarOpen ? (
+                            <>
+                                <X className="w-5 h-5 text-foreground/70" />
+                                <span className="hidden md:block">
+                                    Fechar Menu
+                                </span>
+                            </>
+                        ) : (
+                            <>
+                                <Menu className="w-5 h-5 text-foreground/70" />
+                                <span className="hidden md:block">
+                                    Abrir Menu
+                                </span>
+                            </>
+                        )
+                        }
+
                     </button>
                     <button
                         onClick={() => router.push(`/app/courses/watch?l=${previousLesson?.id}&c=${courseID}`)}
@@ -347,16 +361,34 @@ export default function WatchPage() {
                                 router.push(`/app/courses/watch?l=${nextLesson.id}&c=${courseID}`)
                             }
                         }}
-                        disabled={(!nextLesson && !nextQuiz) || (nextLesson?.status !== "READY" && !nextQuiz)}
-                        className={`border-r flex gap-2 items-center justify-center hover:bg-muted transition-colors ${((!nextLesson && !nextQuiz) || (nextLesson?.status !== "READY" && !nextQuiz)) ? "opacity-70 cursor-not-allowed" : "cursor-pointer"}`}>
+                        disabled={(() => {
+                            if (!nextLesson && !nextQuiz) return true;
+                            if (nextLesson && nextLesson.status !== "READY") return true;
+                            if (nextQuiz) {
+                                // All lessons in the module must be watched (including the current one via `ended`)
+                                const moduleOfQuiz = course?.modules.find(m => m.id === nextQuiz.moduleId);
+                                const allWatched = moduleOfQuiz?.lessons.every(l =>
+                                    l.id === lesson?.id ? ended : l.watched
+                                ) ?? false;
+                                return !allWatched;
+                            }
+                            return false;
+                        })()}
+                        className={`border-r flex gap-2 items-center justify-center hover:bg-muted transition-colors ${(() => {
+                            if (!nextLesson && !nextQuiz) return true;
+                            if (nextLesson && nextLesson.status !== "READY") return true;
+                            if (nextQuiz) {
+                                const moduleOfQuiz = course?.modules.find(m => m.id === nextQuiz.moduleId);
+                                return !(moduleOfQuiz?.lessons.every(l =>
+                                    l.id === lesson?.id ? ended : l.watched
+                                ) ?? false);
+                            }
+                            return false;
+                        })() ? "opacity-70 cursor-not-allowed" : "cursor-pointer"}`}>
                         <span className="hidden md:block">
-                            {nextQuiz ? "Próximo Quiz" : "Próxima Aula"}
+                            {nextQuiz ? "Próximo (Quiz)" : "Próxima Aula"}
                         </span>
-                        {nextLesson && (nextLesson.status === "PROCESSING" || nextLesson.status === "PENDING") ? (
-                            <Loader2 className="w-4 h-4 animate-spin text-primary" />
-                        ) : (
-                            <ChevronRight className="w-4 h-4" />
-                        )}
+                        <ChevronRight className="w-4 h-4" />
                     </button>
 
                     <button className="flex gap-2 items-center cursor-pointer justify-center border-r hover:bg-muted transition-colors" onClick={() => setShowQuestionsModal(true)}>

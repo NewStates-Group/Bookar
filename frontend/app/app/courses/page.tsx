@@ -614,12 +614,6 @@ export default function CoursesPage() {
                   </div>
                   <div className="flex items-center justify-between mb-1">
                     <h1 className="text-lg">{course.title}</h1>
-                    {course.status === "PROCESSING" && (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">
-                        <Loader2 className="w-2.5 h-2.5 animate-spin" />
-                        A gerar
-                      </span>
-                    )}
                   </div>
                   <p className="line-clamp-2 text-gray-600 text-base">{course.desc}</p>
                   <Link href={'/app/courses/' + course.id} className="text-blue-600 mt-2 mb-4">Veja mais</Link>
