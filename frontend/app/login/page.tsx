@@ -150,8 +150,7 @@ export default function LoginPage() {
             toast.error(result.error);
           } else {
             if (typeof window !== "undefined") console.log("[Login] Google login successful, redirecting to /app/courses");
-            toast.success("Login com Google efetuado!");
-            router.push("/app/courses");
+            router.replace("/app/courses");
           }
         } catch (err) {
           toast.error("Erro ao finalizar autenticação.");
