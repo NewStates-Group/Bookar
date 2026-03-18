@@ -235,10 +235,10 @@ def generate_lesson(self, user_id, lesson_id: int):
         logger.info(f"Lesson {lesson_id} already READY, skipping generation.")
         return lesson.lesson_file
 
-    if Lesson.objects.filter(
-        module__course__user_id=user_id, status="PROCESSING"
-    ).exclude(id=lesson_id).exists():
-        raise RuntimeError("Only one lesson at a time")
+    # if Lesson.objects.filter(
+    #     module__course__user_id=user_id, status="PROCESSING"
+    # ).exclude(id=lesson_id).exists():
+    #     raise RuntimeError("Only one lesson at a time")
 
     lesson.status = "PROCESSING"
     lesson.save(update_fields=["status"])
@@ -277,7 +277,7 @@ def generate_lesson(self, user_id, lesson_id: int):
 
         # --- RESTORED PARALLEL PROCESSING ---
         videos = []
-        with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
             futures = [
                 executor.submit(_process_segment, i, seg, client, temp_dir)
                 for i, seg in enumerate(segments)
@@ -443,13 +443,13 @@ def generate_next_module(self, user_pk: int, course_pk: int, module_pk: int = No
             )
         Lesson.objects.bulk_create(lessons_to_create)
         
-        # Only auto-generate the first lesson if this is the very first module of the course
+        # Generate all lessons in the module simultaneously
+        pending_lessons = Lesson.objects.filter(module=module_object, status="PENDING")
+        for l in pending_lessons:
+            generate_lesson.delay(user_pk, l.id)
+
+        # For the first module, mark course as READY to show in dashboard
         if course.modules.count() == 1:
-            first_lesson = (
-                Lesson.objects.filter(module=module_object).order_by("id").first()
-            )
-            if first_lesson:
-                generate_lesson.delay(user_pk, first_lesson.id)
             
             # For the first module, mark course as READY to show in dashboard
             Course.objects.filter(pk=course_pk).update(status="READY")
@@ -597,7 +597,10 @@ def create_course_details(course_pk: int, prompt: str, level: str):
     Course.objects.filter(pk=course_pk).update(
         desc=course_desc, title=course_title, max_modules=max_modules, status="PROCESSING"
     )
+    
+    # Trigger thumbnail and module generation in parallel
     create_course_thumb.delay(course_pk, prompt)
+    generate_next_module.delay(course.user.pk, course_pk)
 
 
 @shared_task(autoretry_for=(Exception,), retry_backoff=True, retry_kwargs={'max_retries': 3}, default_retry_delay=40)
@@ -684,7 +687,8 @@ def create_course_thumb(course_pk: str, prompt: str):
         course.thumb.save(thumb_filename, ContentFile(buffer.getvalue(), name=thumb_filename), save=True)
         course.status = "READY"
         course.save()
-        generate_next_module.delay(course.user.pk, course_pk)
+        # Thumbnail generation is now independent of module generation
+        # generate_next_module.delay(course.user.pk, course_pk)
     except Exception as e:
         logger.error(f"Thumbnail creation failed: {e}")
         Course.objects.filter(pk=course_pk).update(status="FAILED")
