@@ -5,26 +5,14 @@ import { FloatingNavbar } from "@/components/floating-navbar"
 import { usePathname } from "next/navigation"
 
 
+import { WebSocketProvider } from "@/components/providers/websocket-provider";
+
 export default function AppLayout({
   children,
 }: Readonly<{
   children: React.ReactNode
 }>) {
   const pathname = usePathname();
-  // const { data: session, status } = useSession();
-  // const router = useRouter();
-
-  // useEffect(() => {
-  //   if (status === "authenticated" && session?.user) {
-  //     const user = session.user as any;
-  //     const isProfileIncomplete = !user.first_name || !user.last_name;
-
-  //     if (isProfileIncomplete && pathname !== "/app/profile") {
-  //       console.log("[AppLayout] Profile incomplete, redirecting to /app/profile");
-  //       router.push("/app/profile");
-  //     }
-  //   }
-  // }, [session, status, pathname, router]);
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">

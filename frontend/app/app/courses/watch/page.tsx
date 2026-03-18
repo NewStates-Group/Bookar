@@ -63,31 +63,58 @@ export default function WatchPage() {
     const [nextLesson, setNextLesson] = useState<Lesson | null>(null)
     const [nextQuiz, setNextQuiz] = useState<{ id: number, moduleId: number } | null>(null)
 
+    useEffect(() => {
+        if ((session as any)?.accessToken && lessonID && (lesson?.status === "PROCESSING" || lesson?.status === "PENDING")) {
+            const ev = new EventSource(`${process.env.NEXT_PUBLIC_API_BASE_URL}/sse/lessons/${lessonID}/?token=${(session as any).accessToken}`);
+
+            ev.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                if (data.status !== lesson?.status) {
+                    getLesson();
+                    fetchCourse();
+                }
+                if (data.status === "READY" || data.status === "ERROR") {
+                    ev.close();
+                }
+            };
+
+            return () => ev.close();
+        }
+    }, [session, lessonID, lesson?.status]);
+
 
     const markDelivered = async () => {
-        if (!lesson) return;
-        if (!lesson.delivered) {
-            await fetch(`${process.env.NEXT_PUBLIC_API_URL}/lessons/${lesson.id}/mark-delivered`, {
+        if (!lesson || lesson.delivered) return;
+        try {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/lessons/${lesson.id}/mark-delivered`, {
                 method: "PUT",
                 headers: {
                     Authorization: `Bearer ${(session as any)?.accessToken}`,
                 },
             });
-            lesson.delivered = true
+            if (res.ok) {
+                setLesson(prev => prev ? { ...prev, delivered: true } : null);
+            }
+        } catch (e) {
+            console.error("Error marking lesson as delivered", e);
         }
     }
 
     const markWatched = async () => {
-        if (!lesson) return;
-        if (!lesson.watched) {
-            await fetch(`${process.env.NEXT_PUBLIC_API_URL}/lessons/${lesson.id}/mark-watched`, {
+        if (!lesson || lesson.watched) return;
+        try {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/lessons/${lesson.id}/mark-watched`, {
                 method: "PUT",
                 headers: {
                     Authorization: `Bearer ${(session as any)?.accessToken}`,
                 },
             });
-            lesson.watched = true;
-            fetchCourse(); // refresh sidebar progress bar
+            if (res.ok) {
+                setLesson(prev => prev ? { ...prev, watched: true } : null);
+                fetchCourse(); // refresh sidebar progress bar
+            }
+        } catch (e) {
+            console.error("Error marking lesson as watched", e);
         }
     }
 
@@ -190,6 +217,11 @@ export default function WatchPage() {
     }, [session, params, lessonID, quizID]);
 
     useEffect(() => {
+        setPlayed(false);
+        setEnded(false);
+    }, [lessonID]);
+
+    useEffect(() => {
         if (!lesson?.delivered && played) {
             markDelivered()
         }
@@ -197,43 +229,8 @@ export default function WatchPage() {
         if (!lesson?.watched && ended) {
             markWatched()
         }
-    }, [played, ended])
+    }, [played, ended, lessonID])
 
-    useEffect(() => {
-        let interval: NodeJS.Timeout;
-
-        if (lesson && (lesson.status === "PROCESSING" || lesson.status === "PENDING")) {
-            interval = setInterval(async () => {
-                const updatedLesson = await fetchLessonStatus(lesson.id);
-                if (updatedLesson && updatedLesson.status !== lesson.status) {
-                    setLesson(updatedLesson);
-                    fetchCourse(); // Refresh sidebar/course data
-                }
-            }, 3000);
-        }
-
-        return () => {
-            if (interval) clearInterval(interval);
-        };
-    }, [lesson?.id, lesson?.status]);
-
-    useEffect(() => {
-        let interval: NodeJS.Timeout;
-
-        if (nextLesson && (nextLesson.status === "PROCESSING" || nextLesson.status === "PENDING")) {
-            interval = setInterval(async () => {
-                const updatedNextLesson = await fetchLessonStatus(nextLesson.id);
-                if (updatedNextLesson && updatedNextLesson.status !== nextLesson.status) {
-                    setNextLesson(updatedNextLesson);
-                    fetchCourse(); // Refresh sidebar/course data
-                }
-            }, 5000); // Polling next lesson a bit slower
-        }
-
-        return () => {
-            if (interval) clearInterval(interval);
-        };
-    }, [nextLesson?.id, nextLesson?.status]);
 
     useEffect(() => {
         if (course) {

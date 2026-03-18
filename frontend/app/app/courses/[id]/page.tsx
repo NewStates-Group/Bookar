@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Loader2, Play, ArrowLeft, Plus, ImageOff, PlayCircle, Trash } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { toast } from "sonner";
 import { Award, FileDown, X, HelpCircle, CheckCircle2, XCircle, Lock } from "lucide-react";
 
@@ -19,6 +19,8 @@ interface Course {
   status: string;
   created_at: string;
   max_modules?: number;
+  certificate_url?: string;
+  certificate_status?: string;
 }
 
 interface Lesson {
@@ -55,6 +57,20 @@ export default function CoursePage() {
   const [fullName, setFullName] = useState("");
   const [isDownloading, setIsDownloading] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
+
+  useEffect(() => {
+    const isProcessing = course?.status === "PROCESSING" ||
+      course?.modules.some(m => m.lessons.some(l => l.status === "PROCESSING"));
+
+    if ((session as any)?.accessToken && params?.id) {
+      const interval = setInterval(() => {
+        fetchCourse();
+        checkFinishment();
+      }, 8000);
+
+      return () => clearInterval(interval);
+    }
+  }, [session, params?.id, course?.status, course?.modules]);
 
   const handleCancel = async () => {
     if (!window.confirm("Tem certeza que deseja cancelar a geração deste curso?")) return;
@@ -219,27 +235,6 @@ export default function CoursePage() {
     }
   }, [session, params]);
 
-  useEffect(() => {
-    if ((session as any)?.accessToken && params?.id && course) {
-      // Check if we need to poll
-      const isCourseProcessing = course.status === 'PROCESSING';
-      const isAnyLessonProcessing = course.modules.some(module =>
-        module.lessons.some(lesson => lesson.status === 'PROCESSING')
-      );
-
-      let intervalId: NodeJS.Timeout;
-
-      if (isCourseProcessing || isAnyLessonProcessing) {
-        intervalId = setInterval(() => {
-          fetchCourse();
-        }, 5000);
-      }
-
-      return () => {
-        if (intervalId) clearInterval(intervalId);
-      };
-    }
-  }, [session, params, course]);
 
   if (status === "loading" || isLoading) return null
   if (!course) return null;
@@ -323,7 +318,9 @@ export default function CoursePage() {
               </Button>
               {course?.is_fully_completed && (
                 <Button
-                  onClick={handleCertificateClick}
+                  onClick={course?.certificate_status === "READY" && course?.certificate_url ?
+                    () => window.open(course.certificate_url, '_blank') :
+                    handleCertificateClick}
                   variant="outline"
                   size="lg"
                   disabled={isDownloading || course?.certificate_status === "PROCESSING"}

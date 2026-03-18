@@ -1,14 +1,19 @@
-FROM python:3.12-alpine
+FROM python:3.12-slim
 
 WORKDIR /app
 
-RUN apk add --no-cache \
-    ffmpeg \
-    build-base \
+RUN apt-get update && apt-get install -y \
+    curl \
+    build-essential \
+    libcairo2 \
+    libcairo2-dev \
+    libpango-1.0-0 \
+    libpangocairo-1.0-0 \
+    libgdk-pixbuf-2.0-0 \
     libffi-dev \
-    musl-dev \
-    postgresql-dev \
-    curl
+    shared-mime-info \
+    pkg-config \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
 

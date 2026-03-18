@@ -80,10 +80,35 @@ export default function CoursesPage() {
   const [numModules, setNumModules] = useState<number>(5);
   const [level, setLevel] = useState<"B" | "IT" | "A">("B");
 
-  const pollingRefs = useRef<Set<Number>>(new Set());
-
   const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
   const [profileNames, setProfileNames] = useState({ firstName: "", lastName: "" });
+
+  const evRefs = useRef<Record<number, EventSource>>({});
+
+  useEffect(() => {
+    // For each processing course, ensure an SSE connection exists
+    courses.forEach(course => {
+      if (course.status === "PROCESSING" && !evRefs.current[course.id]) {
+        const ev = new EventSource(`${process.env.NEXT_PUBLIC_API_BASE_URL}/sse/courses/${course.id}/?token=${session?.accessToken}`);
+        ev.onmessage = (event) => {
+          const data = JSON.parse(event.data);
+          if (data.status === "READY" || data.status === "FAILED") {
+            ev.close();
+            delete evRefs.current[course.id];
+            fetchCourses();
+            if (data.status === "READY") toast.success(`Curso "${data.title}" está pronto!`);
+          }
+        };
+        evRefs.current[course.id] = ev;
+      }
+    });
+
+    return () => {
+      // Cleanup SSE on unmount
+      Object.values(evRefs.current).forEach(ev => ev.close());
+      evRefs.current = {};
+    };
+  }, [courses, session]);
 
   const levelConfig = {
     B: { label: "Iniciante", color: "bg-emerald-100 text-emerald-700 border-emerald-200" },
@@ -103,14 +128,6 @@ export default function CoursesPage() {
     }
   }, [session]);
 
-  // Resume polling for courses that are still processing on load/refresh
-  useEffect(() => {
-    courses.forEach(course => {
-      if (course.status === "PROCESSING" && !pollingRefs.current.has(course.id)) {
-        waitForCourseReady(course.id);
-      }
-    });
-  }, [courses]);
 
   const fetchCourses = async () => {
     try {
@@ -183,35 +200,6 @@ export default function CoursesPage() {
     }
   };
 
-  const waitForCourseReady = async (courseID: Number) => {
-    if (pollingRefs.current.has(courseID)) return;
-
-    pollingRefs.current.add(courseID);
-
-    const interval = setInterval(async () => {
-      try {
-        const res = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/courses/${courseID}`,
-          {
-            headers: {
-              Authorization: `Bearer ${session?.accessToken}`,
-            },
-          }
-        );
-
-        if (!res.ok) return;
-        const course = await res.json();
-
-        if (course.status === "READY" || course.status === "FAILED") {
-          clearInterval(interval);
-          pollingRefs.current.delete(courseID);
-          fetchCourses();
-        }
-      } catch (err) {
-        console.error(err);
-      }
-    }, 8000);
-  };
 
   const downloadCertificate = async (course: Course, name?: string) => {
     setIsDownloading(true);
@@ -299,7 +287,6 @@ export default function CoursesPage() {
         };
 
         setCourses(prev => [newCourse, ...prev]);
-        waitForCourseReady(course.id);
       } else {
         const err = await res.json();
         toast.error(err.message || "Erro ao criar curso");
