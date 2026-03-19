@@ -708,133 +708,105 @@ def create_course_thumb(course_pk: str, prompt: str):
         logger.error(f"Thumbnail creation failed: {e}")
         Course.objects.filter(pk=course_pk).update(status="FAILED")
         raise ThumbnailCreationError(f"Erro ao criar thumbnail: {str(e)}") 
-def get_certificate_base_layer():
-    """Generates the static background layer of the certificate."""
-    buffer = io.BytesIO()
-    c = canvas.Canvas(buffer, pagesize=landscape(A4))
-    width, height = landscape(A4)
-    
-    # --- Background ---
-    bg_path = os.path.join(settings.BASE_DIR, "static", "BG.png")
-    if os.path.exists(bg_path):
-        c.drawImage(bg_path, 0, 0, width=width, height=height)
-    else:
-        c.setFillColor(colors.white)
-        c.rect(0, 0, width, height, fill=1, stroke=0)
-
-    # Logo
-    logo_path = os.path.join(settings.BASE_DIR, "static", "logo.png")
-    if os.path.exists(logo_path):
-        c.drawImage(logo_path, width/2 - 15*mm, height - 35*mm, width=30*mm, preserveAspectRatio=True)
-    
-    # Title
-    c.setFont("Helvetica-Bold", 14)
-    c.setFillColor(colors.black)
-    c.drawCentredString(width/2, height - 45*mm, "BOOKAR")
-
-    # Certificate Name
-    c.setFont("Helvetica-Bold", 28)
-    c.drawCentredString(width/2, height - 60*mm, "CERTIFICADO DE CONCLUSÃO")
-    
-    # Static footer parts
-    footer_y = 25*mm
-    
-    # Sign line
-    c.setStrokeColor(colors.black)
-    c.setLineWidth(0.5)
-    c.line(25*mm, footer_y + 12*mm, 85*mm, footer_y + 12*mm)
-    c.setFont("Helvetica-Bold", 10)
-    c.drawString(25*mm, footer_y + 8*mm, "ASSINATURA BOOKAR")
-    c.setFont("Helvetica", 7)
-    c.setFillColor(colors.gray)
-    c.drawString(25*mm, footer_y + 4*mm, "PLATAFORMA DE ENSINO INTELIGENTE")
-    
-    # Authenticity
-    c.setFont("Helvetica", 9)
-    c.setFillColor(colors.gray)
-    c.drawCentredString(width/2, footer_y + 8*mm, "AUTENTICIDADE GARANTIDA")
-    c.setFillColor(colors.black)
-    c.drawCentredString(width/2, footer_y + 4*mm, "bookar.ai/verify")
-    
-    # Seal
-    c.setStrokeColor(colors.black)
-    c.setLineWidth(1.5)
-    c.circle(width - 40*mm, footer_y + 12*mm, 15*mm, fill=0, stroke=1)
-    c.setFont("Helvetica-Bold", 24)
-    c.drawCentredString(width - 40*mm, footer_y + 8*mm, "B")
-    
-    c.showPage()
-    c.save()
-    buffer.seek(0)
-    return buffer
-
 @shared_task(autoretry_for=(Exception,), retry_backoff=True, retry_kwargs={'max_retries': 3}, default_retry_delay=40)
 def generate_certificate_task(user_id: int, course_id: int, full_name: str):
     from .models import Course, CourseEnrollment
+    from PIL import Image
+    import io
+    import uuid
+    from django.core.files.base import ContentFile
+    from google.genai import types
+
     User = get_user_model()
     try:
         user = User.objects.get(pk=user_id)
         course = Course.objects.get(pk=course_id)
-        
-        # 1. Generate text layer (Transparent)
-        text_buffer = io.BytesIO()
-        c = canvas.Canvas(text_buffer, pagesize=landscape(A4))
-        width, height = landscape(A4)
-        
-        c.setFont("Helvetica", 12)
-        c.setFillColor(colors.gray)
-        c.drawCentredString(width/2, height - 80*mm, "CERTIFICAMOS QUE")
-        
-        c.setFont("Helvetica-Bold", 42)
-        c.setFillColor(colors.black)
-        c.drawCentredString(width/2, height - 105*mm, full_name.upper())
-        
-        c.setFont("Helvetica", 16)
-        c.setFillColor(colors.gray)
-        c.drawCentredString(width/2, height - 120*mm, f"Concluiu com aproveitamento o curso de {course.title}")
-        c.drawCentredString(width/2, height - 130*mm, "ministrado pela plataforma Bookar, com carga horária de 24 horas")
-        
+        client = get_genai_client()
+        # 1. Calculate real duration
+        from django.db.models import Sum
+        total_seconds = course.modules.aggregate(
+            total=Sum('lessons__duration')
+        )['total'] or 0
+        total_hours = max(1, round(total_seconds / 3600))
+        duration_str = f"{total_hours} horas" if total_hours > 1 else "1 hora"
+
+        # 2. Get current date in DD/MM/YYYY
         from datetime import datetime
-        emission_date = datetime.now().strftime("%d de %B de %Y")
-        months = {"January": "Janeiro", "February": "Fevereiro", "March": "Março", "April": "Abril", "May": "Maio", "June": "Junho", "July": "Julho", "August": "Agosto", "September": "Setembro", "October": "Outubro", "November": "Novembro", "December": "Dezembro"}
-        for eng, pt in months.items(): emission_date = emission_date.replace(eng, pt)
+        data_actual = datetime.now().strftime("%d/%m/%Y")
+
+        # 3. Load base image
+        base_path = settings.BASE_DIR / "static" / "certificate_base.png"
+        if not base_path.exists():
+            raise FileNotFoundError(f"Base certificate image not found at {base_path}")
+            
+        base_img = Image.open(base_path)
         
-        c.setFont("Helvetica", 10)
-        c.drawCentredString(width/2, height - 150*mm, f"EMITIDO EM {emission_date.upper()}")
+        # 4. Prepare multimodal prompt
+        prompt = f"""
+        Utilize a imagem fornecida como REFERÊNCIA DE ESTILO para criar um certificado de conclusão NOVO, MODERNO e PROFISSIONAL.
         
-        # Signature name
-        c.setFont("Helvetica-Oblique", 18)
-        c.setFillColor(colors.gray)
-        c.drawString(25*mm, 25*mm + 15*mm, "Bookar.")
+        O certificado gerado deve conter OBRIGATORIAMENTE os seguintes elementos de texto (você tem liberdade para ajustar o layout, fontes e espaçamentos para que tudo fique perfeitamente alinhado e legível):
         
-        c.showPage()
-        c.save()
-        text_buffer.seek(0)
+        1. **Cabeçalho**: Logo da "BOOKAR" e o título "CERTIFICADO DE CONCLUSÃO".
+        2. **Chamada**: O texto "CERTIFICAMOS QUE".
+        3. **Nome do Aluno**: "{full_name.upper()}" (deve estar em grande destaque, no centro, com uma fonte elegante).
+        4. **Corpo do Texto**: "Concluiu o curso de **{course.title}** ministrado pela plataforma **Bookar**, com carga de **{duration_str}**." (O nome do curso e a carga horária devem estar em negrito/destaque).
+        5. **Rodapé**: Inclua o texto "Bookar.study - ENSINO BASEADO EM IA" no canto inferior esquerdo e "EMITIDO EM {data_actual}" no canto inferior direito.
         
-        # 2. Merge Layers
-        base_buffer = get_certificate_base_layer()
-        reader_base = PdfReader(base_buffer)
-        reader_text = PdfReader(text_buffer)
-        writer = PdfWriter()
+        Instruções de Estilo:
+        - Mantenha a paleta de cores e o "feeling" da imagem de referência.
+        - Você pode modificar levemente a posição dos elementos para garantir que o nome do curso e o nome do aluno caibam perfeitamente sem sobreposições.
+        - O design deve ser limpo, minimalista e premium.
+        - A imagem final deve ter alta qualidade (1600x1000).
+        """
         
-        page = reader_base.pages[0]
-        page.merge_page(reader_text.pages[0])
-        writer.add_page(page)
-        
-        final_buffer = io.BytesIO()
-        writer.write(final_buffer)
-        
-        # 3. Save
+        model_name = settings.AI.get("GENAI_MODEL_IMAGE", "gemini-2.0-flash")
+
+        response = safe_gemini_call(
+            client.models.generate_content,                                                                                                     
+            model=model_name,
+            contents=[base_img, prompt],
+            config=types.GenerateContentConfig(
+                image_config=types.ImageConfig(aspect_ratio="16:9")
+            ),
+        )
+
+        image_data = None
+        if hasattr(response, 'parts'):
+            for part in response.parts:
+                if part.inline_data:
+                    image_data = part.inline_data.data
+                    break
+                if hasattr(part, 'image'):
+                    image_data = part.image if isinstance(part.image, bytes) else getattr(part.image, 'data', None)
+                    if image_data: break
+
+        if not image_data:
+             # Fallback to the text-based drawing if image generation modality is not supported by the model
+             # or returned nothing. But given the user's frustration, we must try to get an image.
+             # If response has text but no image, maybe the model didn't support image generation.
+             raise ValueError(f"IA não retornou uma imagem para o certificado. Resposta: {getattr(response, 'text', 'Sem texto')}")
+
+        # 3. Save to Database/Cloudinary
         enrollment = CourseEnrollment.objects.get(course=course, user=user)
-        cert_filename = f"cert_{course.id}_{user.id}_{uuid.uuid4().hex[:8]}.pdf"
-        enrollment.certificate_file.save(cert_filename, ContentFile(final_buffer.getvalue(), name=cert_filename), save=False)
+        cert_filename = f"cert_{course.id}_{user.id}_{uuid.uuid4().hex[:8]}.png"
+        enrollment.certificate_file.save(cert_filename, ContentFile(image_data, name=cert_filename), save=False)
         enrollment.certificate_status = "READY"
         enrollment.save()
         
         send_certificate_email(user, course, enrollment.certificate_file.url)
         return enrollment.certificate_file.url
+
     except Exception as e:
         logger.error(f"Certificate generation failed: {e}")
         try: CourseEnrollment.objects.filter(course_id=course_id, user_id=user_id).update(certificate_status="FAILED")
         except: pass
         raise e
+
+
+    except Exception as e:
+        logger.error(f"Certificate generation failed: {e}")
+        try: CourseEnrollment.objects.filter(course_id=course_id, user_id=user_id).update(certificate_status="FAILED")
+        except: pass
+        raise e
+
