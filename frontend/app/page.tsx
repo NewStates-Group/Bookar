@@ -34,10 +34,8 @@ function CountdownTimer({ onComplete }: { onComplete: () => void }) {
   });
 
   useEffect(() => {
-    // Set a short timer for transition effect (e.g., 2 seconds)
-    // In production, this would be a fixed target date.
     const targetDate = new Date();
-    targetDate.setSeconds(targetDate.getSeconds() + 10);
+    targetDate.setSeconds(targetDate.getDate() + 14);
 
     const timer = setInterval(() => {
       const now = new Date().getTime();
