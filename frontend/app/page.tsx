@@ -216,7 +216,7 @@ export default function HomePage() {
                   </form>
                 ) : (
                   <div className="bg-cyan-50 border border-cyan-100 rounded-2xl p-6 max-w-md w-full">
-                    <p className="text-cyan-700 font-semibold text-lg">🚀 Já estás na lista de espera!</p>
+                    <p className="text-cyan-700 font-semibold text-lg">Já estás na lista de espera!</p>
                     <p className="text-cyan-600/70 text-sm mt-1">Avisaremos assim que abrirmos as portas.</p>
                   </div>
                 )}
