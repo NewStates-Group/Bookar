@@ -1,4 +1,3 @@
-from django.conf import settings
 from django.http import JsonResponse
 from django.urls import path
 
@@ -7,7 +6,6 @@ from .api import api
 
 def healthcheck(request):
     return JsonResponse({"status": "ok"})
-
 
 
 urlpatterns = [
