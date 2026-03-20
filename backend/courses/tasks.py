@@ -244,7 +244,7 @@ def generate_lesson(self, user_id, lesson_id: int):
 
     lesson.status = "PROCESSING"
     lesson.save(update_fields=["status"])
-    send_user_update(user_id, {"type": "lesson_update", "id": lesson.id, "status": "PROCESSING"})
+    send_user_update(user_id, {"type": "lesson_update", "id": lesson.short_id, "status": "PROCESSING"})
 
     # Check for cancellation before starting heavy work
     lesson.refresh_from_db()
@@ -351,13 +351,13 @@ def generate_lesson(self, user_id, lesson_id: int):
         
         lesson.status = "READY"
         lesson.save()
-        send_user_update(user_id, {"type": "lesson_update", "id": lesson.id, "status": "READY", "lesson_file": lesson.lesson_file.url if lesson.lesson_file else ""})
+        send_user_update(user_id, {"type": "lesson_update", "id": lesson.short_id, "status": "READY", "lesson_file": lesson.lesson_file.url if lesson.lesson_file else ""})
 
         return lesson.lesson_file.url if lesson.lesson_file else None
     except Exception as e:
         lesson.status = "ERROR"
         lesson.save(update_fields=["status"])
-        send_user_update(user_id, {"type": "lesson_update", "id": lesson.id, "status": "ERROR"})
+        send_user_update(user_id, {"type": "lesson_update", "id": lesson.short_id, "status": "ERROR"})
         raise e
     finally:
         shutil.rmtree(temp_dir, ignore_errors=True)
