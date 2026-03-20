@@ -90,7 +90,7 @@ class CourseService:
 
         # 3. If no existing course, create new one
         # Course no longer has 'user' (owner) field. First enrollment identifies creator.
-        course = Course.objects.create(level=level, max_modules=num_modules or 4)
+        course = Course.objects.create(level=level, max_modules=num_modules or 4, owner=user)
         # Owner must be enrolled
         self.enroll_course(user, course.id)
         
@@ -128,6 +128,12 @@ class CourseService:
             enrollment, created = CourseEnrollment.objects.get_or_create(
                 user=user, course=course
             )
+            
+            # If the course has no owner and this is the first enrollment, set the owner
+            if not course.owner:
+                course.owner = user
+                course.save(update_fields=["owner"])
+
             if enrollment.deleted:
                 enrollment.deleted = False
                 enrollment.save()

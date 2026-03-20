@@ -7,6 +7,9 @@ from pydantic import Field
 
 from .models import Choice, Course, CourseEnrollment, CourseLevel, Lesson, Module, Question, Quiz, CourseShare, CourseShareClaim
 
+import logging
+
+logger = logging.Logger(__name__)
 
 class CourseOut(ModelSchema):
     is_fully_completed: bool = False
@@ -72,7 +75,9 @@ class CourseOut(ModelSchema):
     @staticmethod
     def resolve_is_owner(obj, context):
         user = context.get("request").user
-        return obj.user == user
+        logger.critical(obj.owner)
+        logger.critical(user)
+        return obj.owner == user
 
 
 class LessonSchema(ModelSchema):

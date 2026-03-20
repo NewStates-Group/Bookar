@@ -53,11 +53,6 @@ export function ShareCourseModal({ isOpen, onClose, shareUrl }: ShareCourseModal
                         {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
                     </Button>
                 </div>
-                <DialogFooter className="sm:justify-start">
-                    <Button type="button" variant="secondary" onClick={onClose} className="rounded-full">
-                        Fechar
-                    </Button>
-                </DialogFooter>
             </DialogContent>
         </Dialog>
     );

@@ -513,7 +513,7 @@ export default function CoursePage() {
             ))}
           </div>
 
-          {course?.is_owner && claims.length > 0 && (
+          {course?.is_owner && (
             <div className="mt-12 pt-8 border-t border-dashed">
               <div className="flex items-center justify-between mb-6">
                 <div className="space-y-1">
@@ -523,31 +523,40 @@ export default function CoursePage() {
                   </h3>
                   <p className="text-sm text-muted-foreground">Pessoas que estão a aprender com o seu link</p>
                 </div>
-                <div className="bg-cyan-500/10 text-cyan-600 px-4 py-2 rounded-2xl font-bold border border-cyan-500/20">
-                  {claims.length} {claims.length === 1 ? 'Aluno' : 'Alunos'}
-                </div>
+                {claims.length > 0 && (
+                  <div className="bg-cyan-500/10 text-cyan-600 px-4 py-2 rounded-2xl font-bold border border-cyan-500/20">
+                    {claims.length} {claims.length === 1 ? 'Aluno' : 'Alunos'}
+                  </div>
+                )}
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {claims.map((claim, idx) => (
-                  <Card key={idx} className="p-4 border-2 border-transparent hover:border-cyan-500/10 transition-all bg-muted/20">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center text-white font-black text-sm shadow-md">
-                          {claim.recipient_name.substring(0, 2).toUpperCase()}
+              {claims.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {claims.map((claim, idx) => (
+                    <Card key={idx} className="p-4 border-2 border-transparent hover:border-cyan-500/10 transition-all bg-muted/20">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center text-white font-black text-sm shadow-md">
+                            {claim.recipient_name.substring(0, 2).toUpperCase()}
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="font-bold text-sm">{claim.recipient_name}</span>
+                          </div>
                         </div>
-                        <div className="flex flex-col">
-                          <span className="font-bold text-sm">{claim.recipient_name}</span>
-                          <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Acabou de Entrar</span>
-                        </div>
+                        <span className="text-xs text-muted-foreground font-medium">
+                          {new Date(claim.claimed_at).toLocaleDateString()}
+                        </span>
                       </div>
-                      <span className="text-xs text-muted-foreground font-medium">
-                        {new Date(claim.claimed_at).toLocaleDateString()}
-                      </span>
-                    </div>
-                  </Card>
-                ))}
-              </div>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <div className="bg-muted/30 p-12 rounded-2xl border-2 border-dotted border-muted/50 text-center grayscale flex flex-col items-center justify-center">
+                  <Users className="w-12 h-12 mb-4 text-muted-foreground opacity-20" />
+                  <p className="font-bold text-muted-foreground/50">Ainda sem alunos pelo seu link.</p>
+                  <p className="text-xs text-muted-foreground/40 mt-1 max-w-[200px]">Partilhe o curso com os seus amigos para começar a construir a sua comunidade!</p>
+                </div>
+              )}
             </div>
           )}
         </div>

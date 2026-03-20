@@ -1,6 +1,7 @@
 import uuid
 import shortuuid
 from django.contrib.auth import get_user_model
+from django.conf import settings
 from django.db import models
 from cloudinary_storage.storage import VideoMediaCloudinaryStorage, RawMediaCloudinaryStorage, MediaCloudinaryStorage
 
@@ -59,6 +60,9 @@ class Course(models.Model):
     uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
     thumb = models.ImageField(upload_to="courses/thumbs/", null=True, blank=True, storage=MediaCloudinaryStorage())
     max_modules = models.PositiveIntegerField(null=True, blank=True, default=5)
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="owned_courses"
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     @property

@@ -295,18 +295,6 @@ export default function CoursesPage() {
     }
   };
 
-  const handleCertificateClick = (course: Course) => {
-    setSelectedCourse(course);
-    // @ts-ignore
-    const sessionName = session?.user?.name || (session as any)?.user?.full_name;
-
-    if (sessionName) {
-      downloadCertificate(course, sessionName);
-    } else {
-      setShowNameModal(true);
-    }
-  };
-
   const handleCreateCourse = async () => {
 
     setIsCreating(true);
@@ -444,67 +432,6 @@ export default function CoursesPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 md:px-8 py-3">
-      <Dialog open={showNameModal} onOpenChange={(val) => {
-        // Prevent closing if names are missing
-        const user = session?.user as any;
-        if (user && user.first_name && user.last_name) {
-          setShowNameModal(val);
-        }
-      }}>
-        <DialogContent className="sm:max-w-[450px]">
-          <div className="text-center space-y-4 pt-4">
-            <div className="w-16 h-16 bg-cyan-500/10 rounded-full flex items-center justify-center mx-auto">
-              <Sparkles className="w-8 h-8 text-cyan-500" />
-            </div>
-            <DialogTitle className="text-2xl font-bold">Complete seu Perfil</DialogTitle>
-            <DialogDescription className="text-base text-muted-foreground">
-              Para uma melhor experiência (e para que o seu certificado seja válido), precisamos do seu nome completo.
-            </DialogDescription>
-          </div>
-
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="firstName">Primeiro Nome</Label>
-              <Input
-                id="firstName"
-                placeholder="Ex: João"
-                value={profileNames.firstName}
-                onChange={(e) => setProfileNames({ ...profileNames, firstName: e.target.value })}
-                className="h-11"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="lastName">Apelido (Sobrenome)</Label>
-              <Input
-                id="lastName"
-                placeholder="Ex: Silva"
-                value={profileNames.lastName}
-                onChange={(e) => setProfileNames({ ...profileNames, lastName: e.target.value })}
-                className="h-11"
-              />
-            </div>
-          </div>
-
-          <div className="pb-4">
-            <Button
-              className="w-full h-11 bg-cyan-500 hover:bg-cyan-600 font-semibold"
-              onClick={handleProfileUpdate}
-              disabled={isUpdatingProfile}
-            >
-              {isUpdatingProfile ? (
-                <>
-                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                  Atualizando...
-                </>
-              ) : (
-                "Finalizar Registo"
-              )}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Import Confirmation Modal */}
       <Dialog open={showImportModal} onOpenChange={setShowImportModal}>
         <DialogContent className="sm:max-w-[450px]">
           <div className="text-center space-y-4 pt-4">
@@ -727,10 +654,6 @@ export default function CoursesPage() {
                         size="sm"
                         variant="ghost"
                         className="text-cyan-500 hover:text-cyan-600 hover:bg-cyan-50 gap-1 h-8"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleCertificateClick(course);
-                        }}
                         disabled={isDownloading && selectedCourse?.id === course.id}
                       >
                         {isDownloading && selectedCourse?.id === course.id ? (
