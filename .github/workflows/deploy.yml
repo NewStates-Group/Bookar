@@ -87,8 +87,7 @@ jobs:
 
       - name: Syncronize files
         run: |
-          rsync -avz deploy/ ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:~/Bookar/ && \
-          rsync -avz deploy/error_pages/ ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/usr/share/nginx/html/error_pages/
+          rsync -avz deploy/ ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:~/Bookar/
 
       - name: Run deploy
         run: |

@@ -111,7 +111,7 @@ server {
     error_page 502 /502.html;
 
     location ~ ^/(404|500|502)\.html$ {
-        root /usr/share/nginx/html/error_pages;
+        root  /home/ubuntu/Bookar/nginx/error_pages;
         internal;
     }
 }
