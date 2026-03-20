@@ -4,7 +4,7 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { BookOpen, Plus, Loader2, ArrowRight, ArrowUp, ImageOff, Sparkles, GraduationCap, Award, FileDown, X, Trash2 } from "lucide-react";
+import { BookOpen, Plus, Loader2, ArrowRight, ArrowUp, ImageOff, Sparkles, GraduationCap, Award, FileDown, X, Trash2, Share2 } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
 import { Label } from "@/components/ui/label";
 import {
@@ -48,6 +48,9 @@ export default function CoursesPage() {
   const [courses, setCourses] = useState<Course[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [pendingShareInfo, setPendingShareInfo] = useState<any>(null);
+  const [isClaiming, setIsClaiming] = useState(false);
   const [open, setOpen] = useState(false);
   const [showNameModal, setShowNameModal] = useState(false);
   const [fullName, setFullName] = useState("");
@@ -137,6 +140,32 @@ export default function CoursesPage() {
     if (!token || !session?.accessToken) return;
 
     try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/courses/share/${token}`);
+      if (res.ok) {
+        const data = await res.json();
+
+        // Check if course is already in the list
+        if (courses.some(c => String(c.id) === String(data.course_id))) {
+          localStorage.removeItem("pending_share_token");
+          return;
+        }
+
+        setPendingShareInfo(data);
+        setShowImportModal(true);
+      } else {
+        localStorage.removeItem("pending_share_token");
+      }
+    } catch (error) {
+      console.error("Error fetching share info:", error);
+    }
+  };
+
+  const confirmClaim = async () => {
+    const token = localStorage.getItem("pending_share_token");
+    if (!token || !session?.accessToken) return;
+
+    setIsClaiming(true);
+    try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/courses/share/${token}/claim`, {
         method: "POST",
         headers: {
@@ -148,10 +177,15 @@ export default function CoursesPage() {
         const data = await res.json();
         toast.success(data.message || "Curso importado com sucesso!");
         fetchCourses();
+      } else {
+        const err = await res.json();
+        toast.error(err.message || "Erro ao importar curso.");
       }
     } catch (error) {
-      console.error("Error claiming shared course:", error);
+      toast.error("Erro ao importar curso.");
     } finally {
+      setIsClaiming(false);
+      setShowImportModal(false);
       localStorage.removeItem("pending_share_token");
     }
   };
@@ -466,6 +500,58 @@ export default function CoursesPage() {
               ) : (
                 "Finalizar Registo"
               )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Import Confirmation Modal */}
+      <Dialog open={showImportModal} onOpenChange={setShowImportModal}>
+        <DialogContent className="sm:max-w-[450px]">
+          <div className="text-center space-y-4 pt-4">
+            <div className="w-16 h-16 bg-cyan-500/10 rounded-full flex items-center justify-center mx-auto">
+              <Share2 className="w-8 h-8 text-cyan-500" />
+            </div>
+            <DialogTitle className="text-2xl font-bold text-balance">Novo Curso Disponível!</DialogTitle>
+            <DialogDescription className="text-base text-muted-foreground">
+              <span className="font-bold text-foreground">{pendingShareInfo?.sharer_name}</span> partilhou um curso consigo.
+            </DialogDescription>
+          </div>
+
+          <div className="bg-muted/50 p-6 rounded-2xl border-2 border-dashed border-cyan-500/20 my-4 text-center">
+            <h3 className="text-xl font-black capitalize text-cyan-600 mb-2">
+              {pendingShareInfo?.course_title}
+            </h3>
+            <p className="text-sm text-balance">
+              Este curso será adicionado à sua biblioteca pessoal.
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-3 pb-2">
+            <Button
+              className="w-full h-12 bg-cyan-500 hover:bg-cyan-600 text-lg font-bold rounded-full"
+              onClick={confirmClaim}
+              disabled={isClaiming}
+            >
+              {isClaiming ? (
+                <>
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                  Importando...
+                </>
+              ) : (
+                "Importar Agora"
+              )}
+            </Button>
+            <Button
+              variant="ghost"
+              className="w-full h-12 rounded-full text-muted-foreground hover:text-red-500"
+              onClick={() => {
+                setShowImportModal(false);
+                localStorage.removeItem("pending_share_token");
+              }}
+              disabled={isClaiming}
+            >
+              Ignorar Convite
             </Button>
           </div>
         </DialogContent>

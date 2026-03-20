@@ -13,6 +13,7 @@ class CourseOut(ModelSchema):
     is_completed: bool = False
     certificate_status: str = "NOT_GENERATED"
     certificate_url: Optional[str] = None
+    is_owner: bool = False
 
     class Meta:
         model = Course
@@ -67,6 +68,11 @@ class CourseOut(ModelSchema):
             except Exception:
                 return None
         return None
+
+    @staticmethod
+    def resolve_is_owner(obj, context):
+        user = context.get("request").user
+        return obj.user == user
 
 
 class LessonSchema(ModelSchema):

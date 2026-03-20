@@ -23,6 +23,7 @@ interface Course {
   max_modules?: number;
   certificate_url?: string;
   certificate_status?: string;
+  is_owner?: boolean;
 }
 
 interface Lesson {
@@ -507,27 +508,41 @@ export default function CoursePage() {
             ))}
           </div>
 
-          {claims.length > 0 && (
-            <div className="mt-12 space-y-4">
-              <h3 className="text-xl font-bold flex items-center gap-2">
-                <Users className="w-5 h-5 text-cyan-500" />
-                Alunos que entraram pelo seu link
-              </h3>
-              <Card className="divide-y overflow-hidden">
+          {course?.is_owner && claims.length > 0 && (
+            <div className="mt-12 pt-8 border-t border-dashed">
+              <div className="flex items-center justify-between mb-6">
+                <div className="space-y-1">
+                  <h3 className="text-2xl font-black flex items-center gap-2">
+                    <Users className="w-6 h-6 text-cyan-500" />
+                    Comunidade
+                  </h3>
+                  <p className="text-sm text-muted-foreground">Pessoas que estão a aprender com o seu link</p>
+                </div>
+                <div className="bg-cyan-500/10 text-cyan-600 px-4 py-2 rounded-2xl font-bold border border-cyan-500/20">
+                  {claims.length} {claims.length === 1 ? 'Aluno' : 'Alunos'}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {claims.map((claim, idx) => (
-                  <div key={idx} className="p-4 flex items-center justify-between bg-muted/10">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-cyan-100 flex items-center justify-center text-cyan-700 font-bold text-xs">
-                        {claim.recipient_name.substring(0, 2).toUpperCase()}
+                  <Card key={idx} className="p-4 border-2 border-transparent hover:border-cyan-500/10 transition-all bg-muted/20">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center text-white font-black text-sm shadow-md">
+                          {claim.recipient_name.substring(0, 2).toUpperCase()}
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="font-bold text-sm">{claim.recipient_name}</span>
+                          <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Acabou de Entrar</span>
+                        </div>
                       </div>
-                      <span className="font-medium text-sm">{claim.recipient_name}</span>
+                      <span className="text-xs text-muted-foreground font-medium">
+                        {new Date(claim.claimed_at).toLocaleDateString()}
+                      </span>
                     </div>
-                    <span className="text-xs text-muted-foreground italic">
-                      {new Date(claim.claimed_at).toLocaleDateString()}
-                    </span>
-                  </div>
+                  </Card>
                 ))}
-              </Card>
+              </div>
             </div>
           )}
         </div>
