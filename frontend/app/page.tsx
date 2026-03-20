@@ -34,7 +34,7 @@ function CountdownTimer() {
 
   useEffect(() => {
     const targetDate = new Date();
-    targetDate.setDate(targetDate.getDate() + 14);
+    targetDate.setDate(targetDate.getDate() + 0);
 
     const timer = setInterval(() => {
       const now = new Date().getTime();
@@ -84,6 +84,7 @@ export default function HomePage() {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [waitingCount, setWaitingCount] = useState(0);
+  const [isSubscribed, setIsSubscribed] = useState(false);
 
   useEffect(() => {
     const fetchCount = async () => {
@@ -92,10 +93,10 @@ export default function HomePage() {
         const response = await fetch(`${apiUrl}/auth/waitlist/count`);
         if (response.ok) {
           const data = await response.json();
-          setWaitingCount(data.count + 1200);
+          setWaitingCount(data.count);
         }
       } catch (error) {
-        setWaitingCount(1243);
+        setWaitingCount(10);
       }
     };
     fetchCount();
@@ -134,7 +135,7 @@ export default function HomePage() {
   return (
     <div className="min-h-screen flex flex-col bg-white text-[#111] font-sans">
       {/* Header mapped from bookar.study */}
-      <header className="p-6 md:p-10 flex justify-end gap-6 items-center">
+      <header className="hidden p-6 md:p-10 flex justify-end gap-6 items-center">
         <Link href="/login" className="text-sm font-medium hover:text-black/60 transition-colors">
           Entrar
         </Link>
@@ -147,7 +148,7 @@ export default function HomePage() {
 
       <main className="flex-1 flex flex-col items-center justify-center p-6 text-center space-y-12 pb-24">
         {/* Hero Section */}
-        <div className="z-10 text-center max-w-3xl space-y-3 animate-in fade-in slide-in-from-bottom-8 duration-1000 relative">
+        <div className="z-10 text-center max-w-3xl space-y-3 relative">
           {/* Subtle Cyan Glow behind logo */}
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-32 bg-cyan-400/10 blur-[60px] -z-10 rounded-full"></div>
 
