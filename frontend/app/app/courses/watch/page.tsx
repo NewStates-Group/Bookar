@@ -57,7 +57,7 @@ export default function WatchPage() {
     const [viewMode, setViewMode] = useState<"video" | "quiz">("video");
     const [played, setPlayed] = useState(false);
     const [ended, setEnded] = useState(false);
-    const [sidebarOpen, setSidebarOpen] = useState(true);
+    const [sidebarOpen, setSidebarOpen] = useState(false);
     const [showQuestionsModal, setShowQuestionsModal] = useState(false);
     const [previousLesson, setPreviousLesson] = useState<Lesson | null>(null)
     const [nextLesson, setNextLesson] = useState<Lesson | null>(null)
@@ -278,12 +278,7 @@ export default function WatchPage() {
     }, [course, lesson, lessonID, quizID]);
 
     if (status === "loading" || loading) {
-        return (
-            <div className="min-h-screen flex flex-col items-center justify-center bg-black text-white">
-                <Loader2 className="w-12 h-12 animate-spin text-primary mb-4" />
-                <p className="text-white/60 animate-pulse">Carregando sua aula...</p>
-            </div>
-        );
+        return null;
     }
 
     if (error || !lesson) {
@@ -303,7 +298,7 @@ export default function WatchPage() {
 
     return (
         <div className="flex h-screen bg-background overflow-hidden">
-            <div className={`fixed min-h-screen z-[100] md:static transition-all duration-300 overflow-hidden ${sidebarOpen ? "w-[22rem]" : "w-0"} bg-card border-r border-border `}>
+            <div className={`fixed min-h-screen z-[100] md:static transition-all duration-300 overflow-hidden ${sidebarOpen ? "w-[25rem]" : "w-0"} bg-card border-r border-border `}>
                 {sidebarOpen && <CourseWatchSidebar course={course} onClose={() => setSidebarOpen(!sidebarOpen)} />}
             </div>
 
@@ -422,20 +417,12 @@ export default function WatchPage() {
                                 </p>
                             </div>
                             {(lesson?.status === "PROCESSING" || lesson?.status === "PENDING") && (
-                                <div className="text-center space-y-6 max-w-lg z-10 py-10">
-                                    <div className="mb-8">
-                                        <BuildingBlocksLoader />
-                                    </div>
-                                    <div>
-                                        <h2 className="text-2xl font-bold text-foreground mb-2">Criando sua aula com IA...</h2>
-                                        <p className="text-foreground/60">
-                                            Nossa IA está gerando o roteiro, a narração e as animações para este tópico.
-                                            Isso leva cerca de 2-3 minutos.
-                                        </p>
-                                    </div>
-                                    <Button variant="outline" size="sm" className="bg-transparent border-border text-foreground/60">
-                                        Verificar estado
-                                    </Button>
+                                <div className="text-center max-w-lg z-10 py-10">
+                                    <BuildingBlocksLoader />
+                                    <h2 className="text-2xl font-bold text-foreground mb-2">Criando sua aula</h2>
+                                    <p className="text-foreground/60">
+                                        Isto pode levar alguns segundos.
+                                    </p>
                                 </div>
                             )}
 

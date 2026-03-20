@@ -26,10 +26,11 @@ export function CourseWatchSidebar({ course, onClose }: { course: CourseData | n
 
     const searchParams = useSearchParams();
     const lessonId = searchParams.get("l");
-    const [expandedModules, setExpandedModules] = useState<Record<number, boolean>>({});
+    const quizID = searchParams.get("id");
+    const [expandedModules, setExpandedModules] = useState<Record<string, boolean>>({});
     const [loading, setLoading] = useState(true);
 
-    const toggleModule = (moduleId: number) => {
+    const toggleModule = (moduleId: string) => {
         setExpandedModules((prev) => ({
             ...prev,
             [moduleId]: !prev[moduleId],
@@ -38,17 +39,19 @@ export function CourseWatchSidebar({ course, onClose }: { course: CourseData | n
 
     useEffect(() => {
         if (course.modules) {
+            const newExpanded: Record<string, boolean> = {};
             course.modules.forEach((module: Module) => {
-                if (module.lessons.some((lesson) => lesson.id === parseInt(lessonId || ""))) {
-                    setExpandedModules((prev) => ({
-                        ...prev,
-                        [module.id]: true,
-                    }));
+                const hasActiveLesson = module.lessons.some((lesson) => lesson.id === lessonId);
+                const hasActiveQuiz = lessonId === "quiz" && quizID === module.id;
+
+                if (hasActiveLesson || hasActiveQuiz) {
+                    newExpanded[module.id] = true;
                 }
             });
+            setExpandedModules(prev => ({ ...prev, ...newExpanded }));
         }
         setLoading(false)
-    }, [course])
+    }, [course, lessonId, quizID])
 
 
     const totalLessons = course?.modules.reduce((sum, m) => sum + m.lessons.length, 0) || 0;
@@ -112,7 +115,7 @@ export function CourseWatchSidebar({ course, onClose }: { course: CourseData | n
                                 {expandedModules[module.id] && (
                                     <div className="pl-2 space-y-1 my-1">
                                         {module.lessons.map((lesson) => {
-                                            const isActive = parseInt(lessonId || "") === lesson.id;
+                                            const isActive = lessonId === lesson.id;
                                             const isPending = lesson.status === "PENDING";
                                             const isProcessing = lesson.status === "PROCESSING";
 
@@ -188,7 +191,7 @@ export function CourseWatchSidebar({ course, onClose }: { course: CourseData | n
                                                                     <div className="flex items-center gap-2">
                                                                         <p className="truncate text-sm">{module.name}</p>
                                                                     </div>
-                                                                    
+
                                                                 </div>
                                                                 <div className="flex items-center gap-2">
                                                                     <p className="text-xs text-foreground/40">

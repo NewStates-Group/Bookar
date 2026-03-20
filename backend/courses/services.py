@@ -89,7 +89,7 @@ class CourseService:
 
         # 3. If no existing course, create new one
         # Course no longer has 'user' (owner) field. First enrollment identifies creator.
-        course = Course.objects.create(level=level, max_modules=num_modules or 5)
+        course = Course.objects.create(level=level, max_modules=num_modules or 4)
         # Owner must be enrolled
         self.enroll_course(user, course.id)
         
@@ -121,9 +121,9 @@ class CourseService:
         except Course.DoesNotExist:
             raise HttpError(404, "Curso não encontrado")
 
-    def enroll_course(self, user, course_id: str) -> CourseEnrollment:
+    def enroll_course(self, user, course_id) -> CourseEnrollment:
         try:
-            course = Course.objects.get(uuid=course_id)
+            course = Course.objects.get(id=course_id)
             enrollment, created = CourseEnrollment.objects.get_or_create(
                 user=user, course=course
             )

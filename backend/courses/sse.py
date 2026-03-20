@@ -121,7 +121,7 @@ async def lesson_sse_stream(request, lesson_id):
             try:
                 lesson = await sync_to_async(
                     lambda: Lesson.objects.select_related('module__course').get(
-                        pk=lesson_id,
+                        short_id=lesson_id,
                         module__course__enrollments__user=user,
                         module__course__enrollments__deleted=False
                     )
@@ -133,7 +133,7 @@ async def lesson_sse_stream(request, lesson_id):
                     'desc': lesson.desc,
                     'status': lesson.status,
                     'delivered': lesson.delivered,
-                    'lesson_file': lesson.lesson_file,
+                    'lesson_file': lesson.lesson_file.url if lesson.lesson_file else "",
                     'duration': lesson.duration,
                 }
                 
