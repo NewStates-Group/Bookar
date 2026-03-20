@@ -607,7 +607,7 @@ def create_course_details(user_id: int, course_pk: int, prompt: str, level: str)
     Course.objects.filter(pk=course_pk).update(
         desc=course_desc, title=course_title, max_modules=max_modules, status="PROCESSING"
     )
-    send_user_update(user_id, {"type": "course_update", "id": course_pk, "status": "PROCESSING", "title": course_title, "desc": course_desc})
+    send_user_update(user_id, {"type": "course_update", "id": str(course.uuid), "status": "PROCESSING", "title": course_title, "desc": course_desc})
 
     # Save generation context for future reuse
     CourseGenerationContext.objects.update_or_create(
@@ -708,7 +708,7 @@ def create_course_thumb(course_pk: str, prompt: str):
         course.thumb.save(thumb_filename, ContentFile(buffer.getvalue(), name=thumb_filename), save=True)
         course.status = "READY"
         course.save()
-        send_user_update(course.enrollments.first().user.id if course.enrollments.exists() else None, {"type": "course_update", "id": course_pk, "status": "READY", "thumb": course.thumb.url if course.thumb else ""})
+        send_user_update(course.enrollments.first().user.id if course.enrollments.exists() else None, {"type": "course_update", "id": str(course.uuid), "status": "READY", "thumb": course.thumb.url if course.thumb else ""})
         # Thumbnail generation is now independent of module generation
         # generate_next_module.delay(course.user.pk, course_pk)
     except Exception as e:
@@ -800,7 +800,7 @@ def generate_certificate_task(user_id: int, course_id: int, full_name: str):
         enrollment.certificate_file.save(cert_filename, ContentFile(image_data, name=cert_filename), save=False)
         enrollment.certificate_status = "READY"
         enrollment.save()
-        send_user_update(user_id, {"type": "certificate_update", "course_id": course_id, "status": "READY", "certificate_url": enrollment.certificate_file.url})
+        send_user_update(user_id, {"type": "certificate_update", "course_id": str(course.uuid), "status": "READY", "certificate_url": enrollment.certificate_file.url})
         
         send_certificate_email(user, course, enrollment.certificate_file.url)
         return enrollment.certificate_file.url
