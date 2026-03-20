@@ -73,9 +73,11 @@ export default function CoursePage() {
   useEffect(() => {
     const removeListener = addListener((data) => {
       // Refresh on ANY relevant update for this course
-      if ((data.type === "course_update" || data.type === "module_update") && data.id === params?.id) {
+      if (data.type === "course_update" && String(data.id) === String(params?.id)) {
         fetchCourse();
-        checkFinishment();
+      }
+      if (data.type === "module_update" && String(data.course_id) === String(params?.id)) {
+        fetchCourse();
       }
       // Also refresh if a lesson within this course is updated
       if (data.type === "lesson_update") {
