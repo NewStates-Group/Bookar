@@ -35,7 +35,7 @@ function CountdownTimer({ onComplete }: { onComplete: () => void }) {
 
   useEffect(() => {
     const targetDate = new Date();
-    targetDate.setSeconds(targetDate.getDate() + 14);
+    targetDate.setDate(targetDate.getDate() + 14);
 
     const timer = setInterval(() => {
       const now = new Date().getTime();
