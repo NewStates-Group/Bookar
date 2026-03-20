@@ -121,6 +121,7 @@ export default function CoursesPage() {
   useEffect(() => {
     if (session?.accessToken) {
       fetchCourses();
+      checkPendingShare();
 
       // Check if profile needs completion
       const user = session.user as any;
@@ -130,6 +131,30 @@ export default function CoursesPage() {
     }
   }, [session]);
 
+
+  const checkPendingShare = async () => {
+    const token = localStorage.getItem("pending_share_token");
+    if (!token || !session?.accessToken) return;
+
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/courses/share/${token}/claim`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${session.accessToken}`,
+        },
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        toast.success(data.message || "Curso importado com sucesso!");
+        fetchCourses();
+      }
+    } catch (error) {
+      console.error("Error claiming shared course:", error);
+    } finally {
+      localStorage.removeItem("pending_share_token");
+    }
+  };
 
   const fetchCourses = async () => {
     try {

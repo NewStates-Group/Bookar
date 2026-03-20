@@ -68,7 +68,7 @@ export default function WatchPage() {
 
     useEffect(() => {
         const removeListener = addListener((data) => {
-            if (data.type === "lesson_update" && data.id === lessonID) {
+            if (data.type === "lesson_update" && String(data.id) === String(lessonID)) {
                 if (data.status !== lesson?.status) {
                     getLesson();
                     fetchCourse();

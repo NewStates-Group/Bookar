@@ -25,6 +25,12 @@ export default function ShareLandingPage() {
     const [isClaiming, setIsClaiming] = useState(false);
 
     useEffect(() => {
+        if (status === "unauthenticated" && token) {
+            localStorage.setItem("pending_share_token", token as string);
+        }
+    }, [status, token]);
+
+    useEffect(() => {
         const fetchShareInfo = async () => {
             try {
                 const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/courses/share/${token}`);

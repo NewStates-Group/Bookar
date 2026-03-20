@@ -37,12 +37,10 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         socket.onmessage = (event) => {
             const data = JSON.parse(event.data);
             setLastMessage(data);
-            console.log(data)
             listenersRef.current.forEach((listener) => listener(data));
         };
 
         socket.onclose = () => {
-            console.log("WebSocket Disconnected, retrying...");
             setIsConnected(false);
             socketRef.current = null;
             setTimeout(connect, 3000); // Reconnect after 3 seconds
