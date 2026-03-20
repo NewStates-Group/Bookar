@@ -259,14 +259,20 @@ def generate_lesson(self, user_id, lesson_id: int):
         Title: {lesson.title}
         Description: {lesson.desc}
         Context: {lesson.narration}
+        Target Duration: {lesson.duration} seconds
         **USE PORTUGUESE ON THE JSON VALUES**
         **KEYS MUST KEEP THE ORIGINAL ENGLISH NAMES**
-        Generate EXACTLY 4 or 5 segments (no more, no less). Quality over quantity.
-        Each narration should cover 1-3 minutes of content.
-        Generate a JSON list of segments:
+        
+        Task:
+        Generate EXACTLY 5 segments.
+        The total content MUST correspond to {lesson.duration} seconds (~150 words per minute).
+        Each segment should have approximately {int(lesson.duration / 5)} seconds of audio.
+        This means each of the 5 segments should have a narration text of roughly {int((lesson.duration / 5) * 2.5)} words.
+        
+        Generate a JSON list of 5 segments:
         [
         {{
-            "narration": "...",
+            "narration": "Detailed and engaging narration for this segment (approx {int((lesson.duration / 5) * 2.5)} words)...",
             "visual_prompt": "A simple image scene description for this part..."
         }}
         ]
@@ -377,19 +383,18 @@ def generate_next_module(self, user_pk: int, course_pk: int, module_pk: int = No
     existing_modules = course.modules.all().order_by("created_at")
     logger.critical(existing_modules)
     modules_context = "\n".join([f"- {m.name}: {m.desc}" for m in existing_modules])
-    # entre 8-15
     prompt = (
         "You are an expert educational content creator. "
         "Create the NEXT module for this course in JSON format. "
         "Don't enumerate the lesson like this 1.1 -, don't enumerate nothing. "
         "NUNCA use prefixos como 'Módulo 1:', 'Aula 1:', ou qualquer tipo de numeração. Use apenas o NOME DIRECTO do conteúdo."
         "Generate the JSON values in portugues, keep the keys in english. "
-        "Cada módulo deve ter apenas 2 aulas. "
+        "Cada módulo deve ter apenas 8-15 aulas. "
         "Gera módulos seguindo uma progressão lógica: Comece SEMPRE com História, Definição, Conceitos Teóricos e Contexto. "
         "NÃO comece com prática imediata ou tópicos avançados. "
         "Exemplo: Se for um curso de HTML, 1. História da Web, 2. O que é HTML, 3. Estrutura Básica, e então Prática. "
         "Mantenha essa estrutura progressiva para todo o curso. "
-        "Cada aula deve ter conteúdo para 5 a 12 minutos"
+        "Cada aula deve ter conteúdo para 5 a 12 minutos (300 a 720 segundos). "
         "Strictly follow this JSON schema:"
         "{"
         '  "title": "Título do módulo (NUNCA inclua numeração ou a palavra Módulo, apenas o título)",'
@@ -398,8 +403,8 @@ def generate_next_module(self, user_pk: int, course_pk: int, module_pk: int = No
         "    {"
         '      "title": "Título da lição (NUNCA inclua numeração ou a palavra Aula, apenas o título)",'
         '      "desc": "Descrição da lição",'
-        '      "duration": 300, '
-        '      "narration": "Detailed narration text, engaging and podcast-style...",'
+        '      "duration": 480, '
+        '      "narration": "Summary narration text (approx 200 words) that will be expanded later...",'
         '      "key_points": "Key takeaway 1, Key takeaway 2",'
         '      "scene_suggestion": "Visual description for whiteboard animation"'
         "    }\n"
@@ -443,7 +448,7 @@ def generate_next_module(self, user_pk: int, course_pk: int, module_pk: int = No
                     narration=lesson.get("narration", ""),
                     key_points=lesson.get("key_points", "")[:150],
                     scene_suggestion=lesson.get("scene_suggestion", ""),
-                    duration=lesson.get("duration", 120),
+                    duration=lesson.get("duration", 300),
                     status="PENDING",
                 )
             )

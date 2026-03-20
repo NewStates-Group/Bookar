@@ -525,7 +525,7 @@ export default function CoursePage() {
                 </div>
                 {claims.length > 0 && (
                   <div className="bg-cyan-500/10 text-cyan-600 px-4 py-2 rounded-2xl font-bold border border-cyan-500/20">
-                    {claims.length} {claims.length === 1 ? 'Aluno' : 'Alunos'}
+                    {claims.length} {claims.length === 1 ? 'Pessoa' : 'Pessoas'}
                   </div>
                 )}
               </div>
