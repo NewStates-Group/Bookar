@@ -105,4 +105,13 @@ server {
     location /.well-known/acme-challenge/ {
         root /var/www/certbot;
     }
+
+    error_page 404 /404.html;
+    error_page 500 /500.html;
+    error_page 502 /502.html;
+
+    location ~ ^/(404|500|502)\.html$ {
+        root /usr/share/nginx/html/error_pages;
+        internal;
+    }
 }
