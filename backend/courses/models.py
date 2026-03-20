@@ -1,3 +1,5 @@
+import uuid
+import shortuuid
 from django.contrib.auth import get_user_model
 from django.db import models
 from cloudinary_storage.storage import VideoMediaCloudinaryStorage, RawMediaCloudinaryStorage, MediaCloudinaryStorage
@@ -39,6 +41,10 @@ class CourseLevel(models.TextChoices):
     ADVANCED = "A", "Advance"
 
 
+def generate_short_id():
+    return shortuuid.ShortUUID().random(length=12)
+
+
 class Course(models.Model):
     title = models.CharField(max_length=80, null=True, blank=True)
     desc = models.TextField(null=True, blank=True)
@@ -50,6 +56,7 @@ class Course(models.Model):
         choices=CourseStatus.choices,
         default=CourseStatus.PROCESSING,
     )
+    uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
     thumb = models.ImageField(upload_to="courses/thumbs/", null=True, blank=True, storage=MediaCloudinaryStorage())
     max_modules = models.PositiveIntegerField(null=True, blank=True, default=5)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -117,6 +124,7 @@ class Module(models.Model):
         choices=ModuleStatus.choices,
         default=ModuleStatus.READY,
     )
+    uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
     created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)
 
 
@@ -131,6 +139,7 @@ class Lesson(models.Model):
         choices=LessonStatus.choices,
         default=LessonStatus.PENDING,
     )
+    short_id = models.CharField(max_length=12, default=generate_short_id, unique=True)
     lesson_file = models.FileField(upload_to="courses/lessons/", null=True, blank=True, storage=VideoMediaCloudinaryStorage())
     narration = models.TextField(null=True, blank=True)
     key_points = models.CharField(max_length=150, null=True, blank=True)
@@ -172,6 +181,7 @@ class Quiz(models.Model):
     )
     title = models.CharField(max_length=150)
     description = models.TextField(null=True, blank=True)
+    uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
 
@@ -181,6 +191,7 @@ class Question(models.Model):
     explanation = models.TextField(
         null=True, blank=True, help_text="Explanation for the correct answer"
     )
+    uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
 
 
 class Choice(models.Model):
@@ -189,6 +200,7 @@ class Choice(models.Model):
     )
     text = models.CharField(max_length=200)
     is_correct = models.BooleanField(default=False)
+    uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
 
 
 class QuizAttempt(models.Model):
@@ -245,3 +257,33 @@ class CourseEnrollment(models.Model):
 
     def __str__(self):
         return f"Enrollment: {self.user} → {self.course}"
+
+
+class CourseShare(models.Model):
+    course = models.ForeignKey(
+        Course, on_delete=models.CASCADE, related_name="shares"
+    )
+    sharer = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="shared_courses"
+    )
+    token = models.CharField(max_length=100, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Share: {self.sharer} → {self.course} ({self.token})"
+
+
+class CourseShareClaim(models.Model):
+    share = models.ForeignKey(
+        CourseShare, on_delete=models.CASCADE, related_name="claims"
+    )
+    recipient = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="claimed_shares"
+    )
+    claimed_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("share", "recipient")
+
+    def __str__(self):
+        return f"Claim: {self.recipient} ← {self.share.token}"

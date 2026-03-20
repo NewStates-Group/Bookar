@@ -12,16 +12,16 @@ import { BuildingBlocksLoader } from "@/components/ui/building-blocks-loader";
 import { QuizView } from "@/components/quiz-view";
 
 export interface Module {
-    id: number;
+    id: string;
     name: string;
     lessons: Lesson[];
-    quiz_id?: number;
+    quiz_id?: string;
     last_quiz_score?: number;
     last_quiz_passed?: boolean;
 }
 
 export interface CourseData {
-    id: number;
+    id: string;
     title: string;
     thumb: string;
     desc: string;
@@ -31,7 +31,7 @@ export interface CourseData {
 }
 
 export interface Lesson {
-    id: number;
+    id: string;
     title: string;
     desc: string;
     lesson_file: string | null;
@@ -61,7 +61,7 @@ export default function WatchPage() {
     const [showQuestionsModal, setShowQuestionsModal] = useState(false);
     const [previousLesson, setPreviousLesson] = useState<Lesson | null>(null)
     const [nextLesson, setNextLesson] = useState<Lesson | null>(null)
-    const [nextQuiz, setNextQuiz] = useState<{ id: number, moduleId: number } | null>(null)
+    const [nextQuiz, setNextQuiz] = useState<{ id: string, moduleId: string } | null>(null)
 
     useEffect(() => {
         if ((session as any)?.accessToken && lessonID && (lesson?.status === "PROCESSING" || lesson?.status === "PENDING")) {
@@ -163,7 +163,7 @@ export default function WatchPage() {
     };
 
 
-    const fetchLessonStatus = async (id: number) => {
+    const fetchLessonStatus = async (id: string) => {
         try {
             const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/lessons/${id}`, {
                 headers: {
@@ -310,11 +310,19 @@ export default function WatchPage() {
             <div className="flex-1 flex flex-col overflow-hidden bg-background">
                 <div className="h-16 grid grid-cols-5 border-b border-border">
                     <button
-                        onClick={() => router.push(`/app/courses/${course?.id}`)}
-                        className="flex gap-1 items-center justify-center border-r cursor-pointer hover:bg-muted transition-colors"
+                        onClick={() => {
+                            if (course?.id) {
+                                router.push(`/app/courses/${course.id}`);
+                            } else if (courseID) {
+                                router.push(`/app/courses/${courseID}`);
+                            } else {
+                                router.push('/app/courses');
+                            }
+                        }}
+                        className="flex gap-1 items-center justify-center border-r cursor-pointer hover:bg-muted transition-colors px-4"
                     >
                         <ArrowLeft className="w-5 h-5 " />
-                        <span className="hidden md:block">
+                        <span className="hidden md:block ml-1">
                             Voltar
                         </span>
                     </button>
@@ -399,7 +407,7 @@ export default function WatchPage() {
                 <div className="flex-1 overflow-y-auto">
                     {viewMode === "quiz" && quizID ? (
                         <QuizView
-                            quizId={parseInt(quizID)}
+                            quizId={quizID}
                             courseId={courseID as string}
                             onComplete={() => {
                                 fetchCourse();

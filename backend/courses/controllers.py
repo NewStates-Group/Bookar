@@ -14,6 +14,9 @@ from .schemas import (
     QuizSchema,
     QuizSubmission,
     MessageSchema,
+    CourseShareOut,
+    ShareClaimOut,
+    ShareClaimListOut,
 )
 from .services import CourseService, LessonService
 
@@ -35,15 +38,15 @@ class CourseController:
         )
 
     @route.get("{course_id}", response=CourseDetailSchema)
-    def get_course(self, request, course_id: int):
+    def get_course(self, request, course_id: str):
         return self.course_service.get_course(course_id, request.user)
 
     @route.delete("{course_id}")
-    def delete_course(self, request, course_id: int):
+    def delete_course(self, request, course_id: str):
         return self.course_service.delete_course(course_id, request.user)
 
     @route.get("{course_id}/get-next-lesson")
-    def get_next_lesson(self, request, course_id: int, current_lesson: int = 0):
+    def get_next_lesson(self, request, course_id: str, current_lesson: str = "0"):
         lesson = self.course_service.get_next_lesson(
             request.user, course_id, current_lesson
         )
@@ -52,28 +55,44 @@ class CourseController:
         return GetNextLessonSchema.from_orm(lesson)
 
     @route.post("{course_id}/generate-module")
-    def generate_module(self, request, course_id: int):
+    def generate_module(self, request, course_id: str):
         return self.course_service.trigger_next_module(request.user.pk, course_id)
 
     @route.get("quiz/{lesson_id}", response=QuizSchema)
-    def get_quiz(self, lesson_id: int):
+    def get_quiz(self, lesson_id: str):
         return self.course_service.get_quiz(lesson_id)
 
     @route.get("module-quiz/{module_id}", response=QuizSchema)
-    def get_module_quiz(self, request, module_id: int):
+    def get_module_quiz(self, request, module_id: str):
         return self.course_service.get_module_quiz(request.user, module_id)
 
     @route.get("{course_id}/certificate")
-    def get_certificate(self, request, course_id: int):
+    def get_certificate(self, request, course_id: str):
         return self.course_service.get_certificate_info(request.user, course_id)
 
     @route.post("quiz/{quiz_id}/submit", response=QuizResult)
-    def submit_quiz(self, request, quiz_id: int, data: QuizSubmission):
+    def submit_quiz(self, request, quiz_id: str, data: QuizSubmission):
         return self.course_service.submit_quiz(request.user, quiz_id, data.answers)
 
     @route.post("{course_id}/cancel")
-    def cancel_course(self, request, course_id: int):
+    def cancel_course(self, request, course_id: str):
         return self.course_service.cancel_course(request.user, course_id)
+
+    @route.post("{course_id}/share", response=CourseShareOut)
+    def share_course(self, request, course_id: str):
+        return self.course_service.generate_share_token(request.user, course_id)
+
+    @route.get("share/{token}", response=CourseShareOut, auth=None)
+    def get_share_info(self, request, token: str):
+        return self.course_service.get_share_info(token)
+
+    @route.post("share/{token}/claim", response=ShareClaimOut)
+    def claim_share(self, request, token: str):
+        return self.course_service.claim_share(request.user, token)
+
+    @route.get("{course_id}/claims", response=List[ShareClaimListOut])
+    def get_course_claims(self, request, course_id: str):
+        return self.course_service.get_course_claims(request.user, course_id)
 
 
 @api_controller("lessons", tags=["Lesson"], auth=JWTAuth())
@@ -83,7 +102,7 @@ class LessonController:
         self.lesson_service = lesson_service
 
     @route.get("{lesson_id}", response=LessonSchema)
-    def get_lesson(self, request, lesson_id: int):
+    def get_lesson(self, request, lesson_id: str):
         lesson = self.lesson_service.get_lesson(request.user, lesson_id)
         if not lesson:
             from ninja.errors import HttpError
@@ -91,9 +110,9 @@ class LessonController:
         return lesson
 
     @route.put("{lesson_id}/mark-watched")
-    def mark_watched(self, request, lesson_id: int):
+    def mark_watched(self, request, lesson_id: str):
         return self.lesson_service.mark_watched(request.user, lesson_id)
 
     @route.put("{lesson_id}/mark-delivered")
-    def mark_delivered(self, request, lesson_id: int):
+    def mark_delivered(self, request, lesson_id: str):
         return self.lesson_service.mark_delivered(request.user, lesson_id)

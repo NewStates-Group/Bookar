@@ -5,7 +5,7 @@ from ninja import ModelSchema, Schema
 from ninja.orm import create_schema
 from pydantic import Field
 
-from .models import Choice, Course, CourseEnrollment, CourseLevel, Lesson, Module, Question, Quiz
+from .models import Choice, Course, CourseEnrollment, CourseLevel, Lesson, Module, Question, Quiz, CourseShare, CourseShareClaim
 
 
 class CourseOut(ModelSchema):
@@ -17,7 +17,6 @@ class CourseOut(ModelSchema):
     class Meta:
         model = Course
         fields = [
-            "id",
             "title",
             "desc",
             "thumb",
@@ -26,6 +25,12 @@ class CourseOut(ModelSchema):
             "status",
             "max_modules",
         ]
+
+    id: str = None
+
+    @staticmethod
+    def resolve_id(obj):
+        return str(obj.uuid)
 
     @staticmethod
     def resolve_thumb(obj):
@@ -70,7 +75,6 @@ class LessonSchema(ModelSchema):
     class Meta:
         model = Lesson
         fields = [
-            "id",
             "module",
             "title",
             "desc",
@@ -83,6 +87,12 @@ class LessonSchema(ModelSchema):
             "created_at",
             "status",
         ]
+
+    id: str = None
+
+    @staticmethod
+    def resolve_id(obj):
+        return obj.short_id
 
     @staticmethod
     def resolve_watched(obj, context):
@@ -105,16 +115,21 @@ class GetNextLessonSchema(ModelSchema):
     class Meta:
         model = Lesson
         fields = [
-            "id",
             "module",
             "status",
         ]
+
+    id: str = None
+
+    @staticmethod
+    def resolve_id(obj):
+        return obj.short_id
 
     @staticmethod
     def resolve_watched(obj, context):
         user = context.get("request").user
         return obj.progress.filter(user=user, watched=True).exists()
-ModuleSchema = create_schema(Module, fields=["id", "name", "desc"])
+ModuleSchema = create_schema(Module, fields=["name", "desc"])
 
 
 class CourseIn(Schema):
@@ -125,14 +140,14 @@ class CourseIn(Schema):
 
 class ModuleDetailSchema(ModuleSchema):
     lessons: List[LessonSchema]
-    quiz_id: Optional[int] = None
+    quiz_id: Optional[str] = None
     quiz_title: Optional[str] = None
     last_quiz_score: Optional[float] = None
     last_quiz_passed: Optional[bool] = None
 
     @staticmethod
     def resolve_quiz_id(obj):
-        return obj.quiz.id if hasattr(obj, "quiz") else None
+        return str(obj.quiz.uuid) if hasattr(obj, "quiz") else None
 
     @staticmethod
     def resolve_quiz_title(obj):
@@ -146,6 +161,12 @@ class ModuleDetailSchema(ModuleSchema):
     def resolve_last_quiz_passed(obj):
         return getattr(obj, "_last_quiz_passed", None)
 
+    id: str = None
+
+    @staticmethod
+    def resolve_id(obj):
+        return str(obj.uuid)
+
 
 class CourseDetailSchema(CourseOut):
     modules: List[ModuleDetailSchema]
@@ -155,7 +176,13 @@ class CourseDetailSchema(CourseOut):
 class ChoiceSchema(ModelSchema):
     class Meta:
         model = Choice
-        fields = ["id", "text"]
+        fields = ["text"]
+
+    id: str = None
+
+    @staticmethod
+    def resolve_id(obj):
+        return str(obj.uuid)
 
 
 class QuestionSchema(ModelSchema):
@@ -163,7 +190,13 @@ class QuestionSchema(ModelSchema):
 
     class Meta:
         model = Question
-        fields = ["id", "text"]
+        fields = ["text"]
+
+    id: str = None
+
+    @staticmethod
+    def resolve_id(obj):
+        return str(obj.uuid)
 
 
 class QuizSchema(ModelSchema):
@@ -171,12 +204,18 @@ class QuizSchema(ModelSchema):
 
     class Meta:
         model = Quiz
-        fields = ["id", "title", "description"]
+        fields = ["title", "description"]
+
+    id: str = None
+
+    @staticmethod
+    def resolve_id(obj):
+        return str(obj.uuid)
 
 
 class AnswerIn(Schema):
-    question_id: int
-    choice_id: int
+    question_id: str
+    choice_id: str
 
 
 class QuizSubmission(Schema):
@@ -186,7 +225,7 @@ class QuizSubmission(Schema):
 class QuizResult(Schema):
     score: float
     passed: bool
-    correct_answers: List[int]  # List of correct Choice IDs
+    correct_answers: List[str]  # List of correct Choice UUIDs
 
 
 class MessageSchema(Schema):
@@ -205,3 +244,22 @@ class EnrollmentOut(ModelSchema):
             "last_accessed_at",
             "completed_at",
         ]
+
+
+class CourseShareOut(Schema):
+    token: str
+    course_id: str
+    course_title: str
+    sharer_name: str
+    created_at: datetime
+
+
+class ShareClaimOut(Schema):
+    success: bool
+    message: str
+    course_id: Optional[str] = None
+
+
+class ShareClaimListOut(Schema):
+    recipient_name: str
+    claimed_at: datetime

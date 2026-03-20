@@ -8,12 +8,12 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 
 interface Choice {
-    id: number;
+    id: string;
     text: string;
 }
 
 interface Question {
-    id: number;
+    id: string;
     text: string;
     choices: Choice[];
 }
@@ -28,7 +28,7 @@ interface Quiz {
 interface QuizResult {
     score: number;
     passed: boolean;
-    correct_answers: number[]; // IDs of correct choices
+    correct_answers: string[]; // IDs of correct choices
 }
 
 export function QuizView({
@@ -36,7 +36,7 @@ export function QuizView({
     courseId,
     onComplete
 }: {
-    quizId: number;
+    quizId: string;
     courseId: string;
     onComplete?: () => void;
 }) {
@@ -44,7 +44,7 @@ export function QuizView({
     const router = useRouter();
     const [quiz, setQuiz] = useState<Quiz | null>(null);
     const [loading, setLoading] = useState(true);
-    const [answers, setAnswers] = useState<Record<number, number>>({}); // questionId -> choiceId
+    const [answers, setAnswers] = useState<Record<string, string>>({}); // questionId -> choiceId
     const [result, setResult] = useState<QuizResult | null>(null);
     const [submitting, setSubmitting] = useState(false);
 
@@ -76,7 +76,7 @@ export function QuizView({
         }
     };
 
-    const handleSelect = (questionId: number, choiceId: number) => {
+    const handleSelect = (questionId: string, choiceId: string) => {
         if (result) return; // Disable changing after submission
         setAnswers(prev => ({ ...prev, [questionId]: choiceId }));
     };
@@ -87,7 +87,7 @@ export function QuizView({
 
         const payload = {
             answers: Object.entries(answers).map(([qId, cId]) => ({
-                question_id: parseInt(qId),
+                question_id: qId,
                 choice_id: cId
             }))
         };

@@ -126,12 +126,12 @@ export function FloatingNavbar() {
                                 <span>Perfil</span>
                             </Link>
                         </DropdownMenuItem>
-                        <DropdownMenuItem asChild>
+                        {/* <DropdownMenuItem asChild>
                             <Link href="/app/settings" className="cursor-pointer flex items-center gap-2">
                                 <Settings className="w-4 h-4" />
                                 <span>Configurações</span>
                             </Link>
-                        </DropdownMenuItem>
+                        </DropdownMenuItem> */}
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
                             onClick={() => signOut({ callbackUrl: "/login" })}

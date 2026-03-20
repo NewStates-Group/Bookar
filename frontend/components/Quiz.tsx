@@ -10,12 +10,12 @@ import { Loader2, CheckCircle, XCircle, Trophy, RefreshCcw } from "lucide-react"
 import { useSession } from "next-auth/react";
 
 interface Choice {
-    id: number;
+    id: string;
     text: string;
 }
 
 interface Question {
-    id: number;
+    id: string;
     text: string;
     choices: Choice[];
 }
@@ -38,7 +38,7 @@ export function Quiz({ lessonId, onComplete }: QuizProps) {
     const [loading, setLoading] = useState(true);
     const [answers, setAnswers] = useState<Record<number, number>>({});
     const [submitting, setSubmitting] = useState(false);
-    const [result, setResult] = useState<{ score: number; passed: boolean; correct_answers: number[] } | null>(null);
+    const [result, setResult] = useState<{ score: number; passed: boolean; correct_answers: string[] } | null>(null);
 
     useEffect(() => {
         if (lessonId && session?.accessToken) {
@@ -73,8 +73,8 @@ export function Quiz({ lessonId, onComplete }: QuizProps) {
         }
     };
 
-    const handleAnswer = (questionId: number, choiceId: string) => {
-        setAnswers(prev => ({ ...prev, [questionId]: parseInt(choiceId) }));
+    const handleAnswer = (questionId: string, choiceId: string) => {
+        setAnswers(prev => ({ ...prev, [questionId]: choiceId }));
     };
 
     const handleSubmit = async () => {
@@ -83,7 +83,7 @@ export function Quiz({ lessonId, onComplete }: QuizProps) {
 
         const submission = {
             answers: Object.entries(answers).map(([qId, cId]) => ({
-                question_id: parseInt(qId),
+                question_id: qId,
                 choice_id: cId
             }))
         };

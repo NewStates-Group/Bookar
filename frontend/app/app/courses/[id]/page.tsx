@@ -8,10 +8,11 @@ import { Loader2, Play, ArrowLeft, Plus, ImageOff, PlayCircle, Trash } from "luc
 import Link from "next/link";
 import { useEffect, useState, useRef } from "react";
 import { toast } from "sonner";
-import { Award, FileDown, X, HelpCircle, CheckCircle2, XCircle, Lock } from "lucide-react";
+import { Award, FileDown, X, HelpCircle, CheckCircle2, XCircle, Lock, Share2, Users } from "lucide-react";
+import { ShareCourseModal } from "@/components/ShareCourseModal";
 
 interface Course {
-  id: number;
+  id: string;
   title: string;
   desc: string;
   level: string;
@@ -24,7 +25,7 @@ interface Course {
 }
 
 interface Lesson {
-  id: number;
+  id: string;
   title: string;
   desc: string;
   duration: number;
@@ -33,7 +34,7 @@ interface Lesson {
 }
 
 interface Module {
-  id: number;
+  id: string;
   name: string;
   lessons: Lesson[];
   last_quiz_score?: number;
@@ -44,6 +45,11 @@ interface Module {
 interface CourseDetail extends Course {
   modules: Module[];
   is_fully_completed: boolean;
+}
+
+interface Claim {
+  recipient_name: string;
+  claimed_at: string;
 }
 
 export default function CoursePage() {
@@ -57,6 +63,9 @@ export default function CoursePage() {
   const [fullName, setFullName] = useState("");
   const [isDownloading, setIsDownloading] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [shareToken, setShareToken] = useState("");
+  const [claims, setClaims] = useState<Claim[]>([]);
 
   useEffect(() => {
     const isProcessing = course?.status === "PROCESSING" ||
@@ -156,6 +165,42 @@ export default function CoursePage() {
     }
   };
 
+  const fetchClaims = async () => {
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/courses/${params?.id}/claims`, {
+        headers: {
+          Authorization: `Bearer ${(session as any)?.accessToken}`,
+        },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setClaims(data);
+      }
+    } catch (error) {
+      console.error("Failed to fetch claims", error);
+    }
+  };
+
+  const handleShare = async () => {
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/courses/${course?.id}/share`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${(session as any)?.accessToken}`,
+        },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setShareToken(data.token);
+        setIsShareModalOpen(true);
+      } else {
+        toast.error("Erro ao gerar link de partilha.");
+      }
+    } catch (e) {
+      toast.error("Erro de conexão.");
+    }
+  };
+
   const handleCertificateClick = async () => {
     setIsDownloading(true);
     try {
@@ -232,6 +277,7 @@ export default function CoursePage() {
     if ((session as any)?.accessToken && params?.id) {
       fetchCourse();
       checkFinishment();
+      fetchClaims();
     }
   }, [session, params]);
 
@@ -283,7 +329,13 @@ export default function CoursePage() {
         <div className="space-y-6">
           <div className="flex items-center justify-between">
             <h2 className="text-2xl font-bold">Conteúdo do Curso</h2>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <Button variant="outline" size="lg" className="rounded-full px-8" onClick={handleShare}>
+                <Share2 className="w-4 h-4 text-cyan-500" />
+                <span className="text-cyan-500 hidden md:block">
+                  Partilhar
+                </span>
+              </Button>
               <Button variant="outline" size="lg" className="rounded-full px-8" onClick={handleDeleteCourse}>
                 <Trash className="w-4 h-4 text-red-500" />
                 <span className="text-red-500 hidden md:block">
@@ -327,14 +379,16 @@ export default function CoursePage() {
                   className="px-8 rounded-full border-cyan-500 text-cyan-500 hover:bg-cyan-500 hover:text-white"
                 >
                   {isDownloading || course?.certificate_status === "PROCESSING" ? (
-                    <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                    <Loader2 className="w-5 h-5 animate-spin" />
                   ) : course?.certificate_status === "READY" ? (
-                    <FileDown className="w-5 h-5 mr-2" />
+                    <FileDown className="w-5 h-5" />
                   ) : (
-                    <Award className="w-5 h-5 mr-2" />
+                    <Award className="w-5 h-5" />
                   )}
-                  {course?.certificate_status === "READY" ? "Ver Certificado" :
-                    course?.certificate_status === "PROCESSING" ? "Gerando..." : "Emitir Certificado"}
+                  <span className="ml-2 hidden md:block">
+                    {course?.certificate_status === "READY" ? "Ver Certificado" :
+                      course?.certificate_status === "PROCESSING" ? "Gerando..." : "Emitir Certificado"}
+                  </span>
                 </Button>
               )}
             </div>
@@ -441,8 +495,37 @@ export default function CoursePage() {
               </Card>
             ))}
           </div>
+
+          {claims.length > 0 && (
+            <div className="mt-12 space-y-4">
+              <h3 className="text-xl font-bold flex items-center gap-2">
+                <Users className="w-5 h-5 text-cyan-500" />
+                Alunos que entraram pelo seu link
+              </h3>
+              <Card className="divide-y overflow-hidden">
+                {claims.map((claim, idx) => (
+                  <div key={idx} className="p-4 flex items-center justify-between bg-muted/10">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-cyan-100 flex items-center justify-center text-cyan-700 font-bold text-xs">
+                        {claim.recipient_name.substring(0, 2).toUpperCase()}
+                      </div>
+                      <span className="font-medium text-sm">{claim.recipient_name}</span>
+                    </div>
+                    <span className="text-xs text-muted-foreground italic">
+                      {new Date(claim.claimed_at).toLocaleDateString()}
+                    </span>
+                  </div>
+                ))}
+              </Card>
+            </div>
+          )}
         </div>
       </div>
+      <ShareCourseModal
+        isOpen={isShareModalOpen}
+        onClose={() => setIsShareModalOpen(false)}
+        shareUrl={`${window.location.origin}/share/${shareToken}`}
+      />
     </div>
   );
 }

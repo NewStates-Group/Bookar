@@ -6,7 +6,7 @@ import { ChevronDown, ChevronUp, PlayCircle, CheckCircle2, Lock } from "lucide-r
 import Link from "next/link"
 
 interface Lesson {
-  id: number
+  id: string
   title: string
   duration: string
   completed: boolean
@@ -14,7 +14,7 @@ interface Lesson {
 }
 
 interface Module {
-  id: number
+  id: string
   title: string
   lessons: Lesson[]
 }
@@ -25,7 +25,7 @@ interface CourseNavProps {
 }
 
 export function CourseNav({ module, courseId }: CourseNavProps) {
-  const [isExpanded, setIsExpanded] = useState(module.id === 1)
+  const [isExpanded, setIsExpanded] = useState(module.id === "1")
 
   const completedCount = module.lessons.filter((l) => l.completed).length
   const totalCount = module.lessons.length
@@ -60,9 +60,8 @@ export function CourseNav({ module, courseId }: CourseNavProps) {
             <Link
               key={lesson.id}
               href={lesson.locked ? "#" : `/courses/${courseId}/lessons/${lesson.id}`}
-              className={`flex items-center justify-between p-4 hover:bg-muted/50 transition-colors border-b border-border last:border-b-0 ${
-                lesson.locked ? "cursor-not-allowed opacity-60" : ""
-              }`}
+              className={`flex items-center justify-between p-4 hover:bg-muted/50 transition-colors border-b border-border last:border-b-0 ${lesson.locked ? "cursor-not-allowed opacity-60" : ""
+                }`}
               onClick={(e) => lesson.locked && e.preventDefault()}
             >
               <div className="flex items-center gap-3 flex-1">

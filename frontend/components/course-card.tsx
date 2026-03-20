@@ -5,7 +5,7 @@ import Link from "next/link"
 import Image from "next/image"
 
 interface Course {
-  id: number
+  id: string
   title: string
   description: string
   instructor: string

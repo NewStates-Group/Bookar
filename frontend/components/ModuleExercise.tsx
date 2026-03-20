@@ -9,12 +9,12 @@ import { CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 interface Choice {
-    id: number;
+    id: string;
     text: string;
 }
 
 interface Question {
-    id: number;
+    id: string;
     text: string;
     type: "TF" | "MC" | "SA";
     explanation?: string;
@@ -22,7 +22,7 @@ interface Question {
 }
 
 interface Quiz {
-    id: number;
+    id: string;
     title: string;
     description?: string;
     questions: Question[];
@@ -31,17 +31,17 @@ interface Quiz {
 interface QuizResult {
     score: number;
     passed: boolean;
-    correct_answers: number[];
+    correct_answers: string[];
 }
 
 interface ModuleExerciseProps {
-    moduleId: number;
+    moduleId: string;
     onComplete?: () => void;
 }
 
 export default function ModuleExercise({ moduleId, onComplete }: ModuleExerciseProps) {
     const [quiz, setQuiz] = useState<Quiz | null>(null);
-    const [answers, setAnswers] = useState<Record<number, number>>({});
+    const [answers, setAnswers] = useState<Record<string, string>>({});
     const [result, setResult] = useState<QuizResult | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -72,7 +72,7 @@ export default function ModuleExercise({ moduleId, onComplete }: ModuleExerciseP
         if (!quiz) return;
 
         const answersArray = Object.entries(answers).map(([questionId, choiceId]) => ({
-            question_id: parseInt(questionId),
+            question_id: questionId,
             choice_id: choiceId,
         }));
 
@@ -115,7 +115,7 @@ export default function ModuleExercise({ moduleId, onComplete }: ModuleExerciseP
         }
     };
 
-    const handleAnswerChange = (questionId: number, choiceId: number) => {
+    const handleAnswerChange = (questionId: string, choiceId: string) => {
         setAnswers((prev) => ({ ...prev, [questionId]: choiceId }));
     };
 
@@ -173,7 +173,7 @@ export default function ModuleExercise({ moduleId, onComplete }: ModuleExerciseP
                         <RadioGroup
                             value={answers[question.id]?.toString()}
                             onValueChange={(value) =>
-                                handleAnswerChange(question.id, parseInt(value))
+                                handleAnswerChange(question.id, value)
                             }
                             disabled={!!result}
                         >
@@ -186,10 +186,10 @@ export default function ModuleExercise({ moduleId, onComplete }: ModuleExerciseP
                                     <div
                                         key={choice.id}
                                         className={`flex items-center space-x-2 p-3 rounded-lg border ${showFeedback
-                                                ? isCorrect
-                                                    ? "border-green-500 bg-green-50 dark:bg-green-950"
-                                                    : "border-red-500 bg-red-50 dark:bg-red-950"
-                                                : "border-border"
+                                            ? isCorrect
+                                                ? "border-green-500 bg-green-50 dark:bg-green-950"
+                                                : "border-red-500 bg-red-50 dark:bg-red-950"
+                                            : "border-border"
                                             }`}
                                     >
                                         <RadioGroupItem value={choice.id.toString()} id={`choice-${choice.id}`} />

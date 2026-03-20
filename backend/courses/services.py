@@ -5,7 +5,8 @@ from django.db.models.query import QuerySet
 from ninja.errors import HttpError
 from django.utils import timezone
 
-from .models import Choice, Course, Lesson, Question, Quiz, QuizAttempt, Module, CourseEnrollment, LessonProgress
+from .models import Choice, Course, Lesson, Question, Quiz, QuizAttempt, Module, CourseEnrollment, LessonProgress, CourseShare, CourseShareClaim
+import uuid
 from .tasks import (
     create_course_details,
     generate_lesson,
@@ -25,7 +26,7 @@ class CourseService:
         )
         return Course.objects.filter(id__in=enrolled_ids).order_by("-created_at")
 
-    def get_course(self, id: int, user=None) -> Course:
+    def get_course(self, id: str, user=None) -> Course:
         try:
             course = Course.objects.prefetch_related(
                 Prefetch(
@@ -34,7 +35,7 @@ class CourseService:
                         Prefetch("lessons", queryset=Lesson.objects.order_by("id"))
                     ),
                 )
-            ).get(pk=id)
+            ).get(uuid=id)
 
             if user:
                 # Update last_accessed_at on enrollment
@@ -95,21 +96,21 @@ class CourseService:
         create_course_details.delay(user.id, course.pk, prompt, course.get_level_display())
         return course
 
-    def delete_course(self, course_id: int, user):
+    def delete_course(self, course_id: str, user):
         try:
             # We "soft delete" the enrollment instead of the course itself
-            enrollment = CourseEnrollment.objects.get(course_id=course_id, user=user)
+            enrollment = CourseEnrollment.objects.get(course__uuid=course_id, user=user)
             enrollment.deleted = True
             enrollment.save()
             return {"success": True}
         except CourseEnrollment.DoesNotExist:
              raise HttpError(404, "Curso não encontrado ou sem permissão")
 
-    def cancel_course(self, user, course_id: int):
+    def cancel_course(self, user, course_id: str):
         # Cancel is usually for when it's still PROCESSING
         try:
             # Check if this user is the "creator" (first enrolled)
-            course = Course.objects.get(pk=course_id)
+            course = Course.objects.get(uuid=course_id)
             if course.creator == user:
                 course.status = "CANCELLED"
                 course.save(update_fields=["status"])
@@ -120,9 +121,9 @@ class CourseService:
         except Course.DoesNotExist:
             raise HttpError(404, "Curso não encontrado")
 
-    def enroll_course(self, user, course_id: int) -> CourseEnrollment:
+    def enroll_course(self, user, course_id: str) -> CourseEnrollment:
         try:
-            course = Course.objects.get(pk=course_id)
+            course = Course.objects.get(uuid=course_id)
             enrollment, created = CourseEnrollment.objects.get_or_create(
                 user=user, course=course
             )
@@ -133,9 +134,9 @@ class CourseService:
         except Course.DoesNotExist:
             raise HttpError(404, "Curso não encontrado")
 
-    def mark_lesson_watched(self, user, lesson_id: int):
+    def mark_lesson_watched(self, user, lesson_id: str):
         try:
-            lesson = Lesson.objects.get(pk=lesson_id)
+            lesson = Lesson.objects.get(short_id=lesson_id)
             LessonProgress.objects.update_or_create(
                 user=user, 
                 lesson=lesson,
@@ -145,19 +146,19 @@ class CourseService:
         except Lesson.DoesNotExist:
             raise HttpError(404, "Lição não encontrada")
 
-    def get_next_lesson(self, user, course_id: int, current_lesson: int = 0):
-        if current_lesson:
+    def get_next_lesson(self, user, course_id: str, current_lesson_id: str = "0"):
+        if current_lesson_id != "0":
             return (
-                Lesson.objects.filter(module__course_id=course_id)
+                Lesson.objects.filter(module__course__uuid=course_id)
                 .only("module", "id", "status")
                 .order_by("module__created_at", "id")
-                .filter(id__gt=current_lesson)
+                .filter(short_id__gt=current_lesson_id)
                 .first()
             )
         
         # Get all lessons for the course
         all_lessons = Lesson.objects.filter(
-            module__course_id=course_id
+            module__course__uuid=course_id
         ).order_by("module__created_at", "module__id", "id")
         
         # Find the first one not watched by the user
@@ -167,15 +168,15 @@ class CourseService:
         
         return None
 
-    def get_quiz(self, lesson_id: int) -> Quiz:
+    def get_quiz(self, lesson_id: str) -> Quiz:
         try:
-            return Quiz.objects.get(lesson_id=lesson_id)
+            return Quiz.objects.get(lesson__short_id=lesson_id)
         except Quiz.DoesNotExist:
             raise HttpError(404, "Quiz ainda não disponível")
 
-    def get_module_quiz(self, user, module_id: int) -> Quiz:
+    def get_module_quiz(self, user, module_id: str) -> Quiz:
         try:
-            module = Module.objects.prefetch_related("lessons").get(pk=module_id)
+            module = Module.objects.prefetch_related("lessons").get(uuid=module_id)
             # Check if all lessons are watched by this user
             total_lessons = module.lessons.count()
             watched_count = LessonProgress.objects.filter(
@@ -185,15 +186,15 @@ class CourseService:
             if watched_count < total_lessons:
                 raise HttpError(400, "Você precisa assistir a todas as aulas antes de iniciar o quiz.")
             
-            return Quiz.objects.get(module_id=module_id)
+            return Quiz.objects.get(module__uuid=module_id)
         except Module.DoesNotExist:
             raise HttpError(404, "Módulo não encontrado")
         except Quiz.DoesNotExist:
             raise HttpError(404, "Quiz ainda não disponível")
 
-    def submit_quiz(self, user, quiz_id: int, answers: list) -> dict:
+    def submit_quiz(self, user, quiz_id: str, answers: list) -> dict:
         try:
-            quiz = Quiz.objects.get(pk=quiz_id)
+            quiz = Quiz.objects.get(uuid=quiz_id)
         except Quiz.DoesNotExist:
             raise HttpError(404, "Quiz não encontrado")
 
@@ -206,8 +207,8 @@ class CourseService:
 
         for ans in answers:
             try:
-                question = Question.objects.get(pk=ans.question_id, quiz=quiz)
-                choice = Choice.objects.get(pk=ans.choice_id, question=question)
+                question = Question.objects.get(uuid=ans.question_id, quiz=quiz)
+                choice = Choice.objects.get(uuid=ans.choice_id, question=question)
                 if choice.is_correct:
                     correct_count += 1
                     correct_choice_ids.append(choice.id)
@@ -220,20 +221,20 @@ class CourseService:
 
         all_correct = Choice.objects.filter(
             question__quiz=quiz, is_correct=True
-        ).values_list("id", flat=True)
+        ).values_list("uuid", flat=True)
 
         score = (correct_count / total_questions) * 10.0
         passed = score >= 7.0
 
         QuizAttempt.objects.create(user=user, quiz=quiz, score=score, passed=passed)
 
-        return {"score": score, "passed": passed, "correct_answers": list(all_correct)}
+        return {"score": score, "passed": passed, "correct_answers": [str(u) for u in all_correct]}
 
-    def trigger_next_module(self, user_pk, course_id: int):
+    def trigger_next_module(self, user_pk, course_id: str):
         from accounts.models import User
         user = User.objects.get(pk=user_pk)
         try:
-            course = Course.objects.get(pk=course_id)
+            course = Course.objects.get(uuid=course_id)
             current_module_count = course.modules.count()
             
             if course.max_modules and current_module_count >= course.max_modules:
@@ -275,8 +276,8 @@ class CourseService:
         except Course.DoesNotExist:
             raise HttpError(404, "Curso não encontrado")
 
-    def get_certificate_info(self, user, course_id: int):
-        course = Course.objects.get(pk=course_id)
+    def get_certificate_info(self, user, course_id: str):
+        course = Course.objects.get(uuid=course_id)
         enrollment = CourseEnrollment.objects.get(course=course, user=user)
         
         # Verify completion for THIS user
@@ -301,19 +302,83 @@ class CourseService:
 
         return {"status": "PROCESSING", "message": "Certificado está a ser gerado. Enviaremos um e-mail brevemente."}
 
+    def generate_share_token(self, user, course_id: str) -> CourseShare:
+        try:
+            course = Course.objects.get(uuid=course_id)
+            # Check if user is enrolled
+            if not CourseEnrollment.objects.filter(course=course, user=user).exists():
+                raise HttpError(403, "Sem permissão para partilhar este curso")
+
+            # Check if a share already exists for this user and course
+            share, created = CourseShare.objects.get_or_create(
+                course=course,
+                sharer=user,
+                defaults={"token": str(uuid.uuid4())}
+            )
+            return self.get_share_info(share.token)
+        except Course.DoesNotExist:
+            raise HttpError(404, "Curso não encontrado")
+
+    def get_share_info(self, token: str) -> dict:
+        try:
+            share = CourseShare.objects.select_related("course", "sharer").get(token=token)
+            return {
+                "token": share.token,
+                "course_id": str(share.course.uuid),
+                "course_title": share.course.title,
+                "sharer_name": f"{share.sharer.first_name} {share.sharer.last_name}".strip() or share.sharer.username,
+                "created_at": share.created_at
+            }
+        except CourseShare.DoesNotExist:
+            raise HttpError(404, "Link de partilha inválido ou expirado")
+
+    def claim_share(self, user, token: str) -> dict:
+        try:
+            share = CourseShare.objects.get(token=token)
+            # Enroll the user
+            self.enroll_course(user, share.course.id)
+            
+            # Track the claim
+            CourseShareClaim.objects.get_or_create(
+                share=share,
+                recipient=user
+            )
+            
+            return {
+                "success": True, 
+                "message": "Curso importado com sucesso!",
+                "course_id": str(share.course.uuid)
+            }
+        except CourseShare.DoesNotExist:
+            raise HttpError(404, "Link de partilha inválido")
+
+    def get_course_claims(self, user, course_id: str) -> list:
+        # Get claims for shares of this course created by this user
+        claims = CourseShareClaim.objects.filter(
+            share__course__uuid=course_id,
+            share__sharer=user
+        ).select_related("recipient").order_by("-claimed_at")
+        
+        return [
+            {
+                "recipient_name": f"{c.recipient.first_name} {c.recipient.last_name}".strip() or c.recipient.username,
+                "claimed_at": c.claimed_at
+            } for c in claims
+        ]
+
 
 class LessonService:
-    def get_lesson(self, user, lesson_id: int):
+    def get_lesson(self, user, lesson_id: str):
         # Allow access if user is enrolled
-        lesson = Lesson.objects.select_related("module__course").get(id=lesson_id)
+        lesson = Lesson.objects.select_related("module__course").get(short_id=lesson_id)
         course = lesson.module.course
         if CourseEnrollment.objects.filter(course=course, user=user, deleted=False).exists():
             return lesson
         return None
 
-    def mark_watched(self, user, lesson_id: int):
+    def mark_watched(self, user, lesson_id: str):
         try:
-            lesson = Lesson.objects.get(id=lesson_id)
+            lesson = Lesson.objects.get(short_id=lesson_id)
             from .models import LessonProgress
             progress, created = LessonProgress.objects.update_or_create(
                 user=user,
@@ -324,11 +389,11 @@ class LessonService:
         except Lesson.DoesNotExist:
             raise HttpError(404, "Lição não encontrada")
 
-    def mark_delivered(self, user, lesson_id: int):
+    def mark_delivered(self, user, lesson_id: str):
         try:
              # Ownership check for delivery: only a user enrolled in the course should be able to trigger this?
              # Or only the "creator"? 
-            lesson = Lesson.objects.get(id=lesson_id)
+            lesson = Lesson.objects.get(short_id=lesson_id)
             course = lesson.module.course
             if not CourseEnrollment.objects.filter(course=course, user=user).exists():
                 raise HttpError(403, "Sem permissão")
