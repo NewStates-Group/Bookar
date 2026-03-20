@@ -10,6 +10,7 @@ import { useEffect, useState, useRef } from "react";
 import { toast } from "sonner";
 import { Award, FileDown, X, HelpCircle, CheckCircle2, XCircle, Lock, Share2, Users } from "lucide-react";
 import { ShareCourseModal } from "@/components/ShareCourseModal";
+import { useWebSocket } from "@/context/WebSocketContext";
 
 interface Course {
   id: string;
@@ -67,19 +68,28 @@ export default function CoursePage() {
   const [shareToken, setShareToken] = useState("");
   const [claims, setClaims] = useState<Claim[]>([]);
 
-  useEffect(() => {
-    const isProcessing = course?.status === "PROCESSING" ||
-      course?.modules.some(m => m.lessons.some(l => l.status === "PROCESSING"));
+  const { addListener } = useWebSocket();
 
-    if ((session as any)?.accessToken && params?.id) {
-      const interval = setInterval(() => {
+  useEffect(() => {
+    const removeListener = addListener((data) => {
+      // Refresh on ANY relevant update for this course
+      if ((data.type === "course_update" || data.type === "module_update") && data.id === params?.id) {
         fetchCourse();
         checkFinishment();
-      }, 8000);
+      }
+      // Also refresh if a lesson within this course is updated
+      if (data.type === "lesson_update") {
+        fetchCourse();
+        checkFinishment();
+      }
+      // Handle certificate update
+      if (data.type === "certificate_update" && String(data.course_id) === String(params?.id)) {
+        fetchCourse();
+      }
+    });
 
-      return () => clearInterval(interval);
-    }
-  }, [session, params?.id, course?.status, course?.modules]);
+    return () => removeListener();
+  }, [addListener, params?.id]);
 
   const handleCancel = async () => {
     if (!window.confirm("Tem certeza que deseja cancelar a geração deste curso?")) return;

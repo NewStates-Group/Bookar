@@ -21,7 +21,7 @@ const LessonStatusIcon = ({ status }: { status: string }) => {
     }
 }
 
-export function CourseWatchSidebar({ course, onClose }: { course: CourseData | null, onClose: () => void }) {
+export function CourseWatchSidebar({ course, onClose, currentLessonId, isEnded }: { course: CourseData | null, onClose: () => void, currentLessonId?: string | null, isEnded?: boolean }) {
     if (!course) return
 
     const searchParams = useSearchParams();
@@ -158,7 +158,7 @@ export function CourseWatchSidebar({ course, onClose }: { course: CourseData | n
                                         })}
                                         {/* @ts-ignore */}
                                         {module.quiz_id && (() => {
-                                            const allWatched = module.lessons.every(l => l.watched);
+                                            const allWatched = module.lessons.every(l => l.watched || (l.id === currentLessonId && isEnded));
                                             return (
                                                 <div className="mt-1">
                                                     <Link

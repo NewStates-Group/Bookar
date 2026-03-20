@@ -14,6 +14,7 @@ arabic-reshaper==3.0.0
 asgiref==3.9.2
     # via
     #   channels
+    #   channels-redis
     #   daphne
     #   django
     #   django-cors-headers
@@ -52,6 +53,10 @@ cffi==2.0.0
     #   autobahn
     #   cryptography
 channels==4.3.2
+    # via
+    #   backend (pyproject.toml)
+    #   channels-redis
+channels-redis==4.3.0
     # via backend (pyproject.toml)
 charset-normalizer==3.4.3
     # via
@@ -175,7 +180,9 @@ lxml==6.0.2
     #   pyhanko
     #   svglib
 msgpack==1.1.2
-    # via autobahn
+    # via
+    #   autobahn
+    #   channels-redis
 ollama==0.6.1
     # via backend (pyproject.toml)
 orjson==3.11.3
@@ -248,7 +255,9 @@ pyyaml==6.0.3
     #   pyhanko
     #   uvicorn
 redis==7.1.0
-    # via backend (pyproject.toml)
+    # via
+    #   backend (pyproject.toml)
+    #   channels-redis
 reportlab==4.4.10
     # via
     #   backend (pyproject.toml)

@@ -13,6 +13,7 @@ from .tasks import (
     generate_next_module,
     generate_certificate_task,
 )
+from core.utils import send_user_update
 
 logger = logging.getLogger(__name__)
 
@@ -272,6 +273,7 @@ class CourseService:
             )
             
             generate_next_module.delay(user_pk, course_id, new_module.pk)
+            send_user_update(user_pk, {"type": "module_update", "course_id": course_id, "id": new_module.pk, "status": "PROCESSING", "name": new_module.name})
             return {"success": True, "message": "Gerando módulo...", "module_id": new_module.pk}
         except Course.DoesNotExist:
             raise HttpError(404, "Curso não encontrado")

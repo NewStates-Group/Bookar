@@ -36,6 +36,7 @@ INSTALLED_APPS = [
     "cloudinary",
     "courses",
     "accounts",
+    "channels",
 ]
 
 MIDDLEWARE = [
@@ -77,6 +78,15 @@ NINJA_JWT = {
 }
 
 CACHES = {"default": env.cache_url("REDIS_URL")}
+
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [env("REDIS_URL")],
+        },
+    },
+}
 
 AUTH_PASSWORD_VALIDATORS = [
     {

@@ -10,6 +10,7 @@ import { CourseWatchSidebar } from "@/components/course-sidebar";
 import Link from "next/link";
 import { BuildingBlocksLoader } from "@/components/ui/building-blocks-loader";
 import { QuizView } from "@/components/quiz-view";
+import { useWebSocket } from "@/context/WebSocketContext";
 
 export interface Module {
     id: string;
@@ -63,24 +64,20 @@ export default function WatchPage() {
     const [nextLesson, setNextLesson] = useState<Lesson | null>(null)
     const [nextQuiz, setNextQuiz] = useState<{ id: string, moduleId: string } | null>(null)
 
-    useEffect(() => {
-        if ((session as any)?.accessToken && lessonID && (lesson?.status === "PROCESSING" || lesson?.status === "PENDING")) {
-            const ev = new EventSource(`${process.env.NEXT_PUBLIC_API_BASE_URL}/sse/lessons/${lessonID}/?token=${(session as any).accessToken}`);
+    const { addListener } = useWebSocket();
 
-            ev.onmessage = (event) => {
-                const data = JSON.parse(event.data);
+    useEffect(() => {
+        const removeListener = addListener((data) => {
+            if (data.type === "lesson_update" && data.id === lessonID) {
                 if (data.status !== lesson?.status) {
                     getLesson();
                     fetchCourse();
                 }
-                if (data.status === "READY" || data.status === "ERROR") {
-                    ev.close();
-                }
-            };
+            }
+        });
 
-            return () => ev.close();
-        }
-    }, [session, lessonID, lesson?.status]);
+        return () => removeListener();
+    }, [addListener, lessonID, lesson?.status]);
 
 
     const markDelivered = async () => {
@@ -299,7 +296,7 @@ export default function WatchPage() {
     return (
         <div className="flex h-screen bg-background overflow-hidden">
             <div className={`fixed min-h-screen z-[100] md:static transition-all duration-300 overflow-hidden ${sidebarOpen ? "w-[25rem]" : "w-0"} bg-card border-r border-border `}>
-                {sidebarOpen && <CourseWatchSidebar course={course} onClose={() => setSidebarOpen(!sidebarOpen)} />}
+                {sidebarOpen && <CourseWatchSidebar course={course} currentLessonId={lesson?.id} isEnded={ended} onClose={() => setSidebarOpen(!sidebarOpen)} />}
             </div>
 
             <div className="flex-1 flex flex-col overflow-hidden bg-background">
@@ -365,10 +362,9 @@ export default function WatchPage() {
                             if (!nextLesson && !nextQuiz) return true;
                             if (nextLesson && nextLesson.status !== "READY") return true;
                             if (nextQuiz) {
-                                // All lessons in the module must be watched (including the current one via `ended`)
                                 const moduleOfQuiz = course?.modules.find(m => m.id === nextQuiz.moduleId);
                                 const allWatched = moduleOfQuiz?.lessons.every(l =>
-                                    l.id === lesson?.id ? ended : l.watched
+                                    l.watched || (l.id === lesson?.id && ended)
                                 ) ?? false;
                                 return !allWatched;
                             }
@@ -379,14 +375,15 @@ export default function WatchPage() {
                             if (nextLesson && nextLesson.status !== "READY") return true;
                             if (nextQuiz) {
                                 const moduleOfQuiz = course?.modules.find(m => m.id === nextQuiz.moduleId);
-                                return !(moduleOfQuiz?.lessons.every(l =>
-                                    l.id === lesson?.id ? ended : l.watched
-                                ) ?? false);
+                                const allWatched = moduleOfQuiz?.lessons.every(l =>
+                                    l.watched || (l.id === lesson?.id && ended)
+                                ) ?? false;
+                                return !allWatched;
                             }
                             return false;
                         })() ? "opacity-70 cursor-not-allowed" : "cursor-pointer"}`}>
                         <span className="hidden md:block">
-                            {nextQuiz ? "Próximo (Quiz)" : "Próxima Aula"}
+                            {nextQuiz ? "Hora do Quiz" : "Próxima Aula"}
                         </span>
                         <ChevronRight className="w-4 h-4" />
                     </button>

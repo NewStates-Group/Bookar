@@ -26,6 +26,7 @@ from django.core.files.storage import default_storage
 from google.genai import types
 from PIL import Image, ImageDraw, UnidentifiedImageError
 
+from core.utils import send_user_update
 from .exceptions import LessonDoesNotExist, ThumbnailCreationError
 from .models import Choice, Course, Lesson, Module, Question, Quiz, CourseGenerationContext
 from .utils import (
@@ -243,6 +244,7 @@ def generate_lesson(self, user_id, lesson_id: int):
 
     lesson.status = "PROCESSING"
     lesson.save(update_fields=["status"])
+    send_user_update(user_id, {"type": "lesson_update", "id": lesson.id, "status": "PROCESSING"})
 
     # Check for cancellation before starting heavy work
     lesson.refresh_from_db()
@@ -349,11 +351,13 @@ def generate_lesson(self, user_id, lesson_id: int):
         
         lesson.status = "READY"
         lesson.save()
+        send_user_update(user_id, {"type": "lesson_update", "id": lesson.id, "status": "READY", "lesson_file": lesson.lesson_file.url if lesson.lesson_file else ""})
 
         return lesson.lesson_file.url if lesson.lesson_file else None
     except Exception as e:
         lesson.status = "ERROR"
         lesson.save(update_fields=["status"])
+        send_user_update(user_id, {"type": "lesson_update", "id": lesson.id, "status": "ERROR"})
         raise e
     finally:
         shutil.rmtree(temp_dir, ignore_errors=True)
@@ -378,6 +382,7 @@ def generate_next_module(self, user_pk: int, course_pk: int, module_pk: int = No
         "You are an expert educational content creator. "
         "Create the NEXT module for this course in JSON format. "
         "Don't enumerate the lesson like this 1.1 -, don't enumerate nothing. "
+        "NUNCA use prefixos como 'Módulo 1:', 'Aula 1:', ou qualquer tipo de numeração. Use apenas o NOME DIRECTO do conteúdo."
         "Generate the JSON values in portugues, keep the keys in english. "
         "Cada módulo deve ter apenas 2 aulas. "
         "Gera módulos seguindo uma progressão lógica: Comece SEMPRE com História, Definição, Conceitos Teóricos e Contexto. "
@@ -387,11 +392,11 @@ def generate_next_module(self, user_pk: int, course_pk: int, module_pk: int = No
         "Cada aula deve ter conteúdo para 5 a 12 minutos"
         "Strictly follow this JSON schema:"
         "{"
-        '  "title": "Título do módulo (sem enumeração, Módulo 1:, directo o título do módulo)",'
+        '  "title": "Título do módulo (NUNCA inclua numeração ou a palavra Módulo, apenas o título)",'
         '  "desc": "Descrição do módulo",'
         '  "lessons": ['
         "    {"
-        '      "title": "Título da lição",'
+        '      "title": "Título da lição (NUNCA inclua numeração ou a palavra Aula, apenas o título)",'
         '      "desc": "Descrição da lição",'
         '      "duration": 300, '
         '      "narration": "Detailed narration text, engaging and podcast-style...",'
@@ -485,7 +490,7 @@ def generate_module_quiz(module_id: int):
         full_text = "\n".join(lessons_content)
 
         prompt = f"""
-        Baseado no conteúdo abaixo, crie um quiz com 3 perguntas de múltipla escolha para testar o conhecimento do aluno sobre este módulo.
+        Baseado no conteúdo abaixo, crie um quiz com 5 perguntas de múltipla escolha para testar o conhecimento do aluno sobre este módulo.
         
         Conteúdo do Módulo:
         {full_text}
@@ -602,6 +607,7 @@ def create_course_details(user_id: int, course_pk: int, prompt: str, level: str)
     Course.objects.filter(pk=course_pk).update(
         desc=course_desc, title=course_title, max_modules=max_modules, status="PROCESSING"
     )
+    send_user_update(user_id, {"type": "course_update", "id": course_pk, "status": "PROCESSING", "title": course_title, "desc": course_desc})
 
     # Save generation context for future reuse
     CourseGenerationContext.objects.update_or_create(
@@ -702,6 +708,7 @@ def create_course_thumb(course_pk: str, prompt: str):
         course.thumb.save(thumb_filename, ContentFile(buffer.getvalue(), name=thumb_filename), save=True)
         course.status = "READY"
         course.save()
+        send_user_update(course.enrollments.first().user.id if course.enrollments.exists() else None, {"type": "course_update", "id": course_pk, "status": "READY", "thumb": course.thumb.url if course.thumb else ""})
         # Thumbnail generation is now independent of module generation
         # generate_next_module.delay(course.user.pk, course_pk)
     except Exception as e:
@@ -793,6 +800,7 @@ def generate_certificate_task(user_id: int, course_id: int, full_name: str):
         enrollment.certificate_file.save(cert_filename, ContentFile(image_data, name=cert_filename), save=False)
         enrollment.certificate_status = "READY"
         enrollment.save()
+        send_user_update(user_id, {"type": "certificate_update", "course_id": course_id, "status": "READY", "certificate_url": enrollment.certificate_file.url})
         
         send_certificate_email(user, course, enrollment.certificate_file.url)
         return enrollment.certificate_file.url

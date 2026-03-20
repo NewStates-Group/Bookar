@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/select";
 import Link from "next/link";
 import { motion } from "framer-motion";
+import { useWebSocket } from "@/context/WebSocketContext";
 
 interface Course {
   id: Number;
@@ -83,32 +84,33 @@ export default function CoursesPage() {
   const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
   const [profileNames, setProfileNames] = useState({ firstName: "", lastName: "" });
 
-  const evRefs = useRef<Record<number, EventSource>>({});
+  const { addListener } = useWebSocket();
 
   useEffect(() => {
-    // For each processing course, ensure an SSE connection exists
-    courses.forEach(course => {
-      if (course.status === "PROCESSING" && !evRefs.current[course.id]) {
-        const ev = new EventSource(`${process.env.NEXT_PUBLIC_API_BASE_URL}/sse/courses/${course.id}/?token=${session?.accessToken}`);
-        ev.onmessage = (event) => {
-          const data = JSON.parse(event.data);
-          if (data.status === "READY" || data.status === "FAILED") {
-            ev.close();
-            delete evRefs.current[course.id];
-            fetchCourses();
-            if (data.status === "READY") toast.success(`Curso "${data.title}" está pronto!`);
-          }
-        };
-        evRefs.current[course.id] = ev;
+    const removeListener = addListener((data) => {
+      if (data.type === "course_update") {
+        setCourses((prev) =>
+          prev.map((c) =>
+            c.id === data.id
+              ? {
+                ...c,
+                status: data.status,
+                title: data.title || c.title,
+                desc: data.desc || c.desc,
+                thumb: data.thumb || c.thumb,
+              }
+              : c
+          )
+        );
+
+        if (data.status === "READY" && data.title) {
+          toast.success(`Curso "${data.title}" está pronto!`);
+        }
       }
     });
 
-    return () => {
-      // Cleanup SSE on unmount
-      Object.values(evRefs.current).forEach(ev => ev.close());
-      evRefs.current = {};
-    };
-  }, [courses, session]);
+    return () => removeListener();
+  }, [addListener]);
 
   const levelConfig = {
     B: { label: "Iniciante", color: "bg-emerald-100 text-emerald-700 border-emerald-200" },
