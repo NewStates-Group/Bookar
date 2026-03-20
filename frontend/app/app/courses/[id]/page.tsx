@@ -342,11 +342,16 @@ export default function CoursePage() {
           <div className="flex items-center justify-between">
             <h2 className="text-2xl font-bold">Conteúdo do Curso</h2>
             <div className="flex flex-wrap items-center gap-2">
-              <Button variant="outline" size="lg" className="rounded-full px-8" onClick={handleShare}>
+              <Button variant="outline" size="lg" className="rounded-full px-8 relative" onClick={handleShare}>
                 <Share2 className="w-4 h-4 text-cyan-500" />
                 <span className="text-cyan-500 hidden md:block">
                   Partilhar
                 </span>
+                {course?.is_owner && claims.length > 0 && (
+                  <span className="absolute -top-2 -right-2 bg-cyan-600 text-white text-[10px] w-5 h-5 rounded-full flex items-center justify-center border-2 border-background font-bold">
+                    {claims.length}
+                  </span>
+                )}
               </Button>
               <Button variant="outline" size="lg" className="rounded-full px-8" onClick={handleDeleteCourse}>
                 <Trash className="w-4 h-4 text-red-500" />

@@ -444,7 +444,6 @@ export default function CoursesPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 md:px-8 py-3">
-      {/* Profile Completion Modal */}
       <Dialog open={showNameModal} onOpenChange={(val) => {
         // Prevent closing if names are missing
         const user = session?.user as any;
