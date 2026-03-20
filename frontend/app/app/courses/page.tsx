@@ -91,7 +91,7 @@ export default function CoursesPage() {
       if (data.type === "course_update") {
         setCourses((prev) =>
           prev.map((c) =>
-            c.id === data.id
+            String(c.id) === String(data.id)
               ? {
                 ...c,
                 status: data.status,
