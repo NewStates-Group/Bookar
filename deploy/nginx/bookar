@@ -106,12 +106,23 @@ server {
         root /var/www/certbot;
     }
 
+    location = /404.html {
+        alias /home/ubuntu/Bookar/nginx/error_pages/404.html;
+        internal;
+    }
+
+    location = /500.html {
+        alias /home/ubuntu/Bookar/nginx/error_pages/500.html;
+        internal;
+    }
+
+    location = /502.html {
+        alias /home/ubuntu/Bookar/nginx/error_pages/502.html;
+        internal;
+    }
+
     error_page 404 /404.html;
     error_page 500 /500.html;
     error_page 502 /502.html;
 
-    location ~ ^/(404|500|502)\.html$ {
-        root  /home/ubuntu/Bookar/nginx/error_pages;
-        internal;
-    }
 }
