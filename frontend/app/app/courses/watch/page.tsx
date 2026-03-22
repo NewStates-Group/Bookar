@@ -123,16 +123,17 @@ export default function WatchPage() {
 
     useEffect(() => {
         const removeListener = addListener((data) => {
-            if (data.type === "lesson_update" && String(data.id) === String(lessonID)) {
-                if (data.status !== lesson?.status) {
+            if (data.type === "lesson_update") {
+                // Refresh course data for ANY lesson update to keep sidebar/next buttons up to date
+                mutateCourse();
+                if (String(data.id) === String(lessonID)) {
                     mutateLesson();
-                    mutateCourse();
                 }
             }
         });
 
         return () => removeListener();
-    }, [addListener, lessonID, lesson?.status, mutateLesson, mutateCourse]);
+    }, [addListener, lessonID, mutateLesson, mutateCourse]);
 
 
     const markDelivered = async () => {
@@ -294,7 +295,7 @@ export default function WatchPage() {
                     <button
                         disabled={!previousLesson}
                         className={`border-r flex gap-2  items-center justify-center hover:bg-muted transition-colors ${!previousLesson ? "opacity-70 cursor-not-allowed" : "cursor-pointer"}`}>
-                        <Link href={`/app/courses/watch?l=${previousLesson?.id}&c=${courseID}`}>
+                        <Link className="flex items-center justify-center gap-2" href={`/app/courses/watch?l=${previousLesson?.id}&c=${courseID}`} className="flex items-center justify-center gap-2">
                             <ChevronLeft className="w-4 h-4" />
                             <span className="hidden md:block">
                                 Aula Anterior
@@ -302,16 +303,8 @@ export default function WatchPage() {
                         </Link>
                     </button>
                     <button
-                        onClick={() => {
-                            if (nextQuiz) {
-                                router.push(`/app/courses/watch?l=quiz&id=${nextQuiz.id}&c=${courseID}`)
-                            } else if (nextLesson) {
-                                router.push(`/app/courses/watch?l=${nextLesson.id}&c=${courseID}`)
-                            }
-                        }}
                         disabled={(() => {
                             if (!nextLesson && !nextQuiz) return true;
-                            if (nextLesson && nextLesson.status !== "READY") return true;
                             if (nextQuiz) {
                                 const moduleOfQuiz = course?.modules.find(m => m.id === nextQuiz.moduleId);
                                 const allWatched = moduleOfQuiz?.lessons.every(l =>
@@ -319,11 +312,12 @@ export default function WatchPage() {
                                 ) ?? false;
                                 return !allWatched;
                             }
+                            // For regular lessons, we allow clicking even if not READY
+                            // This allows the user to see the processing state on the next page
                             return false;
                         })()}
                         className={`border-r flex gap-2 items-center justify-center hover:bg-muted transition-colors ${(() => {
                             if (!nextLesson && !nextQuiz) return true;
-                            if (nextLesson && nextLesson.status !== "READY") return true;
                             if (nextQuiz) {
                                 const moduleOfQuiz = course?.modules.find(m => m.id === nextQuiz.moduleId);
                                 const allWatched = moduleOfQuiz?.lessons.every(l =>
@@ -333,10 +327,12 @@ export default function WatchPage() {
                             }
                             return false;
                         })() ? "opacity-70 cursor-not-allowed" : "cursor-pointer"}`}>
-                        <span className="hidden md:block">
-                            {nextQuiz ? "Hora do Quiz" : "Próxima Aula"}
-                        </span>
-                        <ChevronRight className="w-4 h-4" />
+                        <Link className="flex items-center justify-center gap-2" href={`/app/courses/watch?l=${nextQuiz ? "quiz&id=" + nextQuiz.id : nextLesson?.id}&c=${courseID}`}>
+                            <span className="hidden md:block">
+                                {nextQuiz ? "Hora do Quiz" : "Próxima Aula"}
+                            </span>
+                            <ChevronRight className="w-4 h-4" />
+                        </Link>
                     </button>
 
                     <button className="flex gap-2 items-center cursor-pointer justify-center border-r hover:bg-muted transition-colors" onClick={() => setShowQuestionsModal(true)}>

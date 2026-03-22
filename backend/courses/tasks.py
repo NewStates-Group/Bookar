@@ -473,7 +473,7 @@ def generate_next_module(self, user_pk: int, course_pk: int, module_pk: int = No
             Course.objects.filter(pk=course_pk).update(status="READY")
                 
         # Generate module quiz
-        generate_module_quiz.delay(module_object.id)
+        generate_module_quiz.delay(module_object.id, user_pk)
 
     except Exception as e:
         if module_pk:
@@ -487,7 +487,7 @@ def generate_next_module(self, user_pk: int, course_pk: int, module_pk: int = No
 
 
 @shared_task(autoretry_for=(Exception,), retry_backoff=True, retry_kwargs={'max_retries': 3}, default_retry_delay=40)
-def generate_module_quiz(module_id: int):
+def generate_module_quiz(module_id: int, user_id: int = None):
     module_object = Module.objects.filter(pk=module_id).first()
     if not module_object:
         logger.error(f"Module {module_id} not found")
@@ -553,6 +553,9 @@ def generate_module_quiz(module_id: int):
         
         # Invalidate course cache
         invalidate_course_cache(module_object.course.uuid)
+        if user_id:
+            send_user_update(user_id, {"type": "course_update", "id": str(module_object.course.uuid), "status": "READY"})
+        
         logger.info(f"Quiz generated for module {module_id}")
 
     except Exception as e:
