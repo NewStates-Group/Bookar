@@ -5,6 +5,9 @@ from django.db.models.query import QuerySet
 from ninja.errors import HttpError
 from django.utils import timezone
 
+from django.core.cache import cache
+from .utils import get_course_list_cache_key, get_course_detail_cache_key, get_lesson_detail_cache_key, invalidate_course_cache
+
 from .models import Choice, Course, Lesson, Question, Quiz, QuizAttempt, Module, CourseEnrollment, LessonProgress, CourseShare, CourseShareClaim
 import uuid
 from .tasks import (
@@ -20,44 +23,56 @@ logger = logging.getLogger(__name__)
 
 class CourseService:
     def list_courses(self, user) -> QuerySet[Course]:
+        cache_key = get_course_list_cache_key(user.id)
+        cached_result = cache.get(cache_key)
+        if cached_result:
+            return cached_result
+            
         # Return courses user is enrolled in and HAS NOT DELETED
         enrolled_ids = (
             CourseEnrollment.objects.filter(user=user, deleted=False)
             .values_list("course_id", flat=True)
         )
-        return Course.objects.filter(id__in=enrolled_ids).order_by("-created_at")
+        courses = Course.objects.filter(id__in=enrolled_ids).order_by("-created_at")
+        cache.set(cache_key, list(courses), 300) # Cache for 5 minutes
+        return courses
 
     def get_course(self, id: str, user=None) -> Course:
-        try:
-            course = Course.objects.prefetch_related(
-                Prefetch(
-                    "modules",
-                    queryset=Module.objects.order_by("created_at").prefetch_related(
-                        Prefetch("lessons", queryset=Lesson.objects.order_by("id"))
-                    ),
-                )
-            ).get(uuid=id)
+        cache_key = get_course_detail_cache_key(id)
+        course = cache.get(cache_key)
+        
+        if not course:
+            try:
+                course = Course.objects.prefetch_related(
+                    Prefetch(
+                        "modules",
+                        queryset=Module.objects.order_by("created_at").prefetch_related(
+                            Prefetch("lessons", queryset=Lesson.objects.order_by("id"))
+                        ),
+                    )
+                ).get(uuid=id)
+                cache.set(cache_key, course, 600) # 10 minutes
+            except Course.DoesNotExist:
+                raise HttpError(404, "Curso não encontrado")
 
-            if user:
-                # Update last_accessed_at on enrollment
-                CourseEnrollment.objects.filter(course=course, user=user).update(
-                    last_accessed_at=timezone.now()
-                )
+        if user:
+            # Update last_accessed_at on enrollment
+            CourseEnrollment.objects.filter(course=course, user=user).update(
+                last_accessed_at=timezone.now()
+            )
 
-                for module in course.modules.all():
-                    if hasattr(module, "quiz"):
-                        last_attempt = (
-                            module.quiz.attempts.filter(user=user)
-                            .order_by("-completed_at")
-                            .first()
-                        )
-                        if last_attempt:
-                            module._last_quiz_score = last_attempt.score
-                            module._last_quiz_passed = last_attempt.passed
+            for module in course.modules.all():
+                if hasattr(module, "quiz"):
+                    last_attempt = (
+                        module.quiz.attempts.filter(user=user)
+                        .order_by("-completed_at")
+                        .first()
+                    )
+                    if last_attempt:
+                        module._last_quiz_score = last_attempt.score
+                        module._last_quiz_passed = last_attempt.passed
 
-            return course
-        except Course.DoesNotExist:
-            raise HttpError(404, "Curso não encontrado")
+        return course
 
     def create_course(self, user, prompt: str, level: str, num_modules: int = None) -> Course:
         # 1. Check if the current user already has this course (enrolled and not deleted)
@@ -103,6 +118,9 @@ class CourseService:
             enrollment = CourseEnrollment.objects.get(course__uuid=course_id, user=user)
             enrollment.deleted = True
             enrollment.save()
+            
+            # Invalidate user course list cache
+            cache.delete(get_course_list_cache_key(user.id))
             return {"success": True}
         except CourseEnrollment.DoesNotExist:
              raise HttpError(404, "Curso não encontrado ou sem permissão")
@@ -115,6 +133,8 @@ class CourseService:
             if course.creator == user:
                 course.status = "CANCELLED"
                 course.save(update_fields=["status"])
+                # Invalidate course detail cache
+                invalidate_course_cache(course_id, user.id)
             
             # Always mark user's enrollment as deleted
             CourseEnrollment.objects.filter(course=course, user=user).update(deleted=True)
@@ -137,6 +157,9 @@ class CourseService:
             if enrollment.deleted:
                 enrollment.deleted = False
                 enrollment.save()
+            
+            # Invalidate user course list cache
+            cache.delete(get_course_list_cache_key(user.id))
             return enrollment
         except Course.DoesNotExist:
             raise HttpError(404, "Curso não encontrado")
@@ -149,6 +172,8 @@ class CourseService:
                 lesson=lesson,
                 defaults={"watched": True}
             )
+            # Invalidate course detail and list cache
+            invalidate_course_cache(lesson.module.course.uuid, user.id)
             return {"success": True}
         except Lesson.DoesNotExist:
             raise HttpError(404, "Lição não encontrada")
@@ -377,8 +402,17 @@ class CourseService:
 
 class LessonService:
     def get_lesson(self, user, lesson_id: str):
-        # Allow access if user is enrolled
-        lesson = Lesson.objects.select_related("module__course").get(short_id=lesson_id)
+        cache_key = get_lesson_detail_cache_key(lesson_id)
+        lesson = cache.get(cache_key)
+        
+        if not lesson:
+            try:
+                # Allow access if user is enrolled
+                lesson = Lesson.objects.select_related("module__course").get(short_id=lesson_id)
+                cache.set(cache_key, lesson, 3600) # 60 minutes
+            except Lesson.DoesNotExist:
+                return None
+        
         course = lesson.module.course
         if CourseEnrollment.objects.filter(course=course, user=user, deleted=False).exists():
             return lesson
@@ -393,6 +427,8 @@ class LessonService:
                 lesson=lesson,
                 defaults={"watched": True}
             )
+            # Invalidate course detail and list cache
+            invalidate_course_cache(lesson.module.course.uuid, user.id)
             return {"success": True}
         except Lesson.DoesNotExist:
             raise HttpError(404, "Lição não encontrada")
@@ -425,8 +461,11 @@ class LessonService:
                     and next_undelivered_lesson.status == "PENDING"
                 ):
                     generate_lesson.delay(user.id, next_undelivered_lesson.id)
-                    return {"success": True}
-                return {"info": "Sem aulas restantes"}
+                
+                # Invalidate course cache as a lesson was marked delivered (status might have changed)
+                invalidate_course_cache(course.uuid, user.id)
+                return {"success": True}
+            return {"info": "Sem aulas restantes"}
             return {"error": "Já foi entregue"}
         except Lesson.DoesNotExist:
             raise HttpError(404, "Lição não encontrada")

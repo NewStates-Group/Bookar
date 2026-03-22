@@ -34,7 +34,9 @@ from .utils import (
     get_genai_client,
     genai_chat,
     safe_gemini_call,
+    invalidate_course_cache,
 )
+from django.core.cache import cache
 logger = logging.getLogger(__name__)
 
 
@@ -357,6 +359,8 @@ def generate_lesson(self, user_id, lesson_id: int):
         
         lesson.status = "READY"
         lesson.save()
+        # Invalidate course cache
+        invalidate_course_cache(lesson.module.course.uuid, user_id)
         send_user_update(user_id, {"type": "lesson_update", "id": lesson.short_id, "status": "READY", "lesson_file": lesson.lesson_file.url if lesson.lesson_file else ""})
 
         return lesson.lesson_file.url if lesson.lesson_file else None
@@ -454,6 +458,9 @@ def generate_next_module(self, user_pk: int, course_pk: int, module_pk: int = No
             )
         Lesson.objects.bulk_create(lessons_to_create)
         
+        # Invalidate course cache as new lessons were added
+        invalidate_course_cache(course.uuid, user_pk)
+        
         # Generate only the first lesson of the module; others will be triggered sequentially
         first_lesson = Lesson.objects.filter(module=module_object, status="PENDING").order_by("id").first()
         if first_lesson:
@@ -544,6 +551,8 @@ def generate_module_quiz(module_id: int):
                     is_correct=c.get("is_correct", False),
                 )
         
+        # Invalidate course cache
+        invalidate_course_cache(module_object.course.uuid)
         logger.info(f"Quiz generated for module {module_id}")
 
     except Exception as e:
@@ -608,10 +617,8 @@ def create_course_details(user_id: int, course_pk: int, prompt: str, level: str)
     Course.objects.filter(pk=course_pk).update(
         desc=course_desc, title=course_title, max_modules=max_modules, status="PROCESSING"
     )
-
-    Course.objects.filter(pk=course_pk).update(
-        desc=course_desc, title=course_title, max_modules=max_modules, status="PROCESSING"
-    )
+    # Invalidate course cache
+    invalidate_course_cache(course.uuid, user_id)
     send_user_update(user_id, {"type": "course_update", "id": str(course.uuid), "status": "PROCESSING", "title": course_title, "desc": course_desc})
 
     # Save generation context for future reuse
@@ -713,6 +720,8 @@ def create_course_thumb(course_pk: str, prompt: str):
         course.thumb.save(thumb_filename, ContentFile(buffer.getvalue(), name=thumb_filename), save=True)
         course.status = "READY"
         course.save()
+        # Invalidate course cache
+        invalidate_course_cache(course.uuid)
         send_user_update(course.enrollments.first().user.id if course.enrollments.exists() else None, {"type": "course_update", "id": str(course.uuid), "status": "READY", "thumb": course.thumb.url if course.thumb else ""})
         # Thumbnail generation is now independent of module generation
         # generate_next_module.delay(course.user.pk, course_pk)

@@ -159,4 +159,24 @@ def cached_genai_call(prompt: str, ttl: int = 86400) -> str:
     return result
 
 
+def get_course_list_cache_key(user_id):
+    return f"course_list_{user_id}"
+
+
+def get_course_detail_cache_key(course_uuid):
+    return f"course_detail_{course_uuid}"
+
+
+def get_lesson_detail_cache_key(lesson_short_id):
+    return f"lesson_detail_{lesson_short_id}"
+
+
+def invalidate_course_cache(course_uuid, user_id=None):
+    from django.core.cache import cache
+
+    cache.delete(get_course_detail_cache_key(course_uuid))
+    if user_id:
+        cache.delete(get_course_list_cache_key(user_id))
+
+
 
