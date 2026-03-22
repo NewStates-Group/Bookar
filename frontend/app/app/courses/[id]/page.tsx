@@ -246,7 +246,7 @@ export default function CoursePage() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-white to-slate-50">
       <div className="text-center space-y-4">
         <p className="text-muted-foreground font-medium">Não foi possível encontrar o curso.</p>
-        <Button asChild className="bg-cyan-500 text-white rounded-full px-8" variant="default" size="lg">
+        <Button asChild className="bg-cyan-500 hover:bg-cyan-600 text-white rounded-full px-8" variant="default" size="lg">
           <Link href="/app/courses">Meus Cursos</Link>
         </Button>
       </div>

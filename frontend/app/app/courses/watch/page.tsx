@@ -69,31 +69,32 @@ export default function WatchPage() {
     const { addListener } = useWebSocket();
 
     // SWR for Course Data
-    const { data: swrCourse, mutate: mutateCourse } = useSWR(
+    const { data: swrCourse, mutate: mutateCourse, isLoading: isLoadingCourse } = useSWR(
         // @ts-ignore
         session?.accessToken && courseID ? [`${process.env.NEXT_PUBLIC_API_URL}/courses/${courseID}`, session.accessToken] : null,
         authenticatedFetcher,
         {
             revalidateOnFocus: false,
             dedupingInterval: 60000,
+            errorRetryCount: 3
         }
     );
 
     // SWR for Lesson Data
-    const { data: swrLesson, error: swrLessonError, mutate: mutateLesson } = useSWR(
+    const { data: swrLesson, error: swrLessonError, mutate: mutateLesson, isLoading: isLoadingLesson } = useSWR(
         // @ts-ignore
         session?.accessToken && lessonID && lessonID !== "quiz" && lessonID !== "undefined" && lessonID !== "null" ? [`${process.env.NEXT_PUBLIC_API_URL}/lessons/${lessonID}`, session.accessToken] : null,
         authenticatedFetcher,
         {
             revalidateOnFocus: false,
             dedupingInterval: 60000,
+            errorRetryCount: 3
         }
     );
 
     useEffect(() => {
         if (swrCourse) {
             setCourse(swrCourse);
-            setLoading(false);
         }
     }, [swrCourse]);
 
@@ -101,12 +102,10 @@ export default function WatchPage() {
         if (lessonID === "quiz") {
             setLesson({ title: "Quiz do Módulo", desc: "Complete o quiz para avançar" } as Lesson);
             setViewMode("quiz");
-            setLoading(false);
             setError(null);
         } else if (swrLesson) {
             setLesson(swrLesson);
             setViewMode("video");
-            setLoading(false);
             setError(null);
         }
     }, [swrLesson, lessonID]);
@@ -119,7 +118,6 @@ export default function WatchPage() {
             } else {
                 setError(swrLessonError.message || "Erro ao carregar aula");
             }
-            setLoading(false);
         }
     }, [swrLessonError]);
 
@@ -232,21 +230,24 @@ export default function WatchPage() {
         }
     }, [course, lesson, lessonID, quizID]);
 
-    if (status === "loading" || loading) {
-        return null;
+    if (status === "loading" || isLoadingCourse || isLoadingLesson) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-white to-slate-50">
+                <div className="text-center space-y-4">
+                    <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto" />
+                    <p className="text-muted-foreground font-medium">Carregando as informações da aula...</p>
+                </div>
+            </div>
+        );
     }
 
-    if (error || !lesson) {
+    if (error || !lesson || !course) {
         return (
             <div className="min-h-screen flex flex-col items-center justify-center">
                 <p className="text-destructive mb-4">{error || "Aula não encontrada"}</p>
-                <Button variant="outline" onClick={() => {
-                    if (courseID) {
-                        router.push(`/app/courses/${courseID}`)
-                    } else {
-                        router.push(`/app`)
-                    }
-                }}>Voltar</Button>
+                <Button asChild className="bg-cyan-500 hover:bg-cyan-600 text-white rounded-full px-8" variant="default" size="lg">
+                    <Link href={`/app/courses/${courseID}`}>Retornar ao Curso</Link>
+                </Button>
             </div>
         )
     }
@@ -259,23 +260,15 @@ export default function WatchPage() {
 
             <div className="flex-1 flex flex-col overflow-hidden bg-background">
                 <div className="h-16 grid grid-cols-5 border-b border-border">
-                    <button
-                        onClick={() => {
-                            if (course?.id) {
-                                router.push(`/app/courses/${course.id}`);
-                            } else if (courseID) {
-                                router.push(`/app/courses/${courseID}`);
-                            } else {
-                                router.push('/app/courses');
-                            }
-                        }}
+                    <Link
+                        href={`/app/courses/${courseID}`}
                         className="flex gap-1 items-center justify-center border-r cursor-pointer hover:bg-muted transition-colors px-4"
                     >
                         <ArrowLeft className="w-5 h-5 " />
                         <span className="hidden md:block ml-1">
                             Voltar
                         </span>
-                    </button>
+                    </Link>
                     <button
                         onClick={() => setSidebarOpen(!sidebarOpen)}
                         className="flex gap-1 items-center justify-center border-r cursor-pointer hover:bg-muted transition-colors"
@@ -299,14 +292,14 @@ export default function WatchPage() {
 
                     </button>
                     <button
-                        onClick={() => router.push(`/app/courses/watch?l=${previousLesson?.id}&c=${courseID}`)}
-
                         disabled={!previousLesson}
                         className={`border-r flex gap-2  items-center justify-center hover:bg-muted transition-colors ${!previousLesson ? "opacity-70 cursor-not-allowed" : "cursor-pointer"}`}>
-                        <ChevronLeft className="w-4 h-4" />
-                        <span className="hidden md:block">
-                            Aula Anterior
-                        </span>
+                        <Link href={`/app/courses/watch?l=${previousLesson?.id}&c=${courseID}`}>
+                            <ChevronLeft className="w-4 h-4" />
+                            <span className="hidden md:block">
+                                Aula Anterior
+                            </span>
+                        </Link>
                     </button>
                     <button
                         onClick={() => {
@@ -401,7 +394,7 @@ export default function WatchPage() {
                     </div>
 
                     <div className="pb-8 pt-4 px-4 flex justify-center">
-                        <p className="text-xs text-foreground/40 text-center max-w-2xl">
+                        <p className="text-sm text-foreground/40 text-center max-w-2xl">
                             O Bookar pode cometer erros. Considere verificar as informações importantes.
                         </p>
                     </div>
