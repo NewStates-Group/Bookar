@@ -28,6 +28,8 @@ import {
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { useWebSocket } from "@/context/WebSocketContext";
+import useSWR from 'swr';
+import { authenticatedFetcher, apiRequest } from "@/lib/api";
 
 interface Course {
   id: Number;
@@ -58,22 +60,34 @@ export default function CoursesPage() {
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const [isDeletingCourse, setIsDeletingCourse] = useState<number | null>(null);
 
+  const { data: swrCourses, mutate: mutateCourses } = useSWR(
+    // @ts-ignore
+    session?.accessToken ? [`${process.env.NEXT_PUBLIC_API_URL}/courses`, session.accessToken] : null,
+    fetcher,
+    {
+      revalidateOnFocus: false,
+      dedupingInterval: 60000,
+    }
+  );
+
+  useEffect(() => {
+    if (swrCourses) {
+      setCourses(swrCourses);
+      setIsLoading(false);
+    }
+  }, [swrCourses]);
+
   const handleDeleteCourse = async (courseId: Number) => {
     if (!window.confirm("Tem certeza que deseja eliminar este curso?")) return;
     setIsDeletingCourse(courseId as number);
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/courses/${courseId}`, {
+      await apiRequest(`${process.env.NEXT_PUBLIC_API_URL}/courses/${courseId}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${session?.accessToken}` },
       });
-      if (res.ok) {
-        setCourses(prev => prev.filter(c => c.id !== courseId));
-        toast.success("Curso eliminado.");
-      } else {
-        toast.error("Erro ao eliminar curso.");
-      }
+      mutateCourses();
+      toast.success("Curso eliminado.");
     } catch {
-      toast.error("Erro de conexão.");
+      toast.error("Erro ao eliminar curso.");
     } finally {
       setIsDeletingCourse(null);
     }
@@ -92,19 +106,7 @@ export default function CoursesPage() {
   useEffect(() => {
     const removeListener = addListener((data) => {
       if (data.type === "course_update") {
-        setCourses((prev) =>
-          prev.map((c) =>
-            String(c.id) === String(data.id)
-              ? {
-                ...c,
-                status: data.status,
-                title: data.title || c.title,
-                desc: data.desc || c.desc,
-                thumb: data.thumb || c.thumb,
-              }
-              : c
-          )
-        );
+        mutateCourses();
 
         if (data.status === "READY" && data.title) {
           toast.success(`Curso "${data.title}" está pronto!`);
@@ -113,7 +115,7 @@ export default function CoursesPage() {
     });
 
     return () => removeListener();
-  }, [addListener]);
+  }, [addListener, mutateCourses]);
 
   const levelConfig = {
     B: { label: "Iniciante", color: "bg-emerald-100 text-emerald-700 border-emerald-200" },
@@ -123,7 +125,6 @@ export default function CoursesPage() {
 
   useEffect(() => {
     if (session?.accessToken) {
-      fetchCourses();
       checkPendingShare();
 
       // Check if profile needs completion
@@ -166,23 +167,14 @@ export default function CoursesPage() {
 
     setIsClaiming(true);
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/courses/share/${token}/claim`, {
+      const data = await apiRequest(`${process.env.NEXT_PUBLIC_API_URL}/courses/share/${token}/claim`, {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${session.accessToken}`,
-        },
       });
 
-      if (res.ok) {
-        const data = await res.json();
-        toast.success(data.message || "Curso importado com sucesso!");
-        fetchCourses();
-      } else {
-        const err = await res.json();
-        toast.error(err.message || "Erro ao importar curso.");
-      }
-    } catch (error) {
-      toast.error("Erro ao importar curso.");
+      toast.success(data.message || "Curso importado com sucesso!");
+      mutateCourses();
+    } catch (error: any) {
+      toast.error(error.message || "Erro ao importar curso.");
     } finally {
       setIsClaiming(false);
       setShowImportModal(false);
@@ -190,23 +182,6 @@ export default function CoursesPage() {
     }
   };
 
-  const fetchCourses = async () => {
-    try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/courses`, {
-        headers: {
-          Authorization: `Bearer ${session?.accessToken}`,
-        },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setCourses(data);
-      }
-    } catch (error) {
-      console.error("Failed to fetch courses", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const handleNext = () => {
     if (step === 1 && prompt.trim()) {
@@ -296,16 +271,11 @@ export default function CoursesPage() {
   };
 
   const handleCreateCourse = async () => {
-
     setIsCreating(true);
 
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/courses`, {
+      const course = await apiRequest(`${process.env.NEXT_PUBLIC_API_URL}/courses`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session?.accessToken}`,
-        },
         body: JSON.stringify({
           prompt,
           level,
@@ -313,35 +283,15 @@ export default function CoursesPage() {
         }),
       });
 
-      if (res.ok) {
-        const course = await res.json();
+      setOpen(false);
+      setPrompt("");
+      setNumModules(5);
+      setLevel("B");
+      setStep(1);
 
-        setOpen(false);
-        setPrompt("");
-        setNumModules(5);
-        setLevel("B");
-        setStep(1);
-
-        // Add the new course to the list immediately with PROCESSING status
-        const newCourse: Course = {
-          id: course.id,
-          prompt: prompt,
-          desc: "Gerando descrição...", // Placeholder
-          level: level,
-          thumb: "",
-          status: "PROCESSING",
-          created_at: new Date().toISOString(),
-          max_modules: numModules,
-          is_fully_completed: false
-        };
-
-        setCourses(prev => [newCourse, ...prev]);
-      } else {
-        const err = await res.json();
-        toast.error(err.message || "Erro ao criar curso");
-      }
-    } catch (error) {
-      toast.error("Erro de conexão");
+      mutateCourses();
+    } catch (error: any) {
+      toast.error(error.message || "Erro ao criar curso");
     } finally {
       setIsCreating(false);
     }
