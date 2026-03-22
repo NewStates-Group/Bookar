@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { toast } from "sonner";
 import { Loader2, Upload, BookOpen, CheckCircle, GraduationCap } from "lucide-react";
+import { apiRequest } from "@/lib/api";
 
 export default function ProfilePage() {
     const { data: session, update } = useSession();
@@ -65,18 +66,11 @@ export default function ProfilePage() {
         }
 
         try {
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/profile`, {
+            const updatedUser = await apiRequest(`${process.env.NEXT_PUBLIC_API_URL}/auth/profile`, {
                 method: "PUT",
-                headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${session?.accessToken}`,
-                },
                 body: JSON.stringify(formData),
             });
 
-            if (!res.ok) throw new Error("Erro ao atualizar perfil");
-
-            const updatedUser = await res.json();
             await update({
                 ...session,
                 user: {
@@ -86,8 +80,8 @@ export default function ProfilePage() {
             });
 
             toast.success("Perfil atualizado com sucesso!");
-        } catch (error) {
-            toast.error("Erro ao atualizar perfil");
+        } catch (error: any) {
+            toast.error(error.message || "Erro ao atualizar perfil");
         } finally {
             setIsLoading(false);
         }
@@ -102,17 +96,12 @@ export default function ProfilePage() {
         uploadData.append("avatar", file);
 
         try {
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/avatar`, {
+            const updatedUser = await apiRequest(`${process.env.NEXT_PUBLIC_API_URL}/auth/avatar`, {
                 method: "POST",
-                headers: {
-                    Authorization: `Bearer ${session?.accessToken}`,
-                },
+                headers: {}, // Do not set Content-Type for FormData
                 body: uploadData,
             });
 
-            if (!res.ok) throw new Error("Erro ao carregar imagem");
-
-            const updatedUser = await res.json();
             await update({
                 ...session,
                 user: {
@@ -122,8 +111,8 @@ export default function ProfilePage() {
             });
 
             toast.success("Foto de perfil atualizada!");
-        } catch (error) {
-            toast.error("Erro ao carregar imagem");
+        } catch (error: any) {
+            toast.error(error.message || "Erro ao carregar imagem");
         } finally {
             setIsUploading(false);
         }
