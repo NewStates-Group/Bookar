@@ -179,7 +179,7 @@ export default function HomePage() {
               </div>
 
               <div className="w-full max-w-xl space-y-4 md:space-y-6">
-                <div className="py-2 md:py-3 border-y border-black/[0.05]">
+                <div className="py-2 border-y border-black/[0.05]">
                   <CountdownTimer onComplete={() => setIsTimerComplete(true)} />
                 </div>
 
@@ -229,7 +229,7 @@ export default function HomePage() {
                     href="https://vm.tiktok.com/ZS9RHKRCc2754-kii29"
                     className="hover:scale-110 transition-transform"
                   >
-                    <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
+                    <svg className="w-8 h-8" viewBox="0 0 24 24" fill="currentColor">
                       <path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.17-2.89-.6-4.09-1.47-.88-.64-1.61-1.47-2.12-2.44v7.37c.02 1.43-.39 2.89-1.2 4.02-1.15 1.7-3.23 2.65-5.23 2.51-1.64-.09-3.24-.92-4.14-2.29-.98-1.42-1.15-3.32-.48-4.88.66-1.57 2.15-2.73 3.84-2.92 1.04-.15 2.13.04 3.06.57.02-.45-.01-4.78.01-6.11-.01-5.1-.01-5.11-.01-5.15z" />
                     </svg>
                   </Link>
@@ -238,7 +238,7 @@ export default function HomePage() {
                     href="https://www.instagram.com/bookar_study"
                     className="hover:scale-110 transition-transform"
                   >
-                    <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <svg className="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
                       <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
                       <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
@@ -249,18 +249,21 @@ export default function HomePage() {
                     href="https://www.facebook.com/profile.php?id=61578517742438"
                     className="hover:scale-110 transition-transform"
                   >
-                    <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
+                    <div className="w-10 h-10 flex items-center justify-center border rounded-full">
+
+                    <svg className="w-8 h-8" viewBox="0 0 24 24" fill="currentColor">
                       <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path>
                     </svg>
+                    </div>
                   </Link>
                 </div>
               </div>
-            </div>                                                                                      
+            </div>
 
-            <footer className="w-full text-[10px] md:text-sm text-gray-400 mt-auto pt-4 flex justify-center items-center">
-              Bookar &copy; 2026. Todos os direitos reservados
-            </footer>
           </main>
+          <footer className="dotted w-full text-sm text-gray-400 flex md:translate-y-[-10] justify-center items-center">
+            Bookar &copy; 2026. Todos os direitos reservados
+          </footer>
         </motion.div>
       ) : (
         <motion.div
