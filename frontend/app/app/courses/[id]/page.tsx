@@ -63,7 +63,6 @@ export default function CoursePage() {
   const [course, setCourse] = useState<CourseDetail | null>(null);
   const [isGeneratingModule, setIsGeneratingModule] = useState(false);
   const [finished, setFinished] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
   const [fullName, setFullName] = useState("");
   const [isDownloading, setIsDownloading] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
@@ -74,13 +73,14 @@ export default function CoursePage() {
   const { addListener } = useWebSocket();
 
   // SWR for Course Detail
-  const { data: swrCourse, mutate: mutateCourse } = useSWR(
+  const { data: swrCourse, mutate: mutateCourse, error: errorCourse, isLoading: isLoadingCourse } = useSWR(
     // @ts-ignore
     session?.accessToken && params?.id ? [`${process.env.NEXT_PUBLIC_API_URL}/courses/${params.id}`, session.accessToken] : null,
     authenticatedFetcher,
     {
       revalidateOnFocus: false,
       dedupingInterval: 60000,
+      errorRetryCount: 3
     }
   );
 
@@ -92,13 +92,13 @@ export default function CoursePage() {
     {
       revalidateOnFocus: false,
       dedupingInterval: 60000,
+      errorRetryCount: 3
     }
   );
 
   useEffect(() => {
     if (swrCourse) {
       setCourse(swrCourse);
-      setIsLoading(false);
     }
     if (swrClaims) setClaims(swrClaims);
   }, [swrCourse, swrClaims]);
@@ -234,8 +234,24 @@ export default function CoursePage() {
   }, [session, params]);
 
 
-  if (status === "loading" || isLoading) return null
-  if (!course) return null;
+  if (status === "loading" || isLoadingCourse) return (
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-white to-slate-50">
+      <div className="text-center space-y-4">
+        <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto" />
+        <p className="text-muted-foreground font-medium">Carregando as informações do curso...</p>
+      </div>
+    </div>
+  )
+  if (!course) return (
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-white to-slate-50">
+      <div className="text-center space-y-4">
+        <p className="text-muted-foreground font-medium">Não foi possível encontrar o curso.</p>
+        <Button asChild className="bg-cyan-500 text-white rounded-full px-8" variant="default" size="lg">
+          <Link href="/app/courses">Meus Cursos</Link>
+        </Button>
+      </div>
+    </div>
+  );
 
   return (
     <div className="relative min-h-screen bg-background p-4 md:p-8">
