@@ -150,78 +150,116 @@ export default function HomePage() {
           initial={{ opacity: 1 }}
           exit={{ opacity: 0, y: -20 }}
           transition={{ duration: 0.8 }}
-          className="min-h-screen flex flex-col bg-white text-[#111] font-sans"
+          className="min-h-screen flex flex-col bg-white text-[#111] font-sans overflow-hidden"
         >
-          <header className="fixed top-0 w-full p-6 md:p-10 flex justify-between items-center z-50">
-            <div className="flex items-center gap-2">
-              <Image src="/logo.png" alt="Logo" width={40} height={40} />
-              <span className="text-2xl font-bold tracking-tighter">Bookar</span>
-            </div>
-          </header>
+          <main className="flex-1 flex flex-col items-center justify-between p-4 md:p-6 text-center py-8 md:py-12">
+            <header className="w-full flex justify-center items-center">
+              <div className="flex items-center gap-2">
+                <Image src="/logo.png" alt="Logo" width={32} height={32} />
+                <span className="text-3xl font-bold tracking-tighter">Bookar</span>
+              </div>
+            </header>
 
-          <main className="flex-1 flex flex-col items-center justify-center p-6 text-center space-y-12 pb-24">
-            <div className="z-10 text-center max-w-3xl space-y-3 relative">
-              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-32 bg-cyan-400/10 blur-[60px] -z-10 rounded-full"></div>
-              <motion.div
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.8 }}
-                className="flex justify-center flex-col items-center gap-4"
-              >
-                <h1 className="text-6xl md:text-8xl font-bold tracking-tighter text-balance bg-clip-text text-transparent bg-gradient-to-b from-foreground to-foreground/70">
-                  Algo Incrível Está a Chegar
-                </h1>
-                <p className="text-xl md:text-2xl text-muted-foreground max-w-2xl mx-auto text-balance font-light">
-                  Prepara-te para a melhor plataforma de aprendizado baseado em IA.
-                </p>
-              </motion.div>
-            </div>
-
-            <div className="w-full max-w-xl space-y-10">
-              <div className="py-4 border-y border-black/[0.05]">
-                <CountdownTimer onComplete={() => setIsTimerComplete(true)} />
+            <div className="flex flex-col items-center justify-center flex-1 w-full max-w-3xl mx-auto space-y-6 md:space-y-8">
+              <div className="z-10 text-center space-y-2 md:space-y-3 relative">
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-32 bg-cyan-400/10 blur-[60px] -z-10 rounded-full"></div>
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.8 }}
+                  className="flex justify-center flex-col items-center gap-2 md:gap-4"
+                >
+                  <h1 className="text-6xl md:text-7xl font-bold tracking-tighter text-balance bg-clip-text text-transparent bg-gradient-to-b from-foreground to-foreground/70">
+                    Algo Incrível Está a Chegar
+                  </h1>
+                  <p className="text-lg md:text-2xl text-muted-foreground max-w-2xl mx-auto text-balance font-light">
+                    Prepara-te para a melhor plataforma de aprendizado baseado em IA.
+                  </p>
+                </motion.div>
               </div>
 
-              <div className="flex flex-col items-center gap-6 mt-4">
-                <div className="flex items-center gap-3">
-                  <div className="flex -space-x-2">
-                    {[1, 2, 3].map((i) => (
-                      <div key={i} className="inline-block h-8 w-8 rounded-full border-2 border-white bg-neutral-100 overflow-hidden">
-                        <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${i + waitingCount}`} alt="" />
-                      </div>
-                    ))}
-                  </div>
-                  <p className="text-sm font-semibold text-black/40">
-                    <span className="text-black font-bold"><AnimatedCounter value={waitingCount} /></span> pessoas já estão na lista
-                  </p>
+              <div className="w-full max-w-xl space-y-4 md:space-y-6">
+                <div className="py-2 md:py-3 border-y border-black/[0.05]">
+                  <CountdownTimer onComplete={() => setIsTimerComplete(true)} />
                 </div>
 
-                {!isSubscribed ? (
-                  <form onSubmit={handleSubmit} className="w-full flex flex-col sm:flex-row gap-2 max-w-md">
-                    <Input
-                      type="email"
-                      placeholder="teu@email.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                      className="h-12 border-black/10 bg-neutral-50 rounded-xl px-4 text-base focus-visible:ring-black/5 focus-visible:border-black/20"
-                    />
-                    <Button
-                      type="submit"
-                      disabled={loading}
-                      className="h-12 bg-cyan-500 hover:bg-cyan-600 text-white font-bold px-8 rounded-xl shadow-sm transition-all"
-                    >
-                      {loading ? "..." : "Reservar Lugar"}
-                    </Button>
-                  </form>
-                ) : (
-                  <div className="bg-cyan-50 border border-cyan-100 rounded-2xl p-6 max-w-md w-full">
-                    <p className="text-cyan-700 font-semibold text-lg">Já estás na lista de espera!</p>
-                    <p className="text-cyan-600/70 text-sm mt-1">Avisaremos assim que abrirmos as portas.</p>
+                <div className="flex flex-col items-center gap-4 md:gap-6 mt-2">
+                  <div className="flex items-center gap-3">
+                    <div className="flex -space-x-2">
+                      {[1, 2, 3].map((i) => (
+                        <div key={i} className="inline-block h-8 w-8 rounded-full border-2 border-white bg-neutral-100 overflow-hidden">
+                          <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${i + waitingCount}`} alt="" />
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-sm font-semibold text-black/40">
+                      <span className="text-black font-bold"><AnimatedCounter value={waitingCount} /></span> pessoas já estão na lista
+                    </p>
                   </div>
-                )}
+
+                  {!isSubscribed ? (
+                    <form onSubmit={handleSubmit} className="w-full flex flex-col sm:flex-row gap-2 max-w-md">
+                      <Input
+                        type="email"
+                        placeholder="teu@email.com"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        required
+                        className="h-11 md:h-12 border-black/10 bg-neutral-50 rounded-xl px-4 text-base focus-visible:ring-black/5 focus-visible:border-black/20"
+                      />
+                      <Button
+                        type="submit"
+                        disabled={loading}
+                        className="h-11 md:h-12 bg-cyan-500 hover:bg-cyan-600 text-white font-bold px-8 rounded-xl shadow-sm transition-all"
+                      >
+                        {loading ? "..." : "Reservar Lugar"}
+                      </Button>
+                    </form>
+                  ) : (
+                    <div className="bg-cyan-50 border border-cyan-100 rounded-2xl p-4 md:p-6 max-w-md w-full">
+                      <p className="text-cyan-700 font-semibold text-base md:text-lg">Já estás na lista de espera!</p>
+                      <p className="text-cyan-600/70 text-xs md:text-sm mt-1">Avisaremos assim que abrirmos as portas.</p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center justify-center gap-6 pt-2">
+                  <Link
+                    target='_blank'
+                    href="https://vm.tiktok.com/ZS9RHKRCc2754-kii29"
+                    className="hover:scale-110 transition-transform"
+                  >
+                    <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.17-2.89-.6-4.09-1.47-.88-.64-1.61-1.47-2.12-2.44v7.37c.02 1.43-.39 2.89-1.2 4.02-1.15 1.7-3.23 2.65-5.23 2.51-1.64-.09-3.24-.92-4.14-2.29-.98-1.42-1.15-3.32-.48-4.88.66-1.57 2.15-2.73 3.84-2.92 1.04-.15 2.13.04 3.06.57.02-.45-.01-4.78.01-6.11-.01-5.1-.01-5.11-.01-5.15z" />
+                    </svg>
+                  </Link>
+                  <Link
+                    target='_blank'
+                    href="https://www.instagram.com/bookar_study"
+                    className="hover:scale-110 transition-transform"
+                  >
+                    <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
+                      <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
+                      <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
+                    </svg>
+                  </Link>
+                  <Link
+                    target='_blank'
+                    href="https://www.facebook.com/profile.php?id=61578517742438"
+                    className="hover:scale-110 transition-transform"
+                  >
+                    <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path>
+                    </svg>
+                  </Link>
+                </div>
               </div>
-            </div>
+            </div>                                                                                      
+
+            <footer className="w-full text-[10px] md:text-sm text-gray-400 mt-auto pt-4 flex justify-center items-center">
+              Bookar &copy; 2026. Todos os direitos reservados
+            </footer>
           </main>
         </motion.div>
       ) : (
