@@ -63,7 +63,7 @@ export default function CoursesPage() {
   const { data: swrCourses, mutate: mutateCourses } = useSWR(
     // @ts-ignore
     session?.accessToken ? [`${process.env.NEXT_PUBLIC_API_URL}/courses`, session.accessToken] : null,
-    fetcher,
+    authenticatedFetcher,
     {
       revalidateOnFocus: false,
       dedupingInterval: 60000,
