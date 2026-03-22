@@ -184,6 +184,12 @@ export default function LoginPage() {
           className="object-cover opacity-50"
           priority
         />
+        <Link
+          href="/"
+          className="absolute p-12 top-0 left-0 cursor-pointer z-50"
+        >
+          <ChevronLeft className="text-white" size={30}/>
+        </Link>
         <div className="relative z-20 text-white p-12 max-w-lg">
           <motion.div
             initial={{ opacity: 0, y: 20 }}

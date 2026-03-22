@@ -13,7 +13,7 @@ export const metadata: Metadata = {
   title: 'Bookar',
   description: 'Aprenda utilizando IA',
   icons: {
-    icon: "/logo.png",
+    icon: "/logo-white.png",
   },
 }
 

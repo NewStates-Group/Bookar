@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import Image from "next/image";
-import { User, Mail, Lock, Loader2, ArrowRight, AlertCircle, ShieldCheck } from "lucide-react";
+import { User, Mail, Lock, Loader2, ArrowRight, AlertCircle, ShieldCheck, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
@@ -190,6 +190,12 @@ export default function SignupPage() {
           className="object-cover opacity-50"
           priority
         />
+          <Link
+          href="/"
+          className="absolute p-12 top-0 right-0 cursor-pointer z-50"
+        >
+          <ChevronRight className="text-white" size={30}/>
+        </Link>
         <div className="relative z-20 text-white p-12 max-w-lg text-right">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -206,6 +212,7 @@ export default function SignupPage() {
 
       {/* Left Side - Form */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-background">
+
         <motion.div
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
