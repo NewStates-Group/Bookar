@@ -159,7 +159,8 @@ export const authOptions: NextAuthOptions = {
                 }
             }
 
-            if (Date.now() < (token.accessTokenExpires as number)) {
+            // Add a 5-minute buffer to ensure we refresh before the token actually expires
+            if (Date.now() < (token.accessTokenExpires as number) - 5 * 60 * 1000) {
                 return token;
             }
 
