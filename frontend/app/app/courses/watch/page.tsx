@@ -11,6 +11,8 @@ import Link from "next/link";
 import { BuildingBlocksLoader } from "@/components/ui/building-blocks-loader";
 import { QuizView } from "@/components/quiz-view";
 import { useWebSocket } from "@/context/WebSocketContext";
+import useSWR from 'swr';
+import { authenticatedFetcher, apiRequest } from "@/lib/api";
 
 export interface Module {
     id: string;
@@ -66,32 +68,82 @@ export default function WatchPage() {
 
     const { addListener } = useWebSocket();
 
+    // SWR for Course Data
+    const { data: swrCourse, mutate: mutateCourse } = useSWR(
+        // @ts-ignore
+        session?.accessToken && courseID ? [`${process.env.NEXT_PUBLIC_API_URL}/courses/${courseID}`, session.accessToken] : null,
+        authenticatedFetcher,
+        {
+            revalidateOnFocus: false,
+            dedupingInterval: 60000,
+        }
+    );
+
+    // SWR for Lesson Data
+    const { data: swrLesson, error: swrLessonError, mutate: mutateLesson } = useSWR(
+        // @ts-ignore
+        session?.accessToken && lessonID && lessonID !== "quiz" && lessonID !== "undefined" && lessonID !== "null" ? [`${process.env.NEXT_PUBLIC_API_URL}/lessons/${lessonID}`, session.accessToken] : null,
+        authenticatedFetcher,
+        {
+            revalidateOnFocus: false,
+            dedupingInterval: 60000,
+        }
+    );
+
+    useEffect(() => {
+        if (swrCourse) {
+            setCourse(swrCourse);
+            setLoading(false);
+        }
+    }, [swrCourse]);
+
+    useEffect(() => {
+        if (lessonID === "quiz") {
+            setLesson({ title: "Quiz do Módulo", desc: "Complete o quiz para avançar" } as Lesson);
+            setViewMode("quiz");
+            setLoading(false);
+            setError(null);
+        } else if (swrLesson) {
+            setLesson(swrLesson);
+            setViewMode("video");
+            setLoading(false);
+            setError(null);
+        }
+    }, [swrLesson, lessonID]);
+
+    useEffect(() => {
+        if (swrLessonError) {
+            // @ts-ignore
+            if (swrLessonError.status === 404) {
+                setError("Esta aula ainda não existe ou não tens acesso.");
+            } else {
+                setError(swrLessonError.message || "Erro ao carregar aula");
+            }
+            setLoading(false);
+        }
+    }, [swrLessonError]);
+
     useEffect(() => {
         const removeListener = addListener((data) => {
             if (data.type === "lesson_update" && String(data.id) === String(lessonID)) {
                 if (data.status !== lesson?.status) {
-                    getLesson();
-                    fetchCourse();
+                    mutateLesson();
+                    mutateCourse();
                 }
             }
         });
 
         return () => removeListener();
-    }, [addListener, lessonID, lesson?.status]);
+    }, [addListener, lessonID, lesson?.status, mutateLesson, mutateCourse]);
 
 
     const markDelivered = async () => {
         if (!lesson || lesson.delivered) return;
         try {
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/lessons/${lesson.id}/mark-delivered`, {
+            await apiRequest(`${process.env.NEXT_PUBLIC_API_URL}/lessons/${lesson.id}/mark-delivered`, {
                 method: "PUT",
-                headers: {
-                    Authorization: `Bearer ${(session as any)?.accessToken}`,
-                },
             });
-            if (res.ok) {
-                setLesson(prev => prev ? { ...prev, delivered: true } : null);
-            }
+            mutateLesson();
         } catch (e) {
             console.error("Error marking lesson as delivered", e);
         }
@@ -100,118 +152,24 @@ export default function WatchPage() {
     const markWatched = async () => {
         if (!lesson || lesson.watched) return;
         try {
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/lessons/${lesson.id}/mark-watched`, {
+            await apiRequest(`${process.env.NEXT_PUBLIC_API_URL}/lessons/${lesson.id}/mark-watched`, {
                 method: "PUT",
-                headers: {
-                    Authorization: `Bearer ${(session as any)?.accessToken}`,
-                },
             });
-            if (res.ok) {
-                setLesson(prev => prev ? { ...prev, watched: true } : null);
-                fetchCourse(); // refresh sidebar progress bar
-            }
+            mutateLesson();
+            mutateCourse(); // refresh sidebar progress bar
         } catch (e) {
             console.error("Error marking lesson as watched", e);
         }
     }
 
-    const getLesson = async () => {
-        if (!lessonID || lessonID === "undefined" || lessonID === "null") {
-            setError("ID de aula inválido");
-            setLoading(false);
-            return;
-        }
-
-        if (lessonID === "quiz") {
-            setLesson({ title: "Quiz do Módulo", desc: "Complete o quiz para avançar" } as Lesson); // Dummy lesson for title
-            setViewMode("quiz");
-            setLoading(false);
-            return;
-        }
-
-        try {
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/lessons/${lessonID}`, {
-                headers: {
-                    Authorization: `Bearer ${(session as any)?.accessToken}`,
-                },
-            });
-
-            if (res.ok) {
-                const data = await res.json();
-                setLesson(data);
-                setLoading(false);
-                setViewMode("video");
-            } else {
-                if (res.status === 404) {
-                    setError("Esta aula ainda não existe ou não tens acesso.");
-                } else if (res.status === 422) {
-                    setError("Erro de comunicação com o servidor (422). Redirecionando...");
-                } else {
-                    const errorData = await res.json().catch(() => ({}));
-                    setError(errorData.message || "Erro ao carregar aula");
-                }
-                setLoading(false);
-            }
-        } catch (e) {
-            console.error(e);
-            setError("Erro de conexão");
-            setLoading(false);
-        }
-    };
-
-
-    const fetchLessonStatus = async (id: string) => {
-        try {
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/lessons/${id}`, {
-                headers: {
-                    Authorization: `Bearer ${(session as any)?.accessToken}`,
-                },
-            });
-            if (res.ok) {
-                const data = await res.json();
-                return data as Lesson;
-            }
-        } catch (e) {
-            console.error("Failed to fetch lesson status", e);
-        }
-        return null;
-    };
-
-    const fetchCourse = async () => {
-        // @ts-ignore
-        if (!courseID || !session?.accessToken) return;
-
-        try {
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/courses/${courseID}`, {
-                headers: {
-                    Authorization: `Bearer ${(session as any)?.accessToken}`,
-                },
-            });
-
-            if (res.ok) {
-                const data = await res.json();
-                setCourse(data);
-
-            }
-        } catch (error) {
-            console.error("Failed to fetch course", error);
-        } finally {
-            setLoading(false);
-        }
-    };
-
     useEffect(() => {
         if (!lessonID || !courseID || lessonID === "undefined" || courseID === "undefined" || lessonID === "null" || courseID === "null") {
-            router.push('/app/courses')
+            if (status !== "loading") {
+                router.push('/app/courses')
+            }
             return
         }
-        // @ts-ignore
-        if (session?.accessToken) {
-            fetchCourse();
-            getLesson();
-        }
-
-    }, [session, params, lessonID, quizID]);
+    }, [session, params, lessonID, quizID, status]);
 
     useEffect(() => {
         setPlayed(false);
@@ -396,49 +354,57 @@ export default function WatchPage() {
                     </button>
                 </div>
 
-                <div className="flex-1 overflow-y-auto">
-                    {viewMode === "quiz" && quizID ? (
-                        <QuizView
-                            quizId={quizID}
-                            courseId={courseID as string}
-                            onComplete={() => {
-                                fetchCourse();
-                            }}
-                        />
-                    ) : (
-                        <div className="flex flex-col items-center justify-center p-4">
-                            <div className="w-full max-w-5xl pb-2 border-b mb-4">
-                                <h1 className="text-wrap font-semibold text-xl md:text-2xl lg:text-3xl truncate text-foreground" title={lesson?.title}>{lesson?.title}</h1>
-                                <p className="text-foreground/70 leading-relaxed text-base md:text-lg">
-                                    {lesson?.desc}
-                                </p>
-                            </div>
-                            {(lesson?.status === "PROCESSING" || lesson?.status === "PENDING") && (
-                                <div className="text-center max-w-lg z-10 py-10">
-                                    <BuildingBlocksLoader />
-                                    <h2 className="text-2xl font-bold text-foreground mb-2">Criando sua aula</h2>
-                                    <p className="text-foreground/60">
-                                        Isto pode levar alguns segundos.
+                <div className="flex-1 overflow-y-auto flex flex-col">
+                    <div className="flex-1">
+                        {viewMode === "quiz" && quizID ? (
+                            <QuizView
+                                quizId={quizID}
+                                courseId={courseID as string}
+                                onComplete={() => {
+                                    mutateCourse();
+                                }}
+                            />
+                        ) : (
+                            <div className="flex flex-col items-center justify-center p-4">
+                                <div className="w-full max-w-5xl pb-2 border-b mb-4">
+                                    <h1 className="text-wrap font-semibold text-xl md:text-2xl lg:text-3xl truncate text-foreground" title={lesson?.title}>{lesson?.title}</h1>
+                                    <p className="text-foreground/70 leading-relaxed text-base md:text-lg">
+                                        {lesson?.desc}
                                     </p>
                                 </div>
-                            )}
+                                {(lesson?.status === "PROCESSING" || lesson?.status === "PENDING") && (
+                                    <div className="text-center max-w-lg z-10 py-10">
+                                        <BuildingBlocksLoader />
+                                        <h2 className="text-2xl font-bold text-foreground mb-2">Criando sua aula</h2>
+                                        <p className="text-foreground/60">
+                                            Isto pode levar alguns segundos.
+                                        </p>
+                                    </div>
+                                )}
 
-                            {lesson?.status === "READY" && viewMode === "video" && lesson?.lesson_file && (
-                                <div className="w-full max-w-5xl aspect-video bg-card rounded-xl overflow-hidden shadow-2xl relative group border border-border">
-                                    <video
-                                        src={lesson.lesson_file.startsWith('http') ? lesson.lesson_file : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/media/${lesson.lesson_file}`}
-                                        controls
-                                        className="w-full h-full"
-                                        onContextMenu={(e) => e.preventDefault()}
-                                        controlsList="nodownload noplaybackrate"
-                                        disablePictureInPicture
-                                        onEnded={() => { setEnded(true) }}
-                                        onPlay={() => { setPlayed(true) }}
-                                    />
-                                </div>
-                            )}
-                        </div>
-                    )}
+                                {lesson?.status === "READY" && viewMode === "video" && lesson?.lesson_file && (
+                                    <div className="w-full max-w-5xl aspect-video bg-card rounded-xl overflow-hidden shadow-2xl relative group border border-border">
+                                        <video
+                                            src={lesson.lesson_file.startsWith('http') ? lesson.lesson_file : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/media/${lesson.lesson_file}`}
+                                            controls
+                                            className="w-full h-full"
+                                            onContextMenu={(e) => e.preventDefault()}
+                                            controlsList="nodownload noplaybackrate"
+                                            disablePictureInPicture
+                                            onEnded={() => { setEnded(true) }}
+                                            onPlay={() => { setPlayed(true) }}
+                                        />
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="pb-8 pt-4 px-4 flex justify-center">
+                        <p className="text-xs text-foreground/40 text-center max-w-2xl">
+                            O Bookar pode cometer erros. Considere verificar as informações importantes.
+                        </p>
+                    </div>
                 </div>
             </div>
 
