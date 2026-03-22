@@ -11,6 +11,8 @@ import { toast } from "sonner";
 import { Award, FileDown, X, HelpCircle, CheckCircle2, XCircle, Lock, Share2, Users } from "lucide-react";
 import { ShareCourseModal } from "@/components/ShareCourseModal";
 import { useWebSocket } from "@/context/WebSocketContext";
+import useSWR from 'swr';
+import { authenticatedFetcher, apiRequest } from "@/lib/api";
 
 interface Course {
   id: string;
@@ -71,44 +73,69 @@ export default function CoursePage() {
 
   const { addListener } = useWebSocket();
 
+  // SWR for Course Detail
+  const { data: swrCourse, mutate: mutateCourse } = useSWR(
+    // @ts-ignore
+    session?.accessToken && params?.id ? [`${process.env.NEXT_PUBLIC_API_URL}/courses/${params.id}`, session.accessToken] : null,
+    authenticatedFetcher,
+    {
+      revalidateOnFocus: false,
+      dedupingInterval: 60000,
+    }
+  );
+
+  // SWR for Claims
+  const { data: swrClaims, mutate: mutateClaims } = useSWR(
+    // @ts-ignore
+    session?.accessToken && params?.id ? [`${process.env.NEXT_PUBLIC_API_URL}/courses/${params.id}/claims`, session.accessToken] : null,
+    authenticatedFetcher,
+    {
+      revalidateOnFocus: false,
+      dedupingInterval: 60000,
+    }
+  );
+
+  useEffect(() => {
+    if (swrCourse) {
+      setCourse(swrCourse);
+      setIsLoading(false);
+    }
+    if (swrClaims) setClaims(swrClaims);
+  }, [swrCourse, swrClaims]);
+
   useEffect(() => {
     const removeListener = addListener((data) => {
       if (data.type === "course_update" && String(data.id) === String(params?.id)) {
-        fetchCourse();
+        mutateCourse();
       }
       if (data.type === "module_update" && String(data.course_id) === String(params?.id)) {
-        fetchCourse();
+        mutateCourse();
       }
       // Also refresh if a lesson within this course is updated
       if (data.type === "lesson_update") {
-        fetchCourse();
+        mutateCourse();
         checkFinishment();
       }
       // Handle certificate update
       if (data.type === "certificate_update" && String(data.course_id) === String(params?.id)) {
-        fetchCourse();
+        mutateCourse();
       }
     });
 
     return () => removeListener();
-  }, [addListener, params?.id]);
+  }, [addListener, params?.id, mutateCourse]);
 
   const handleCancel = async () => {
     if (!window.confirm("Tem certeza que deseja cancelar a geração deste curso?")) return;
     setIsCancelling(true);
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/courses/${course?.id}/cancel`, {
+      await apiRequest(`${process.env.NEXT_PUBLIC_API_URL}/courses/${course?.id}/cancel`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${(session as any)?.accessToken}` }
       });
-      if (res.ok) {
-        toast.success("Geração cancelada.");
-        fetchCourse();
-      } else {
-        toast.error("Erro ao cancelar geração.");
-      }
-    } catch (e) {
-      toast.error("Erro de conexão.");
+      toast.success("Geração cancelada.");
+      mutateCourse();
+    } catch (e: any) {
+      toast.error(e.message || "Erro ao cancelar geração.");
     } finally {
       setIsCancelling(false);
     }
@@ -117,17 +144,10 @@ export default function CoursePage() {
   const handleGenerateModule = async () => {
     setIsGeneratingModule(true);
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/courses/${course?.id}/generate-module`, {
+      await apiRequest(`${process.env.NEXT_PUBLIC_API_URL}/courses/${course?.id}/generate-module`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${(session as any)?.accessToken}` }
       });
-
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.detail || error.message || "Erro ao solicitar módulo");
-      }
-
-      fetchCourse();
+      mutateCourse();
     } catch (e: any) {
       toast.error(e.message || "Erro ao solicitar módulo");
     } finally {
@@ -137,105 +157,41 @@ export default function CoursePage() {
 
   const checkFinishment = async () => {
     try {
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/courses/${params?.id}/get-next-lesson`,
-        {
-          headers: {
-            Authorization: `Bearer ${(session as any)?.accessToken}`,
-          },
-        });
-      const data = await res.json();
-      if (res.ok) {
-        if (data.finished) {
-          setFinished(true)
-        }
+      const data = await apiRequest(`${process.env.NEXT_PUBLIC_API_URL}/courses/${params?.id}/get-next-lesson`);
+      if (data.finished) {
+        setFinished(true)
       }
     } catch (error) {
-      toast.error('Erro desconhecido, aguarde.')
+      // Sielently fail or handle progress check error
     }
   }
 
-  const fetchCourse = async () => {
-    try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/courses/${params?.id}`, {
-        headers: {
-          Authorization: `Bearer ${(session as any)?.accessToken}`,
-        },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setCourse(data);
-
-      } else {
-        setIsLoading(false);
-        router.push("/app/courses");
-      }
-    } catch (error) {
-      console.error("Failed to fetch course", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const fetchClaims = async () => {
-    try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/courses/${params?.id}/claims`, {
-        headers: {
-          Authorization: `Bearer ${(session as any)?.accessToken}`,
-        },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setClaims(data);
-      }
-    } catch (error) {
-      console.error("Failed to fetch claims", error);
-    }
-  };
 
   const handleShare = async () => {
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/courses/${course?.id}/share`, {
+      const data = await apiRequest(`${process.env.NEXT_PUBLIC_API_URL}/courses/${course?.id}/share`, {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${(session as any)?.accessToken}`,
-        },
       });
-      if (res.ok) {
-        const data = await res.json();
-        setShareToken(data.token);
-        setIsShareModalOpen(true);
-      } else {
-        toast.error("Erro ao gerar link de partilha.");
-      }
-    } catch (e) {
-      toast.error("Erro de conexão.");
+      setShareToken(data.token);
+      setIsShareModalOpen(true);
+    } catch (e: any) {
+      toast.error(e.message || "Erro ao gerar link de partilha.");
     }
   };
 
   const handleCertificateClick = async () => {
     setIsDownloading(true);
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/courses/${course?.id}/certificate`, {
-        headers: {
-          Authorization: `Bearer ${(session as any)?.accessToken}`,
-        },
-      });
+      const data = await apiRequest(`${process.env.NEXT_PUBLIC_API_URL}/courses/${course?.id}/certificate`);
 
-      if (res.ok) {
-        const data = await res.json();
-        if (data.status === "READY" && data.certificate_url) {
-          window.open(data.certificate_url.startsWith('http') ? data.certificate_url : data.certificate_url, '_blank');
-        } else {
-          toast.success(data.message || "Solicitação iniciada!");
-          fetchCourse(); // Refresh to update status
-        }
+      if (data.status === "READY" && data.certificate_url) {
+        window.open(data.certificate_url.startsWith('http') ? data.certificate_url : data.certificate_url, '_blank');
       } else {
-        const error = await res.json();
-        toast.error(error.message || "Erro ao processar certificado");
+        toast.success(data.message || "Solicitação iniciada!");
+        mutateCourse();
       }
-    } catch (e) {
-      toast.error("Erro ao processar certificado");
+    } catch (e: any) {
+      toast.error(e.message || "Erro ao processar certificado");
     } finally {
       setIsDownloading(false);
     }
@@ -243,53 +199,37 @@ export default function CoursePage() {
 
   const watchCourse = async () => {
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/courses/${course?.id}/get-next-lesson`, {
-        headers: {
-          Authorization: `Bearer ${(session as any)?.accessToken}`,
-        },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.finished) {
-          toast.success("Curso finalizado! Podes gerar novos módulos ou rever aulas anteriores.");
-          return;
-        }
-
-        if (data.id) {
-          router.push(`/app/courses/watch?l=${data.id}&c=${course?.id}`)
-        } else {
-          toast.error("Não foi possível encontrar a próxima aula.");
-        }
+      const data = await apiRequest(`${process.env.NEXT_PUBLIC_API_URL}/courses/${course?.id}/get-next-lesson`);
+      if (data.finished) {
+        toast.success("Curso finalizado! Podes gerar novos módulos ou rever aulas anteriores.");
+        return;
       }
-    } catch (error) {
-      toast.error('Erro de conexão, aguarde.')
+
+      if (data.id) {
+        router.push(`/app/courses/watch?l=${data.id}&c=${course?.id}`)
+      } else {
+        toast.error("Não foi possível encontrar a próxima aula.");
+      }
+    } catch (error: any) {
+      toast.error(error.message || 'Erro de conexão, aguarde.')
     }
   }
 
   const handleDeleteCourse = async () => {
+    if (!window.confirm("Tem certeza que deseja eliminar este curso?")) return;
     try {
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/courses/${course?.id}`,
-        {
-          method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${session?.accessToken}`,
-          },
-        }
-      );
-      if (res.ok) {
-        router.replace('/app/courses')
-      }
-    } catch (e) {
-      toast.error("Erro de conexão");
+      await apiRequest(`${process.env.NEXT_PUBLIC_API_URL}/courses/${course?.id}`, {
+        method: "DELETE",
+      });
+      router.replace('/app/courses')
+    } catch (e: any) {
+      toast.error(e.message || "Erro ao eliminar curso");
     }
   };
 
   useEffect(() => {
-    if ((session as any)?.accessToken && params?.id) {
-      fetchCourse();
+    if (session?.accessToken && params?.id) {
       checkFinishment();
-      fetchClaims();
     }
   }, [session, params]);
 
