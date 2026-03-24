@@ -138,11 +138,7 @@ jobs:
         with:
           task-definition: frontend-task-def.json
           container-name: Main
-          image: $FRONTEND_IMAGE:latest
-
-      - name: Print image Test
-        run: |
-          echo "IMAGE=$BACKEND_IMAGE:latest"
+          image: ${{ env.FRONTEND_IMAGE }}:latest
 
       - name: Deploy Frontend AWS ECS task definition
         uses: aws-actions/amazon-ecs-deploy-task-definition@vv2.6.0
@@ -179,11 +175,7 @@ jobs:
         with:
           task-definition: backend-task-def.json
           container-name: Main
-          image: $BACKEND_IMAGE:latest
-
-      - name: Print image Test
-        run: |
-          echo "IMAGE=$BACKEND_IMAGE:latest"
+          image: ${{ env.BACKEND_IMAGE }}:latest
 
       - name: Deploy Backend AWS ECS task definition
         uses: aws-actions/amazon-ecs-deploy-task-definition@v2.6.0
