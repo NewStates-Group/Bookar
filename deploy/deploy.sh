@@ -1,23 +1,34 @@
 #!/bin/bash
 set -e
 
-# Logar no Docker (se precisar)
-# echo $DOCKER_PASSWORD | docker login -u $DOCKER_USERNAME --password-stdin
-
-echo "Stopping containers..."
-docker compose down --remove-orphans
-
-echo "Cleaning unused Docker resources..."
-docker system prune -af
-docker builder prune -af
-
 echo "Pulling images..."
 docker compose pull
 
-echo "Starting containers..."
-docker compose up -d --build
+echo "Rebuilding..."
+docker compose build
 
-echo "Restarting Nginx"
+echo "Updating workers one by one..."
+
+workers=$(docker ps --filter "name=worker" --format "{{.Names}}")
+
+for worker in $workers; do
+    echo "Updating $worker..."
+
+    docker stop $worker
+    docker rm $worker
+
+    docker compose up -d --no-deps --build worker
+
+    echo "Waiting before next worker..."
+    sleep 10
+done
+
+echo "Cleaning old Docker stuff..."
+docker image prune -f
+docker builder prune -f --filter "until=24h"
+
+
+echo "Reloading nginx..."
 sudo nginx -s reload
 
 echo "Deploy finished!"
