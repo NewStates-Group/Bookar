@@ -8,7 +8,6 @@ on:
 env:
   BACKEND_IMAGE: ${{ secrets.DOCKER_USERNAME }}/bookar-backend
   FRONTEND_IMAGE: ${{ secrets.DOCKER_USERNAME }}/bookar-frontend
-  ECS_CLUSTER: ${{ secrets.ECS_CLUSTER }}
 
 jobs:
   # test:
@@ -56,7 +55,7 @@ jobs:
       - name: Build frontend image
         run: |
           IMAGE_TAG=${{ github.sha }}
-          docker build -f ./frontend/Dockerfile.prod --build-arg NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL }} -t $FRONTEND_IMAGE:$IMAGE_TAG ./frontend
+          docker build -f ./frontend/Dockerfile.prod -t $FRONTEND_IMAGE:$IMAGE_TAG ./frontend
           docker tag $FRONTEND_IMAGE:$IMAGE_TAG $FRONTEND_IMAGE:latest
 
       - name: Push backend image
@@ -116,43 +115,43 @@ jobs:
       - name: Download backend task definition
         run: |
           aws ecs describe-task-definition --task-definition \
-          ${{ secrets.BACKEND_TASK_DEFINITION_FAMILY }} \
-          --query taskDefinition > ${{ secrets.BACKEND_TASK_DEFINITION }}
+          default-bookar-backend-cccb \
+          --query taskDefinition > backend-task-def.json
 
       - name: Download frontend task definition
         run: |
           aws ecs describe-task-definition --task-definition \
-          ${{ secrets.FRONTEND_TASK_DEFINITION_FAMILY }} \
-          --query taskDefinition > ${{ secrets.FRONTEND_TASK_DEFINITION }}
+          default-bookar-frontend-c69e \
+          --query taskDefinition > frontend-task-def.json
 
       - name: Update Backend Task Definition
         id: task-def-backend
         uses: aws-actions/amazon-ecs-render-task-definition@c804dfbdd57f713b6c079302a4c01db7017a36fc
         with:
-          task-definition: ${{ secrets.BACKEND_TASK_DEFINITION }}
-          container-name: ${{ secrets.BACKEND_CONTAINER_NAME }}
+          task-definition: backend-task-def.json
+          container-name: Main
           image: $BACKEND_IMAGE
       
       - name: Update Frontend Task Definition
         id: task-def-frontend
         uses: aws-actions/amazon-ecs-render-task-definition@c804dfbdd57f713b6c079302a4c01db7017a36fc
         with:
-          task-definition: ${{ secrets.FRONTEND_TASK_DEFINITION }}
-          container-name: ${{ secrets.FRONTEND_CONTAINER_NAME }}
+          task-definition: frontend-task-def.json
+          container-name: Main
           image: $FRONTEND_IMAGE
 
       - name: Deploy Backend Amazon ECS task definition
         uses: aws-actions/amazon-ecs-deploy-task-definition@df9643053eda01f169e64a0e60233aacca83799a
         with:
           task-definition: ${{ steps.task-def-backend.outputs.task-definition }}
-          service: ${{ secrets.BACKEND_ECS_SERVICE }}
-          cluster: ${{ secrets.ECS_CLUSTER }}
+          service: bookar-backend-cccb
+          cluster: default
           wait-for-service-stability: true
 
       - name: Deploy Frontend Amazon ECS task definition
         uses: aws-actions/amazon-ecs-deploy-task-definition@df9643053eda01f169e64a0e60233aacca83799a
         with:
           task-definition: ${{ steps.task-def-frontend.outputs.task-definition }}
-          service: ${{ secrets.FRONTEND_ECS_SERVICE }}
-          cluster: ${{ secrets.ECS_CLUSTER }}
+          service: bookar-frontend-c69e
+          cluster: default
           wait-for-service-stability: true
