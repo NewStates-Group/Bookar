@@ -70,7 +70,7 @@ jobs:
           docker push $FRONTEND_IMAGE:$IMAGE_TAG
           docker push $FRONTEND_IMAGE:latest
           
-  deploy-worker:
+  deploy-vps-worker:
     needs: build-and-push
     runs-on: ubuntu-latest
 
@@ -97,8 +97,8 @@ jobs:
             ./deploy.sh
           "
 
-  deploy-worker:
-    needs: build-and-push
-    runs-on: ubuntu-latest
+  # deploy-backend-and-frotend-aws:
+  #   needs: deploy-vps-worker
+  #   runs-on: ubuntu-latest
 
-    steps:  
+  #   steps:  
