@@ -1,6 +1,5 @@
 services:
   worker:
-    container_name: "worker"
     image: ${BACKEND_IMAGE}
     env_file: ".env"
     entrypoint: "" 
