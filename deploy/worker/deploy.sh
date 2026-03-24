@@ -14,14 +14,9 @@ workers=("worker1" "worker2" "flower")
 for worker in "${workers[@]}"; do
     echo "Updating $worker..."
 
-    if ! docker compose config --services | grep -q "^$worker$"; then
-        echo "$worker not in compose, skipping..."
-        continue
-    fi
+    docker compose stop $worker 2>/dev/null || echo "not running"
 
-    docker compose stop $worker 2>/dev/null
-
-    docker rm -f $(docker ps -aq --filter "name=$worker") 2>/dev/null 
+    docker rm -f $(docker ps -aq --filter "name=$worker") 2>/dev/null || echo "Fail to remove" 
 
     docker compose up -d --no-deps --build $worker
 
