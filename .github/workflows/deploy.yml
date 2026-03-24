@@ -140,8 +140,12 @@ jobs:
           container-name: Main
           image: $FRONTEND_IMAGE:lastest
 
+      - name: Print image Test
+        run: |
+          echo "IMAGE=$BACKEND_IMAGE:latest"
+
       - name: Deploy Frontend AWS ECS task definition
-        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        uses: aws-actions/amazon-ecs-deploy-task-definition@vv2.6.0
         with:
           task-definition: ${{ steps.task-def-frontend.outputs.task-definition }}
           service: bookar-frontend-c69e
@@ -175,10 +179,14 @@ jobs:
         with:
           task-definition: backend-task-def.json
           container-name: Main
-          image: $BACKEND_IMAGE:lastest
+          image: $BACKEND_IMAGE:latest
+
+      - name: Print image Test
+        run: |
+          echo "IMAGE=$BACKEND_IMAGE:latest"
 
       - name: Deploy Backend AWS ECS task definition
-        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2.6.0
         with:
           task-definition: ${{ steps.task-def-backend.outputs.task-definition }}
           service: bookar-backend-cccb
