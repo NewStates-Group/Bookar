@@ -9,7 +9,7 @@ docker compose build
 
 echo "Updating workers one by one..."
 
-workers=$(docker ps --filter "name=worker" --format "{{.Names}}")
+workers=$(docker ps --filter "name=w" --format "{{.Names}}")
 
 for worker in $workers; do
     echo "Updating $worker..."
