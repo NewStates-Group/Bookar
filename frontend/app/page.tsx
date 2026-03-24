@@ -126,7 +126,6 @@ export default function HomePage() {
       });
 
       if (response.ok) {
-        toast.success("Inscrito na lista de espera! Avisaremos em breve.");
         setEmail("");
         setWaitingCount(prev => prev + 1);
         setIsSubscribed(true);
