@@ -19,9 +19,9 @@ for worker in "${workers[@]}"; do
         continue
     fi
 
-    docker compose stop $worker 2>/dev/null || echo "$worker not running"
+    docker compose stop $worker 2>/dev/null
 
-    docker rm -f $(docker ps -aq --filter "name=$worker") 2>/dev/null || true
+    docker rm -f $(docker ps -aq --filter "name=$worker") 2>/dev/null 
 
     docker compose up -d --no-deps --build $worker
 
@@ -29,14 +29,10 @@ for worker in "${workers[@]}"; do
 done
 
 echo "Cleaning old Docker stuff..."
-docker image prune -f || true
-docker builder prune -f --filter "until=24h" || true
+docker image prune -f
+docker builder prune -f --filter "until=24h"
 
 echo "Reloading nginx..."
-if command -v nginx >/dev/null 2>&1; then
-    sudo nginx -s reload || echo "Falha ao recarregar nginx"
-else
-    echo "nginx não está instalado"
-fi
+sudo nginx -s reload
 
 echo "Deploy finished!"
