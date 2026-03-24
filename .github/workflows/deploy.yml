@@ -140,7 +140,7 @@ jobs:
           container-name: Main
           image: $FRONTEND_IMAGE
 
-      - name: Deploy Backend Amazon ECS task definition
+      - name: Deploy Backend AWS ECS task definition
         uses: aws-actions/amazon-ecs-deploy-task-definition@df9643053eda01f169e64a0e60233aacca83799a
         with:
           task-definition: ${{ steps.task-def-backend.outputs.task-definition }}
@@ -148,7 +148,7 @@ jobs:
           cluster: default
           wait-for-service-stability: true
 
-      - name: Deploy Frontend Amazon ECS task definition
+      - name: Deploy Frontend AWS ECS task definition
         uses: aws-actions/amazon-ecs-deploy-task-definition@df9643053eda01f169e64a0e60233aacca83799a
         with:
           task-definition: ${{ steps.task-def-frontend.outputs.task-definition }}
