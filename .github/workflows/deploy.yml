@@ -83,7 +83,6 @@ jobs:
           IMAGE_TAG=${{ github.sha }}
           docker push $FRONTEND_IMAGE:$IMAGE_TAG
           docker push $FRONTEND_IMAGE:latest
-        
 
   deploy-vps-worker:
     needs: [build-and-push-frontend, build-and-push-backend]

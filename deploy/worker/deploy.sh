@@ -9,24 +9,23 @@ docker compose build
 
 echo "Updating workers one by one..."
 
-workers=$(docker ps --filter "name=w" --format "{{.Names}}")
+workers=("worker1" "worker2" "flower")
 
-for worker in $workers; do
+for worker in "${workers[@]}"; do
     echo "Updating $worker..."
 
-    docker stop $worker
+    docker compose stop $worker
     docker rm $worker
 
-    docker compose up -d --no-deps --build worker
+    docker compose up -d --no-deps --build $worker
 
-    echo "Waiting before next worker..."
+    echo "Waiting before next service..."
     sleep 10
 done
 
 echo "Cleaning old Docker stuff..."
 docker image prune -f
 docker builder prune -f --filter "until=24h"
-
 
 echo "Reloading nginx..."
 sudo nginx -s reload
