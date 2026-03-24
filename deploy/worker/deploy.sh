@@ -18,7 +18,7 @@ for worker in "${workers[@]}"; do
 
     docker rm -f $(docker ps -aq --filter "name=$worker") 2>/dev/null || echo "Fail to remove" 
 
-    docker compose up -d --no-deps --build $worker
+    docker compose up -d --build $worker
 
     sleep 5
 done
