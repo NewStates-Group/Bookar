@@ -138,7 +138,7 @@ jobs:
         with:
           task-definition: frontend-task-def.json
           container-name: Main
-          image: $FRONTEND_IMAGE
+          image: $FRONTEND_IMAGE:lastest
 
       - name: Deploy Frontend AWS ECS task definition
         uses: aws-actions/amazon-ecs-deploy-task-definition@v2
@@ -175,7 +175,7 @@ jobs:
         with:
           task-definition: backend-task-def.json
           container-name: Main
-          image: $BACKEND_IMAGE
+          image: $BACKEND_IMAGE:lastest
 
       - name: Deploy Backend AWS ECS task definition
         uses: aws-actions/amazon-ecs-deploy-task-definition@v2
