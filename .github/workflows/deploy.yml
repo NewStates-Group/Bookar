@@ -84,8 +84,8 @@ jobs:
           docker push $FRONTEND_IMAGE:$IMAGE_TAG
           docker push $FRONTEND_IMAGE:latest
 
-  deploy-vps-worker:
-    needs: [build-and-push-frontend, build-and-push-backend]
+  deploy-worker:
+    needs: build-and-push-backend
     runs-on: ubuntu-latest
 
     steps:
@@ -111,8 +111,8 @@ jobs:
             ./deploy.sh
           "
 
-  deploy-frotend-aws:
-    needs: deploy-vps-worker
+  deploy-frotend:
+    needs: build-and-push-frontend
     runs-on: ubuntu-latest
 
     steps:  
@@ -148,8 +148,8 @@ jobs:
           cluster: default
           wait-for-service-stability: true
 
-  deploy-backend-aws:
-    needs: deploy-vps-worker
+  deploy-backend:
+    needs: build-and-push-backend
     runs-on: ubuntu-latest
 
     steps:  
