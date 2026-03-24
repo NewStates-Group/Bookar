@@ -125,7 +125,7 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
-    
+
       - name: Download frontend task definition
         run: |
           aws ecs describe-task-definition --task-definition \
@@ -141,7 +141,7 @@ jobs:
           image: $FRONTEND_IMAGE
 
       - name: Deploy Frontend AWS ECS task definition
-        uses: aws-actions/amazon-ecs-deploy-task-definition@df9643053eda01f169e64a0e60233aacca83799a
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
         with:
           task-definition: ${{ steps.task-def-frontend.outputs.task-definition }}
           service: bookar-frontend-c69e
@@ -178,7 +178,7 @@ jobs:
           image: $BACKEND_IMAGE
 
       - name: Deploy Backend AWS ECS task definition
-        uses: aws-actions/amazon-ecs-deploy-task-definition@df9643053eda01f169e64a0e60233aacca83799a
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
         with:
           task-definition: ${{ steps.task-def-backend.outputs.task-definition }}
           service: bookar-backend-cccb
