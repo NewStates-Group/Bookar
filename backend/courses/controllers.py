@@ -17,6 +17,7 @@ from .schemas import (
     CourseShareOut,
     ShareClaimOut,
     ShareClaimListOut,
+    ModuleMaterialSchema,
 )
 from .services import CourseService, LessonService
 
@@ -93,6 +94,10 @@ class CourseController:
     @route.get("{course_id}/claims", response=List[ShareClaimListOut])
     def get_course_claims(self, request, course_id: str):
         return self.course_service.get_course_claims(request.user, course_id)
+
+    @route.get("module-material/{module_id}", response=ModuleMaterialSchema)
+    def get_module_material(self, request, module_id: str):
+        return self.course_service.get_module_material(request.user, module_id)
 
 
 @api_controller("lessons", tags=["Lesson"], auth=JWTAuth())

@@ -28,7 +28,7 @@ from PIL import Image, ImageDraw, UnidentifiedImageError
 
 from core.utils import send_user_update
 from .exceptions import LessonDoesNotExist, ThumbnailCreationError
-from .models import Choice, Course, Lesson, Module, Question, Quiz, CourseGenerationContext
+from .models import Choice, Course, Lesson, Module, ModuleMaterial, Question, Quiz, CourseGenerationContext
 from .utils import (
     extract_json,
     get_genai_client,
@@ -474,6 +474,8 @@ def generate_next_module(self, user_pk: int, course_pk: int, module_pk: int = No
                 
         # Generate module quiz
         generate_module_quiz.delay(module_object.id, user_pk)
+        # Generate module study material PDF
+        generate_module_material.delay(module_object.id)
 
     except Exception as e:
         if module_pk:
@@ -559,7 +561,167 @@ def generate_module_quiz(module_id: int, user_id: int = None):
         logger.info(f"Quiz generated for module {module_id}")
 
     except Exception as e:
-        logger.error(f"Module quiz generation failed: {e}") 
+        logger.error(f"Module quiz generation failed: {e}")
+
+
+@shared_task(autoretry_for=(Exception,), retry_backoff=True, retry_kwargs={'max_retries': 3}, default_retry_delay=40)
+def generate_module_material(module_id: int):
+    """Generate a PDF study material for a module using its lessons content."""
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib import colors
+    from reportlab.lib.units import cm
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.enums import TA_LEFT, TA_CENTER
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, HRFlowable, PageBreak
+    from io import BytesIO
+
+    module = Module.objects.filter(pk=module_id).select_related("course").prefetch_related("lessons").first()
+    if not module:
+        logger.error(f"generate_module_material: Module {module_id} not found")
+        return
+
+    # Create or get existing material record
+    material, _ = ModuleMaterial.objects.get_or_create(
+        module=module,
+        defaults={"status": "PROCESSING"}
+    )
+    material.status = "PROCESSING"
+    material.save(update_fields=["status"])
+
+    try:
+        buffer = BytesIO()
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=A4,
+            rightMargin=2 * cm,
+            leftMargin=2 * cm,
+            topMargin=2 * cm,
+            bottomMargin=2 * cm,
+        )
+
+        styles = getSampleStyleSheet()
+
+        # ── Custom styles ────────────────────────────────────────────
+        cover_title_style = ParagraphStyle(
+            "CoverTitle",
+            parent=styles["Title"],
+            fontSize=28,
+            leading=34,
+            textColor=colors.HexColor("#0F172A"),
+            spaceAfter=12,
+            alignment=TA_CENTER,
+        )
+        cover_subtitle_style = ParagraphStyle(
+            "CoverSubtitle",
+            parent=styles["Normal"],
+            fontSize=14,
+            leading=18,
+            textColor=colors.HexColor("#64748B"),
+            alignment=TA_CENTER,
+            spaceAfter=6,
+        )
+        lesson_title_style = ParagraphStyle(
+            "LessonTitle",
+            parent=styles["Heading2"],
+            fontSize=16,
+            leading=20,
+            textColor=colors.HexColor("#1E40AF"),
+            spaceBefore=16,
+            spaceAfter=6,
+        )
+        body_style = ParagraphStyle(
+            "Body",
+            parent=styles["Normal"],
+            fontSize=11,
+            leading=16,
+            textColor=colors.HexColor("#1E293B"),
+            spaceAfter=8,
+        )
+        label_style = ParagraphStyle(
+            "Label",
+            parent=styles["Normal"],
+            fontSize=10,
+            leading=14,
+            textColor=colors.HexColor("#475569"),
+            fontName="Helvetica-Bold",
+            spaceAfter=4,
+        )
+        keypoint_style = ParagraphStyle(
+            "KeyPoint",
+            parent=styles["Normal"],
+            fontSize=11,
+            leading=16,
+            textColor=colors.HexColor("#0F172A"),
+            leftIndent=12,
+            bulletIndent=0,
+            spaceAfter=4,
+        )
+
+        story = []
+
+        # ── Cover Page ──────────────────────────────────────────────
+        story.append(Spacer(1, 3 * cm))
+        story.append(Paragraph("Material de Estudo", cover_subtitle_style))
+        story.append(Spacer(1, 0.5 * cm))
+        story.append(Paragraph(module.name or "Módulo", cover_title_style))
+        story.append(Spacer(1, 0.4 * cm))
+        story.append(HRFlowable(width="80%", thickness=2, color=colors.HexColor("#1E40AF"), hAlign="CENTER"))
+        story.append(Spacer(1, 0.4 * cm))
+        if module.desc:
+            story.append(Paragraph(module.desc, cover_subtitle_style))
+        story.append(Spacer(1, 0.6 * cm))
+        story.append(Paragraph(f"Curso: {module.course.title or ''}", cover_subtitle_style))
+        story.append(Spacer(1, 0.3 * cm))
+        story.append(Paragraph("bookar.study", cover_subtitle_style))
+        story.append(PageBreak())
+
+        # ── One section per lesson ───────────────────────────────────
+        lessons = module.lessons.all().order_by("id")
+        for lesson in lessons:
+            story.append(Paragraph(lesson.title, lesson_title_style))
+            story.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor("#CBD5E1")))
+            story.append(Spacer(1, 0.2 * cm))
+
+            if lesson.desc:
+                story.append(Paragraph(lesson.desc, body_style))
+
+            if lesson.key_points:
+                story.append(Spacer(1, 0.3 * cm))
+                story.append(Paragraph("Pontos-Chave", label_style))
+                for kp in lesson.key_points.split(","):
+                    kp = kp.strip()
+                    if kp:
+                        story.append(Paragraph(f"• {kp}", keypoint_style))
+
+            if lesson.narration:
+                story.append(Spacer(1, 0.3 * cm))
+                story.append(Paragraph("Conteúdo", label_style))
+                # Truncate very long narrations to avoid bloated PDFs
+                narration_text = lesson.narration[:2000]
+                if len(lesson.narration) > 2000:
+                    narration_text += "..."
+                story.append(Paragraph(narration_text, body_style))
+
+            story.append(Spacer(1, 0.5 * cm))
+
+        doc.build(story)
+        buffer.seek(0)
+
+        pdf_filename = f"module_{module_id}_{module.course_id}.pdf"
+        material.pdf_file.save(
+            pdf_filename,
+            ContentFile(buffer.read(), name=pdf_filename),
+            save=False,
+        )
+        material.status = "READY"
+        material.save()
+        logger.info(f"Module material PDF generated for module {module_id}")
+
+    except Exception as e:
+        logger.error(f"generate_module_material failed for module {module_id}: {e}")
+        material.status = "FAILED"
+        material.save(update_fields=["status"])
+        raise
 
 
 

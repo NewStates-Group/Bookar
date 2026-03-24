@@ -36,6 +36,12 @@ class ModuleStatus(models.TextChoices):
     CANCELLED = "CANCELLED", "Cancelado"
 
 
+class ModuleMaterialStatus(models.TextChoices):
+    PROCESSING = "PROCESSING", "Processando"
+    READY = "READY", "Pronto"
+    FAILED = "FAILED", "Falhou"
+
+
 class CourseLevel(models.TextChoices):
     BEGINNER = "B", "Beginner"
     INTERMEDIATE = "IT", "Intermediate"
@@ -291,3 +297,24 @@ class CourseShareClaim(models.Model):
 
     def __str__(self):
         return f"Claim: {self.recipient} ← {self.share.token}"
+
+
+class ModuleMaterial(models.Model):
+    module = models.OneToOneField(
+        Module, on_delete=models.CASCADE, related_name="material"
+    )
+    pdf_file = models.FileField(
+        upload_to="courses/materials/",
+        null=True,
+        blank=True,
+        storage=RawMediaCloudinaryStorage(),
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=ModuleMaterialStatus.choices,
+        default=ModuleMaterialStatus.PROCESSING,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Material: {self.module.name}"

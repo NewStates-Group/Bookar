@@ -399,6 +399,29 @@ class CourseService:
             } for c in claims
         ]
 
+    def get_module_material(self, user, module_id: str) -> dict:
+        from .models import ModuleMaterial
+        try:
+            module = Module.objects.get(uuid=module_id)
+        except Module.DoesNotExist:
+            raise HttpError(404, "Módulo não encontrado")
+
+        # Verify user is enrolled
+        if not CourseEnrollment.objects.filter(course=module.course, user=user, deleted=False).exists():
+            raise HttpError(403, "Sem acesso a este módulo")
+
+        try:
+            mat = module.material
+            pdf_url = None
+            if mat.status == "READY" and mat.pdf_file:
+                try:
+                    pdf_url = mat.pdf_file.url
+                except Exception:
+                    pdf_url = None
+            return {"status": mat.status, "pdf_url": pdf_url}
+        except Exception:
+            return {"status": "PROCESSING", "pdf_url": None}
+
 
 class LessonService:
     def get_lesson(self, user, lesson_id: str):

@@ -3,7 +3,7 @@
 import { useSession } from "next-auth/react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Loader2, ArrowRight, ChevronLeft, ChevronRight, HelpCircle, X, Menu, ArrowLeft, Award, FileDown } from "lucide-react";
+import { Loader2, ArrowRight, ChevronLeft, ChevronRight, HelpCircle, X, Menu, ArrowLeft, Award, FileDown, FileText, ExternalLink } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
 import { toast } from "sonner";
 import { CourseWatchSidebar } from "@/components/course-sidebar";
@@ -21,6 +21,8 @@ export interface Module {
     quiz_id?: string;
     last_quiz_score?: number;
     last_quiz_passed?: boolean;
+    material_status?: string;
+    material_pdf_url?: string;
 }
 
 export interface CourseData {
@@ -65,6 +67,8 @@ export default function WatchPage() {
     const [previousLesson, setPreviousLesson] = useState<Lesson | null>(null)
     const [nextLesson, setNextLesson] = useState<Lesson | null>(null)
     const [nextQuiz, setNextQuiz] = useState<{ id: string, moduleId: string } | null>(null)
+    const [materialSidebarOpen, setMaterialSidebarOpen] = useState(false);
+    const [activeMaterialUrl, setActiveMaterialUrl] = useState<string | null>(null);
 
     const { addListener } = useWebSocket();
 
@@ -385,6 +389,53 @@ export default function WatchPage() {
                                         />
                                     </div>
                                 )}
+
+                                {/* Materials Section */}
+                                {viewMode === "video" && (() => {
+                                    const currentModule = course?.modules.find(m =>
+                                        m.lessons.some(l => l.id === lesson?.id)
+                                    );
+                                    if (!currentModule) return null;
+                                    return (
+                                        <div className="w-full max-w-5xl mt-6">
+                                            <div className="flex items-center gap-2 mb-3">
+                                                <FileText className="w-5 h-5 text-primary" />
+                                                <h3 className="text-base font-semibold text-foreground">Materiais</h3>
+                                            </div>
+                                            <div className="flex items-center gap-3 p-4 rounded-xl border border-border bg-card hover:bg-muted/50 transition-colors">
+                                                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                                                    <FileText className="w-5 h-5 text-primary" />
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="font-medium text-foreground text-sm truncate">{currentModule.name}</p>
+                                                    <p className="text-xs text-foreground/50 mt-0.5">
+                                                        {currentModule.material_status === "READY" ? "Material de estudo disponível" :
+                                                            currentModule.material_status === "PROCESSING" ? "A gerar material..." :
+                                                                currentModule.material_status === "FAILED" ? "Erro ao gerar material" :
+                                                                    "A preparar..."}
+                                                    </p>
+                                                </div>
+                                                {currentModule.material_status === "READY" && currentModule.material_pdf_url ? (
+                                                    <button
+                                                        onClick={() => {
+                                                            setActiveMaterialUrl(currentModule.material_pdf_url!);
+                                                            setMaterialSidebarOpen(true);
+                                                        }}
+                                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors flex-shrink-0"
+                                                    >
+                                                        <FileText className="w-3.5 h-3.5" />
+                                                        Ver PDF
+                                                    </button>
+                                                ) : currentModule.material_status === "PROCESSING" || !currentModule.material_status ? (
+                                                    <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-muted text-foreground/50 text-xs font-medium flex-shrink-0">
+                                                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                                        A gerar
+                                                    </span>
+                                                ) : null}
+                                            </div>
+                                        </div>
+                                    );
+                                })()}
                             </div>
                         )}
                     </div>
@@ -421,6 +472,52 @@ export default function WatchPage() {
                             <Button onClick={() => { setShowQuestionsModal(false); toast.success("Dúvida enviada com sucesso!"); }} className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground">
                                 Enviar
                             </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* PDF Material Sidebar */}
+            {materialSidebarOpen && activeMaterialUrl && (
+                <div className="fixed inset-y-0 right-0 z-[120] flex">
+                    {/* Backdrop */}
+                    <div
+                        className="fixed inset-0 bg-black/30"
+                        onClick={() => setMaterialSidebarOpen(false)}
+                    />
+                    {/* Panel */}
+                    <div className="relative ml-auto w-full max-w-2xl h-full bg-card border-l border-border flex flex-col shadow-2xl">
+                        {/* Header */}
+                        <div className="flex items-center justify-between px-4 py-3 border-b border-border flex-shrink-0">
+                            <div className="flex items-center gap-2">
+                                <FileText className="w-5 h-5 text-primary" />
+                                <span className="font-semibold text-foreground text-sm">Material do Módulo</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <a
+                                    href={activeMaterialUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+                                >
+                                    <ExternalLink className="w-3.5 h-3.5" />
+                                    Abrir
+                                </a>
+                                <button
+                                    onClick={() => setMaterialSidebarOpen(false)}
+                                    className="p-1.5 rounded-lg hover:bg-muted transition-colors text-foreground/60 hover:text-foreground"
+                                >
+                                    <X className="w-5 h-5" />
+                                </button>
+                            </div>
+                        </div>
+                        {/* PDF iframe */}
+                        <div className="flex-1 overflow-hidden">
+                            <iframe
+                                src={activeMaterialUrl}
+                                className="w-full h-full border-0"
+                                title="Material do Módulo"
+                            />
                         </div>
                     </div>
                 </div>

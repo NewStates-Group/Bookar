@@ -5,7 +5,7 @@ from ninja import ModelSchema, Schema
 from ninja.orm import create_schema
 from pydantic import Field
 
-from .models import Choice, Course, CourseEnrollment, CourseLevel, Lesson, Module, Question, Quiz, CourseShare, CourseShareClaim
+from .models import Choice, Course, CourseEnrollment, CourseLevel, Lesson, Module, ModuleMaterial, Question, Quiz, CourseShare, CourseShareClaim
 
 import logging
 
@@ -155,6 +155,8 @@ class ModuleDetailSchema(ModuleSchema):
     quiz_title: Optional[str] = None
     last_quiz_score: Optional[float] = None
     last_quiz_passed: Optional[bool] = None
+    material_status: Optional[str] = None
+    material_pdf_url: Optional[str] = None
 
     @staticmethod
     def resolve_quiz_id(obj):
@@ -171,6 +173,23 @@ class ModuleDetailSchema(ModuleSchema):
     @staticmethod
     def resolve_last_quiz_passed(obj):
         return getattr(obj, "_last_quiz_passed", None)
+
+    @staticmethod
+    def resolve_material_status(obj):
+        try:
+            return obj.material.status
+        except Exception:
+            return None
+
+    @staticmethod
+    def resolve_material_pdf_url(obj):
+        try:
+            mat = obj.material
+            if mat.status == "READY" and mat.pdf_file:
+                return mat.pdf_file.url
+        except Exception:
+            pass
+        return None
 
     id: str = None
 
@@ -274,3 +293,8 @@ class ShareClaimOut(Schema):
 class ShareClaimListOut(Schema):
     recipient_name: str
     claimed_at: datetime
+
+
+class ModuleMaterialSchema(Schema):
+    status: str
+    pdf_url: Optional[str] = None
