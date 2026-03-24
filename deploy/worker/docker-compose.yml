@@ -17,4 +17,4 @@ services:
     entrypoint: "" 
     ports:
       - "5555:5555"
-    command: sh -c "celery -A core --broker=${REDIS_URL} flower --address=0.0.0.0 --port=5555 --basic-auth=${FLOWER_USER}:${FLOWER_PASSWORD}"
+    command: sh -c "celery -A core -b ${REDIS_URL} flower --address=0.0.0.0 --port=5555 --basic-auth=${FLOWER_USER}:${FLOWER_PASSWORD}"
