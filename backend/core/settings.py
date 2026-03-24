@@ -133,8 +133,8 @@ CLOUDINARY_STORAGE = {
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-CELERY_BROKER_URL = env("REDIS_URL") + "?ssl_cert_reqs=CERT_NONE"
-CELERY_RESULT_BACKEND = env("REDIS_URL") + "?ssl_cert_reqs=CERT_NONE"
+CELERY_BROKER_URL = env.str("REDIS_URL") + "?ssl_cert_reqs=CERT_NONE"
+CELERY_RESULT_BACKEND = env.str("REDIS_URL") + "?ssl_cert_reqs=CERT_NONE"
 CELERY_TIMEZONE = TIME_ZONE
 
 CORS_ALLOW_CREDENTIALS = True
