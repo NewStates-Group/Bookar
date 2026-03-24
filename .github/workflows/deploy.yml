@@ -8,6 +8,7 @@ on:
 env:
   BACKEND_IMAGE: ${{ secrets.DOCKER_USERNAME }}/bookar-backend
   FRONTEND_IMAGE: ${{ secrets.DOCKER_USERNAME }}/bookar-frontend
+  ECS_CLUSTER: ${{ secrets.ECS_CLUSTER }}
 
 jobs:
   # test:
@@ -87,7 +88,7 @@ jobs:
 
       - name: Syncronize files
         run: |
-          rsync -avz vps/ ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:~/Bookar/
+          rsync -avz vps/worker/ ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:~/Bookar/
 
       - name: Run deploy
         run: |
@@ -97,8 +98,61 @@ jobs:
             ./deploy.sh
           "
 
-  # deploy-backend-and-frotend-aws:
-  #   needs: deploy-vps-worker
-  #   runs-on: ubuntu-latest
+  deploy-backend-and-frotend-aws:
+    needs: deploy-vps-worker
+    runs-on: ubuntu-latest
 
-  #   steps:  
+    steps:  
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@0e613a0980cbf65ed5b322eb7a1e075d28913a83
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      
+      - name: Download backend task definition
+        run: |
+          aws ecs describe-task-definition --task-definition \
+          ${{ secrets.BACKEND_TASK_DEFINITION_FAMILY }} \
+          --query taskDefinition > ${{ secrets.BACKEND_TASK_DEFINITION }}
+
+      - name: Download frontend task definition
+        run: |
+          aws ecs describe-task-definition --task-definition \
+          ${{ secrets.FRONTEND_TASK_DEFINITION_FAMILY }} \
+          --query taskDefinition > ${{ secrets.FRONTEND_TASK_DEFINITION }}
+
+      - name: Update Backend Task Definition
+        id: task-def-backend
+        uses: aws-actions/amazon-ecs-render-task-definition@c804dfbdd57f713b6c079302a4c01db7017a36fc
+        with:
+          task-definition: ${{ secrets.BACKEND_TASK_DEFINITION }}
+          container-name: ${{ secrets.BACKEND_CONTAINER_NAME }}
+          image: $BACKEND_IMAGE
+      
+      - name: Update Frontend Task Definition
+        id: task-def-frontend
+        uses: aws-actions/amazon-ecs-render-task-definition@c804dfbdd57f713b6c079302a4c01db7017a36fc
+        with:
+          task-definition: ${{ secrets.FRONTEND_TASK_DEFINITION }}
+          container-name: ${{ secrets.FRONTEND_CONTAINER_NAME }}
+          image: $FRONTEND_IMAGE
+
+      - name: Deploy Backend Amazon ECS task definition
+        uses: aws-actions/amazon-ecs-deploy-task-definition@df9643053eda01f169e64a0e60233aacca83799a
+        with:
+          task-definition: ${{ steps.task-def-backend.outputs.task-definition }}
+          service: ${{ secrets.BACKEND_ECS_SERVICE }}
+          cluster: ${{ secrets.ECS_CLUSTER }}
+          wait-for-service-stability: true
+
+      - name: Deploy Frontend Amazon ECS task definition
+        uses: aws-actions/amazon-ecs-deploy-task-definition@df9643053eda01f169e64a0e60233aacca83799a
+        with:
+          task-definition: ${{ steps.task-def-frontend.outputs.task-definition }}
+          service: ${{ secrets.FRONTEND_ECS_SERVICE }}
+          cluster: ${{ secrets.ECS_CLUSTER }}
+          wait-for-service-stability: true
