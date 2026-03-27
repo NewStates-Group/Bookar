@@ -2,8 +2,6 @@ from typing import List
 
 from injector import inject
 from ninja_extra import api_controller, route
-from ninja_jwt.authentication import JWTAuth
-
 from .schemas import (
     CourseDetailSchema,
     CourseIn,
@@ -19,9 +17,10 @@ from .schemas import (
     ShareClaimListOut,
 )
 from .services import CourseService, LessonService
+from core.security import CookieJWTAuth, throttle
 
 
-@api_controller("courses", tags=["Course"], auth=JWTAuth())
+@api_controller("courses", tags=["Course"], auth=CookieJWTAuth())
 class CourseController:
     @inject
     def __init__(self, course_service: CourseService):
@@ -32,6 +31,7 @@ class CourseController:
         return self.course_service.list_courses(request.user)
 
     @route.post("", response=CourseOut)
+    @throttle(limit=2, period=3600)
     def create_course(self, request, data: CourseIn):
         return self.course_service.create_course(
             request.user, data.prompt, data.level, data.num_modules
@@ -55,6 +55,7 @@ class CourseController:
         return GetNextLessonSchema.from_orm(lesson)
 
     @route.post("{course_id}/generate-module")
+    @throttle(limit=5, period=3600)
     def generate_module(self, request, course_id: str):
         return self.course_service.trigger_next_module(request.user.pk, course_id)
 
@@ -95,7 +96,7 @@ class CourseController:
         return self.course_service.get_course_claims(request.user, course_id)
 
 
-@api_controller("lessons", tags=["Lesson"], auth=JWTAuth())
+@api_controller("lessons", tags=["Lesson"], auth=CookieJWTAuth())
 class LessonController:
     @inject
     def __init__(self, lesson_service: LessonService):

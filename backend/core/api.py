@@ -1,15 +1,18 @@
 from ninja_extra import NinjaExtraAPI
+from ninja_jwt.authentication import JWTAuth
 from ninja.errors import ValidationError as NinjaValidationError
 from pydantic import ValidationError as PydanticValidationError
 
 from accounts.controllers import AuthController
 from courses.controllers import CourseController, LessonController
+from core.security import CookieJWTAuth
 
 api = NinjaExtraAPI(
-    title="Bookar API",
+    title="Bookar API v1",
     description="The greatest AI based learning plataform",
     csrf=False,
-    version="0.0.1",
+    version="1.0.0",
+    auth=CookieJWTAuth(),
 )
 
 api.register_controllers(AuthController, CourseController, LessonController)

@@ -11,6 +11,8 @@ class RegisterIn(Schema):
     email: EmailStr
     password: str
     code: str
+    captcha_token: str | None = None
+    honeypot: str | None = None
 
     @field_validator("email", mode="after")
     @classmethod
@@ -84,3 +86,4 @@ class SendVerificationIn(Schema):
 
 class WaitlistEmailIn(Schema):
     email: EmailStr
+    captcha_token: str | None = None

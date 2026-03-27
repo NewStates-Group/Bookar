@@ -134,7 +134,17 @@ export function FloatingNavbar() {
                         </DropdownMenuItem> */}
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
-                            onClick={() => signOut({ callbackUrl: "/login" })}
+                            onClick={async () => {
+                                try {
+                                    await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/logout`, {
+                                        method: "POST",
+                                        credentials: "include"
+                                    });
+                                } catch (e) {
+                                    console.error("Backend logout failed", e);
+                                }
+                                signOut({ callbackUrl: "/login" });
+                            }}
                             className="cursor-pointer text-red-500 focus:text-red-500 flex items-center gap-2"
                         >
                             <LogOut className="w-4 h-4" />

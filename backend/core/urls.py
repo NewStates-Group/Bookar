@@ -10,5 +10,5 @@ def healthcheck(request):
 
 urlpatterns = [
     path("healthcheck/", healthcheck),
-    path("api/", api.urls),
+    path("api/v1/", api.urls),
 ]

@@ -13,6 +13,8 @@ env = environ.Env(
     CLOUDINARY_CLOUD_NAME=(str, ""),
     CLOUDINARY_API_KEY=(str, ""),
     CLOUDINARY_API_SECRET=(str, ""),
+    TURNSTILE_SITE_KEY=(str, ""),
+    TURNSTILE_SECRET_KEY=(str, ""),
 )
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -159,3 +161,23 @@ EMAIL_USE_TLS = True
 EMAIL_HOST_USER = "newstates.bookar@gmail.com"
 EMAIL_HOST_PASSWORD = env("EMAIL_PASSWORD")
 DEFAULT_FROM_EMAIL = f"Bookar <{EMAIL_HOST_USER}>"
+
+# Security Hardening
+SECURE_BROWSER_XSS_FILTER = True
+SECURE_CONTENT_TYPE_NOSNIFF = True
+X_FRAME_OPTIONS = 'DENY'
+CSP_DEFAULT_SRC = ("'self'",)
+CSP_SCRIPT_SRC = ("'self'", "https://static.cloudflareinsights.com", "https://challenges.cloudflare.com")
+CSP_CONNECT_SRC = ("'self'", "https://cloudflareinsights.com")
+CSP_STYLE_SRC = ("'self'", "'unsafe-inline'")
+CSP_IMG_SRC = ("'self'", "data:", "https://res.cloudinary.com")
+CSP_FONT_SRC = ("'self'", "data:")
+
+DATA_UPLOAD_MAX_MEMORY_SIZE = 5242880  # 5MB
+FILE_UPLOAD_MAX_MEMORY_SIZE = 5242880
+
+SESSION_COOKIE_HTTPONLY = True
+CSRF_COOKIE_HTTPONLY = True
+SECURE_SSL_REDIRECT = not DEBUG
+SESSION_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SECURE = not DEBUG

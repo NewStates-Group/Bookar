@@ -33,7 +33,9 @@ export default function ShareLandingPage() {
     useEffect(() => {
         const fetchShareInfo = async () => {
             try {
-                const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/courses/share/${token}`);
+                const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/courses/share/${token}`, {
+                    credentials: "include"
+                });
                 if (res.ok) {
                     const data = await res.json();
                     setShareInfo(data);
@@ -63,6 +65,7 @@ export default function ShareLandingPage() {
                         headers: {
                             Authorization: `Bearer ${(session as any)?.accessToken}`,
                         },
+                        credentials: "include",
                     });
 
                     if (res.ok) {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Turnstile } from "@marsidev/react-turnstile";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -31,6 +32,8 @@ export default function SignupPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
+  const [captchaToken, setCaptchaToken] = useState("");
+  const [honeypot, setHoneypot] = useState("");
   const [step, setStep] = useState<"email" | "verification" | "details">("email");
   const [errors, setErrors] = useState<ValidationErrors>({});
   const [isLoading, setIsLoading] = useState(false);
@@ -58,6 +61,7 @@ export default function SignupPage() {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/check-email`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ email }),
       });
       const data = await res.json();
@@ -81,6 +85,7 @@ export default function SignupPage() {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/send-verification`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ email }),
       });
 
@@ -129,12 +134,15 @@ export default function SignupPage() {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/signup`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({
           first_name: firstName,
           last_name: lastName,
           email,
           password,
-          code
+          code,
+          captcha_token: captchaToken,
+          honeypot
         }),
       });
 
@@ -190,11 +198,11 @@ export default function SignupPage() {
           className="object-cover opacity-50"
           priority
         />
-          <Link
+        <Link
           href="/"
           className="absolute p-12 top-0 right-0 cursor-pointer z-50"
         >
-          <ChevronRight className="text-white" size={30}/>
+          <ChevronRight className="text-white" size={30} />
         </Link>
         <div className="relative z-20 text-white p-12 max-w-lg text-right">
           <motion.div
@@ -387,6 +395,25 @@ export default function SignupPage() {
                       <AlertCircle className="w-4 h-4" /> {errors.password[0]}
                     </p>
                   )}
+                </div>
+
+                {/* Honeypot field - hidden from users but visible to some bots */}
+                <div style={{ position: 'absolute', left: '-9999px', opacity: 0 }}>
+                  <input
+                    type="text"
+                    name="phone_number_alt"
+                    value={honeypot}
+                    onChange={(e) => setHoneypot(e.target.value)}
+                    tabIndex={-1}
+                    autoComplete="off"
+                  />
+                </div>
+
+                <div className="flex justify-center py-4">
+                  <Turnstile
+                    siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || ""}
+                    onSuccess={(token) => setCaptchaToken(token)}
+                  />
                 </div>
               </motion.div>
             )}

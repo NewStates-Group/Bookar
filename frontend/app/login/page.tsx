@@ -43,6 +43,7 @@ export default function LoginPage() {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/check-email`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ email }),
       });
       const data = await res.json();
@@ -99,6 +100,7 @@ export default function LoginPage() {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/password-reset/request`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ email }),
       });
 
@@ -188,7 +190,7 @@ export default function LoginPage() {
           href="/"
           className="absolute p-12 top-0 left-0 cursor-pointer z-50"
         >
-          <ChevronLeft className="text-white" size={30}/>
+          <ChevronLeft className="text-white" size={30} />
         </Link>
         <div className="relative z-20 text-white p-12 max-w-lg">
           <motion.div

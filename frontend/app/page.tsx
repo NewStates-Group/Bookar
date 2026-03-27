@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import Image from "next/image";
 import Link from "next/link";
 import { useState, useEffect } from "react";
+import { Turnstile } from "@marsidev/react-turnstile";
 import { motion, useSpring, useTransform, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { Sparkles, ArrowRight, Zap, Shield, Smartphone, PlayCircle } from "lucide-react";
@@ -88,6 +89,7 @@ export default function HomePage() {
   const [waitingCount, setWaitingCount] = useState(0);
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [isTimerComplete, setIsTimerComplete] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState("");
 
   useEffect(() => {
     const subscribed = localStorage.getItem("bookar_waitlist_subscribed");
@@ -98,7 +100,7 @@ export default function HomePage() {
     const fetchCount = async () => {
       try {
         const apiUrl = process.env.NEXT_PUBLIC_API_URL;
-        const response = await fetch(`${apiUrl}/auth/waitlist/count`);
+        const response = await fetch(`${apiUrl}/auth/waitlist/count`, { credentials: "include" });
         if (response.ok) {
           const data = await response.json();
           setWaitingCount(data.count);
@@ -122,7 +124,11 @@ export default function HomePage() {
       const response = await fetch(`${apiUrl}/auth/waitlist`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
+        credentials: "include",
+        body: JSON.stringify({
+          email,
+          captcha_token: captchaToken
+        }),
       });
 
       if (response.ok) {
@@ -197,22 +203,31 @@ export default function HomePage() {
                   </div>
 
                   {!isSubscribed ? (
-                    <form onSubmit={handleSubmit} className="w-full flex flex-col sm:flex-row gap-2 max-w-md">
-                      <Input
-                        type="email"
-                        placeholder="teu@email.com"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        required
-                        className="h-11 md:h-12 border-black/10 bg-neutral-50 rounded-xl px-4 text-base focus-visible:ring-black/5 focus-visible:border-black/20"
-                      />
-                      <Button
-                        type="submit"
-                        disabled={loading}
-                        className="h-11 md:h-12 bg-cyan-500 hover:bg-cyan-600 text-white font-bold px-8 rounded-xl shadow-sm transition-all"
-                      >
-                        {loading ? "..." : "Reservar Lugar"}
-                      </Button>
+                    <form onSubmit={handleSubmit} className="w-full flex flex-col gap-4 max-w-md">
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <Input
+                          type="email"
+                          placeholder="teu@email.com"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          required
+                          className="h-11 md:h-12 border-black/10 bg-neutral-50 rounded-xl px-4 text-base focus-visible:ring-black/5 focus-visible:border-black/20"
+                        />
+                        <Button
+                          type="submit"
+                          disabled={loading || !captchaToken}
+                          className="h-11 md:h-12 bg-cyan-500 hover:bg-cyan-600 text-white font-bold px-8 rounded-xl shadow-sm transition-all"
+                        >
+                          {loading ? "..." : "Reservar Lugar"}
+                        </Button>
+                      </div>
+
+                      <div className="flex justify-center scale-90 origin-top">
+                        <Turnstile
+                          siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || ""}
+                          onSuccess={(token) => setCaptchaToken(token)}
+                        />
+                      </div>
                     </form>
                   ) : (
                     <div className="bg-cyan-50 border border-cyan-100 rounded-2xl p-4 md:p-6 max-w-md w-full">
@@ -250,9 +265,9 @@ export default function HomePage() {
                   >
                     <div className="w-10 h-10 flex items-center justify-center border rounded-full">
 
-                    <svg className="w-8 h-8" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path>
-                    </svg>
+                      <svg className="w-8 h-8" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path>
+                      </svg>
                     </div>
                   </Link>
                 </div>

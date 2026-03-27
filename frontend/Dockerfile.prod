@@ -7,7 +7,7 @@ RUN npm ci --legacy-peer-deps
 
 COPY . .
 
-ENV NEXT_PUBLIC_API_URL=https://api.bookar.study/api
+ENV NEXT_PUBLIC_API_URL=https://api.bookar.study/api/v1
 ENV NEXT_PUBLIC_API_BASE_URL=https://api.bookar.study
 ENV NODE_ENV=production
 

@@ -9,6 +9,7 @@ async function getMe(accessToken: string) {
             Authorization: `Bearer ${accessToken}`,
             "Content-Type": "application/json",
         },
+        credentials: "include",
     });
 
     if (!res.ok) {
@@ -24,6 +25,7 @@ async function refreshAccessToken(token: any) {
         const res = await fetch(`${apiUrl}/auth/refresh`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
+            credentials: "include",
             body: JSON.stringify({
                 refresh: token.refreshToken,
             }),
@@ -81,6 +83,7 @@ export const authOptions: NextAuthOptions = {
                 const res = await fetch(`${apiUrl}/auth/pair`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
+                    credentials: "include",
                     body: JSON.stringify({
                         email: credentials.email,
                         password: credentials.password,
