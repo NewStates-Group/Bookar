@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ import { User, Mail, Lock, Loader2, ArrowRight, AlertCircle, ShieldCheck, Chevro
 import Link from "next/link";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
+import { Turnstile } from "next-turnstile";
 
 interface ValidationErrors {
   [key: string]: string[];
@@ -34,7 +35,22 @@ export default function SignupPage() {
   const [step, setStep] = useState<"email" | "verification" | "details">("email");
   const [errors, setErrors] = useState<ValidationErrors>({});
   const [isLoading, setIsLoading] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState("");
+  const [cooldown, setCooldown] = useState(0);
   const router = useRouter();
+
+  useEffect(() => {
+    if (cooldown > 0) {
+      const timer = setTimeout(() => setCooldown(cooldown - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [cooldown]);
+
+  const formatCooldown = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
+  };
 
   const validateEmail = () => {
     const newErrors: Record<string, string[]> = {};
@@ -62,6 +78,11 @@ export default function SignupPage() {
       });
       const data = await res.json();
 
+      if (res.status === 429) {
+        setCooldown(180);
+        return;
+      }
+
       if (!data.exists) {
         // Send verification code
         await handleSendVerification();
@@ -69,7 +90,6 @@ export default function SignupPage() {
         setErrors({ email: ["Este e-mail já está em uso."] });
       }
     } catch (error) {
-      toast.error("Erro ao verificar e-mail.");
     } finally {
       setIsLoading(false);
     }
@@ -87,6 +107,8 @@ export default function SignupPage() {
       if (res.ok) {
         toast.info("Código de verificação enviado!");
         setStep("verification");
+      } else if (res.status === 429) {
+        setCooldown(300); // 5 minutes for emails
       } else {
         toast.error("Erro ao enviar código de verificação.");
       }
@@ -134,13 +156,18 @@ export default function SignupPage() {
           last_name: lastName,
           email,
           password,
-          code
+          code,
+          token: turnstileToken
         }),
       });
 
       const data = await res.json();
 
       if (!res.ok) {
+        if (res.status === 429) {
+          setCooldown(180); // 3 minutes for signup
+          return;
+        }
         if (res.status === 422 && data.errors) {
           const newErrors: ValidationErrors = {};
           if (Array.isArray(data.errors)) {
@@ -190,11 +217,11 @@ export default function SignupPage() {
           className="object-cover opacity-50"
           priority
         />
-          <Link
+        <Link
           href="/"
           className="absolute p-12 top-0 right-0 cursor-pointer z-50"
         >
-          <ChevronRight className="text-white" size={30}/>
+          <ChevronRight className="text-white" size={30} />
         </Link>
         <div className="relative z-20 text-white p-12 max-w-lg text-right">
           <motion.div
@@ -257,6 +284,11 @@ export default function SignupPage() {
                     <AlertCircle className="w-4 h-4" /> {errors.email[0]}
                   </p>
                 )}
+                {cooldown > 0 && (
+                  <p className="text-sm text-red-500 mt-2 font-medium text-center">
+                    Muitas tentativas. Tenta novamente em {formatCooldown(cooldown)}
+                  </p>
+                )}
               </motion.div>
             )}
 
@@ -306,6 +338,11 @@ export default function SignupPage() {
                     </Button>
                   </div>
                 </div>
+                {cooldown > 0 && (
+                  <p className="text-sm text-red-500 mt-2 font-medium text-center">
+                    Muitas tentativas. Tenta novamente em {formatCooldown(cooldown)}
+                  </p>
+                )}
               </motion.div>
             )}
 
@@ -388,13 +425,27 @@ export default function SignupPage() {
                     </p>
                   )}
                 </div>
+
+                {cooldown > 0 && (
+                  <p className="text-sm text-red-500 mt-4 font-medium text-center">
+                    Muitas tentativas. Tenta novamente em {formatCooldown(cooldown)}
+                  </p>
+                )}
               </motion.div>
             )}
+
+            <div className="flex flex-col items-center gap-4 py-4">
+              <Turnstile
+                siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY!}
+                onVerify={(token) => setTurnstileToken(token)}
+                theme="light"
+              />
+            </div>
 
             <Button
               type="submit"
               className="w-full h-12 text-base font-medium group bg-cyan-500 hover:bg-cyan-600 text-white"
-              disabled={isLoading}
+              disabled={isLoading || !turnstileToken || cooldown > 0}
             >
               {isLoading ? (
                 <>

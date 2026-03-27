@@ -6,6 +6,7 @@ from asgiref.sync import sync_to_async
 
 User = get_user_model()
 
+
 class UserUpdateConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         # Authenticate using token from query string
@@ -40,4 +41,5 @@ class UserUpdateConsumer(AsyncWebsocketConsumer):
             return User.objects.get(pk=user_id)
         except Exception:
             from django.contrib.auth.models import AnonymousUser
+
             return AnonymousUser()

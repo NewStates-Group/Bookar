@@ -28,7 +28,15 @@ from PIL import Image, ImageDraw, UnidentifiedImageError
 
 from core.utils import send_user_update
 from .exceptions import LessonDoesNotExist, ThumbnailCreationError
-from .models import Choice, Course, Lesson, Module, Question, Quiz, CourseGenerationContext
+from .models import (
+    Choice,
+    Course,
+    Lesson,
+    Module,
+    Question,
+    Quiz,
+    CourseGenerationContext,
+)
 from .utils import (
     extract_json,
     get_genai_client,
@@ -37,6 +45,7 @@ from .utils import (
     invalidate_course_cache,
 )
 from django.core.cache import cache
+
 logger = logging.getLogger(__name__)
 
 
@@ -123,10 +132,12 @@ def _generate_image(client, prompt, output_path, timeout=30):
     try:
         img_prompt = f"Hand-drawn whiteboard animation style, minimalist black marker on white board: {prompt}. Any visible text MUST be in Portuguese."
         model_name = settings.AI.get("GENAI_MODEL_IMAGE", "gemini-2.5-flash-lite")
-        
+
         # Log the attempt
-        logger.info(f"Generating image with model {model_name} for prompt: {prompt[:50]}...")
-        
+        logger.info(
+            f"Generating image with model {model_name} for prompt: {prompt[:50]}..."
+        )
+
         response = safe_gemini_call(
             client.models.generate_content,
             model=model_name,
@@ -135,27 +146,31 @@ def _generate_image(client, prompt, output_path, timeout=30):
                 image_config=types.ImageConfig(aspect_ratio="16:9")
             ),
         )
-        
+
         if not response or not response.parts:
             raise ValueError("Empty response from Gemini")
-            
+
         for part in response.parts:
             if part.inline_data:
                 output_path.write_bytes(part.inline_data.data)
                 return True
             # Some versions might return just 'image' or similar, though SDK usually gives inline_data
-            if hasattr(part, 'image'):
-                 # Check if part.image is bytes or have .data
-                 data = part.image if isinstance(part.image, bytes) else getattr(part.image, 'data', None)
-                 if data:
-                     output_path.write_bytes(data)
-                     return True
+            if hasattr(part, "image"):
+                # Check if part.image is bytes or have .data
+                data = (
+                    part.image
+                    if isinstance(part.image, bytes)
+                    else getattr(part.image, "data", None)
+                )
+                if data:
+                    output_path.write_bytes(data)
+                    return True
         raise ValueError("No image part in response")
     except Exception as e:
         logger.warning(f"Image generation failed for '{prompt[:50]}...': {str(e)}")
         # If it's a BadRequest, it might be the config. Let's try once without image_config as a last resort
         if "BadRequest" in str(e) or "400" in str(e):
-             try:
+            try:
                 logger.info("Retrying without image_config...")
                 response = safe_gemini_call(
                     client.models.generate_content,
@@ -166,7 +181,7 @@ def _generate_image(client, prompt, output_path, timeout=30):
                     if part.inline_data:
                         output_path.write_bytes(part.inline_data.data)
                         return True
-             except Exception as retry_e:
+            except Exception as retry_e:
                 logger.warning(f"Retry without config also failed: {retry_e}")
 
         logger.info("Using fallback image.")
@@ -229,7 +244,13 @@ def _process_segment(i, segment, client, temp_dir):
     return video
 
 
-@shared_task(bind=True, autoretry_for=(Exception,), retry_backoff=True, retry_kwargs={'max_retries': 3}, default_retry_delay=40)
+@shared_task(
+    bind=True,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_kwargs={"max_retries": 3},
+    default_retry_delay=40,
+)
 def generate_lesson(self, user_id, lesson_id: int):
     lesson = Lesson.objects.filter(id=lesson_id).first()
     if not lesson:
@@ -246,7 +267,10 @@ def generate_lesson(self, user_id, lesson_id: int):
 
     lesson.status = "PROCESSING"
     lesson.save(update_fields=["status"])
-    send_user_update(user_id, {"type": "lesson_update", "id": lesson.short_id, "status": "PROCESSING"})
+    send_user_update(
+        user_id,
+        {"type": "lesson_update", "id": lesson.short_id, "status": "PROCESSING"},
+    )
 
     # Check for cancellation before starting heavy work
     lesson.refresh_from_db()
@@ -302,7 +326,7 @@ def generate_lesson(self, user_id, lesson_id: int):
                     logger.error(f"Segment processing failed: {e}")
 
         # Sort videos by segment index (s0.mp4, s1.mp4, etc.)
-        videos.sort(key=lambda x: int(x.stem[1:]) if x.stem.startswith('s') else 999)
+        videos.sort(key=lambda x: int(x.stem[1:]) if x.stem.startswith("s") else 999)
 
         if not videos:
             raise RuntimeError("No video segments created")
@@ -311,7 +335,7 @@ def generate_lesson(self, user_id, lesson_id: int):
 
         list_file = temp_dir / "list.txt"
         list_file.write_text("\n".join(f"file '{v}'" for v in videos))
-        
+
         # Keep everything in temp_dir to avoid polluting MEDIA_ROOT/Cloudinary
         concat_output = temp_dir / "concat_output.mp4"
         final_temp_output = temp_dir / "final_output.mp4"
@@ -321,17 +345,24 @@ def generate_lesson(self, user_id, lesson_id: int):
             [
                 "ffmpeg",
                 "-y",
-                "-f", "concat",
-                "-safe", "0",
-                "-i", str(list_file),
-                "-c:v", "libx264",
-                "-preset", "veryfast",
-                "-pix_fmt", "yuv420p",
-                "-c:a", "aac",
+                "-f",
+                "concat",
+                "-safe",
+                "0",
+                "-i",
+                str(list_file),
+                "-c:v",
+                "libx264",
+                "-preset",
+                "veryfast",
+                "-pix_fmt",
+                "yuv420p",
+                "-c:a",
+                "aac",
                 str(concat_output),
             ],
             check=True,
-            timeout=15*60,
+            timeout=15 * 60,
         )
 
         # Step 2: Add logo overlay
@@ -339,41 +370,67 @@ def generate_lesson(self, user_id, lesson_id: int):
             [
                 "ffmpeg",
                 "-y",
-                "-i", str(concat_output),
-                "-i", str(logo_path),
-                "-filter_complex", "[1:v]scale=iw*0.08:-1[logo];[logo]format=rgba[logo];[0:v][logo]overlay=20:20",
-                "-c:v", "libx264",
-                "-preset", "veryfast",
-                "-pix_fmt", "yuv420p",
-                "-c:a", "aac",
-                "-b:a", "128k",
+                "-i",
+                str(concat_output),
+                "-i",
+                str(logo_path),
+                "-filter_complex",
+                "[1:v]scale=iw*0.08:-1[logo];[logo]format=rgba[logo];[0:v][logo]overlay=20:20",
+                "-c:v",
+                "libx264",
+                "-preset",
+                "veryfast",
+                "-pix_fmt",
+                "yuv420p",
+                "-c:a",
+                "aac",
+                "-b:a",
+                "128k",
                 str(final_temp_output),
             ],
             check=True,
-            timeout=15*60,
+            timeout=15 * 60,
         )
 
         final_filename = f"{uuid.uuid4()}.mp4"
         with final_temp_output.open("rb") as f:
-            lesson.lesson_file.save(final_filename, ContentFile(f.read(), name=final_filename), save=False)
-        
+            lesson.lesson_file.save(
+                final_filename, ContentFile(f.read(), name=final_filename), save=False
+            )
+
         lesson.status = "READY"
         lesson.save()
         # Invalidate course cache
         invalidate_course_cache(lesson.module.course.uuid, user_id)
-        send_user_update(user_id, {"type": "lesson_update", "id": lesson.short_id, "status": "READY", "lesson_file": lesson.lesson_file.url if lesson.lesson_file else ""})
+        send_user_update(
+            user_id,
+            {
+                "type": "lesson_update",
+                "id": lesson.short_id,
+                "status": "READY",
+                "lesson_file": lesson.lesson_file.url if lesson.lesson_file else "",
+            },
+        )
 
         return lesson.lesson_file.url if lesson.lesson_file else None
     except Exception as e:
         lesson.status = "ERROR"
         lesson.save(update_fields=["status"])
-        send_user_update(user_id, {"type": "lesson_update", "id": lesson.short_id, "status": "ERROR"})
+        send_user_update(
+            user_id, {"type": "lesson_update", "id": lesson.short_id, "status": "ERROR"}
+        )
         raise e
     finally:
         shutil.rmtree(temp_dir, ignore_errors=True)
 
 
-@shared_task(bind=True, autoretry_for=(Exception,), retry_backoff=True, retry_kwargs={'max_retries': 3}, default_retry_delay=40)
+@shared_task(
+    bind=True,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_kwargs={"max_retries": 3},
+    default_retry_delay=40,
+)
 def generate_next_module(self, user_pk: int, course_pk: int, module_pk: int = None):
     try:
         course = Course.objects.get(pk=course_pk)
@@ -438,7 +495,7 @@ def generate_next_module(self, user_pk: int, course_pk: int, module_pk: int = No
                 course=course,
                 name=module_data.get("title")[:80],
                 desc=module_data.get("desc", ""),
-                status="READY"
+                status="READY",
             )
 
         lessons_data = module_data.get("lessons", [])
@@ -457,21 +514,24 @@ def generate_next_module(self, user_pk: int, course_pk: int, module_pk: int = No
                 )
             )
         Lesson.objects.bulk_create(lessons_to_create)
-        
+
         # Invalidate course cache as new lessons were added
         invalidate_course_cache(course.uuid, user_pk)
-        
+
         # Generate only the first lesson of the module; others will be triggered sequentially
-        first_lesson = Lesson.objects.filter(module=module_object, status="PENDING").order_by("id").first()
+        first_lesson = (
+            Lesson.objects.filter(module=module_object, status="PENDING")
+            .order_by("id")
+            .first()
+        )
         if first_lesson:
-             generate_lesson.delay(user_pk, first_lesson.id)
+            generate_lesson.delay(user_pk, first_lesson.id)
 
         # For the first module, mark course as READY to show in dashboard
         if course.modules.count() == 1:
-            
             # For the first module, mark course as READY to show in dashboard
             Course.objects.filter(pk=course_pk).update(status="READY")
-                
+
         # Generate module quiz
         generate_module_quiz.delay(module_object.id, user_pk)
 
@@ -486,7 +546,12 @@ def generate_next_module(self, user_pk: int, course_pk: int, module_pk: int = No
             Course.objects.filter(pk=course_pk).update(status="READY")
 
 
-@shared_task(autoretry_for=(Exception,), retry_backoff=True, retry_kwargs={'max_retries': 3}, default_retry_delay=40)
+@shared_task(
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_kwargs={"max_retries": 3},
+    default_retry_delay=40,
+)
 def generate_module_quiz(module_id: int, user_id: int = None):
     module_object = Module.objects.filter(pk=module_id).first()
     if not module_object:
@@ -497,8 +562,10 @@ def generate_module_quiz(module_id: int, user_id: int = None):
         # Aggregate content from all lessons in the module
         lessons_content = []
         for lesson in module_object.lessons.all():
-            lessons_content.append(f"Lesson: {lesson.title}\nContent: {lesson.key_points}\n")
-        
+            lessons_content.append(
+                f"Lesson: {lesson.title}\nContent: {lesson.key_points}\n"
+            )
+
         full_text = "\n".join(lessons_content)
 
         prompt = f"""
@@ -550,20 +617,31 @@ def generate_module_quiz(module_id: int, user_id: int = None):
                     text=c.get("text"),
                     is_correct=c.get("is_correct", False),
                 )
-        
+
         # Invalidate course cache
         invalidate_course_cache(module_object.course.uuid)
         if user_id:
-            send_user_update(user_id, {"type": "course_update", "id": str(module_object.course.uuid), "status": "READY"})
-        
+            send_user_update(
+                user_id,
+                {
+                    "type": "course_update",
+                    "id": str(module_object.course.uuid),
+                    "status": "READY",
+                },
+            )
+
         logger.info(f"Quiz generated for module {module_id}")
 
     except Exception as e:
-        logger.error(f"Module quiz generation failed: {e}") 
+        logger.error(f"Module quiz generation failed: {e}")
 
 
-
-@shared_task(autoretry_for=(Exception,), retry_backoff=True, retry_kwargs={'max_retries': 3}, default_retry_delay=40)
+@shared_task(
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_kwargs={"max_retries": 3},
+    default_retry_delay=40,
+)
 def create_course_details(user_id: int, course_pk: int, prompt: str, level: str):
     ai_prompt = f"""
     You are an AI that outputs STRICT JSON.
@@ -606,7 +684,7 @@ def create_course_details(user_id: int, course_pk: int, prompt: str, level: str)
         logger.error(f"Outline generation failed: {e}")
         Course.objects.filter(pk=course_pk).update(status="FAILED")
         return
-    
+
     course_title = course_outline.get("title", "Sem título")
     course_desc = course_outline.get("desc", course_title)
     max_modules = course_outline.get("max_modules", 5)
@@ -618,28 +696,41 @@ def create_course_details(user_id: int, course_pk: int, prompt: str, level: str)
         max_modules = 5
 
     Course.objects.filter(pk=course_pk).update(
-        desc=course_desc, title=course_title, max_modules=max_modules, status="PROCESSING"
+        desc=course_desc,
+        title=course_title,
+        max_modules=max_modules,
+        status="PROCESSING",
     )
     # Invalidate course cache
     invalidate_course_cache(course.uuid, user_id)
-    send_user_update(user_id, {"type": "course_update", "id": str(course.uuid), "status": "PROCESSING", "title": course_title, "desc": course_desc})
+    send_user_update(
+        user_id,
+        {
+            "type": "course_update",
+            "id": str(course.uuid),
+            "status": "PROCESSING",
+            "title": course_title,
+            "desc": course_desc,
+        },
+    )
 
     # Save generation context for future reuse
     CourseGenerationContext.objects.update_or_create(
         course=course,
-        defaults={
-            "prompt": prompt,
-            "system_prompt": ai_prompt,
-            "response": response
-        }
+        defaults={"prompt": prompt, "system_prompt": ai_prompt, "response": response},
     )
-    
+
     # Trigger thumbnail and module generation in parallel
     create_course_thumb.delay(course_pk, prompt)
     generate_next_module.delay(user_id, course_pk)
 
 
-@shared_task(autoretry_for=(Exception,), retry_backoff=True, retry_kwargs={'max_retries': 3}, default_retry_delay=40)
+@shared_task(
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_kwargs={"max_retries": 3},
+    default_retry_delay=40,
+)
 def create_course_thumb(course_pk: str, prompt: str):
     client = get_genai_client()
     ai_prompt = f"""
@@ -681,9 +772,14 @@ def create_course_thumb(course_pk: str, prompt: str):
             if part.inline_data:
                 image_data = part.inline_data.data
                 break
-            if hasattr(part, 'image'):
-                image_data = part.image if isinstance(part.image, bytes) else getattr(part.image, 'data', None)
-                if image_data: break
+            if hasattr(part, "image"):
+                image_data = (
+                    part.image
+                    if isinstance(part.image, bytes)
+                    else getattr(part.image, "data", None)
+                )
+                if image_data:
+                    break
 
         if not image_data:
             raise ThumbnailCreationError("IA não retornou uma imagem válida")
@@ -720,19 +816,38 @@ def create_course_thumb(course_pk: str, prompt: str):
 
         thumb_filename = f"{uuid.uuid4()}.jpg"
         # Passing name to ContentFile is good practice for some storage backends
-        course.thumb.save(thumb_filename, ContentFile(buffer.getvalue(), name=thumb_filename), save=True)
+        course.thumb.save(
+            thumb_filename,
+            ContentFile(buffer.getvalue(), name=thumb_filename),
+            save=True,
+        )
         course.status = "READY"
         course.save()
         # Invalidate course cache
         invalidate_course_cache(course.uuid)
-        send_user_update(course.enrollments.first().user.id if course.enrollments.exists() else None, {"type": "course_update", "id": str(course.uuid), "status": "READY", "thumb": course.thumb.url if course.thumb else ""})
+        send_user_update(
+            course.enrollments.first().user.id if course.enrollments.exists() else None,
+            {
+                "type": "course_update",
+                "id": str(course.uuid),
+                "status": "READY",
+                "thumb": course.thumb.url if course.thumb else "",
+            },
+        )
         # Thumbnail generation is now independent of module generation
         # generate_next_module.delay(course.user.pk, course_pk)
     except Exception as e:
         logger.error(f"Thumbnail creation failed: {e}")
         Course.objects.filter(pk=course_pk).update(status="FAILED")
-        raise ThumbnailCreationError(f"Erro ao criar thumbnail: {str(e)}") 
-@shared_task(autoretry_for=(Exception,), retry_backoff=True, retry_kwargs={'max_retries': 3}, default_retry_delay=40)
+        raise ThumbnailCreationError(f"Erro ao criar thumbnail: {str(e)}")
+
+
+@shared_task(
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_kwargs={"max_retries": 3},
+    default_retry_delay=40,
+)
 def generate_certificate_task(user_id: int, course_id: int, full_name: str):
     from .models import Course, CourseEnrollment
     from PIL import Image
@@ -748,23 +863,25 @@ def generate_certificate_task(user_id: int, course_id: int, full_name: str):
         client = get_genai_client()
         # 1. Calculate real duration
         from django.db.models import Sum
-        total_seconds = course.modules.aggregate(
-            total=Sum('lessons__duration')
-        )['total'] or 0
+
+        total_seconds = (
+            course.modules.aggregate(total=Sum("lessons__duration"))["total"] or 0
+        )
         total_hours = max(1, round(total_seconds / 3600))
         duration_str = f"{total_hours} horas" if total_hours > 1 else "1 hora"
 
         # 2. Get current date in DD/MM/YYYY
         from datetime import datetime
+
         data_actual = datetime.now().strftime("%d/%m/%Y")
 
         # 3. Load base image
         base_path = settings.BASE_DIR / "static" / "certificate_base.png"
         if not base_path.exists():
             raise FileNotFoundError(f"Base certificate image not found at {base_path}")
-            
+
         base_img = Image.open(base_path)
-        
+
         # 4. Prepare multimodal prompt
         prompt = f"""
         Utilize a imagem fornecida como REFERÊNCIA DE ESTILO para criar um certificado de conclusão NOVO, MODERNO e PROFISSIONAL.
@@ -783,11 +900,11 @@ def generate_certificate_task(user_id: int, course_id: int, full_name: str):
         - O design deve ser limpo, minimalista e premium.
         - A imagem final deve ter alta qualidade (1600x1000).
         """
-        
+
         model_name = settings.AI.get("GENAI_MODEL_IMAGE", "gemini-2.0-flash")
 
         response = safe_gemini_call(
-            client.models.generate_content,                                                                                                     
+            client.models.generate_content,
             model=model_name,
             contents=[base_img, prompt],
             config=types.GenerateContentConfig(
@@ -796,42 +913,65 @@ def generate_certificate_task(user_id: int, course_id: int, full_name: str):
         )
 
         image_data = None
-        if hasattr(response, 'parts'):
+        if hasattr(response, "parts"):
             for part in response.parts:
                 if part.inline_data:
                     image_data = part.inline_data.data
                     break
-                if hasattr(part, 'image'):
-                    image_data = part.image if isinstance(part.image, bytes) else getattr(part.image, 'data', None)
-                    if image_data: break
+                if hasattr(part, "image"):
+                    image_data = (
+                        part.image
+                        if isinstance(part.image, bytes)
+                        else getattr(part.image, "data", None)
+                    )
+                    if image_data:
+                        break
 
         if not image_data:
-             # Fallback to the text-based drawing if image generation modality is not supported by the model
-             # or returned nothing. But given the user's frustration, we must try to get an image.
-             # If response has text but no image, maybe the model didn't support image generation.
-             raise ValueError(f"IA não retornou uma imagem para o certificado. Resposta: {getattr(response, 'text', 'Sem texto')}")
+            # Fallback to the text-based drawing if image generation modality is not supported by the model
+            # or returned nothing. But given the user's frustration, we must try to get an image.
+            # If response has text but no image, maybe the model didn't support image generation.
+            raise ValueError(
+                f"IA não retornou uma imagem para o certificado. Resposta: {getattr(response, 'text', 'Sem texto')}"
+            )
 
         # 3. Save to Database/Cloudinary
         enrollment = CourseEnrollment.objects.get(course=course, user=user)
         cert_filename = f"cert_{course.id}_{user.id}_{uuid.uuid4().hex[:8]}.png"
-        enrollment.certificate_file.save(cert_filename, ContentFile(image_data, name=cert_filename), save=False)
+        enrollment.certificate_file.save(
+            cert_filename, ContentFile(image_data, name=cert_filename), save=False
+        )
         enrollment.certificate_status = "READY"
         enrollment.save()
-        send_user_update(user_id, {"type": "certificate_update", "course_id": str(course.uuid), "status": "READY", "certificate_url": enrollment.certificate_file.url})
-        
+        send_user_update(
+            user_id,
+            {
+                "type": "certificate_update",
+                "course_id": str(course.uuid),
+                "status": "READY",
+                "certificate_url": enrollment.certificate_file.url,
+            },
+        )
+
         send_certificate_email(user, course, enrollment.certificate_file.url)
         return enrollment.certificate_file.url
 
     except Exception as e:
         logger.error(f"Certificate generation failed: {e}")
-        try: CourseEnrollment.objects.filter(course_id=course_id, user_id=user_id).update(certificate_status="FAILED")
-        except: pass
+        try:
+            CourseEnrollment.objects.filter(
+                course_id=course_id, user_id=user_id
+            ).update(certificate_status="FAILED")
+        except:
+            pass
         raise e
-
 
     except Exception as e:
         logger.error(f"Certificate generation failed: {e}")
-        try: CourseEnrollment.objects.filter(course_id=course_id, user_id=user_id).update(certificate_status="FAILED")
-        except: pass
+        try:
+            CourseEnrollment.objects.filter(
+                course_id=course_id, user_id=user_id
+            ).update(certificate_status="FAILED")
+        except:
+            pass
         raise e
-

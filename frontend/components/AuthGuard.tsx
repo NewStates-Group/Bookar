@@ -20,7 +20,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
 
         if (status === "unauthenticated" || session?.error === "RefreshAccessTokenError") {
             if (isAppRoute) {
-                console.log("[AuthGuard] Unauthenticated on protected route, redirecting to /login");
+                // console.log("[AuthGuard] Unauthenticated on protected route, redirecting to /login");
                 router.replace("/login");
             }
         } else if (status === "authenticated" && session?.user) {
@@ -28,7 +28,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
             const isProfileIncomplete = !user.first_name || !user.last_name;
 
             if (isProfileIncomplete && isAppRoute && pathname !== "/app/profile") {
-                console.log("[AuthGuard] Profile incomplete, redirecting to /app/profile");
+                // console.log("[AuthGuard] Profile incomplete, redirecting to /app/profile");
                 router.replace("/app/profile");
             }
         }

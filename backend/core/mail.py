@@ -3,6 +3,7 @@ from django.template.loader import render_to_string
 from django.utils.html import strip_tags
 from django.conf import settings
 
+
 def send_html_email(subject, template_name, context, recipient_list):
     """
     Utility to send HTML emails based on a template.
@@ -10,7 +11,7 @@ def send_html_email(subject, template_name, context, recipient_list):
     html_message = render_to_string(template_name, context)
     plain_message = strip_tags(html_message)
     from_email = settings.DEFAULT_FROM_EMAIL
-    
+
     send_mail(
         subject,
         plain_message,
@@ -20,18 +21,12 @@ def send_html_email(subject, template_name, context, recipient_list):
         fail_silently=False,
     )
 
+
 def send_welcome_email(user):
     subject = "Bem-vindo ao Bookar!"
-    context = {
-        "username": user.username,
-        "site_url": settings.SITE_URL
-    }
-    send_html_email(
-        subject,
-        "emails/welcome.html",
-        context,
-        [user.email]
-    )
+    context = {"username": user.username, "site_url": settings.SITE_URL}
+    send_html_email(subject, "emails/welcome.html", context, [user.email])
+
 
 def send_certificate_email(user, course, certificate_url):
     subject = f"Seu Certificado do curso {course.title} está disponível! 🎓"
@@ -39,14 +34,10 @@ def send_certificate_email(user, course, certificate_url):
         "username": user.username,
         "course_title": course.title,
         "site_url": settings.SITE_URL,
-        "certificate_url": certificate_url
+        "certificate_url": certificate_url,
     }
-    send_html_email(
-        subject,
-        "emails/certificate.html",
-        context,
-        [user.email]
-    )
+    send_html_email(subject, "emails/certificate.html", context, [user.email])
+
 
 def send_password_reset_email(user, token):
     subject = "Recuperação de Senha - Bookar"
@@ -54,25 +45,12 @@ def send_password_reset_email(user, token):
     context = {
         "username": user.username,
         "reset_url": reset_url,
-        "site_url": settings.SITE_URL
+        "site_url": settings.SITE_URL,
     }
-    send_html_email(
-        subject,
-        "emails/password_reset.html",
-        context,
-        [user.email]
-    )
+    send_html_email(subject, "emails/password_reset.html", context, [user.email])
 
 
 def send_verification_email(email, code):
     subject = f"Seu código de verificação: {code}"
-    context = {
-        "code": code,
-        "site_url": settings.SITE_URL
-    }
-    send_html_email(
-        subject,
-        "emails/verification_code.html",
-        context,
-        [email]
-    )
+    context = {"code": code, "site_url": settings.SITE_URL}
+    send_html_email(subject, "emails/verification_code.html", context, [email])

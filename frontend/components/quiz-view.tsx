@@ -69,7 +69,7 @@ export function QuizView({
                 toast.error(errorData.detail || errorData.message || "Erro ao carregar quiz");
             }
         } catch (error) {
-            console.error(error);
+            // console.error(error);
             toast.error("Erro de conexão");
         } finally {
             setLoading(false);
@@ -116,7 +116,7 @@ export function QuizView({
                 toast.error("Erro ao enviar respostas");
             }
         } catch (error) {
-            console.error(error);
+            // console.error(error);
             toast.error("Erro de conexão");
         } finally {
             setSubmitting(false);

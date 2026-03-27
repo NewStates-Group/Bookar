@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 
 import threading
 
+
 # Simple rate limiter state
 class RateLimiter:
     def __init__(self, min_interval=1.0):
@@ -33,7 +34,9 @@ class RateLimiter:
                 time.sleep(self.min_interval - elapsed)
             self.last_call = time.time()
 
+
 limiter = RateLimiter(min_interval=settings.AI.get("GENAI_RATE_LIMIT", 5.0))
+
 
 def is_retryable_error(exception):
     """Check if the error is 429 Resource Exhausted."""
@@ -42,6 +45,7 @@ def is_retryable_error(exception):
         # The error message usually contains 429 or RESOURCE_EXHAUSTED
         return "429" in exc_str or "RESOURCE_EXHAUSTED" in exc_str
     return "429" in exc_str or "RESOURCE_EXHAUSTED" in exc_str
+
 
 @retry(
     retry=retry_if_exception_type(ClientError),
@@ -64,30 +68,32 @@ def safe_gemini_call(method, *args, **kwargs):
         # if though we want to keep it if we catch it later
         raise e
 
+
 def extract_json(response: str, isList: bool = False):
     if not response:
         return None
-        
+
     cleaned = response.strip()
-    
+
     # Remove markdown code blocks if present
     if "```" in cleaned:
         import re
+
         # Try to find content between ```json and ```
         match = re.search(r"```(?:json)?\s*([\s\S]*?)```", cleaned)
         if match:
             cleaned = match.group(1).strip()
-            
+
     try:
         start_bracket = cleaned.find("{" if not isList else "[")
         end_bracket = cleaned.rfind("}" if not isList else "]")
-        
+
         if start_bracket == -1 or end_bracket == -1:
             logger.error(f"Brackets not found in response: {cleaned[:100]}...")
             return None
-            
+
         json_str = cleaned[start_bracket : end_bracket + 1]
-        
+
         # Try orjson first for speed
         try:
             return orjson.loads(json_str)
@@ -95,8 +101,9 @@ def extract_json(response: str, isList: bool = False):
             # Fallback to standard json which is sometimes more lenient with trailing commans in some setups
             # or just to provide a second chance
             import json
+
             return json.loads(json_str)
-            
+
     except Exception as e:
         logger.error(f"Failed to extract JSON from response: {e}")
         logger.debug(f"Raw response for failure: {response}")
@@ -125,9 +132,13 @@ def genai_chat(messages, model=None):
     client = get_genai_client()
     if model is None:
         model = settings.AI.get("GENAI_MODEL_TEXT", "gemini-2.5-flash-lite")
-    
+
     # Extract content from the last message if it's a list of dicts (Ollama style)
-    if isinstance(messages, list) and len(messages) > 0 and isinstance(messages[-1], dict):
+    if (
+        isinstance(messages, list)
+        and len(messages) > 0
+        and isinstance(messages[-1], dict)
+    ):
         prompt = messages[-1].get("content", "")
     else:
         prompt = str(messages)
@@ -137,7 +148,7 @@ def genai_chat(messages, model=None):
         model=model,
         contents=prompt,
     )
-    
+
     return response.text
 
 
@@ -177,6 +188,3 @@ def invalidate_course_cache(course_uuid, user_id=None):
     cache.delete(get_course_detail_cache_key(course_uuid))
     if user_id:
         cache.delete(get_course_list_cache_key(user_id))
-
-
-

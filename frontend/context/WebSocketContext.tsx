@@ -30,7 +30,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         const socket = new WebSocket(wsUrl);
 
         socket.onopen = () => {
-            console.log("WebSocket Connected");
+            // console.log("WebSocket Connected");
             setIsConnected(true);
         };
 
@@ -47,7 +47,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         };
 
         socket.onerror = (error) => {
-            console.error("WebSocket Error:", error);
+            // console.error("WebSocket Error:", error);
             socket.close();
         };
 

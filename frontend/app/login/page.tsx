@@ -70,20 +70,20 @@ export default function LoginPage() {
 
     setIsLoading(true);
     try {
-      if (typeof window !== "undefined") console.log("[Login] Attempting credentials login for:", email);
+      // if (typeof window !== "undefined") console.log("[Login] Attempting credentials login for:", email);
       const result = await signIn("credentials", {
         email: email,
         password,
         redirect: false,
       });
 
-      if (typeof window !== "undefined") console.log("[Login] signIn result:", result);
+      // if (typeof window !== "undefined") console.log("[Login] signIn result:", result);
 
       if (result?.error) {
-        if (typeof window !== "undefined") console.error("[Login] signIn error:", result.error);
+        // if (typeof window !== "undefined") console.error("[Login] signIn error:", result.error);
         setErrors({ password: ["Palavra-passe incorreta"] });
       } else {
-        if (typeof window !== "undefined") console.log("[Login] Login successful, redirecting to /app/courses");
+        // if (typeof window !== "undefined") console.log("[Login] Login successful, redirecting to /app/courses");
         router.push("/app/courses");
       }
     } catch (error) {
@@ -134,7 +134,7 @@ export default function LoginPage() {
 
     const handleMessage = async (event: MessageEvent) => {
       if (event.data?.type === "AUTH_SUCCESS") {
-        if (typeof window !== "undefined") console.log("[Login] Google AUTH_SUCCESS received:", event.data);
+        // if (typeof window !== "undefined") console.log("[Login] Google AUTH_SUCCESS received:", event.data);
         setIsLoading(true);
         try {
           const result = await signIn("credentials", {
@@ -143,13 +143,13 @@ export default function LoginPage() {
             redirect: false,
           });
 
-          if (typeof window !== "undefined") console.log("[Login] Google signIn result:", result);
+          // if (typeof window !== "undefined") console.log("[Login] Google signIn result:", result);
 
           if (result?.error) {
-            if (typeof window !== "undefined") console.error("[Login] Google signIn error:", result.error);
+            // if (typeof window !== "undefined") console.error("[Login] Google signIn error:", result.error);
             toast.error(result.error);
           } else {
-            if (typeof window !== "undefined") console.log("[Login] Google login successful, redirecting to /app/courses");
+            // if (typeof window !== "undefined") console.log("[Login] Google login successful, redirecting to /app/courses");
             router.replace("/app/courses");
           }
         } catch (err) {

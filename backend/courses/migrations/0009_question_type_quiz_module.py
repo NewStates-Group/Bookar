@@ -5,20 +5,33 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('courses', '0008_course_deleted'),
+        ("courses", "0008_course_deleted"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='question',
-            name='type',
-            field=models.CharField(choices=[('TF', 'True/False'), ('MC', 'Multiple Choice'), ('SA', 'Short Answer')], default='MC', max_length=2),
+            model_name="question",
+            name="type",
+            field=models.CharField(
+                choices=[
+                    ("TF", "True/False"),
+                    ("MC", "Multiple Choice"),
+                    ("SA", "Short Answer"),
+                ],
+                default="MC",
+                max_length=2,
+            ),
         ),
         migrations.AddField(
-            model_name='quiz',
-            name='module',
-            field=models.OneToOneField(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, related_name='quiz', to='courses.module'),
+            model_name="quiz",
+            name="module",
+            field=models.OneToOneField(
+                blank=True,
+                null=True,
+                on_delete=django.db.models.deletion.CASCADE,
+                related_name="quiz",
+                to="courses.module",
+            ),
         ),
     ]

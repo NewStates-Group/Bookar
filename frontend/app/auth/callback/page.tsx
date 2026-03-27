@@ -15,7 +15,7 @@ function AuthCallbackContent() {
         const code = searchParams.get("code");
         const access = searchParams.get("access");
         const refresh = searchParams.get("refresh");
-        console.log("[GoogleCallback] Received params - code:", !!code, "access:", !!access, "refresh:", !!refresh);
+        // console.log("[GoogleCallback] Received params - code:", !!code, "access:", !!access, "refresh:", !!refresh);
 
         if (called.current) return;
 
@@ -38,7 +38,7 @@ function AuthCallbackContent() {
 
                     // Notify opener and close
                     if (window.opener) {
-                        console.log("[GoogleCallback] Notifying opener with tokens");
+                        // console.log("[GoogleCallback] Notifying opener with tokens");
                         window.opener.postMessage({
                             type: "AUTH_SUCCESS",
                             access: tokens.access,
@@ -54,7 +54,7 @@ function AuthCallbackContent() {
                         });
                     }
                 } catch (error: any) {
-                    console.error("Google Auth Error:", error);
+                    // console.error("Google Auth Error:", error);
                     if (window.opener) {
                         window.opener.postMessage({
                             type: "AUTH_ERROR",

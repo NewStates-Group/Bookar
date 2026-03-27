@@ -6,9 +6,26 @@ from ninja.errors import HttpError
 from django.utils import timezone
 
 from django.core.cache import cache
-from .utils import get_course_list_cache_key, get_course_detail_cache_key, get_lesson_detail_cache_key, invalidate_course_cache
+from .utils import (
+    get_course_list_cache_key,
+    get_course_detail_cache_key,
+    get_lesson_detail_cache_key,
+    invalidate_course_cache,
+)
 
-from .models import Choice, Course, Lesson, Question, Quiz, QuizAttempt, Module, CourseEnrollment, LessonProgress, CourseShare, CourseShareClaim
+from .models import (
+    Choice,
+    Course,
+    Lesson,
+    Question,
+    Quiz,
+    QuizAttempt,
+    Module,
+    CourseEnrollment,
+    LessonProgress,
+    CourseShare,
+    CourseShareClaim,
+)
 import uuid
 from .tasks import (
     create_course_details,
@@ -27,20 +44,19 @@ class CourseService:
         cached_result = cache.get(cache_key)
         if cached_result:
             return cached_result
-            
+
         # Return courses user is enrolled in and HAS NOT DELETED
-        enrolled_ids = (
-            CourseEnrollment.objects.filter(user=user, deleted=False)
-            .values_list("course_id", flat=True)
-        )
+        enrolled_ids = CourseEnrollment.objects.filter(
+            user=user, deleted=False
+        ).values_list("course_id", flat=True)
         courses = Course.objects.filter(id__in=enrolled_ids).order_by("-created_at")
-        cache.set(cache_key, list(courses), 300) # Cache for 5 minutes
+        cache.set(cache_key, list(courses), 300)  # Cache for 5 minutes
         return courses
 
     def get_course(self, id: str, user=None) -> Course:
         cache_key = get_course_detail_cache_key(id)
         course = cache.get(cache_key)
-        
+
         if not course:
             try:
                 course = Course.objects.prefetch_related(
@@ -51,7 +67,7 @@ class CourseService:
                         ),
                     )
                 ).get(uuid=id)
-                cache.set(cache_key, course, 600) # 10 minutes
+                cache.set(cache_key, course, 600)  # 10 minutes
             except Course.DoesNotExist:
                 raise HttpError(404, "Curso não encontrado")
 
@@ -74,42 +90,55 @@ class CourseService:
 
         return course
 
-    def create_course(self, user, prompt: str, level: str, num_modules: int = None) -> Course:
+    def create_course(
+        self, user, prompt: str, level: str, num_modules: int = None
+    ) -> Course:
         # 1. Check if the current user already has this course (enrolled and not deleted)
         user_enrollment = CourseEnrollment.objects.filter(
             user=user,
             course__level=level,
             course__generation_context__prompt=prompt,
-            deleted=False
+            deleted=False,
         ).first()
-        
+
         if user_enrollment:
-            logger.info(f"User {user.id} already has enrollment in course {user_enrollment.course_id}")
+            logger.info(
+                f"User {user.id} already has enrollment in course {user_enrollment.course_id}"
+            )
             return user_enrollment.course
 
         # 2. Check if ANY course with this prompt already exists and is READY
         from .models import CourseGenerationContext
-        existing_context = CourseGenerationContext.objects.filter(
-            prompt=prompt, 
-            course__level=level, 
-            course__status="READY"
-        ).order_by("-created_at").first()
+
+        existing_context = (
+            CourseGenerationContext.objects.filter(
+                prompt=prompt, course__level=level, course__status="READY"
+            )
+            .order_by("-created_at")
+            .first()
+        )
 
         if existing_context:
             existing_course = existing_context.course
-            logger.info(f"Reusing existing course {existing_course.id} for prompt '{prompt}'")
-            
+            logger.info(
+                f"Reusing existing course {existing_course.id} for prompt '{prompt}'"
+            )
+
             # Instead of duplicating, just enroll the user in the existing course
             self.enroll_course(user, existing_course.id)
             return existing_course
 
         # 3. If no existing course, create new one
         # Course no longer has 'user' (owner) field. First enrollment identifies creator.
-        course = Course.objects.create(level=level, max_modules=num_modules or 4, owner=user)
+        course = Course.objects.create(
+            level=level, max_modules=num_modules or 4, owner=user
+        )
         # Owner must be enrolled
         self.enroll_course(user, course.id)
-        
-        create_course_details.delay(user.id, course.pk, prompt, course.get_level_display())
+
+        create_course_details.delay(
+            user.id, course.pk, prompt, course.get_level_display()
+        )
         return course
 
     def delete_course(self, course_id: str, user):
@@ -118,12 +147,12 @@ class CourseService:
             enrollment = CourseEnrollment.objects.get(course__uuid=course_id, user=user)
             enrollment.deleted = True
             enrollment.save()
-            
+
             # Invalidate user course list cache
             cache.delete(get_course_list_cache_key(user.id))
             return {"success": True}
         except CourseEnrollment.DoesNotExist:
-             raise HttpError(404, "Curso não encontrado ou sem permissão")
+            raise HttpError(404, "Curso não encontrado ou sem permissão")
 
     def cancel_course(self, user, course_id: str):
         # Cancel is usually for when it's still PROCESSING
@@ -135,9 +164,11 @@ class CourseService:
                 course.save(update_fields=["status"])
                 # Invalidate course detail cache
                 invalidate_course_cache(course_id, user.id)
-            
+
             # Always mark user's enrollment as deleted
-            CourseEnrollment.objects.filter(course=course, user=user).update(deleted=True)
+            CourseEnrollment.objects.filter(course=course, user=user).update(
+                deleted=True
+            )
             return {"success": True, "message": "Curso cancelado e removido."}
         except Course.DoesNotExist:
             raise HttpError(404, "Curso não encontrado")
@@ -148,7 +179,7 @@ class CourseService:
             enrollment, created = CourseEnrollment.objects.get_or_create(
                 user=user, course=course
             )
-            
+
             # If the course has no owner and this is the first enrollment, set the owner
             if not course.owner:
                 course.owner = user
@@ -157,7 +188,7 @@ class CourseService:
             if enrollment.deleted:
                 enrollment.deleted = False
                 enrollment.save()
-            
+
             # Invalidate user course list cache
             cache.delete(get_course_list_cache_key(user.id))
             return enrollment
@@ -168,9 +199,7 @@ class CourseService:
         try:
             lesson = Lesson.objects.get(short_id=lesson_id)
             LessonProgress.objects.update_or_create(
-                user=user, 
-                lesson=lesson,
-                defaults={"watched": True}
+                user=user, lesson=lesson, defaults={"watched": True}
             )
             # Invalidate course detail and list cache
             invalidate_course_cache(lesson.module.course.uuid, user.id)
@@ -187,17 +216,19 @@ class CourseService:
                 .filter(short_id__gt=current_lesson_id)
                 .first()
             )
-        
+
         # Get all lessons for the course
-        all_lessons = Lesson.objects.filter(
-            module__course__uuid=course_id
-        ).order_by("module__created_at", "module__id", "id")
-        
+        all_lessons = Lesson.objects.filter(module__course__uuid=course_id).order_by(
+            "module__created_at", "module__id", "id"
+        )
+
         # Find the first one not watched by the user
         for lesson in all_lessons:
-            if not LessonProgress.objects.filter(user=user, lesson=lesson, watched=True).exists():
+            if not LessonProgress.objects.filter(
+                user=user, lesson=lesson, watched=True
+            ).exists():
                 return lesson
-        
+
         return None
 
     def get_quiz(self, lesson_id: str) -> Quiz:
@@ -214,10 +245,13 @@ class CourseService:
             watched_count = LessonProgress.objects.filter(
                 lesson__module=module, user=user, watched=True
             ).count()
-            
+
             if watched_count < total_lessons:
-                raise HttpError(400, "Você precisa assistir a todas as aulas antes de iniciar o quiz.")
-            
+                raise HttpError(
+                    400,
+                    "Você precisa assistir a todas as aulas antes de iniciar o quiz.",
+                )
+
             return Quiz.objects.get(module__uuid=module_id)
         except Module.DoesNotExist:
             raise HttpError(404, "Módulo não encontrado")
@@ -260,17 +294,24 @@ class CourseService:
 
         QuizAttempt.objects.create(user=user, quiz=quiz, score=score, passed=passed)
 
-        return {"score": score, "passed": passed, "correct_answers": [str(u) for u in all_correct]}
+        return {
+            "score": score,
+            "passed": passed,
+            "correct_answers": [str(u) for u in all_correct],
+        }
 
     def trigger_next_module(self, user_pk, course_id: str):
         from accounts.models import User
+
         user = User.objects.get(pk=user_pk)
         try:
             course = Course.objects.get(uuid=course_id)
             current_module_count = course.modules.count()
-            
+
             if course.max_modules and current_module_count >= course.max_modules:
-                raise HttpError(400, f"Limite de módulos atingido ({course.max_modules})")
+                raise HttpError(
+                    400, f"Limite de módulos atingido ({course.max_modules})"
+                )
 
             # Check if the previous module is completed for this user
             last_module = course.modules.order_by("id").last()
@@ -280,10 +321,13 @@ class CourseService:
                 watched_count = LessonProgress.objects.filter(
                     lesson__module=last_module, user=user, watched=True
                 ).count()
-                
+
                 if watched_count < total_lessons:
-                    raise HttpError(400, "Você precisa assistir a todas as aulas do módulo anterior para avançar.")
-                
+                    raise HttpError(
+                        400,
+                        "Você precisa assistir a todas as aulas do módulo anterior para avançar.",
+                    )
+
                 try:
                     # Check if the module quiz is passed
                     quiz = last_module.quiz
@@ -292,36 +336,56 @@ class CourseService:
                             user=user, quiz=quiz, passed=True
                         ).exists()
                         if not passed:
-                            raise HttpError(400, "Você precisa passar no quiz do módulo anterior para avançar.")
+                            raise HttpError(
+                                400,
+                                "Você precisa passar no quiz do módulo anterior para avançar.",
+                            )
                 except Quiz.DoesNotExist:
-                    pass # No quiz for previous module, allow proceed
-            
+                    pass  # No quiz for previous module, allow proceed
+
             # Pre-create the module in PROCESSING status
             new_module = Module.objects.create(
-                course=course,
-                name="Gerando módulo...",
-                status="PROCESSING"
+                course=course, name="Gerando módulo...", status="PROCESSING"
             )
-            
+
             generate_next_module.delay(user_pk, course_id, new_module.pk)
-            send_user_update(user_pk, {"type": "module_update", "course_id": course_id, "id": str(new_module.uuid), "status": "PROCESSING", "name": new_module.name})
-            return {"success": True, "message": "Gerando módulo...", "module_id": new_module.pk}
+            send_user_update(
+                user_pk,
+                {
+                    "type": "module_update",
+                    "course_id": course_id,
+                    "id": str(new_module.uuid),
+                    "status": "PROCESSING",
+                    "name": new_module.name,
+                },
+            )
+            return {
+                "success": True,
+                "message": "Gerando módulo...",
+                "module_id": new_module.pk,
+            }
         except Course.DoesNotExist:
             raise HttpError(404, "Curso não encontrado")
 
     def get_certificate_info(self, user, course_id: str):
         course = Course.objects.get(uuid=course_id)
         enrollment = CourseEnrollment.objects.get(course=course, user=user)
-        
+
         # Verify completion for THIS user
         if not course.is_fully_completed(user):
             raise HttpError(400, "O curso ainda não foi totalmente concluído.")
 
         if enrollment.certificate_status == "READY":
-             return {"status": "READY", "certificate_url": enrollment.certificate_file.url}
+            return {
+                "status": "READY",
+                "certificate_url": enrollment.certificate_file.url,
+            }
 
         if enrollment.certificate_status == "PROCESSING":
-            return {"status": "PROCESSING", "message": "Seu certificado está sendo gerado."}
+            return {
+                "status": "PROCESSING",
+                "message": "Seu certificado está sendo gerado.",
+            }
 
         # If NOT_GENERATED, trigger generation
         full_name = f"{user.first_name} {user.last_name}".strip()
@@ -330,10 +394,13 @@ class CourseService:
 
         enrollment.certificate_status = "PROCESSING"
         enrollment.save()
-        
+
         generate_certificate_task.delay(user.id, course.id, full_name)
 
-        return {"status": "PROCESSING", "message": "Certificado está a ser gerado. Enviaremos um e-mail brevemente."}
+        return {
+            "status": "PROCESSING",
+            "message": "Certificado está a ser gerado. Enviaremos um e-mail brevemente.",
+        }
 
     def generate_share_token(self, user, course_id: str) -> CourseShare:
         try:
@@ -344,9 +411,7 @@ class CourseService:
 
             # Check if a share already exists for this user and course
             share, created = CourseShare.objects.get_or_create(
-                course=course,
-                sharer=user,
-                defaults={"token": str(uuid.uuid4())}
+                course=course, sharer=user, defaults={"token": str(uuid.uuid4())}
             )
             return self.get_share_info(share.token)
         except Course.DoesNotExist:
@@ -354,13 +419,16 @@ class CourseService:
 
     def get_share_info(self, token: str) -> dict:
         try:
-            share = CourseShare.objects.select_related("course", "sharer").get(token=token)
+            share = CourseShare.objects.select_related("course", "sharer").get(
+                token=token
+            )
             return {
                 "token": share.token,
                 "course_id": str(share.course.uuid),
                 "course_title": share.course.title,
-                "sharer_name": f"{share.sharer.first_name} {share.sharer.last_name}".strip() or share.sharer.username,
-                "created_at": share.created_at
+                "sharer_name": f"{share.sharer.first_name} {share.sharer.last_name}".strip()
+                or share.sharer.username,
+                "created_at": share.created_at,
             }
         except CourseShare.DoesNotExist:
             raise HttpError(404, "Link de partilha inválido ou expirado")
@@ -370,33 +438,35 @@ class CourseService:
             share = CourseShare.objects.get(token=token)
             # Enroll the user
             self.enroll_course(user, share.course.id)
-            
+
             # Track the claim
-            CourseShareClaim.objects.get_or_create(
-                share=share,
-                recipient=user
-            )
-            
+            CourseShareClaim.objects.get_or_create(share=share, recipient=user)
+
             return {
-                "success": True, 
+                "success": True,
                 "message": "Curso importado com sucesso!",
-                "course_id": str(share.course.uuid)
+                "course_id": str(share.course.uuid),
             }
         except CourseShare.DoesNotExist:
             raise HttpError(404, "Link de partilha inválido")
 
     def get_course_claims(self, user, course_id: str) -> list:
         # Get claims for shares of this course created by this user
-        claims = CourseShareClaim.objects.filter(
-            share__course__uuid=course_id,
-            share__sharer=user
-        ).select_related("recipient").order_by("-claimed_at")
-        
+        claims = (
+            CourseShareClaim.objects.filter(
+                share__course__uuid=course_id, share__sharer=user
+            )
+            .select_related("recipient")
+            .order_by("-claimed_at")
+        )
+
         return [
             {
-                "recipient_name": f"{c.recipient.first_name} {c.recipient.last_name}".strip() or c.recipient.username,
-                "claimed_at": c.claimed_at
-            } for c in claims
+                "recipient_name": f"{c.recipient.first_name} {c.recipient.last_name}".strip()
+                or c.recipient.username,
+                "claimed_at": c.claimed_at,
+            }
+            for c in claims
         ]
 
 
@@ -404,17 +474,21 @@ class LessonService:
     def get_lesson(self, user, lesson_id: str):
         cache_key = get_lesson_detail_cache_key(lesson_id)
         lesson = cache.get(cache_key)
-        
+
         if not lesson:
             try:
                 # Allow access if user is enrolled
-                lesson = Lesson.objects.select_related("module__course").get(short_id=lesson_id)
-                cache.set(cache_key, lesson, 3600) # 60 minutes
+                lesson = Lesson.objects.select_related("module__course").get(
+                    short_id=lesson_id
+                )
+                cache.set(cache_key, lesson, 3600)  # 60 minutes
             except Lesson.DoesNotExist:
                 return None
-        
+
         course = lesson.module.course
-        if CourseEnrollment.objects.filter(course=course, user=user, deleted=False).exists():
+        if CourseEnrollment.objects.filter(
+            course=course, user=user, deleted=False
+        ).exists():
             return lesson
         return None
 
@@ -422,10 +496,9 @@ class LessonService:
         try:
             lesson = Lesson.objects.get(short_id=lesson_id)
             from .models import LessonProgress
+
             progress, created = LessonProgress.objects.update_or_create(
-                user=user,
-                lesson=lesson,
-                defaults={"watched": True}
+                user=user, lesson=lesson, defaults={"watched": True}
             )
             # Invalidate course detail and list cache
             invalidate_course_cache(lesson.module.course.uuid, user.id)
@@ -435,8 +508,8 @@ class LessonService:
 
     def mark_delivered(self, user, lesson_id: str):
         try:
-             # Ownership check for delivery: only a user enrolled in the course should be able to trigger this?
-             # Or only the "creator"? 
+            # Ownership check for delivery: only a user enrolled in the course should be able to trigger this?
+            # Or only the "creator"?
             lesson = Lesson.objects.get(short_id=lesson_id)
             course = lesson.module.course
             if not CourseEnrollment.objects.filter(course=course, user=user).exists():
@@ -461,7 +534,7 @@ class LessonService:
                     and next_undelivered_lesson.status == "PENDING"
                 ):
                     generate_lesson.delay(user.id, next_undelivered_lesson.id)
-                
+
                 # Invalidate course cache as a lesson was marked delivered (status might have changed)
                 invalidate_course_cache(course.uuid, user.id)
                 return {"success": True}

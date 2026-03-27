@@ -144,7 +144,7 @@ export default function WatchPage() {
             });
             mutateLesson();
         } catch (e) {
-            console.error("Error marking lesson as delivered", e);
+            // console.error("Error marking lesson as delivered", e);
         }
     }
 
@@ -157,7 +157,7 @@ export default function WatchPage() {
             mutateLesson();
             mutateCourse(); // refresh sidebar progress bar
         } catch (e) {
-            console.error("Error marking lesson as watched", e);
+            // console.error("Error marking lesson as watched", e);
         }
     }
 
@@ -295,7 +295,7 @@ export default function WatchPage() {
                     <button
                         disabled={!previousLesson}
                         className={`border-r flex gap-2  items-center justify-center hover:bg-muted transition-colors ${!previousLesson ? "opacity-70 cursor-not-allowed" : "cursor-pointer"}`}>
-                        <Link className="flex items-center justify-center gap-2" href={`/app/courses/watch?l=${previousLesson?.id}&c=${courseID}`} className="flex items-center justify-center gap-2">
+                        <Link className="flex items-center justify-center gap-2" href={`/app/courses/watch?l=${previousLesson?.id}&c=${courseID}`}>
                             <ChevronLeft className="w-4 h-4" />
                             <span className="hidden md:block">
                                 Aula Anterior

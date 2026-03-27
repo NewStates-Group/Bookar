@@ -107,7 +107,7 @@ export const authOptions: NextAuthOptions = {
             if (user) {
                 try {
                     const profile = await getMe(user.accessToken);
-                    console.log("[Auth] Profile fetched successfully:", profile.email);
+                    // console.log("[Auth] Profile fetched successfully:", profile.email);
 
                     return {
                         accessToken: user.accessToken,
@@ -125,7 +125,7 @@ export const authOptions: NextAuthOptions = {
                         },
                     };
                 } catch (error) {
-                    console.error("Error fetching user profile at login:", error);
+                    // console.error("Error fetching user profile at login:", error);
                     // Return tokens so they can at least try to refresh or logout, but avoid empty user if possible
                     return {
                         accessToken: user.accessToken,
@@ -154,7 +154,7 @@ export const authOptions: NextAuthOptions = {
                         },
                     };
                 } catch (error) {
-                    console.error("Error during session update:", error);
+                    // console.error("Error during session update:", error);
                     return token;
                 }
             }

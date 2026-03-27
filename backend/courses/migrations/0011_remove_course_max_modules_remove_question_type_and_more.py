@@ -4,22 +4,21 @@ from django.db import migrations
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('courses', '0010_course_max_modules'),
+        ("courses", "0010_course_max_modules"),
     ]
 
     operations = [
         migrations.RemoveField(
-            model_name='course',
-            name='max_modules',
+            model_name="course",
+            name="max_modules",
         ),
         migrations.RemoveField(
-            model_name='question',
-            name='type',
+            model_name="question",
+            name="type",
         ),
         migrations.RemoveField(
-            model_name='quiz',
-            name='module',
+            model_name="quiz",
+            name="module",
         ),
     ]

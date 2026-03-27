@@ -7,7 +7,9 @@ class User(AbstractUser):
     email = models.EmailField(unique=True)
     username = models.CharField(max_length=150, unique=True, blank=True, null=True)
     bio = models.TextField(max_length=500, blank=True)
-    avatar = models.ImageField(upload_to="avatars/", null=True, blank=True, storage=MediaCloudinaryStorage())
+    avatar = models.ImageField(
+        upload_to="avatars/", null=True, blank=True, storage=MediaCloudinaryStorage()
+    )
 
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = []
@@ -20,6 +22,7 @@ class EmailVerificationCode(models.Model):
 
     def __str__(self):
         return f"{self.email} - {self.code}"
+
 
 class Waitlist(models.Model):
     email = models.EmailField(unique=True)

@@ -20,13 +20,17 @@ api.register_controllers(AuthController, CourseController, LessonController)
 def validation_exception_handler(request, exc):
     errors = []
     # Handle both callable errors() (Pydantic v2) and list errors (Django Ninja)
-    exc_errors = exc.errors() if callable(getattr(exc, "errors", None)) else getattr(exc, "errors", [])
-    
+    exc_errors = (
+        exc.errors()
+        if callable(getattr(exc, "errors", None))
+        else getattr(exc, "errors", [])
+    )
+
     for error in exc_errors:
         msg = error.get("msg", "")
         if msg.startswith("Value error, "):
             msg = msg.replace("Value error, ", "")
-        
+
         # Normalize pydantic built-in errors to codes if needed, or just clean them
         lower_msg = msg.lower()
         if "value is not a valid email address" in lower_msg:
@@ -39,7 +43,7 @@ def validation_exception_handler(request, exc):
             msg = "USERNAME_TOO_SHORT"
         elif "password_too_short" in lower_msg:
             msg = "PASSWORD_TOO_SHORT"
-            
+
         error["msg"] = msg
         errors.append(error)
 
@@ -53,14 +57,13 @@ def validation_exception_handler(request, exc):
 @api.exception_handler(Exception)
 def service_exception_handler(request, exc):
     from django.conf import settings
-    
+
     response_data = {"message": "Erro interno no servidor"}
     if settings.DEBUG:
         response_data["detail"] = str(exc)
-        
+
     return api.create_response(
         request,
         response_data,
         status=500,
     )
-

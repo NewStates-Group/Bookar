@@ -4,15 +4,14 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('courses', '0009_question_type_quiz_module'),
+        ("courses", "0009_question_type_quiz_module"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='course',
-            name='max_modules',
+            model_name="course",
+            name="max_modules",
             field=models.PositiveIntegerField(default=5),
         ),
     ]
