@@ -11,10 +11,31 @@ const _geistMono = Geist_Mono({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: 'Bookar',
-  description: 'Aprenda utilizando IA',
+  description: 'Aprenda utilizando IA e impulsione sua carreira',
   icons: {
     icon: "/logo-white.png",
   },
+  openGraph: {
+    title: 'Bookar',
+    description: 'Aprenda utilizando IA e impulsione sua carreira',
+    url: 'https://bookar.study',
+    siteName: 'Bookar',
+    images: [
+      {
+        url: 'https://bookar.study/logo.png',
+        width: 800,
+        height: 600,
+      },
+    ],
+    locale: 'pt-PT',
+    type: 'website',
+  },
+  // twitter: {
+  //   card: 'summary_large_image',
+  //   title: 'Bookar',
+  //   description: 'Aprenda utilizando IA e impulsione sua carreira',
+  //   images: ['https://bookar.study/logo.png'],
+  // },
 }
 
 export default function RootLayout({
