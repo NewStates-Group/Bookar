@@ -147,7 +147,8 @@ export default function HomePage() {
         // toast.success("Código enviado para o seu e-mail!");
         setStep("code");
       } else if (response.status === 429) {
-        setCooldown(180); // 3 minutes for emails
+        const missingTime = response.headers.get("retry-after") || 180;
+        setCooldown(Number(missingTime));
       } else {
         const data = await response.json();
         toast.error(data.detail || "Erro ao enviar código. Tente novamente.");
@@ -178,7 +179,8 @@ export default function HomePage() {
       if (response.ok) {
         setStep("turnstile");
       } else if (response.status === 429) {
-        setCooldown(180); // 3 minutes for code verification
+        const missingTime = response.headers.get("retry-after") || 180;
+        setCooldown(Number(missingTime));
       } else {
         const data = await response.json();
         toast.error(data.detail || "Código inválido");
@@ -206,7 +208,8 @@ export default function HomePage() {
         localStorage.setItem("bookar_waitlist_subscribed", "true");
         toast.success("Bem-vindo à lista de espera!");
       } else if (response.status === 429) {
-        setCooldown(180); // 3 minutes for final submit
+        const missingTime = response.headers.get("retry-after") || 180;
+        setCooldown(Number(missingTime));
       } else {
         const data = await response.json();
         toast.error(data.detail || "Algo correu mal. Tenta de novo.");
@@ -336,7 +339,7 @@ export default function HomePage() {
                             className="text-xs text-muted-foreground p-0 h-auto"
                             onClick={() => setStep("email")}
                           >
-                            Mudar e-mail
+                            Mudar e-mail / E-mail não chegou?
                           </Button>
                         </form>
                       )}

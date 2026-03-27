@@ -7,7 +7,7 @@ import uuid
 
 import httpx
 from django.conf import settings
-from django.contrib.auth import get_user_model
+from django.contrib.auth import get_user_model, authenticate
 from django.core.files.base import ContentFile
 from django.core.signing import TimestampSigner, BadSignature, SignatureExpired
 from django.db import transaction, IntegrityError
@@ -61,15 +61,27 @@ class AuthService:
         send_verification_email_task.delay(email, code)
         return True
 
+    def authenticate_user(self, email, password, token):
+        if not self.verify_turnstile(token):
+            raise HttpError(400, "Verificação anti-bot falhou.")
+
+        user = authenticate(email=email, password=password)
+        if not user:
+            raise HttpError(401, "E-mail ou senha incorretos.")
+
+        refresh = RefreshToken.for_user(user)
+        return {
+            "access": str(refresh.access_token),
+            "refresh": str(refresh),
+        }
+
     def verify_verification_code(self, email, code):
         from django.utils import timezone
         from datetime import timedelta
 
-        # Expire after 10 minutes
         ten_minutes_ago = timezone.now() - timedelta(minutes=10)
-
         return EmailVerificationCode.objects.filter(
-            email=email, code=code, created_at__gte=ten_minutes_ago
+            email=email, code=code, updated_at__gte=ten_minutes_ago
         ).exists()
 
     def user_exists(self, email):

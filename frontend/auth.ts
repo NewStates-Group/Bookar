@@ -62,6 +62,7 @@ export const authOptions: NextAuthOptions = {
             credentials: {
                 email: { label: "Email", type: "email" },
                 password: { label: "Password", type: "password" },
+                token: { label: "Token", type: "text" },
             },
 
             async authorize(credentials: any) {
@@ -84,13 +85,15 @@ export const authOptions: NextAuthOptions = {
                     body: JSON.stringify({
                         email: credentials.email,
                         password: credentials.password,
+                        token: credentials.token,
                     }),
                 });
 
                 const data = await res.json();
 
                 if (!res.ok || !data.access) {
-                    throw new Error(data.detail || "Authentication failed");
+                    // throw new Error(data.detail || "Authentication failed");
+                    throw new Error("Login falhou. Verifique o seu e-mail e senha.");
                 }
 
                 return {

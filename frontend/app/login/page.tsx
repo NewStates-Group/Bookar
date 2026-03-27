@@ -1,7 +1,7 @@
 "use client";
 
 import { signIn } from "next-auth/react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,6 +12,7 @@ import Link from "next/link";
 import { toast } from "sonner";
 import Image from "next/image";
 import { motion } from "framer-motion";
+import { Turnstile } from "next-turnstile";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -19,7 +20,30 @@ export default function LoginPage() {
   const [step, setStep] = useState<"email" | "password" | "reset-success">("email");
   const [errors, setErrors] = useState<Record<string, string[]>>({});
   const [isLoading, setIsLoading] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState("");
+  const [cooldown, setCooldown] = useState(0);
+  const [forgotPasswordCooldown, setForgotPasswordCooldown] = useState(0);
   const router = useRouter();
+
+  useEffect(() => {
+    if (cooldown > 0) {
+      const timer = setTimeout(() => setCooldown(cooldown - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [cooldown]);
+
+  useEffect(() => {
+    if (forgotPasswordCooldown > 0) {
+      const timer = setTimeout(() => setForgotPasswordCooldown(forgotPasswordCooldown - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [forgotPasswordCooldown]);
+
+  const formatCooldown = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
+  };
 
   const validateEmail = () => {
     const newErrors: Record<string, string[]> = {};
@@ -49,11 +73,13 @@ export default function LoginPage() {
 
       if (data.exists) {
         setStep("password");
+      } else if (res.status === 429) {
+        const missingTime = res.headers.get("retry-after") || 60;
+        setCooldown(Number(missingTime));
       } else {
         setErrors({ email: ["Este e-mail não está cadastrado."] });
       }
     } catch (error) {
-      toast.error("Erro ao verificar e-mail.");
     } finally {
       setIsLoading(false);
     }
@@ -74,14 +100,23 @@ export default function LoginPage() {
       const result = await signIn("credentials", {
         email: email,
         password,
+        token: turnstileToken,
         redirect: false,
       });
 
       // if (typeof window !== "undefined") console.log("[Login] signIn result:", result);
 
       if (result?.error) {
-        // if (typeof window !== "undefined") console.error("[Login] signIn error:", result.error);
-        setErrors({ password: ["Palavra-passe incorreta"] });
+        if (result.error === "AUTHENTICATION_FAILED" || result.error.includes("incorretos")) {
+          setErrors({ password: ["E-mail ou palavra-passe incorretos"] });
+        } else if (result.error.includes("anti-bot")) {
+          toast.error("Por favor, resolva o CAPTCHA.");
+        } else if (result.error.includes("Muitas tentativas") || result.status === 429) {
+          // NextAuth might not pass the status directly, but let's try to handle it
+          setCooldown(180);
+        } else {
+          toast.error(result.error);
+        }
       } else {
         // if (typeof window !== "undefined") console.log("[Login] Login successful, redirecting to /app/courses");
         router.push("/app/courses");
@@ -105,8 +140,12 @@ export default function LoginPage() {
       if (res.ok) {
         setStep("reset-success");
         toast.success("Link de recuperação enviado!");
+      } else if (res.status === 429) {
+        const retryAfter = res.headers.get("retry-after") || "60";
+        setForgotPasswordCooldown(parseInt(retryAfter));
+        toast.error(`Tente novamente em alguns segundos`);
       } else {
-        toast.error("Erro ao solicitar recuperação de senha.");
+        toast.error("Recuperação de senha falhou");
       }
     } catch (err) {
       toast.error("Erro ao conectar com o servidor.");
@@ -188,7 +227,7 @@ export default function LoginPage() {
           href="/"
           className="absolute p-12 top-0 left-0 cursor-pointer z-50"
         >
-          <ChevronLeft className="text-white" size={30}/>
+          <ChevronLeft className="text-white" size={30} />
         </Link>
         <div className="relative z-20 text-white p-12 max-w-lg">
           <motion.div
@@ -316,17 +355,35 @@ export default function LoginPage() {
                         variant="link"
                         className="h-auto p-0 text-xs text-cyan-500 hover:text-cyan-600 font-medium"
                         onClick={handleForgotPassword}
+                        disabled={forgotPasswordCooldown > 0}
                       >
-                        Esqueceu a palavra-passe?
+                        {forgotPasswordCooldown > 0
+                          ? `Tente novamente em ${formatCooldown(forgotPasswordCooldown)}`
+                          : "Esqueceu a palavra-passe?"}
                       </Button>
                     </div>
                   </motion.div>
                 )}
 
+                {step === "password" && (
+                  <div className="flex justify-center py-2">
+                    <Turnstile
+                      siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY!}
+                      onVerify={(token) => setTurnstileToken(token)}
+                    />
+                  </div>
+                )}
+
+                {cooldown > 0 && (
+                  <p className="text-sm text-red-500 mt-2 font-medium text-center">
+                    Muitas tentativas. Tenta novamente em {formatCooldown(cooldown)}
+                  </p>
+                )}
+
                 <Button
                   type="submit"
                   className="w-full h-12 text-base font-medium group bg-cyan-500 hover:bg-cyan-600 text-white"
-                  disabled={isLoading}
+                  disabled={isLoading || (step === "password" && !turnstileToken) || cooldown > 0}
                 >
                   {isLoading ? (
                     <>

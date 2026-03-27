@@ -73,6 +73,12 @@ class EmailCheckOut(Schema):
     exists: bool
 
 
+class LoginIn(Schema):
+    email: str
+    password: str
+    token: str
+
+
 class PasswordResetConfirmIn(Schema):
     token: str
     new_password: str

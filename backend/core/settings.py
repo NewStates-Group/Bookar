@@ -1,5 +1,6 @@
 from datetime import timedelta
 from pathlib import Path
+from corsheaders.defaults import default_headers
 
 import environ
 
@@ -143,6 +144,13 @@ CELERY_TIMEZONE = TIME_ZONE
 
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS")
+CORS_ALLOW_HEADERS = (
+    *default_headers,
+    "retry-after",
+)
+CORS_EXPOSE_HEADERS = [
+    "Retry-After",
+]
 
 AI = {
     "OLLAMA_KEY": env("OLLAMA_KEY"),
@@ -167,7 +175,11 @@ DEFAULT_FROM_EMAIL = f"Bookar <{EMAIL_HOST_USER}>"
 NINJA_EXTRA = {
     "THROTTLE_RATES": {
         "anon": "3/3m",
-        "email_verification": "2/5m",
+        "send_verification": "3/5m",
+        "verify_code": "3/3m",
+        "email_check": "3/1m",
+        "password_reset_request": "3/5m",
+        "password_reset_confirm": "3/3m"
     }
 }
 
