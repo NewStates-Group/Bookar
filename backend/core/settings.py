@@ -18,8 +18,6 @@ env = environ.Env(
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# environ.Env.read_env(BASE_DIR.parent / ".env")
-
 SECRET_KEY = env("SECRET_KEY")
 
 DEBUG = env("DEBUG")
@@ -188,6 +186,6 @@ NINJA_EXTRA = {
 CLOUDFLARE_TURNSTILE_SECRET_KEY = env("TURNSTILE_SECRET_KEY")
 CLOUDFLARE_TURNSTILE_SITE_KEY = env("NEXT_PUBLIC_TURNSTILE_SITE_KEY")
 
-SECURE_CONTENT_TYPE_NOSNIFF = True
-SECURE_REFERRER_POLICY = "same-origin"
+# SECURE_CONTENT_TYPE_NOSNIFF = True
+# SECURE_REFERRER_POLICY = "same-origin"
 X_FRAME_OPTIONS = "DENY"
