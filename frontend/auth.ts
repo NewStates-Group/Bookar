@@ -1,7 +1,7 @@
 import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 
-const apiUrlRaw = process.env.NEXT_PUBLIC_API_URL;
+const apiUrlRaw = process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL;
 const apiUrl = apiUrlRaw?.endsWith("/") ? apiUrlRaw.slice(0, -1) : apiUrlRaw;
 
 async function getMe(accessToken: string) {

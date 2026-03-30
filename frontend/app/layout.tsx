@@ -22,7 +22,7 @@ export const metadata: Metadata = {
     siteName: 'Bookar',
     images: [
       {
-        url: 'https://bookar.study/logo.png',
+        url: 'https://bookar.study/logo-white.png',
         width: 800,
         height: 600,
       },
@@ -57,7 +57,6 @@ export default function RootLayout({
           speed={200}
           shadow="0 0 10px #2563eb,0 0 5px #06b6d4"
         />
-        <link rel="shortcut icon" href="/logo.png" type="image/x-icon" />
         <Providers>
           <AuthGuard>
             {children}
