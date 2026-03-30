@@ -1,13 +1,15 @@
 import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 
+const isProdEnv = process.env.NODE_ENV === "production"
 
 async function getMe(accessToken: string) {
-    const apiUrl = process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL;
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL;
     const res = await fetch(`${apiUrl}/auth/me`, {
         headers: {
             Authorization: `Bearer ${accessToken}`,
             "Content-Type": "application/json",
+            "Host": isProdEnv ? "api.bookar.study" : "api.localhost",
         },
     });
 
@@ -20,10 +22,13 @@ async function getMe(accessToken: string) {
 
 async function refreshAccessToken(token: any) {
     try {
-        const apiUrl = process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL;
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL;
         const res = await fetch(`${apiUrl}/auth/refresh`, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+                "Content-Type": "application/json",
+                "Host": isProdEnv ? "api.bookar.study" : "api.localhost"
+            },
             body: JSON.stringify({
                 refresh: token.refreshToken,
             }),
@@ -78,10 +83,10 @@ export const authOptions: NextAuthOptions = {
                     return null;
                 }
 
-                const apiUrl = process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL;
+                const apiUrl = process.env.NEXT_PUBLIC_API_URL;
                 const res = await fetch(`${apiUrl}/auth/pair`, {
                     method: "POST",
-                    headers: { "Content-Type": "application/json" },
+                    headers: { "Content-Type": "application/json", "Host": isProdEnv ? "api.bookar.study" : "api.localhost", },
                     body: JSON.stringify({
                         email: credentials.email,
                         password: credentials.password,

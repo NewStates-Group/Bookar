@@ -31,20 +31,11 @@ def validation_exception_handler(request, exc):
         if msg.startswith("Value error, "):
             msg = msg.replace("Value error, ", "")
 
-        # Normalize pydantic built-in errors to codes if needed, or just clean them
         lower_msg = msg.lower()
         if "value is not a valid email address" in lower_msg:
-            msg = "INVALID_EMAIL"
-        elif "username_taken" in lower_msg:
-            msg = "USERNAME_TAKEN"
-        elif "email_taken" in lower_msg:
-            msg = "EMAIL_TAKEN"
-        elif "username_too_short" in lower_msg:
-            msg = "USERNAME_TOO_SHORT"
-        elif "password_too_short" in lower_msg:
-            msg = "PASSWORD_TOO_SHORT"
+            msg = "invalid_email"
 
-        error["msg"] = msg
+        error["msg"] = msg.upper()
         errors.append(error)
 
     return api.create_response(
