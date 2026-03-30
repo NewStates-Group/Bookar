@@ -3,13 +3,15 @@ import CredentialsProvider from "next-auth/providers/credentials";
 
 const apiUrlRaw = process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL;
 const apiUrl = apiUrlRaw?.endsWith("/") ? apiUrlRaw.slice(0, -1) : apiUrlRaw;
+const origin = process.env.NEXT_PUBLIC_API_BASE_URL || "https://api.bookar.study"
 
 async function getMe(accessToken: string) {
     const res = await fetch(`${apiUrl}/auth/me`, {
         headers: {
             Authorization: `Bearer ${accessToken}`,
             "Content-Type": "application/json",
-        },  
+            "Origin": origin
+        },
     });
 
     if (!res.ok) {
@@ -25,6 +27,7 @@ async function refreshAccessToken(token: any) {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
+                "Origin": origin
             },
             body: JSON.stringify({
                 refresh: token.refreshToken,
@@ -82,7 +85,10 @@ export const authOptions: NextAuthOptions = {
                 try {
                     res = await fetch(`${apiUrl}/auth/pair`, {
                         method: "POST",
-                        headers: { "Content-Type": "application/json" },
+                        headers: {
+                            "Content-Type": "application/json",
+                            "Origin": origin
+                        },
                         body: JSON.stringify({
                             email: credentials.email,
                             password: credentials.password,

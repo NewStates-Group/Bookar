@@ -3,11 +3,11 @@ import { NextResponse } from "next/server";
 export async function GET() {
     // console.log("[GoogleRoute] Initiating Google login...");
     try {
-        const isProdEnv = process.env.NODE_ENV === "production"
+        const origin = process.env.NEXT_PUBLIC_API_BASE_URL || "https://api.bookar.study"
         const res = await fetch(`${process.env.AUTH_URL}/auth/google/url`, {
             cache: "no-store",
             headers: {
-                "Host": isProdEnv ? "api.bookar.study" : "api.localhost"
+                "Origin": origin
             }
         });
         const data = await res.json();
