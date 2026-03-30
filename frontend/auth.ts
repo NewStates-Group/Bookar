@@ -106,7 +106,7 @@ export const authOptions: NextAuthOptions = {
 
                 if (!res.ok) {
                     const text = await res.text();
-                    console.error(`[NextAuth] Login failed with status ${res.status}. Body:`, text.substring(0, 500));
+                    console.error(`[NextAuth] Login failed with status ${res.status}. Body:`, text);
                     throw new Error("Login falhou. Verifique o seu e-mail e senha.");
                 }
 
