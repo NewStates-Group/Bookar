@@ -529,19 +529,32 @@ def generate_next_module(self, user_pk: int, course_pk: int, module_pk: int = No
 
         # For the first module, mark course as READY to show in dashboard
         if course.modules.count() == 1:
-            # For the first module, mark course as READY to show in dashboard
             Course.objects.filter(pk=course_pk).update(status="READY")
 
-        # Generate module quiz
-        generate_module_quiz.delay(module_object.id, user_pk)
-        # Generate module study material PDF
-        generate_module_material.delay(module_object.id)
+        # --- TRIGGER FOLLOW-UP TASKS INDEPENDENTLY ---
+        try:
+            # Generate module quiz
+            generate_module_quiz.delay(module_object.id, user_pk)
+        except Exception as q_err:
+            logger.error(f"Failed to trigger quiz generation: {q_err}")
+
+        try:
+            # Generate module study material PDF
+            generate_module_material.delay(module_object.id)
+        except Exception as m_err:
+            logger.error(f"Failed to trigger material generation: {m_err}")
 
     except Exception as e:
         if module_pk:
             Module.objects.filter(pk=module_pk).update(status="FAILED")
         elif module_object:
-            module_object.delete()
+            # Only delete if it was just created AND we haven't successfully queued lessons yet
+            # Actually, to be safe, if we reach here, something went wrong during generation.
+            # But if lessons were created, maybe we should keep it in FAILED status instead of deleting.
+            module_object.status = "FAILED"
+            module_object.save(update_fields=["status"])
+            logger.error(f"Module generation failed, status set to FAILED: {e}")
+        
         logger.error(f"Failed to generate next module: {e}")
         # Only set course to READY if it was processing the very first module
         if course.modules.count() <= 1:
@@ -636,6 +649,104 @@ def generate_module_quiz(module_id: int, user_id: int = None):
 
     except Exception as e:
         logger.error(f"Module quiz generation failed: {e}")
+
+
+@shared_task(
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_kwargs={"max_retries": 3},
+    default_retry_delay=40,
+)
+def generate_module_material(module_id: int):
+    from .models import Module, ModuleMaterial
+    from reportlab.pdfgen import canvas
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib import colors
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+    from reportlab.lib.units import cm
+    from io import BytesIO
+    from django.core.files.base import ContentFile
+
+    module = Module.objects.filter(pk=module_id).first()
+    if not module:
+        logger.error(f"Module {module_id} not found for material generation")
+        return
+
+    # Create or get ModuleMaterial record
+    material, created = ModuleMaterial.objects.get_or_create(module=module)
+    material.status = "PROCESSING"
+    material.save(update_fields=["status"])
+
+    try:
+        buffer = BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=2 * cm, leftMargin=2 * cm, topMargin=2 * cm, bottomMargin=2 * cm)
+        styles = getSampleStyleSheet()
+        
+        # Custom styles
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=24,
+            spaceAfter=20,
+            textColor=colors.HexColor("#1A237E") # Dark blue
+        )
+        module_title_style = ParagraphStyle(
+            'ModuleTitle',
+            parent=styles['Heading2'],
+            fontSize=18,
+            spaceAfter=10,
+            textColor=colors.HexColor("#283593")
+        )
+        lesson_title_style = ParagraphStyle(
+            'LessonTitle',
+            parent=styles['Heading3'],
+            fontSize=14,
+            spaceBefore=15,
+            spaceAfter=5,
+            textColor=colors.HexColor("#3F51B5")
+        )
+        body_style = styles['BodyText']
+        
+        elements = []
+        
+        # Course and Module Info
+        elements.append(Paragraph(f"Guia de Estudo: {module.course.title}", title_style))
+        elements.append(Paragraph(f"Módulo: {module.name}", module_title_style))
+        elements.append(Paragraph(module.desc or "", body_style))
+        elements.append(Spacer(1, 1 * cm))
+        
+        # Lessons
+        for lesson in module.lessons.all().order_by('id'):
+            elements.append(Paragraph(lesson.title, lesson_title_style))
+            elements.append(Paragraph(f"<b>Descrição:</b> {lesson.desc}", body_style))
+            if lesson.key_points:
+                elements.append(Paragraph(f"<b>Pontos Chave:</b> {lesson.key_points}", body_style))
+            elements.append(Spacer(1, 0.5 * cm))
+            
+        # Footer decoration
+        elements.append(Spacer(1, 2 * cm))
+        elements.append(Paragraph("Gerado automaticamente por Bookar.study - IA Education", styles['Italic']))
+
+        doc.build(elements)
+        
+        # Save the file
+        pdf_filename = f"material_module_{module.uuid}.pdf"
+        material.pdf_file.save(
+            pdf_filename,
+            ContentFile(buffer.getvalue(), name=pdf_filename),
+            save=False
+        )
+        material.status = "READY"
+        material.save()
+        
+        logger.info(f"Material generated for module {module_id}")
+        
+    except Exception as e:
+        material.status = "FAILED"
+        material.save(update_fields=["status"])
+        logger.error(f"Failed to generate material for module {module_id}: {e}")
+        raise e
 
 
 @shared_task(
