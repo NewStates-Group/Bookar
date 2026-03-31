@@ -3,8 +3,8 @@
 import { useSession } from "next-auth/react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Loader2, ArrowRight, ChevronLeft, ChevronRight, HelpCircle, X, Menu, ArrowLeft, Award, FileDown, FileText, ExternalLink } from "lucide-react";
-import { useEffect, useState, useRef } from "react";
+import { Loader2, ArrowRight, ChevronLeft, ChevronRight, HelpCircle, X, Menu, ArrowLeft, Award, FileDown, FileText, ExternalLink, BookOpen, GripVertical } from "lucide-react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { toast } from "sonner";
 import { CourseWatchSidebar } from "@/components/course-sidebar";
 import Link from "next/link";
@@ -13,6 +13,9 @@ import { QuizView } from "@/components/quiz-view";
 import { useWebSocket } from "@/context/WebSocketContext";
 import useSWR from 'swr';
 import { authenticatedFetcher, apiRequest } from "@/lib/api";
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import rehypeSlug from 'rehype-slug';
 
 export interface Module {
     id: string;
@@ -23,6 +26,7 @@ export interface Module {
     last_quiz_passed?: boolean;
     material_status?: string;
     material_pdf_url?: string;
+    material_content?: string;
 }
 
 export interface CourseData {
@@ -47,6 +51,18 @@ export interface Lesson {
     narration: string;
 }
 
+// Helper to match rehype-slug / github-slugger behavior
+function slugify(text: string) {
+    return text
+        .toLowerCase()
+        .trim()
+        .normalize('NFD') // handle accents
+        .replace(/[\u0300-\u036f]/g, '') // remove accent marks
+        .replace(/[^\w\s-]/g, '')
+        .replace(/[\s_-]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+}
+
 export default function WatchPage() {
     const { data: session, status } = useSession();
     const router = useRouter()
@@ -68,7 +84,13 @@ export default function WatchPage() {
     const [nextLesson, setNextLesson] = useState<Lesson | null>(null)
     const [nextQuiz, setNextQuiz] = useState<{ id: string, moduleId: string } | null>(null)
     const [materialSidebarOpen, setMaterialSidebarOpen] = useState(false);
-    const [activeMaterialUrl, setActiveMaterialUrl] = useState<string | null>(null);
+    const [activeMaterialContent, setActiveMaterialContent] = useState<string | null>(null);
+
+    // Sidebar Resizing State
+    const [sidebarWidth, setSidebarWidth] = useState(550);
+    const [isResizing, setIsResizing] = useState(false);
+    const sidebarRef = useRef<HTMLDivElement>(null);
+    const materialContentRef = useRef<HTMLDivElement>(null);
 
     const { addListener } = useWebSocket();
 
@@ -127,10 +149,10 @@ export default function WatchPage() {
 
     useEffect(() => {
         const removeListener = addListener((data) => {
-            if (data.type === "lesson_update") {
-                // Refresh course data for ANY lesson update to keep sidebar/next buttons up to date
+            if (data.type === "lesson_update" || data.type === "material_update") {
+                // Refresh course data for ANY lesson or material update
                 mutateCourse();
-                if (String(data.id) === String(lessonID)) {
+                if (data.type === "lesson_update" && String(data.id) === String(lessonID)) {
                     mutateLesson();
                 }
             }
@@ -235,6 +257,67 @@ export default function WatchPage() {
         }
     }, [course, lesson, lessonID, quizID]);
 
+    // Resizing Logic
+    const startResizing = useCallback((e: React.MouseEvent) => {
+        e.preventDefault();
+        setIsResizing(true);
+    }, []);
+
+    const stopResizing = useCallback(() => {
+        setIsResizing(false);
+    }, []);
+
+    const resize = useCallback((e: MouseEvent) => {
+        if (isResizing) {
+            const newWidth = window.innerWidth - e.clientX;
+            // Constraints: Min 300px, Max 80% of window
+            if (newWidth >= 300 && newWidth <= window.innerWidth * 0.8) {
+                setSidebarWidth(newWidth);
+            }
+        }
+    }, [isResizing]);
+
+    useEffect(() => {
+        if (isResizing) {
+            window.addEventListener('mousemove', resize);
+            window.addEventListener('mouseup', stopResizing);
+            document.body.style.cursor = 'col-resize';
+        } else {
+            window.removeEventListener('mousemove', resize);
+            window.removeEventListener('mouseup', stopResizing);
+            document.body.style.cursor = 'default';
+        }
+        return () => {
+            window.removeEventListener('mousemove', resize);
+            window.removeEventListener('mouseup', stopResizing);
+        };
+    }, [isResizing, resize, stopResizing]);
+
+    // Automatic Scrolling Logic
+    useEffect(() => {
+        if (materialSidebarOpen && lesson?.title && activeMaterialContent) {
+            // Wait slightly longer for Markdown to fully render and IDs to be available
+            const timer = setTimeout(() => {
+                const targetId = slugify(lesson.title);
+                const element = document.getElementById(targetId);
+
+                if (element) {
+                    element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                } else {
+                    // Try a fallback: search for h2 that contains the title
+                    const headings = document.querySelectorAll('h2');
+                    for (const h of Array.from(headings)) {
+                        if (h.textContent?.toLowerCase().includes(lesson.title.toLowerCase())) {
+                            h.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                            break;
+                        }
+                    }
+                }
+            }, 500);
+            return () => clearTimeout(timer);
+        }
+    }, [materialSidebarOpen, lesson?.title, activeMaterialContent]);
+
     if (status === "loading" || isLoadingCourse || isLoadingLesson) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-white to-slate-50">
@@ -258,7 +341,7 @@ export default function WatchPage() {
     }
 
     return (
-        <div className="flex h-screen bg-background overflow-hidden">
+        <div className="flex h-screen bg-background overflow-hidden font-sans">
             <div className={`fixed min-h-screen z-[100] md:static transition-all duration-300 overflow-hidden ${sidebarOpen ? "w-[25rem]" : "w-0"} bg-card border-r border-border `}>
                 {sidebarOpen && <CourseWatchSidebar course={course} currentLessonId={lesson?.id} isEnded={ended} onClose={() => setSidebarOpen(!sidebarOpen)} />}
             </div>
@@ -400,32 +483,32 @@ export default function WatchPage() {
                                         return (
                                             <div className="w-full max-w-5xl mt-6">
                                                 <div className="flex items-center gap-2 mb-3">
-                                                    <FileText className="w-5 h-5 text-primary" />
-                                                    <h3 className="text-base font-semibold text-foreground">Materiais</h3>
+                                                    <BookOpen className="w-5 h-5 text-primary" />
+                                                    <h3 className="text-base font-semibold text-foreground">Material de Estudo</h3>
                                                 </div>
                                                 <div className="flex items-center gap-3 p-4 rounded-xl border border-border bg-card hover:bg-muted/50 transition-colors">
                                                     <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                                                        <FileText className="w-5 h-5 text-primary" />
+                                                        <BookOpen className="w-5 h-5 text-primary" />
                                                     </div>
                                                     <div className="flex-1 min-w-0">
                                                         <p className="font-medium text-foreground text-sm truncate">{currentModule.name}</p>
                                                         <p className="text-xs text-foreground/50 mt-0.5">
-                                                            {currentModule.material_status === "READY" ? "Material de estudo disponível" :
-                                                                currentModule.material_status === "PROCESSING" ? "A gerar material..." :
+                                                            {currentModule.material_status === "READY" ? "Guia completo de estudo disponível" :
+                                                                currentModule.material_status === "PROCESSING" ? "A gerar material detalhado..." :
                                                                     currentModule.material_status === "FAILED" ? "Erro ao gerar material" :
-                                                                        "A preparar..."}
+                                                                        "A preparar material..."}
                                                         </p>
                                                     </div>
-                                                    {currentModule.material_status === "READY" && currentModule.material_pdf_url ? (
+                                                    {currentModule.material_status === "READY" && currentModule.material_content ? (
                                                         <button
                                                             onClick={() => {
-                                                                setActiveMaterialUrl(currentModule.material_pdf_url!);
+                                                                setActiveMaterialContent(currentModule.material_content!);
                                                                 setMaterialSidebarOpen(true);
                                                             }}
                                                             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors flex-shrink-0"
                                                         >
-                                                            <FileText className="w-3.5 h-3.5" />
-                                                            Ver PDF
+                                                            <BookOpen className="w-3.5 h-3.5" />
+                                                            Estudar Agora
                                                         </button>
                                                     ) : currentModule.material_status === "PROCESSING" || !currentModule.material_status ? (
                                                         <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-muted text-foreground/50 text-xs font-medium flex-shrink-0">
@@ -448,48 +531,57 @@ export default function WatchPage() {
                         </div>
                     </div>
 
-                    {/* PDF Material Panel (Side-by-side) */}
-                    {materialSidebarOpen && activeMaterialUrl && (
-                        <div className="hidden lg:flex w-full max-w-xl h-full bg-card border-l border-border flex-col shadow-xl animate-in slide-in-from-right duration-300">
-                            {/* Header */}
-                            <div className="flex items-center justify-between px-4 py-3 border-b border-border flex-shrink-0">
-                                <div className="flex items-center gap-2">
-                                    <FileText className="w-5 h-5 text-primary" />
-                                    <span className="font-semibold text-foreground text-sm">Material do Módulo</span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <a
-                                        href={activeMaterialUrl}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
-                                    >
-                                        <ExternalLink className="w-3.5 h-3.5" />
-                                        Abrir
-                                    </a>
-                                    <button
-                                        onClick={() => setMaterialSidebarOpen(false)}
-                                        className="p-1.5 rounded-lg hover:bg-muted transition-colors text-foreground/60 hover:text-foreground"
-                                    >
-                                        <X className="w-5 h-5" />
-                                    </button>
+                    {/* Markdown Material Panel (Side-by-side) */}
+                    {materialSidebarOpen && activeMaterialContent && (
+                        <div
+                            ref={sidebarRef}
+                            style={{ width: sidebarWidth }}
+                            className="hidden lg:flex h-full bg-card border-l border-border flex-col shadow-xl animate-in slide-in-from-right duration-300 relative"
+                        >
+                            {/* Resizer Handle */}
+                            <div
+                                onMouseDown={startResizing}
+                                className="absolute left-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-primary/30 transition-colors z-20 group"
+                            >
+                                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <GripVertical className="w-4 h-4 text-primary" />
                                 </div>
                             </div>
-                            {/* PDF iframe */}
-                            <div className="flex-1 overflow-hidden">
-                                <iframe
-                                    src={activeMaterialUrl}
-                                    className="w-full h-full border-0"
-                                    title="Material do Módulo"
-                                />
+
+                            {/* Header */}
+                            <div className="flex items-center justify-between px-6 py-4 border-b border-border flex-shrink-0">
+                                <div className="flex items-center gap-2">
+                                    <BookOpen className="w-5 h-5 text-primary" />
+                                    <span className="font-bold text-foreground">Guia de Estudo</span>
+                                </div>
+                                <button
+                                    onClick={() => setMaterialSidebarOpen(false)}
+                                    className="p-2 rounded-lg hover:bg-muted transition-colors text-foreground/60 hover:text-foreground"
+                                >
+                                    <X className="w-5 h-5" />
+                                </button>
+                            </div>
+                            {/* Markdown Content */}
+                            <div
+                                ref={materialContentRef}
+                                className="flex-1 overflow-y-auto px-8 py-6 bg-card custom-scrollbar"
+                            >
+                                <div className="prose prose-sm dark:prose-invert max-w-none prose-headings:text-foreground prose-p:text-foreground/80 prose-strong:text-foreground prose-pre:bg-muted prose-pre:text-foreground prose-a:text-primary">
+                                    <ReactMarkdown
+                                        remarkPlugins={[remarkGfm]}
+                                        rehypePlugins={[rehypeSlug]}
+                                    >
+                                        {activeMaterialContent}
+                                    </ReactMarkdown>
+                                </div>
                             </div>
                         </div>
                     )}
                 </div>
             </div>
 
-            {/* Mobile PDF Material Sidebar (Overlay) */}
-            {materialSidebarOpen && activeMaterialUrl && (
+            {/* Mobile Markdown Material Sidebar (Overlay) */}
+            {materialSidebarOpen && activeMaterialContent && (
                 <div className="lg:hidden fixed inset-0 z-[120] flex">
                     {/* Backdrop */}
                     <div
@@ -499,10 +591,10 @@ export default function WatchPage() {
                     {/* Panel */}
                     <div className="relative ml-auto w-full max-w-md h-full bg-card flex flex-col shadow-2xl animate-in slide-in-from-right duration-300">
                         {/* Header */}
-                        <div className="flex items-center justify-between px-4 py-4 border-b border-border flex-shrink-0">
+                        <div className="flex items-center justify-between px-5 py-4 border-b border-border flex-shrink-0">
                             <div className="flex items-center gap-2">
-                                <FileText className="w-5 h-5 text-primary" />
-                                <span className="font-semibold text-foreground">Material</span>
+                                <BookOpen className="w-5 h-5 text-primary" />
+                                <span className="font-bold text-foreground">Guia de Estudo</span>
                             </div>
                             <button
                                 onClick={() => setMaterialSidebarOpen(false)}
@@ -511,13 +603,16 @@ export default function WatchPage() {
                                 <X className="w-6 h-6" />
                             </button>
                         </div>
-                        {/* PDF iframe */}
-                        <div className="flex-1 overflow-hidden">
-                            <iframe
-                                src={activeMaterialUrl}
-                                className="w-full h-full border-0"
-                                title="Material do Módulo"
-                            />
+                        {/* Markdown Content */}
+                        <div className="flex-1 overflow-y-auto px-6 py-6 bg-card">
+                            <div className="prose prose-sm dark:prose-invert max-w-none prose-headings:text-foreground prose-p:text-foreground/80">
+                                <ReactMarkdown
+                                    remarkPlugins={[remarkGfm]}
+                                    rehypePlugins={[rehypeSlug]}
+                                >
+                                    {activeMaterialContent}
+                                </ReactMarkdown>
+                            </div>
                         </div>
                     </div>
                 </div>
