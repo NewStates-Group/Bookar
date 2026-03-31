@@ -175,6 +175,7 @@ class ModuleDetailSchema(ModuleSchema):
     last_quiz_passed: Optional[bool] = None
     material_status: Optional[str] = None
     material_pdf_url: Optional[str] = None
+    material_content: Optional[str] = None
 
     @staticmethod
     def resolve_quiz_id(obj):
@@ -208,6 +209,13 @@ class ModuleDetailSchema(ModuleSchema):
         except Exception:
             pass
         return None
+
+    @staticmethod
+    def resolve_material_content(obj):
+        try:
+            return obj.material.content if obj.material.status == "READY" else None
+        except Exception:
+            return None
 
     id: str = None
 
@@ -316,3 +324,4 @@ class ShareClaimListOut(Schema):
 class ModuleMaterialSchema(Schema):
     status: str
     pdf_url: Optional[str] = None
+    content: Optional[str] = None

@@ -659,14 +659,8 @@ def generate_module_quiz(module_id: int, user_id: int = None):
 )
 def generate_module_material(module_id: int):
     from .models import Module, ModuleMaterial
-    from reportlab.pdfgen import canvas
-    from reportlab.lib.pagesizes import A4
-    from reportlab.lib import colors
-    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
-    from reportlab.lib.units import cm
-    from io import BytesIO
-    from django.core.files.base import ContentFile
+    from .utils import genai_chat
+    import json
 
     module = Module.objects.filter(pk=module_id).first()
     if not module:
@@ -677,74 +671,74 @@ def generate_module_material(module_id: int):
     material, created = ModuleMaterial.objects.get_or_create(module=module)
     material.status = "PROCESSING"
     material.save(update_fields=["status"])
+    
+    user_id = module.course.owner_id
+    send_user_update(
+        user_id,
+        {"type": "material_update", "module_id": str(module.uuid), "status": "PROCESSING"},
+    )
 
     try:
-        buffer = BytesIO()
-        doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=2 * cm, leftMargin=2 * cm, topMargin=2 * cm, bottomMargin=2 * cm)
-        styles = getSampleStyleSheet()
-        
-        # Custom styles
-        title_style = ParagraphStyle(
-            'CustomTitle',
-            parent=styles['Heading1'],
-            fontSize=24,
-            spaceAfter=20,
-            textColor=colors.HexColor("#1A237E") # Dark blue
-        )
-        module_title_style = ParagraphStyle(
-            'ModuleTitle',
-            parent=styles['Heading2'],
-            fontSize=18,
-            spaceAfter=10,
-            textColor=colors.HexColor("#283593")
-        )
-        lesson_title_style = ParagraphStyle(
-            'LessonTitle',
-            parent=styles['Heading3'],
-            fontSize=14,
-            spaceBefore=15,
-            spaceAfter=5,
-            textColor=colors.HexColor("#3F51B5")
-        )
-        body_style = styles['BodyText']
-        
-        elements = []
-        
-        # Course and Module Info
-        elements.append(Paragraph(f"Guia de Estudo: {module.course.title}", title_style))
-        elements.append(Paragraph(f"Módulo: {module.name}", module_title_style))
-        elements.append(Paragraph(module.desc or "", body_style))
-        elements.append(Spacer(1, 1 * cm))
-        
-        # Lessons
+        # Aggregate content from all lessons
+        lessons_data = []
         for lesson in module.lessons.all().order_by('id'):
-            elements.append(Paragraph(lesson.title, lesson_title_style))
-            elements.append(Paragraph(f"<b>Descrição:</b> {lesson.desc}", body_style))
-            if lesson.key_points:
-                elements.append(Paragraph(f"<b>Pontos Chave:</b> {lesson.key_points}", body_style))
-            elements.append(Spacer(1, 0.5 * cm))
-            
-        # Footer decoration
-        elements.append(Spacer(1, 2 * cm))
-        elements.append(Paragraph("Gerado automaticamente por Bookar.study - IA Education", styles['Italic']))
+            lessons_data.append({
+                "title": lesson.title,
+                "description": lesson.desc,
+                "key_points": lesson.key_points or "",
+                "narration_summary": (lesson.narration[:1000] + "...") if lesson.narration and len(lesson.narration) > 1000 else (lesson.narration or "")
+            })
 
-        doc.build(elements)
+        course_title = module.course.title
+        module_name = module.name
+
+        prompt = f"""
+        Você é um especialista em educação e design instrucional.
+        Sua tarefa é criar um **Guia de Estudo Completo e Profissional** em formato Markdown para o módulo "{module_name}" do curso "{course_title}".
+
+        Aqui estão os detalhes das aulas deste módulo:
+        {json.dumps(lessons_data, ensure_ascii=False, indent=2)}
+
+        **Instruções para o conteúdo:**
+        1. Use formatação Markdown rica (Headers, Listas, Negrito, Itálico, Blockquotes).
+        2. O material deve ser coeso, transformando os pontos das aulas em um texto fluido e educativo.
+        3. Adicione uma introdução motivadora para o módulo.
+        4. Para cada aula, expanda os conceitos principais, explicando-os de forma clara.
+        5. Inclua uma seção de "Resumo Executivo" ou "Conclusão" ao final.
+        6. O tom deve ser profissional, encorajador e fácil de ler.
+        7. NÃO use placeholders. Gere conteúdo real baseado nos títulos e descrições fornecidos.
+        8. O resultado deve ser APENAS o texto em Markdown, pronto para ser renderizado.
+
+        Escreva em Português do Brasil.
+        """
+
+        # Generate content using AI
+        markdown_content = genai_chat(prompt)
         
-        # Save the file
-        pdf_filename = f"material_module_{module.uuid}.pdf"
-        material.pdf_file.save(
-            pdf_filename,
-            ContentFile(buffer.getvalue(), name=pdf_filename),
-            save=False
-        )
+        if not markdown_content:
+            raise Exception("AI failed to generate markdown content")
+
+        # Save the markdown content
+        material.content = markdown_content
         material.status = "READY"
         material.save()
         
-        logger.info(f"Material generated for module {module_id}")
+        send_user_update(
+            user_id,
+            {"type": "material_update", "module_id": str(module.uuid), "status": "READY"},
+        )
+        
+        logger.info(f"Markdown material generated for module {module_id}")
         
     except Exception as e:
         material.status = "FAILED"
         material.save(update_fields=["status"])
+        
+        send_user_update(
+            user_id,
+            {"type": "material_update", "module_id": str(module.uuid), "status": "FAILED"},
+        )
+        
         logger.error(f"Failed to generate material for module {module_id}: {e}")
         raise e
 
