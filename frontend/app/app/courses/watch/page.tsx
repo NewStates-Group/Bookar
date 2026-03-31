@@ -318,6 +318,12 @@ export default function WatchPage() {
         }
     }, [materialSidebarOpen, lesson?.title, activeMaterialContent]);
 
+    const canGoNext = (() => {
+        if (nextQuiz) return true; // backend controla
+        if (nextLesson) return lesson?.watched;
+        return false;
+    })();
+
     if (status === "loading" || isLoadingCourse || isLoadingLesson) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-white to-slate-50">
@@ -327,10 +333,6 @@ export default function WatchPage() {
                 </div>
             </div>
         );
-    }
-
-    if (lesson?.status === "PENDING") {
-        return null;
     }
 
     if (!course) return null;
@@ -407,46 +409,11 @@ export default function WatchPage() {
                         )}
                     </button>
                     <button
-                        disabled={(() => {
-                            if (!nextLesson && !nextQuiz) return true;
-                            if (nextQuiz) {
-                                const moduleOfQuiz = course?.modules.find(m => m.id === nextQuiz.moduleId);
-                                const allWatched = moduleOfQuiz?.lessons.every(l =>
-                                    l.watched || (l.id === lesson?.id && ended)
-                                ) ?? false;
-                                return !allWatched;
-                            }
-                            return (nextLesson?.status === "READY") && !lesson?.watched;
-                        })()}
-                        className={`border-r flex gap-2 items-center justify-center transition-colors ${(() => {
-                            const isDisabled = (() => {
-                                if (!nextLesson && !nextQuiz) return true;
-                                if (nextQuiz) {
-                                    const moduleOfQuiz = course?.modules.find(m => m.id === nextQuiz.moduleId);
-                                    const allWatched = moduleOfQuiz?.lessons.every(l =>
-                                        l.watched || (l.id === lesson?.id && ended)
-                                    ) ?? false;
-                                    return !allWatched;
-                                }
-                                return (nextLesson?.status === "PENDING") && !lesson?.watched;
-                            })();
-                            return isDisabled ? "opacity-70 cursor-not-allowed" : "cursor-pointer hover:bg-muted";
-                        })()}`}
+                        disabled={!canGoNext}
+                        className={`border-r flex gap-2 items-center justify-center transition-colors ${!canGoNext ? "opacity-70 cursor-not-allowed" : "cursor-pointer hover:bg-muted"}`}
                     >
                         {(() => {
-                            const isDisabled = (() => {
-                                if (!nextLesson && !nextQuiz) return true;
-                                if (nextQuiz) {
-                                    const moduleOfQuiz = course?.modules.find(m => m.id === nextQuiz.moduleId);
-                                    const allWatched = moduleOfQuiz?.lessons.every(l =>
-                                        l.watched || (l.id === lesson?.id && ended)
-                                    ) ?? false;
-                                    return !allWatched;
-                                }
-                                return (nextLesson?.status === "PENDING") && !lesson?.watched;
-                            })();
-
-                            if (isDisabled) {
+                            if (!canGoNext) {
                                 return (
                                     <div className="flex items-center justify-center gap-2 text-foreground/50">
                                         <span className="hidden md:block">
@@ -495,7 +462,7 @@ export default function WatchPage() {
                                             {lesson?.desc}
                                         </p>
                                     </div>
-                                    {(lesson?.status === "PROCESSING") && (
+                                    {(lesson?.status === "PROCESSING" || lesson?.status === "PENDING") && (
                                         <div className="text-center max-w-lg z-10 py-10">
                                             <BuildingBlocksLoader />
                                             <h2 className="text-2xl font-bold text-foreground mb-2">Criando sua aula</h2>
