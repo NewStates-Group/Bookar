@@ -58,7 +58,7 @@ export function Quiz({ lessonId, onComplete }: QuizProps) {
                 setQuiz(data);
             } else {
                 const err = await res.json();
-                console.error(err);
+                // console.error(err);
                 if (res.status === 404) {
                     // Quiz not ready or not found
                     // Assuming if not found, we might skip or show a specific message
@@ -67,7 +67,7 @@ export function Quiz({ lessonId, onComplete }: QuizProps) {
                 }
             }
         } catch (error) {
-            console.error("Failed to fetch quiz", error);
+            // console.error("Failed to fetch quiz", error);
         } finally {
             setLoading(false);
         }

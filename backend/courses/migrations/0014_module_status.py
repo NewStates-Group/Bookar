@@ -4,15 +4,22 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('courses', '0013_quiz_module'),
+        ("courses", "0013_quiz_module"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='module',
-            name='status',
-            field=models.CharField(choices=[('PROCESSING', 'Processando'), ('READY', 'Pronto'), ('FAILED', 'Falhou')], default='READY', max_length=20),
+            model_name="module",
+            name="status",
+            field=models.CharField(
+                choices=[
+                    ("PROCESSING", "Processando"),
+                    ("READY", "Pronto"),
+                    ("FAILED", "Falhou"),
+                ],
+                default="READY",
+                max_length=20,
+            ),
         ),
     ]

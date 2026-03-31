@@ -27,13 +27,13 @@ export const apiRequest = async (url: string, options: RequestInit = {}) => {
     let res = await fetch(url, { ...options, headers });
 
     if (res.status === 401) {
-        console.warn(`[API] 401 detected for ${url}. Attempting session refresh and retry...`);
+        // console.warn(`[API] 401 detected for ${url}. Attempting session refresh and retry...`);
 
         // Force a session refresh
         session = await getSession();
 
         if (session?.accessToken) {
-            console.log(`[API] Retrying with new token...`);
+            // console.log(`[API] Retrying with new token...`);
             res = await fetch(url, {
                 ...options,
                 headers: {
@@ -44,7 +44,7 @@ export const apiRequest = async (url: string, options: RequestInit = {}) => {
         }
 
         if (res.status === 401) {
-            console.error("[API] Persistent 401. User might need to login again.");
+            // console.error("[API] Persistent 401. User might need to login again.");
             // We don't sign out automatically here to avoid aggressive loops, 
             // but we could if we're sure the refresh token is dead.
         }

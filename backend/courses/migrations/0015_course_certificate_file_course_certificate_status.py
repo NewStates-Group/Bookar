@@ -4,20 +4,27 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('courses', '0014_module_status'),
+        ("courses", "0014_module_status"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='course',
-            name='certificate_file',
+            model_name="course",
+            name="certificate_file",
             field=models.CharField(blank=True, max_length=255, null=True),
         ),
         migrations.AddField(
-            model_name='course',
-            name='certificate_status',
-            field=models.CharField(choices=[('NOT_GENERATED', 'Não Gerado'), ('PROCESSING', 'Processando'), ('READY', 'Pronto')], default='NOT_GENERATED', max_length=20),
+            model_name="course",
+            name="certificate_status",
+            field=models.CharField(
+                choices=[
+                    ("NOT_GENERATED", "Não Gerado"),
+                    ("PROCESSING", "Processando"),
+                    ("READY", "Pronto"),
+                ],
+                default="NOT_GENERATED",
+                max_length=20,
+            ),
         ),
     ]

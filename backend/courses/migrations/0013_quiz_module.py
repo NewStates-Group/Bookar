@@ -5,15 +5,20 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('courses', '0012_course_max_modules'),
+        ("courses", "0012_course_max_modules"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='quiz',
-            name='module',
-            field=models.OneToOneField(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, related_name='quiz', to='courses.module'),
+            model_name="quiz",
+            name="module",
+            field=models.OneToOneField(
+                blank=True,
+                null=True,
+                on_delete=django.db.models.deletion.CASCADE,
+                related_name="quiz",
+                to="courses.module",
+            ),
         ),
     ]

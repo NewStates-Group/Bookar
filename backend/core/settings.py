@@ -1,5 +1,6 @@
 from datetime import timedelta
 from pathlib import Path
+from corsheaders.defaults import default_headers
 
 import environ
 
@@ -16,8 +17,6 @@ env = environ.Env(
 )
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-
-# environ.Env.read_env(BASE_DIR.parent / ".env")
 
 SECRET_KEY = env("SECRET_KEY")
 
@@ -40,8 +39,10 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    "django.middleware.security.SecurityMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
 ROOT_URLCONF = "core.urls"
@@ -133,12 +134,23 @@ CLOUDINARY_STORAGE = {
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-CELERY_BROKER_URL = env("REDIS_URL")
-CELERY_RESULT_BACKEND = env("REDIS_URL")
+CELERY_REDIS_URL = env.str("REDIS_URL") + (
+    "?ssl_cert_reqs=CERT_NONE" if not DEBUG else ""
+)
+
+CELERY_BROKER_URL = CELERY_REDIS_URL
+CELERY_RESULT_BACKEND = CELERY_REDIS_URL
 CELERY_TIMEZONE = TIME_ZONE
 
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS")
+CORS_ALLOW_HEADERS = (
+    *default_headers,
+    "retry-after",
+)
+CORS_EXPOSE_HEADERS = [
+    "Retry-After",
+]
 
 AI = {
     "OLLAMA_KEY": env("OLLAMA_KEY"),
@@ -159,3 +171,21 @@ EMAIL_USE_TLS = True
 EMAIL_HOST_USER = "newstates.bookar@gmail.com"
 EMAIL_HOST_PASSWORD = env("EMAIL_PASSWORD")
 DEFAULT_FROM_EMAIL = f"Bookar <{EMAIL_HOST_USER}>"
+
+NINJA_EXTRA = {
+    "THROTTLE_RATES": {
+        "anon": "3/3m",
+        "send_verification": "3/5m",
+        "verify_code": "3/3m",
+        "email_check": "3/1m",
+        "password_reset_request": "3/5m",
+        "password_reset_confirm": "3/3m"
+    }
+}
+
+CLOUDFLARE_TURNSTILE_SECRET_KEY = env("TURNSTILE_SECRET_KEY")
+CLOUDFLARE_TURNSTILE_SITE_KEY = env("NEXT_PUBLIC_TURNSTILE_SITE_KEY")
+
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_REFERRER_POLICY = "same-origin"
+X_FRAME_OPTIONS = "DENY"

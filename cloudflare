@@ -1,0 +1,2 @@
+((http.request.uri.path wildcard r"/api/docs" or http.request.uri.path wildcard r"/api/openapi.json") and http.host wildcard r"api.bookar.study") 
+# or (http.host eq "api.bookar.study" and not http.referer contains "bookar.study")

@@ -111,6 +111,7 @@ class LessonController:
         lesson = self.lesson_service.get_lesson(request.user, lesson_id)
         if not lesson:
             from ninja.errors import HttpError
+
             raise HttpError(404, "Você ainda não criou esta aula")
         return lesson
 

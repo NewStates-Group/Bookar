@@ -6,16 +6,21 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('courses', '0026_choice_uuid_question_uuid'),
+        ("courses", "0026_choice_uuid_question_uuid"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='course',
-            name='owner',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='owned_courses', to=settings.AUTH_USER_MODEL),
+            model_name="course",
+            name="owner",
+            field=models.ForeignKey(
+                blank=True,
+                null=True,
+                on_delete=django.db.models.deletion.SET_NULL,
+                related_name="owned_courses",
+                to=settings.AUTH_USER_MODEL,
+            ),
         ),
     ]

@@ -1,13 +1,16 @@
 import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 
+const apiUrlRaw = process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL;
+const apiUrl = apiUrlRaw?.endsWith("/") ? apiUrlRaw.slice(0, -1) : apiUrlRaw;
+const origin = process.env.NEXT_PUBLIC_API_BASE_URL || "https://api.bookar.study"
 
 async function getMe(accessToken: string) {
-    const apiUrl = process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL;
     const res = await fetch(`${apiUrl}/auth/me`, {
         headers: {
             Authorization: `Bearer ${accessToken}`,
             "Content-Type": "application/json",
+            "Origin": origin
         },
     });
 
@@ -20,10 +23,12 @@ async function getMe(accessToken: string) {
 
 async function refreshAccessToken(token: any) {
     try {
-        const apiUrl = process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL;
         const res = await fetch(`${apiUrl}/auth/refresh`, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+                "Content-Type": "application/json",
+                "Origin": origin
+            },
             body: JSON.stringify({
                 refresh: token.refreshToken,
             }),
@@ -62,10 +67,10 @@ export const authOptions: NextAuthOptions = {
             credentials: {
                 email: { label: "Email", type: "email" },
                 password: { label: "Password", type: "password" },
+                token: { label: "Token", type: "text" },
             },
 
             async authorize(credentials: any) {
-                // Support passing tokens directly (for Google callback flow)
                 if (credentials?.accessToken && credentials?.refreshToken) {
                     return {
                         accessToken: credentials.accessToken,
@@ -76,21 +81,39 @@ export const authOptions: NextAuthOptions = {
                 if (!credentials?.email || !credentials?.password) {
                     return null;
                 }
+                let res;
+                try {
+                    res = await fetch(`${apiUrl}/auth/pair`, {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                            "Origin": origin
+                        },
+                        body: JSON.stringify({
+                            email: credentials.email,
+                            password: credentials.password,
+                            token: credentials.token,
+                        }),
+                    });
+                } catch (e) {
+                    console.error("[NextAuth] Fetch error for /auth/pair:", e);
+                }
 
-                const apiUrl = process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL;
-                const res = await fetch(`${apiUrl}/auth/pair`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        email: credentials.email,
-                        password: credentials.password,
-                    }),
-                });
+                if (!res) {
+                    console.error("[NextAuth] No response received for /auth/pair");
+                    return null;
+                }
+
+                if (!res.ok) {
+                    const text = await res.text();
+                    console.error(`[NextAuth] Login failed with status ${res.status}. Body:`, text);
+                    throw new Error("Login falhou. Verifique o seu e-mail e senha.");
+                }
 
                 const data = await res.json();
 
-                if (!res.ok || !data.access) {
-                    throw new Error(data.detail || "Authentication failed");
+                if (!data.access) {
+                    throw new Error("Login falhou. Resposta inválida do servidor.");
                 }
 
                 return {
@@ -107,7 +130,6 @@ export const authOptions: NextAuthOptions = {
             if (user) {
                 try {
                     const profile = await getMe(user.accessToken);
-                    console.log("[Auth] Profile fetched successfully:", profile.email);
 
                     return {
                         accessToken: user.accessToken,
@@ -125,19 +147,16 @@ export const authOptions: NextAuthOptions = {
                         },
                     };
                 } catch (error) {
-                    console.error("Error fetching user profile at login:", error);
-                    // Return tokens so they can at least try to refresh or logout, but avoid empty user if possible
                     return {
                         accessToken: user.accessToken,
                         refreshToken: user.refreshToken,
                         accessTokenExpires: Date.now() + 30 * 60 * 1000,
-                        user: null, // Change to null to indicate no profile
+                        user: null,
                         error: "FetchProfileError"
                     };
                 }
             }
 
-            // Handle manual update from client
             if (trigger === "update" && token.accessToken) {
                 try {
                     const profile = await getMe(token.accessToken as string);
@@ -154,12 +173,10 @@ export const authOptions: NextAuthOptions = {
                         },
                     };
                 } catch (error) {
-                    console.error("Error during session update:", error);
                     return token;
                 }
             }
 
-            // Add a 5-minute buffer to ensure we refresh before the token actually expires
             if (Date.now() < (token.accessTokenExpires as number) - 5 * 60 * 1000) {
                 return token;
             }

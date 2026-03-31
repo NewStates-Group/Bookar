@@ -157,7 +157,7 @@ export default function CoursesPage() {
         localStorage.removeItem("pending_share_token");
       }
     } catch (error) {
-      console.error("Error fetching share info:", error);
+      // console.error("Error fetching share info:", error);
     }
   };
 

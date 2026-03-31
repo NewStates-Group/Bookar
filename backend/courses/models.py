@@ -3,7 +3,11 @@ import shortuuid
 from django.contrib.auth import get_user_model
 from django.conf import settings
 from django.db import models
-from cloudinary_storage.storage import VideoMediaCloudinaryStorage, RawMediaCloudinaryStorage, MediaCloudinaryStorage
+from cloudinary_storage.storage import (
+    VideoMediaCloudinaryStorage,
+    RawMediaCloudinaryStorage,
+    MediaCloudinaryStorage,
+)
 
 User = get_user_model()
 
@@ -64,10 +68,19 @@ class Course(models.Model):
         default=CourseStatus.PROCESSING,
     )
     uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
-    thumb = models.ImageField(upload_to="courses/thumbs/", null=True, blank=True, storage=MediaCloudinaryStorage())
+    thumb = models.ImageField(
+        upload_to="courses/thumbs/",
+        null=True,
+        blank=True,
+        storage=MediaCloudinaryStorage(),
+    )
     max_modules = models.PositiveIntegerField(null=True, blank=True, default=5)
     owner = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="owned_courses"
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="owned_courses",
     )
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -150,7 +163,12 @@ class Lesson(models.Model):
         default=LessonStatus.PENDING,
     )
     short_id = models.CharField(max_length=12, default=generate_short_id, unique=True)
-    lesson_file = models.FileField(upload_to="courses/lessons/", null=True, blank=True, storage=VideoMediaCloudinaryStorage())
+    lesson_file = models.FileField(
+        upload_to="courses/lessons/",
+        null=True,
+        blank=True,
+        storage=VideoMediaCloudinaryStorage(),
+    )
     narration = models.TextField(null=True, blank=True)
     key_points = models.CharField(max_length=150, null=True, blank=True)
     scene_suggestion = models.TextField(null=True, blank=True)
@@ -158,8 +176,12 @@ class Lesson(models.Model):
 
 
 class LessonProgress(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="lesson_progress")
-    lesson = models.ForeignKey(Lesson, on_delete=models.CASCADE, related_name="progress")
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="lesson_progress"
+    )
+    lesson = models.ForeignKey(
+        Lesson, on_delete=models.CASCADE, related_name="progress"
+    )
     watched = models.BooleanField(default=False)
     watched_at = models.DateTimeField(auto_now=True)
 
@@ -234,12 +256,11 @@ class CourseEnrollment(models.Model):
     Links a Course to a User (for course reuse / sharing).
     The course owner is still tracked by Course.user.
     """
+
     course = models.ForeignKey(
         Course, on_delete=models.CASCADE, related_name="enrollments"
     )
-    user = models.ForeignKey(
-        User, on_delete=models.CASCADE, related_name="enrollments"
-    )
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="enrollments")
     status = models.CharField(
         max_length=20,
         choices=EnrollmentStatus.choices,
@@ -270,9 +291,7 @@ class CourseEnrollment(models.Model):
 
 
 class CourseShare(models.Model):
-    course = models.ForeignKey(
-        Course, on_delete=models.CASCADE, related_name="shares"
-    )
+    course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name="shares")
     sharer = models.ForeignKey(
         User, on_delete=models.CASCADE, related_name="shared_courses"
     )

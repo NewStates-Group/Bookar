@@ -11,6 +11,7 @@ class RegisterIn(Schema):
     email: EmailStr
     password: str
     code: str
+    token: str
 
     @field_validator("email", mode="after")
     @classmethod
@@ -32,6 +33,7 @@ class UserStatsSchema(Schema):
     finished_courses: int
     certificates_issued: int
 
+
 class RegisterOut(Schema):
     id: int
     email: str
@@ -43,9 +45,10 @@ class RegisterOut(Schema):
 
     @staticmethod
     def resolve_avatar(obj):
-        if hasattr(obj, 'avatar') and obj.avatar:
+        if hasattr(obj, "avatar") and obj.avatar:
             return obj.avatar.url
         return f"https://api.dicebear.com/7.x/avataaars/svg?seed={obj.id}"
+
 
 class ProfileUpdateIn(Schema):
     email: EmailStr = None
@@ -53,8 +56,10 @@ class ProfileUpdateIn(Schema):
     last_name: str = None
     bio: str = None
 
+
 class GoogleLoginIn(Schema):
     id_token: str
+
 
 class PasswordResetRequestIn(Schema):
     email: EmailStr
@@ -66,6 +71,13 @@ class EmailCheckIn(Schema):
 
 class EmailCheckOut(Schema):
     exists: bool
+
+
+class LoginIn(Schema):
+    email: str
+    password: str
+    token: str
+
 
 class PasswordResetConfirmIn(Schema):
     token: str
@@ -82,5 +94,13 @@ class PasswordResetConfirmIn(Schema):
 class SendVerificationIn(Schema):
     email: EmailStr
 
+
+class PreWaitlistEmailIn(Schema):
+    email: EmailStr
+    code: str
+
+
 class WaitlistEmailIn(Schema):
     email: EmailStr
+    code: str
+    token: str

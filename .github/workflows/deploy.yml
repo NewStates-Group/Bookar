@@ -32,7 +32,7 @@ jobs:
   #         cd backend
   #         python manage.py test || echo "Failed"
 
-  build-and-push:
+  build-and-push-backend:
     # needs: test
     runs-on: ubuntu-latest
 
@@ -46,32 +46,46 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Build backend image
+      - name: Build image
         run: |
           IMAGE_TAG=${{ github.sha }}
           docker build -f ./backend/Dockerfile.prod -t $BACKEND_IMAGE:$IMAGE_TAG ./backend
           docker tag $BACKEND_IMAGE:$IMAGE_TAG $BACKEND_IMAGE:latest
 
-      - name: Build frontend image
-        run: |
-          IMAGE_TAG=${{ github.sha }}
-          docker build -f ./frontend/Dockerfile.prod --build-arg NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL }} -t $FRONTEND_IMAGE:$IMAGE_TAG ./frontend
-          docker tag $FRONTEND_IMAGE:$IMAGE_TAG $FRONTEND_IMAGE:latest
-
-      - name: Push backend image
+      - name: Push image
         run: |
           IMAGE_TAG=${{ github.sha }}
           docker push $BACKEND_IMAGE:$IMAGE_TAG
           docker push $BACKEND_IMAGE:latest
 
-      - name: Push frontend image
+  build-and-push-frontend:
+    # needs: test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3  
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build image
+        run: |
+          IMAGE_TAG=${{ github.sha }}
+          docker build -f ./frontend/Dockerfile.prod --build-arg NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL }} --build-arg NEXT_PUBLIC_API_BASE_URL=${{ secrets.NEXT_PUBLIC_API_BASE_URL }} --build-arg NEXT_PUBLIC_TURNSTILE_SITE_KEY=${{ secrets.NEXT_PUBLIC_TURNSTILE_SITE_KEY }} -t $FRONTEND_IMAGE:$IMAGE_TAG ./frontend
+          docker tag $FRONTEND_IMAGE:$IMAGE_TAG $FRONTEND_IMAGE:latest
+
+      - name: Push image
         run: |
           IMAGE_TAG=${{ github.sha }}
           docker push $FRONTEND_IMAGE:$IMAGE_TAG
           docker push $FRONTEND_IMAGE:latest
-          
-  deploy:
-    needs: build-and-push
+
+  deploy-worker:
+    needs: build-and-push-backend
     runs-on: ubuntu-latest
 
     steps:
@@ -87,7 +101,7 @@ jobs:
 
       - name: Syncronize files
         run: |
-          rsync -avz deploy/ ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:~/Bookar/
+          rsync -avz deploy/worker/ ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:~/Bookar/
 
       - name: Run deploy
         run: |
@@ -96,3 +110,77 @@ jobs:
             chmod +x deploy.sh &&
             ./deploy.sh
           "
+
+  deploy-frotend:
+    needs: build-and-push-frontend
+    runs-on: ubuntu-latest
+
+    steps:  
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@0e613a0980cbf65ed5b322eb7a1e075d28913a83
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Download frontend task definition
+        run: |
+          aws ecs describe-task-definition --task-definition \
+          default-bookar-frontend-c69e \
+          --query taskDefinition > frontend-task-def.json
+      
+      - name: Update Frontend Task Definition
+        id: task-def-frontend
+        uses: aws-actions/amazon-ecs-render-task-definition@c804dfbdd57f713b6c079302a4c01db7017a36fc
+        with:
+          task-definition: frontend-task-def.json
+          container-name: Main
+          image: ${{ env.FRONTEND_IMAGE }}:latest
+
+      - name: Deploy Frontend AWS ECS task definition
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2.6.0
+        with:
+          task-definition: ${{ steps.task-def-frontend.outputs.task-definition }}
+          service: bookar-frontend-c69e
+          cluster: default
+          wait-for-service-stability: true
+
+  deploy-backend:
+    needs: build-and-push-backend
+    runs-on: ubuntu-latest
+
+    steps:  
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@0e613a0980cbf65ed5b322eb7a1e075d28913a83
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      
+      - name: Download backend task definition
+        run: |
+          aws ecs describe-task-definition --task-definition \
+          default-bookar-backend-cccb \
+          --query taskDefinition > backend-task-def.json
+
+      - name: Update Backend Task Definition
+        id: task-def-backend
+        uses: aws-actions/amazon-ecs-render-task-definition@c804dfbdd57f713b6c079302a4c01db7017a36fc
+        with:
+          task-definition: backend-task-def.json
+          container-name: Main
+          image: ${{ env.BACKEND_IMAGE }}:latest
+
+      - name: Deploy Backend AWS ECS task definition
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2.6.0
+        with:
+          task-definition: ${{ steps.task-def-backend.outputs.task-definition }}
+          service: bookar-backend-cccb
+          cluster: default
+          wait-for-service-stability: true

@@ -5,11 +5,23 @@ from ninja import ModelSchema, Schema
 from ninja.orm import create_schema
 from pydantic import Field
 
-from .models import Choice, Course, CourseEnrollment, CourseLevel, Lesson, Module, ModuleMaterial, Question, Quiz, CourseShare, CourseShareClaim
+from .models import (
+    Choice,
+    Course,
+    CourseEnrollment,
+    CourseLevel,
+    Lesson,
+    Module,
+    Question,
+    Quiz,
+    CourseShare,
+    CourseShareClaim,
+)
 
 import logging
 
 logger = logging.Logger(__name__)
+
 
 class CourseOut(ModelSchema):
     is_fully_completed: bool = False
@@ -65,7 +77,11 @@ class CourseOut(ModelSchema):
     def resolve_certificate_url(obj, context):
         user = context.get("request").user
         enrollment = obj.enrollments.filter(user=user).first()
-        if enrollment and enrollment.certificate_status == "READY" and enrollment.certificate_file:
+        if (
+            enrollment
+            and enrollment.certificate_status == "READY"
+            and enrollment.certificate_file
+        ):
             try:
                 return enrollment.certificate_file.url
             except Exception:
@@ -140,6 +156,8 @@ class GetNextLessonSchema(ModelSchema):
     def resolve_watched(obj, context):
         user = context.get("request").user
         return obj.progress.filter(user=user, watched=True).exists()
+
+
 ModuleSchema = create_schema(Module, fields=["name", "desc"])
 
 

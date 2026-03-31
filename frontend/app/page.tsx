@@ -8,6 +8,7 @@ import { useState, useEffect } from "react";
 import { motion, useSpring, useTransform, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { Sparkles, ArrowRight, Zap, Shield, Smartphone, PlayCircle } from "lucide-react";
+import { Turnstile } from "next-turnstile";
 
 function AnimatedCounter({ value }: { value: number }) {
   const count = useSpring(0, {
@@ -88,6 +89,23 @@ export default function HomePage() {
   const [waitingCount, setWaitingCount] = useState(0);
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [isTimerComplete, setIsTimerComplete] = useState(false);
+  const [step, setStep] = useState<"email" | "code" | "turnstile">("email");
+  const [code, setCode] = useState("");
+  const [turnstileToken, setTurnstileToken] = useState("");
+  const [cooldown, setCooldown] = useState(0);
+
+  useEffect(() => {
+    if (cooldown > 0) {
+      const timer = setTimeout(() => setCooldown(cooldown - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [cooldown]);
+
+  const formatCooldown = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
+  };
 
   useEffect(() => {
     const subscribed = localStorage.getItem("bookar_waitlist_subscribed");
@@ -112,28 +130,28 @@ export default function HomePage() {
     return () => clearInterval(interval);
   }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSendVerification = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email) return;
 
     setLoading(true);
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL;
-      const response = await fetch(`${apiUrl}/auth/waitlist`, {
+      const response = await fetch(`${apiUrl}/auth/send-verification`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
       });
 
       if (response.ok) {
-        toast.success("Inscrito na lista de espera! Avisaremos em breve.");
-        setEmail("");
-        setWaitingCount(prev => prev + 1);
-        setIsSubscribed(true);
-        localStorage.setItem("bookar_waitlist_subscribed", "true");
+        // toast.success("Código enviado para o seu e-mail!");
+        setStep("code");
+      } else if (response.status === 429) {
+        const missingTime = response.headers.get("retry-after") || 180;
+        setCooldown(Number(missingTime));
       } else {
         const data = await response.json();
-        toast.error(data.message || "Algo correu mal. Tenta de novo.");
+        toast.error(data.detail || "Erro ao enviar código. Tente novamente.");
       }
     } catch (error) {
       toast.error("Erro de ligação. Verifica a tua internet.");
@@ -141,6 +159,76 @@ export default function HomePage() {
       setLoading(false);
     }
   };
+
+  const handleVerifyCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (code.length !== 6) {
+      toast.error("O código deve ter 6 dígitos.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+      const response = await fetch(`${apiUrl}/auth/verify-code`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, code }),
+      });
+
+      if (response.ok) {
+        setStep("turnstile");
+      } else if (response.status === 429) {
+        const missingTime = response.headers.get("retry-after") || 180;
+        setCooldown(Number(missingTime));
+      } else {
+        const data = await response.json();
+        toast.error(data.detail || "Código inválido");
+      }
+    } catch (error) {
+      toast.error("Erro de ligação.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleFinalSubmit = async (token: string) => {
+    setLoading(true);
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+      const response = await fetch(`${apiUrl}/auth/waitlist`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, code, token }),
+      });
+
+      if (response.ok) {
+        setWaitingCount(prev => prev + 1);
+        setIsSubscribed(true);
+        localStorage.setItem("bookar_waitlist_subscribed", "true");
+        toast.success("Bem-vindo à lista de espera!");
+      } else if (response.status === 429) {
+        const missingTime = response.headers.get("retry-after") || 180;
+        setCooldown(Number(missingTime));
+      } else {
+        const data = await response.json();
+        toast.error(data.detail || "Algo correu mal. Tenta de novo.");
+        // If it's a turnstile or code error, maybe go back
+        if (response.status === 400) setStep("code");
+      }
+    } catch (error) {
+      toast.error("Erro de ligação.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyTurnstile = (token: string) => {
+    setTurnstileToken(token);
+    handleFinalSubmit(token);
+  };
+
+
 
   return (
     <AnimatePresence mode="wait">
@@ -198,64 +286,124 @@ export default function HomePage() {
                   </div>
 
                   {!isSubscribed ? (
-                    <form onSubmit={handleSubmit} className="w-full flex flex-col sm:flex-row gap-2 max-w-md">
-                      <Input
-                        type="email"
-                        placeholder="teu@email.com"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        required
-                        className="h-11 md:h-12 border-black/10 bg-neutral-50 rounded-xl px-4 text-base focus-visible:ring-black/5 focus-visible:border-black/20"
-                      />
-                      <Button
-                        type="submit"
-                        disabled={loading}
-                        className="h-11 md:h-12 bg-cyan-500 hover:bg-cyan-600 text-white font-bold px-8 rounded-xl shadow-sm transition-all"
-                      >
-                        {loading ? "..." : "Reservar Lugar"}
-                      </Button>
-                    </form>
+                    <div className="w-full max-w-md">
+                      {step === "email" && (
+                        <form onSubmit={handleSendVerification} className="w-full flex flex-col sm:flex-row gap-2">
+                          <Input
+                            type="email"
+                            placeholder="teu@email.com"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            required
+                            className="h-11 md:h-12 border-black/10 bg-neutral-50 rounded-xl px-4 text-base focus-visible:ring-black/5 focus-visible:border-black/20"
+                          />
+                          <Button
+                            type="submit"
+                            disabled={loading || cooldown > 0}
+                            className="h-11 md:h-12 bg-cyan-500 hover:bg-cyan-600 text-white font-bold px-8 rounded-xl shadow-sm transition-all"
+                          >
+                            {loading ? "..." : "Reservar Lugar"}
+                          </Button>
+                        </form>
+                      )}
+
+                      {cooldown > 0 && (
+                        <p className="text-xs text-red-500 mt-2 font-medium">
+                          Muitas tentativas. Tenta novamente em {formatCooldown(cooldown)}
+                        </p>
+                      )}
+
+                      {step === "code" && (
+                        <form onSubmit={handleVerifyCode} className="w-full flex flex-col gap-3">
+                          <div className="text-sm text-muted-foreground mb-1">Insere o código de 6 dígitos enviado para o teu e-mail</div>
+                          <div className="flex gap-2">
+                            <Input
+                              type="text"
+                              placeholder="000000"
+                              value={code}
+                              onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                              required
+                              className="h-11 md:h-12 border-black/10 bg-neutral-50 rounded-xl px-4 text-center text-xl tracking-widest focus-visible:ring-black/5"
+                            />
+                            <Button
+                              type="submit"
+                              disabled={loading || cooldown > 0}
+                              className="h-11 md:h-12 bg-cyan-500 hover:bg-cyan-600 text-white font-bold px-6 rounded-xl transition-all"
+                            >
+                              {loading ? "..." : "Verificar"}
+                            </Button>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="link"
+                            className="text-xs text-muted-foreground p-0 h-auto"
+                            onClick={() => setStep("email")}
+                          >
+                            Mudar e-mail / E-mail não chegou?
+                          </Button>
+                        </form>
+                      )}
+
+                      {step === "turnstile" && (
+                        <div className="flex flex-col items-center gap-4">
+                          <div className="text-sm font-medium">Verifica que és humano</div>
+                          <Turnstile
+                            siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY!}
+                            onVerify={handleVerifyTurnstile}
+                            theme="light"
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            className="text-xs text-muted-foreground"
+                            onClick={() => setStep("code")}
+                          >
+                            Voltar
+                          </Button>
+                        </div>
+                      )}
+                    </div>
                   ) : (
                     <div className="bg-cyan-50 border border-cyan-100 rounded-2xl p-4 md:p-6 max-w-md w-full">
                       <p className="text-cyan-700 font-semibold text-base md:text-lg">Já estás na lista de espera!</p>
                       <p className="text-cyan-600/70 text-xs md:text-sm mt-1">Avisaremos assim que abrirmos as portas.</p>
                     </div>
                   )}
-                </div>
 
-                <div className="flex items-center justify-center gap-6 pt-2">
-                  <Link
-                    target='_blank'
-                    href="https://vm.tiktok.com/ZS9RHKRCc2754-kii29"
-                    className="hover:scale-110 transition-transform"
-                  >
-                    <svg className="w-8 h-8" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.17-2.89-.6-4.09-1.47-.88-.64-1.61-1.47-2.12-2.44v7.37c.02 1.43-.39 2.89-1.2 4.02-1.15 1.7-3.23 2.65-5.23 2.51-1.64-.09-3.24-.92-4.14-2.29-.98-1.42-1.15-3.32-.48-4.88.66-1.57 2.15-2.73 3.84-2.92 1.04-.15 2.13.04 3.06.57.02-.45-.01-4.78.01-6.11-.01-5.1-.01-5.11-.01-5.15z" />
-                    </svg>
-                  </Link>
-                  <Link
-                    target='_blank'
-                    href="https://www.instagram.com/bookar_study"
-                    className="hover:scale-110 transition-transform"
-                  >
-                    <svg className="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
-                      <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
-                      <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
-                    </svg>
-                  </Link>
-                  <Link
-                    target='_blank'
-                    href="https://www.facebook.com/profile.php?id=61578517742438"
-                    className="hover:scale-110 transition-transform"
-                  >
-                    <div className="w-10 h-10 flex items-center justify-center border rounded-full">
+                  <div className="flex items-center justify-center gap-6 pt-2">
+                    <Link
+                      target='_blank'
+                      href="https://vm.tiktok.com/ZS9RHKRCc2754-kii29"
+                      className="hover:scale-110 transition-transform"
+                    >
+                      <svg className="w-8 h-8" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.17-2.89-.6-4.09-1.47-.88-.64-1.61-1.47-2.12-2.44v7.37c.02 1.43-.39 2.89-1.2 4.02-1.15 1.7-3.23 2.65-5.23 2.51-1.64-.09-3.24-.92-4.14-2.29-.98-1.42-1.15-3.32-.48-4.88.66-1.57 2.15-2.73 3.84-2.92 1.04-.15 2.13.04 3.06.57.02-.45-.01-4.78.01-6.11-.01-5.1-.01-5.11-.01-5.15z" />
+                      </svg>
+                    </Link>
+                    <Link
+                      target='_blank'
+                      href="https://www.instagram.com/bookar_study"
+                      className="hover:scale-110 transition-transform"
+                    >
+                      <svg className="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
+                        <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
+                        <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
+                      </svg>
+                    </Link>
+                    <Link
+                      target='_blank'
+                      href="https://www.facebook.com/profile.php?id=61578517742438"
+                      className="hover:scale-110 transition-transform"
+                    >
+                      <div className="w-10 h-10 flex items-center justify-center border rounded-full">
 
-                    <svg className="w-8 h-8" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path>
-                    </svg>
-                    </div>
-                  </Link>
+                        <svg className="w-8 h-8" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path>
+                        </svg>
+                      </div>
+                    </Link>
+                  </div>
                 </div>
               </div>
             </div>

@@ -1,6 +1,7 @@
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 
+
 def send_user_update(user_id, data):
     """
     Send a message to a user's WebSocket group.
@@ -11,5 +12,5 @@ def send_user_update(user_id, data):
         {
             "type": "user.update",
             "data": data,
-        }
+        },
     )

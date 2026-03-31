@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,6 +15,20 @@ export default function ForgotPasswordPage() {
     const [isLoading, setIsLoading] = useState(false);
     const [isSubmitted, setIsSubmitted] = useState(false);
     const [error, setError] = useState("");
+    const [cooldown, setCooldown] = useState(0);
+
+    useEffect(() => {
+        if (cooldown > 0) {
+            const timer = setTimeout(() => setCooldown(cooldown - 1), 1000);
+            return () => clearTimeout(timer);
+        }
+    }, [cooldown]);
+
+    const formatCooldown = (seconds: number) => {
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        return `${mins}:${secs.toString().padStart(2, "0")}`;
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -34,6 +48,11 @@ export default function ForgotPasswordPage() {
             });
 
             if (!response.ok) {
+                if (response.status === 429) {
+                    const retryAfter = response.headers.get("retry-after") || "60";
+                    setCooldown(parseInt(retryAfter));
+                    throw new Error(`Tente novamente em ${formatCooldown(parseInt(retryAfter))}`);
+                }
                 const data = await response.json();
                 throw new Error(data.message || "Ocorreu um erro ao processar sua solicitação.");
             }
@@ -151,10 +170,16 @@ export default function ForgotPasswordPage() {
                             )}
                         </div>
 
+                        {cooldown > 0 && (
+                            <p className="text-sm text-red-500 mt-2 font-medium text-center">
+                                Muitas tentativas. Tente novamente em {formatCooldown(cooldown)}
+                            </p>
+                        )}
+
                         <Button
                             type="submit"
                             className="w-full h-12 text-base font-medium group bg-cyan-500 hover:bg-cyan-600 text-white"
-                            disabled={isLoading}
+                            disabled={isLoading || cooldown > 0}
                         >
                             {isLoading ? (
                                 <>

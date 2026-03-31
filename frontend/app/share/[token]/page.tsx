@@ -42,7 +42,7 @@ export default function ShareLandingPage() {
                     router.push("/");
                 }
             } catch (error) {
-                console.error("Error fetching share info:", error);
+                // console.error("Error fetching share info:", error);
             } finally {
                 setIsLoading(false);
             }
