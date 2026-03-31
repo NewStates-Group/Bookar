@@ -329,7 +329,14 @@ export default function WatchPage() {
         );
     }
 
-    if (error || !lesson || !course) {
+    if (lesson?.status === "PENDING") {
+        return null;
+    }
+
+    if (!course) return null;
+    if (!lesson && lessonID !== "quiz") return null;
+
+    if (error) {
         return (
             <div className="min-h-screen flex flex-col items-center justify-center">
                 <p className="text-destructive mb-4">{error || "Aula não encontrada"}</p>
@@ -381,13 +388,23 @@ export default function WatchPage() {
                     </button>
                     <button
                         disabled={!previousLesson}
-                        className={`border-r flex gap-2  items-center justify-center hover:bg-muted transition-colors ${!previousLesson ? "opacity-70 cursor-not-allowed" : "cursor-pointer"}`}>
-                        <Link className="flex items-center justify-center gap-2" href={`/app/courses/watch?l=${previousLesson?.id}&c=${courseID}`}>
-                            <ChevronLeft className="w-4 h-4" />
-                            <span className="hidden md:block">
-                                Aula Anterior
-                            </span>
-                        </Link>
+                        className={`border-r flex gap-2 items-center justify-center hover:bg-muted transition-colors ${!previousLesson ? "opacity-70 cursor-not-allowed" : "cursor-pointer"}`}
+                    >
+                        {previousLesson ? (
+                            <Link className="flex items-center justify-center gap-2" href={`/app/courses/watch?l=${previousLesson.id}&c=${courseID}`}>
+                                <ChevronLeft className="w-4 h-4" />
+                                <span className="hidden md:block">
+                                    Aula Anterior
+                                </span>
+                            </Link>
+                        ) : (
+                            <div className="flex items-center justify-center gap-2 text-foreground/50">
+                                <ChevronLeft className="w-4 h-4" />
+                                <span className="hidden md:block">
+                                    Aula Anterior
+                                </span>
+                            </div>
+                        )}
                     </button>
                     <button
                         disabled={(() => {
@@ -399,27 +416,56 @@ export default function WatchPage() {
                                 ) ?? false;
                                 return !allWatched;
                             }
-                            // For regular lessons, we allow clicking even if not READY
-                            // This allows the user to see the processing state on the next page
-                            return false;
+                            return (nextLesson?.status === "READY") && !lesson?.watched;
                         })()}
-                        className={`border-r flex gap-2 items-center justify-center hover:bg-muted transition-colors ${(() => {
-                            if (!nextLesson && !nextQuiz) return true;
-                            if (nextQuiz) {
-                                const moduleOfQuiz = course?.modules.find(m => m.id === nextQuiz.moduleId);
-                                const allWatched = moduleOfQuiz?.lessons.every(l =>
-                                    l.watched || (l.id === lesson?.id && ended)
-                                ) ?? false;
-                                return !allWatched;
+                        className={`border-r flex gap-2 items-center justify-center transition-colors ${(() => {
+                            const isDisabled = (() => {
+                                if (!nextLesson && !nextQuiz) return true;
+                                if (nextQuiz) {
+                                    const moduleOfQuiz = course?.modules.find(m => m.id === nextQuiz.moduleId);
+                                    const allWatched = moduleOfQuiz?.lessons.every(l =>
+                                        l.watched || (l.id === lesson?.id && ended)
+                                    ) ?? false;
+                                    return !allWatched;
+                                }
+                                return (nextLesson?.status === "PENDING") && !lesson?.watched;
+                            })();
+                            return isDisabled ? "opacity-70 cursor-not-allowed" : "cursor-pointer hover:bg-muted";
+                        })()}`}
+                    >
+                        {(() => {
+                            const isDisabled = (() => {
+                                if (!nextLesson && !nextQuiz) return true;
+                                if (nextQuiz) {
+                                    const moduleOfQuiz = course?.modules.find(m => m.id === nextQuiz.moduleId);
+                                    const allWatched = moduleOfQuiz?.lessons.every(l =>
+                                        l.watched || (l.id === lesson?.id && ended)
+                                    ) ?? false;
+                                    return !allWatched;
+                                }
+                                return (nextLesson?.status === "PENDING") && !lesson?.watched;
+                            })();
+
+                            if (isDisabled) {
+                                return (
+                                    <div className="flex items-center justify-center gap-2 text-foreground/50">
+                                        <span className="hidden md:block">
+                                            {nextQuiz ? "Hora do Quiz" : "Próxima Aula"}
+                                        </span>
+                                        <ChevronRight className="w-4 h-4" />
+                                    </div>
+                                );
                             }
-                            return false;
-                        })() ? "opacity-70 cursor-not-allowed" : "cursor-pointer"}`}>
-                        <Link className="flex items-center justify-center gap-2" href={`/app/courses/watch?l=${nextQuiz ? "quiz&id=" + nextQuiz.id : nextLesson?.id}&c=${courseID}`}>
-                            <span className="hidden md:block">
-                                {nextQuiz ? "Hora do Quiz" : "Próxima Aula"}
-                            </span>
-                            <ChevronRight className="w-4 h-4" />
-                        </Link>
+
+                            return (
+                                <Link className="flex items-center justify-center gap-2" href={`/app/courses/watch?l=${nextQuiz ? "quiz&id=" + nextQuiz.id : nextLesson?.id}&c=${courseID}`}>
+                                    <span className="hidden md:block">
+                                        {nextQuiz ? "Hora do Quiz" : "Próxima Aula"}
+                                    </span>
+                                    <ChevronRight className="w-4 h-4" />
+                                </Link>
+                            );
+                        })()}
                     </button>
 
                     <button className="flex gap-2 items-center cursor-pointer justify-center border-r hover:bg-muted transition-colors" onClick={() => setShowQuestionsModal(true)}>
@@ -449,7 +495,7 @@ export default function WatchPage() {
                                             {lesson?.desc}
                                         </p>
                                     </div>
-                                    {(lesson?.status === "PROCESSING" || lesson?.status === "PENDING") && (
+                                    {(lesson?.status === "PROCESSING") && (
                                         <div className="text-center max-w-lg z-10 py-10">
                                             <BuildingBlocksLoader />
                                             <h2 className="text-2xl font-bold text-foreground mb-2">Criando sua aula</h2>
@@ -580,7 +626,6 @@ export default function WatchPage() {
                 </div>
             </div>
 
-            {/* Mobile Markdown Material Sidebar (Overlay) */}
             {materialSidebarOpen && activeMaterialContent && (
                 <div className="lg:hidden fixed inset-0 z-[120] flex">
                     {/* Backdrop */}
@@ -619,29 +664,32 @@ export default function WatchPage() {
             )}
 
             {showQuestionsModal && (
-                <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-[110]">
-                    <div className="bg-card border border-border rounded-lg max-w-md w-full mx-4 p-6">
-                        <div className="flex items-center justify-between mb-4">
-                            <h2 className="text-xl font-bold text-foreground">Dúvidas sobre a aula?</h2>
-                            <button onClick={() => setShowQuestionsModal(false)} className="text-foreground/50 hover:text-foreground">
-                                <X className="w-5 h-5" />
-                            </button>
+                <div className="fixed inset-0 bg-black/40 backdrop-blur-[2px] flex items-center justify-center z-[110] animate-in fade-in duration-200">
+                    <div className="bg-card border border-border rounded-2xl max-w-md w-full mx-4 overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
+                        <div className="bg-primary/10 px-4 py-1.5 flex items-center justify-center gap-2 border-b border-primary/20">
+                            <span className="text-xs font-medium text-primary">Funcionalidade em Desenvolvimento</span>
                         </div>
-                        <p className="text-foreground/60 mb-4">
-                            Descreva sua dúvida e nossos instrutores responderão em breve.
-                        </p>
-                        <textarea
-                            placeholder="Digite sua dúvida aqui..."
-                            className="w-full bg-muted border border-border rounded-lg p-3 text-foreground placeholder-foreground/40 focus:outline-none focus:border-primary focus:bg-muted/80 mb-4 resize-none"
-                            rows={4}
-                        />
-                        <div className="flex gap-2">
-                            <Button variant="outline" onClick={() => setShowQuestionsModal(false)} className="flex-1">
-                                Cancelar
-                            </Button>
-                            <Button onClick={() => { setShowQuestionsModal(false); toast.success("Dúvida enviada com sucesso!"); }} className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground">
-                                Enviar
-                            </Button>
+
+                        <div className="p-6">
+                            <div className="relative group">
+                                {/* Blurred Overlay for content */}
+                                <div className="absolute inset-0 z-10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                                    <div className="bg-background/80 backdrop-blur-sm px-4 py-2 rounded-full border border-border shadow-sm">
+                                        <p className="text-xs font-semibold text-foreground">Disponível em breve!</p>
+                                    </div>
+                                </div>
+
+                            </div>
+
+                            <div className="mt-6 flex justify-center">
+                                <Button
+                                    onClick={() => setShowQuestionsModal(false)}
+                                    variant="ghost"
+                                    className="text-primary hover:text-primary/80 hover:bg-primary/5 text-sm font-medium"
+                                >
+                                    Entendido, voltar para a aula
+                                </Button>
+                            </div>
                         </div>
                     </div>
                 </div>
