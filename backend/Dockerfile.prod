@@ -32,6 +32,10 @@ COPY --from=builder /install /usr/local
 
 COPY . .
 
+RUN chown -R app:app /app
+
+USER app
+
 RUN chmod +x /app/entrypoint.sh
 
 EXPOSE 8000
