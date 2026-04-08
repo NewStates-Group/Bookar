@@ -35,7 +35,7 @@ function CountdownTimer({ onComplete }: { onComplete: () => void }) {
   });
 
   useEffect(() => {
-    const targetDate = new Date("2026-04-24T15:00:00");
+    const targetDate = new Date("2026-04-24T15:00:00+01:00");
 
     const timer = setInterval(() => {
       const now = new Date().getTime();
