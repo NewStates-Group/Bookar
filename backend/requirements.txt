@@ -8,6 +8,7 @@ anyio==4.11.0
     # via
     #   google-genai
     #   httpx
+    #   openai
     #   watchfiles
 arabic-reshaper==3.0.0
     # via xhtml2pdf
@@ -95,6 +96,8 @@ cssselect2==0.9.0
     # via svglib
 daphne==4.2.1
     # via backend (pyproject.toml)
+distro==1.9.0
+    # via openai
 django==5.2.7
     # via
     #   backend (pyproject.toml)
@@ -124,6 +127,8 @@ django-xhtml2pdf==0.0.4
     # via backend (pyproject.toml)
 dnspython==2.8.0
     # via email-validator
+elevenlabs==2.42.0
+    # via backend (pyproject.toml)
 email-validator==2.3.0
     # via pydantic
 exceptiongroup==1.3.1
@@ -147,14 +152,19 @@ h11==0.16.0
 html5lib==1.1
     # via xhtml2pdf
 httpcore==1.0.9
-    # via httpx
+    # via
+    #   httpx
+    #   openrouter
 httptools==0.7.1
     # via uvicorn
 httpx==0.28.1
     # via
     #   backend (pyproject.toml)
+    #   elevenlabs
     #   google-genai
     #   ollama
+    #   openai
+    #   openrouter
 humanize==4.14.0
     # via flower
 hyperlink==21.0.0
@@ -173,6 +183,8 @@ incremental==24.11.0
     # via twisted
 injector==0.23.0
     # via django-ninja-extra
+jiter==0.13.0
+    # via openai
 kombu==5.6.1
     # via celery
 lxml==6.0.2
@@ -184,6 +196,10 @@ msgpack==1.1.2
     #   autobahn
     #   channels-redis
 ollama==0.6.1
+    # via backend (pyproject.toml)
+openai==2.31.0
+    # via backend (pyproject.toml)
+openrouter==0.8.1
     # via backend (pyproject.toml)
 orjson==3.11.3
     # via backend (pyproject.toml)
@@ -224,10 +240,15 @@ pydantic==2.11.10
     # via
     #   backend (pyproject.toml)
     #   django-ninja
+    #   elevenlabs
     #   google-genai
     #   ollama
+    #   openai
+    #   openrouter
 pydantic-core==2.33.2
-    # via pydantic
+    # via
+    #   elevenlabs
+    #   pydantic
 pyhanko==0.34.1
     # via xhtml2pdf
 pyhanko-certvalidator==0.30.1
@@ -266,6 +287,7 @@ reportlab==4.4.10
 requests==2.32.5
     # via
     #   django-cloudinary-storage
+    #   elevenlabs
     #   google-genai
     #   pyhanko
     #   pyhanko-certvalidator
@@ -283,7 +305,9 @@ six==1.17.0
     #   html5lib
     #   python-dateutil
 sniffio==1.3.1
-    # via anyio
+    # via
+    #   anyio
+    #   openai
 sqlparse==0.5.3
     # via django
 svglib==1.6.0
@@ -298,13 +322,17 @@ tinycss2==1.5.1
     #   svglib
 tornado==6.5.4
     # via flower
+tqdm==4.67.3
+    # via openai
 twisted==25.5.0
     # via daphne
 txaio==25.12.2
     # via autobahn
 typing-extensions==4.15.0
     # via
+    #   elevenlabs
     #   google-genai
+    #   openai
     #   pydantic
     #   pydantic-core
     #   twisted
@@ -345,6 +373,7 @@ webencodings==0.5.1
     #   tinycss2
 websockets==15.0.1
     # via
+    #   elevenlabs
     #   google-genai
     #   uvicorn
 xhtml2pdf==0.2.17

@@ -85,6 +85,10 @@ CHANNEL_LAYERS = {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
             "hosts": [env("REDIS_URL")],
+            "ssl_context_config": {
+                "check_hostname": False,
+                "cert_reqs": "none",
+            },
         },
     },
 }
@@ -152,10 +156,15 @@ CORS_EXPOSE_HEADERS = [
 AI = {
     "OLLAMA_KEY": env("OLLAMA_KEY"),
     "GENAI_KEY": env("GENAI_KEY"),
+    "OPENROUTER_KEY": env("OPENROUTER_KEY", default=""),
+    "ELEVENLABS_KEY": env("ELEVENLABS_KEY", default=""),
     "OLLAMA_MODEL_TEXT": env("OLLAMA_MODEL_TEXT"),
     "GENAI_MODEL_IMAGE": env("GENAI_MODEL_IMAGE"),
     "GENAI_MODEL_AUDIO": env("GENAI_MODEL_AUDIO"),
     "GENAI_MODEL_TEXT": env("GENAI_MODEL_TEXT"),
+    "OPENROUTER_MODEL_TEXT": env("OPENROUTER_MODEL_TEXT", default="google/gemma-4-26b-a4b-it:free"),
+    "OPENROUTER_MODEL_IMAGE": env("OPENROUTER_MODEL_IMAGE", default="sourceful/riverflow-v2-pro"),
+    "ELEVENLABS_VOICE_ID": env("ELEVENLABS_VOICE_ID", default="pNInz6obpg8ndclQU7Nc"),
 }
 
 GOOGLE_CLIENT_ID = env("GOOGLE_CLIENT_ID")

@@ -23,7 +23,6 @@ from django.core.files.base import ContentFile
 from django.contrib.auth import get_user_model
 
 from django.core.files.storage import default_storage
-from google.genai import types
 from PIL import Image, ImageDraw, UnidentifiedImageError
 
 from core.utils import send_user_update
@@ -39,9 +38,9 @@ from .models import (
 )
 from .utils import (
     extract_json,
-    get_genai_client,
+    get_openrouter_client,
+    openrouter_chat,
     genai_chat,
-    safe_gemini_call,
     invalidate_course_cache,
 )
 from django.core.cache import cache
@@ -90,29 +89,21 @@ def _normalize_audio(input_path, output_path):
 
 def _generate_audio(client, text, output_path):
     try:
-        response = safe_gemini_call(
-            client.models.generate_content,
-            model=settings.AI.get("GENAI_MODEL_AUDIO", "gemini-2.5-flash-preview-tts"),
-            contents=text,
-            config=types.GenerateContentConfig(
-                response_modalities=["AUDIO"],
-                speech_config=types.SpeechConfig(
-                    voice_config=types.VoiceConfig(
-                        prebuilt_voice_config=types.PrebuiltVoiceConfig(
-                            voice_name="Puck"
-                        )
-                    )
-                ),
-            ),
+        from elevenlabs.client import ElevenLabs
+        
+        client = ElevenLabs(api_key=settings.AI["ELEVENLABS_KEY"])
+        audio_iterator = client.generate(
+            text=text,
+            voice=settings.AI.get("ELEVENLABS_VOICE_ID", "pNInz6obpg8ndclQU7Nc"),
+            model="eleven_multilingual_v2"
         )
-
-        if hasattr(response, "parts"):
-            for part in response.parts:
-                if part.inline_data:
-                    return _save_pcm_as_wav(output_path, part.inline_data.data)
-            raise ValueError("No audio data received from API")
+        
+        # Combine the iterator into a single byte string
+        audio_data = b"".join(audio_iterator)
+        output_path.write_bytes(audio_data)
+        return True
     except Exception as e:
-        logger.error(f"Audio generation failed: {e}")
+        logger.error(f"Audio generation failed with ElevenLabs: {e}")
         return False
 
 
@@ -131,59 +122,33 @@ def _create_fallback_image(prompt, output_path):
 def _generate_image(client, prompt, output_path, timeout=30):
     try:
         img_prompt = f"Hand-drawn whiteboard animation style, minimalist black marker on white board: {prompt}. Any visible text MUST be in Portuguese."
-        model_name = settings.AI.get("GENAI_MODEL_IMAGE", "gemini-2.5-flash-lite")
+        model_name = settings.AI.get("OPENROUTER_MODEL_IMAGE", "sourceful/riverflow-v2-pro")
 
         # Log the attempt
         logger.info(
             f"Generating image with model {model_name} for prompt: {prompt[:50]}..."
         )
 
-        response = safe_gemini_call(
-            client.models.generate_content,
+        client = get_openrouter_client()
+        response = client.images.generate(
             model=model_name,
-            contents=img_prompt,
-            config=types.GenerateContentConfig(
-                image_config=types.ImageConfig(aspect_ratio="16:9")
-            ),
+            prompt=img_prompt,
         )
 
-        if not response or not response.parts:
-            raise ValueError("Empty response from Gemini")
+        if not response or not response.data:
+            raise ValueError("Empty response from OpenRouter")
 
-        for part in response.parts:
-            if part.inline_data:
-                output_path.write_bytes(part.inline_data.data)
+        img_url = response.data[0].url
+        if img_url:
+            import requests
+            img_response = requests.get(img_url, timeout=timeout)
+            if img_response.status_code == 200:
+                output_path.write_bytes(img_response.content)
                 return True
-            # Some versions might return just 'image' or similar, though SDK usually gives inline_data
-            if hasattr(part, "image"):
-                # Check if part.image is bytes or have .data
-                data = (
-                    part.image
-                    if isinstance(part.image, bytes)
-                    else getattr(part.image, "data", None)
-                )
-                if data:
-                    output_path.write_bytes(data)
-                    return True
-        raise ValueError("No image part in response")
+        
+        raise ValueError("No image URL in response")
     except Exception as e:
         logger.warning(f"Image generation failed for '{prompt[:50]}...': {str(e)}")
-        # If it's a BadRequest, it might be the config. Let's try once without image_config as a last resort
-        if "BadRequest" in str(e) or "400" in str(e):
-            try:
-                logger.info("Retrying without image_config...")
-                response = safe_gemini_call(
-                    client.models.generate_content,
-                    model=model_name,
-                    contents=img_prompt,
-                )
-                for part in response.parts:
-                    if part.inline_data:
-                        output_path.write_bytes(part.inline_data.data)
-                        return True
-            except Exception as retry_e:
-                logger.warning(f"Retry without config also failed: {retry_e}")
-
         logger.info("Using fallback image.")
         return _create_fallback_image(prompt, output_path)
 
@@ -279,7 +244,7 @@ def generate_lesson(self, user_id, lesson_id: int):
         return None
 
     temp_dir = Path(tempfile.mkdtemp())
-    client = get_genai_client()
+    client = get_openrouter_client()
     try:
         plan_prompt = f"""
         Title: {lesson.title}
@@ -839,7 +804,7 @@ def create_course_details(user_id: int, course_pk: int, prompt: str, level: str)
     default_retry_delay=40,
 )
 def create_course_thumb(course_pk: str, prompt: str):
-    client = get_genai_client()
+    client = get_openrouter_client()
     ai_prompt = f"""
     Cria uma capa profissional de curso educacional.
     Tema do curso: "{prompt}"
@@ -865,28 +830,17 @@ def create_course_thumb(course_pk: str, prompt: str):
             logger.info(f"Course {course_pk} thumbnail generation cancelled.")
             return
 
-        response = safe_gemini_call(
-            client.models.generate_content,
-            model=settings.AI.get("GENAI_MODEL_IMAGE", "gemini-2.5-flash-lite"),
-            contents=[ai_prompt],
-            config=types.GenerateContentConfig(
-                image_config=types.ImageConfig(aspect_ratio="16:9")
-            ),
+        response = client.images.generate(
+            model=settings.AI.get("OPENROUTER_MODEL_IMAGE", "sourceful/riverflow-v2-pro"),
+            prompt=ai_prompt,
         )
 
         image_data = None
-        for part in response.parts:
-            if part.inline_data:
-                image_data = part.inline_data.data
-                break
-            if hasattr(part, "image"):
-                image_data = (
-                    part.image
-                    if isinstance(part.image, bytes)
-                    else getattr(part.image, "data", None)
-                )
-                if image_data:
-                    break
+        if response and response.data and response.data[0].url:
+            import requests
+            img_response = requests.get(response.data[0].url, timeout=30)
+            if img_response.status_code == 200:
+                image_data = img_response.content
 
         if not image_data:
             raise ThumbnailCreationError("IA não retornou uma imagem válida")
@@ -1008,31 +962,22 @@ def generate_certificate_task(user_id: int, course_id: int, full_name: str):
         - A imagem final deve ter alta qualidade (1600x1000).
         """
 
-        model_name = settings.AI.get("GENAI_MODEL_IMAGE", "gemini-2.0-flash")
 
-        response = safe_gemini_call(
-            client.models.generate_content,
-            model=model_name,
-            contents=[base_img, prompt],
-            config=types.GenerateContentConfig(
-                image_config=types.ImageConfig(aspect_ratio="16:9")
-            ),
+
+        # OpenRouter/OpenAI doesn't natively support "image + text to image" for most models in the same way Gemini does.
+        # We will use the prompt alone for now, or use a vision model if available.
+        # Given the request, we'll try to describe the style in the prompt.
+        response = client.images.generate(
+            model=settings.AI.get("OPENROUTER_MODEL_IMAGE", "sourceful/riverflow-v2-pro"),
+            prompt=prompt,
         )
 
         image_data = None
-        if hasattr(response, "parts"):
-            for part in response.parts:
-                if part.inline_data:
-                    image_data = part.inline_data.data
-                    break
-                if hasattr(part, "image"):
-                    image_data = (
-                        part.image
-                        if isinstance(part.image, bytes)
-                        else getattr(part.image, "data", None)
-                    )
-                    if image_data:
-                        break
+        if response and response.data and response.data[0].url:
+            import requests
+            img_response = requests.get(response.data[0].url, timeout=30)
+            if img_response.status_code == 200:
+                image_data = img_response.content
 
         if not image_data:
             # Fallback to the text-based drawing if image generation modality is not supported by the model
