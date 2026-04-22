@@ -14,6 +14,7 @@ env = environ.Env(
     CLOUDINARY_CLOUD_NAME=(str, ""),
     CLOUDINARY_API_KEY=(str, ""),
     CLOUDINARY_API_SECRET=(str, ""),
+    REPLICATE_API_TOKEN=(str, ""),
 )
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -163,8 +164,14 @@ AI = {
     "GENAI_MODEL_IMAGE": env("GENAI_MODEL_IMAGE"),
     "GENAI_MODEL_AUDIO": env("GENAI_MODEL_AUDIO"),
     "GENAI_MODEL_TEXT": env("GENAI_MODEL_TEXT"),
-    "OPENROUTER_MODEL_TEXT": env("OPENROUTER_MODEL_TEXT", default="google/gemma-4-26b-a4b-it:free"),
-    "OPENROUTER_MODEL_IMAGE": env("OPENROUTER_MODEL_IMAGE", default="sourceful/riverflow-v2-pro"),
+    "OPENROUTER_MODEL_TEXT": env(
+        "OPENROUTER_MODEL_TEXT", default="google/gemma-4-26b-a4b-it:free"
+    ),
+    "OPENROUTER_MODEL_IMAGE": env(
+        "OPENROUTER_MODEL_IMAGE", default="sourceful/riverflow-v2-fast"
+    ),
+    "REPLICATE_API_TOKEN": env("REPLICATE_API_TOKEN"),
+    "REPLICATE_MODEL_IMAGE": env("REPLICATE_MODEL_IMAGE", default="google/imagen-4"),
     "ELEVENLABS_VOICE_ID": env("ELEVENLABS_VOICE_ID", default="pNInz6obpg8ndclQU7Nc"),
 }
 
