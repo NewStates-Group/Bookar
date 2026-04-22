@@ -1,8 +1,8 @@
 from datetime import timedelta
 from pathlib import Path
-from corsheaders.defaults import default_headers
 
 import environ
+from corsheaders.defaults import default_headers
 
 env = environ.Env(
     SECRET_KEY=(str, "django-example-secret-key"),
@@ -84,11 +84,12 @@ CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            "hosts": [env("REDIS_URL")],
-            "ssl_context_config": {
-                "check_hostname": False,
-                "cert_reqs": "none",
-            },
+            "hosts": [
+                {
+                    "address": env.str("REDIS_URL"),
+                    "ssl_cert_reqs": None,
+                }
+            ],
         },
     },
 }
@@ -185,7 +186,7 @@ NINJA_EXTRA = {
         "verify_code": "3/3m",
         "email_check": "3/1m",
         "password_reset_request": "3/5m",
-        "password_reset_confirm": "3/3m"
+        "password_reset_confirm": "3/3m",
     }
 }
 
