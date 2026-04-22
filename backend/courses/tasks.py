@@ -41,6 +41,7 @@ from .utils import (
     get_openrouter_client,
     openrouter_chat,
     genai_chat,
+    replicate_generate_image,
     invalidate_course_cache,
 )
 from django.core.cache import cache
@@ -122,31 +123,20 @@ def _create_fallback_image(prompt, output_path):
 def _generate_image(client, prompt, output_path, timeout=30):
     try:
         img_prompt = f"Hand-drawn whiteboard animation style, minimalist black marker on white board: {prompt}. Any visible text MUST be in Portuguese."
-        model_name = settings.AI.get("OPENROUTER_MODEL_IMAGE", "sourceful/riverflow-v2-pro")
 
         # Log the attempt
         logger.info(
-            f"Generating image with model {model_name} for prompt: {prompt[:50]}..."
+            f"Generating image with Replicate for prompt: {prompt[:50]}..."
         )
 
-        client = get_openrouter_client()
-        response = client.images.generate(
-            model=model_name,
-            prompt=img_prompt,
-        )
+        output = replicate_generate_image(img_prompt, aspect_ratio="16:9")
 
-        if not response or not response.data:
-            raise ValueError("Empty response from OpenRouter")
+        if not output:
+            raise ValueError("Empty response from Replicate")
 
-        img_url = response.data[0].url
-        if img_url:
-            import requests
-            img_response = requests.get(img_url, timeout=timeout)
-            if img_response.status_code == 200:
-                output_path.write_bytes(img_response.content)
-                return True
-        
-        raise ValueError("No image URL in response")
+        # Based on user snippet, output is a Replicate object with .read()
+        output_path.write_bytes(output.read())
+        return True
     except Exception as e:
         logger.warning(f"Image generation failed for '{prompt[:50]}...': {str(e)}")
         logger.info("Using fallback image.")
@@ -830,17 +820,12 @@ def create_course_thumb(course_pk: str, prompt: str):
             logger.info(f"Course {course_pk} thumbnail generation cancelled.")
             return
 
-        response = client.images.generate(
-            model=settings.AI.get("OPENROUTER_MODEL_IMAGE", "sourceful/riverflow-v2-pro"),
-            prompt=ai_prompt,
-        )
+        logger.info(f"Generating course thumbnail with Replicate for prompt: {prompt[:50]}...")
+        output = replicate_generate_image(ai_prompt, aspect_ratio="16:9")
 
         image_data = None
-        if response and response.data and response.data[0].url:
-            import requests
-            img_response = requests.get(response.data[0].url, timeout=30)
-            if img_response.status_code == 200:
-                image_data = img_response.content
+        if output:
+            image_data = output.read()
 
         if not image_data:
             raise ThumbnailCreationError("IA não retornou uma imagem válida")
@@ -921,7 +906,6 @@ def generate_certificate_task(user_id: int, course_id: int, full_name: str):
     try:
         user = User.objects.get(pk=user_id)
         course = Course.objects.get(pk=course_id)
-        client = get_genai_client()
         # 1. Calculate real duration
         from django.db.models import Sum
 
@@ -964,27 +948,17 @@ def generate_certificate_task(user_id: int, course_id: int, full_name: str):
 
 
 
-        # OpenRouter/OpenAI doesn't natively support "image + text to image" for most models in the same way Gemini does.
-        # We will use the prompt alone for now, or use a vision model if available.
-        # Given the request, we'll try to describe the style in the prompt.
-        response = client.images.generate(
-            model=settings.AI.get("OPENROUTER_MODEL_IMAGE", "sourceful/riverflow-v2-pro"),
-            prompt=prompt,
-        )
+        # describe the style in the prompt.
+        logger.info(f"Generating certificate with Replicate for: {full_name}")
+        output = replicate_generate_image(prompt, aspect_ratio="16:9")
 
         image_data = None
-        if response and response.data and response.data[0].url:
-            import requests
-            img_response = requests.get(response.data[0].url, timeout=30)
-            if img_response.status_code == 200:
-                image_data = img_response.content
+        if output:
+            image_data = output.read()
 
         if not image_data:
-            # Fallback to the text-based drawing if image generation modality is not supported by the model
-            # or returned nothing. But given the user's frustration, we must try to get an image.
-            # If response has text but no image, maybe the model didn't support image generation.
             raise ValueError(
-                f"IA não retornou uma imagem para o certificado. Resposta: {getattr(response, 'text', 'Sem texto')}"
+                "IA não retornou uma imagem para o certificado através do Replicate."
             )
 
         # 3. Save to Database/Cloudinary
@@ -1007,16 +981,6 @@ def generate_certificate_task(user_id: int, course_id: int, full_name: str):
 
         send_certificate_email(user, course, enrollment.certificate_file.url)
         return enrollment.certificate_file.url
-
-    except Exception as e:
-        logger.error(f"Certificate generation failed: {e}")
-        try:
-            CourseEnrollment.objects.filter(
-                course_id=course_id, user_id=user_id
-            ).update(certificate_status="FAILED")
-        except:
-            pass
-        raise e
 
     except Exception as e:
         logger.error(f"Certificate generation failed: {e}")
