@@ -3,6 +3,7 @@ import time
 import orjson
 from django.conf import settings
 from openai import OpenAI
+import replicate
 from ollama import Client as OllamaClient
 from tenacity import (
     retry,
@@ -154,6 +155,37 @@ def genai_chat(messages, model=None):
     Backwards compatibility: redirects to OpenRouter as requested.
     """
     return openrouter_chat(messages, model=model)
+
+
+def replicate_generate_image(prompt, aspect_ratio="16:9"):
+    """
+    Generate an image using Replicate's API.
+    """
+    import os
+
+    # Replicate client uses REPLICATE_API_TOKEN from environment by default,
+    # but we can also set it explicitly if needed.
+    # We'll ensure it's in the environment.
+    os.environ["REPLICATE_API_TOKEN"] = settings.AI["REPLICATE_API_TOKEN"]
+
+    model = settings.AI.get("REPLICATE_MODEL_IMAGE", "google/imagen-4")
+
+    input_data = {
+        "prompt": prompt,
+        "aspect_ratio": aspect_ratio,
+        "safety_filter_level": "block_medium_and_above"
+    }
+
+    try:
+        output = replicate.run(
+            model,
+            input=input_data
+        )
+        # Based on the user's snippet, output has a .url property and .read() method
+        return output
+    except Exception as e:
+        logger.error(f"Replicate image generation failed: {e}")
+        raise e
 
 
 def cached_genai_call(prompt: str, ttl: int = 86400) -> str:
