@@ -155,6 +155,7 @@ httpx==0.28.1
     #   backend (pyproject.toml)
     #   google-genai
     #   ollama
+    #   replicate
 humanize==4.14.0
     # via flower
 hyperlink==21.0.0
@@ -194,6 +195,7 @@ packaging==25.0
     #   gunicorn
     #   incremental
     #   kombu
+    #   replicate
 pillow==11.3.0
     # via
     #   backend (pyproject.toml)
@@ -226,6 +228,7 @@ pydantic==2.11.10
     #   django-ninja
     #   google-genai
     #   ollama
+    #   replicate
 pydantic-core==2.33.2
     # via pydantic
 pyhanko==0.34.1
@@ -258,6 +261,8 @@ redis==7.1.0
     # via
     #   backend (pyproject.toml)
     #   channels-redis
+replicate==1.0.7
+    # via backend (pyproject.toml)
 reportlab==4.4.10
     # via
     #   backend (pyproject.toml)
@@ -307,6 +312,7 @@ typing-extensions==4.15.0
     #   google-genai
     #   pydantic
     #   pydantic-core
+    #   replicate
     #   twisted
     #   typing-inspection
 typing-inspection==0.4.2
