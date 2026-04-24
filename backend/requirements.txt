@@ -165,6 +165,7 @@ httpx==0.28.1
     #   ollama
     #   openai
     #   openrouter
+    #   replicate
 humanize==4.14.0
     # via flower
 hyperlink==21.0.0
@@ -210,6 +211,7 @@ packaging==25.0
     #   gunicorn
     #   incremental
     #   kombu
+    #   replicate
 pillow==11.3.0
     # via
     #   backend (pyproject.toml)
@@ -243,8 +245,12 @@ pydantic==2.11.10
     #   elevenlabs
     #   google-genai
     #   ollama
+<<<<<<< HEAD
     #   openai
     #   openrouter
+=======
+    #   replicate
+>>>>>>> main
 pydantic-core==2.33.2
     # via
     #   elevenlabs
@@ -279,6 +285,8 @@ redis==7.1.0
     # via
     #   backend (pyproject.toml)
     #   channels-redis
+replicate==1.0.7
+    # via backend (pyproject.toml)
 reportlab==4.4.10
     # via
     #   backend (pyproject.toml)
@@ -335,6 +343,7 @@ typing-extensions==4.15.0
     #   openai
     #   pydantic
     #   pydantic-core
+    #   replicate
     #   twisted
     #   typing-inspection
 typing-inspection==0.4.2
