@@ -122,7 +122,7 @@ def _create_fallback_image(prompt, output_path):
 
 def _generate_image(client, prompt, output_path, timeout=30):
     try:
-        img_prompt = f"Hand-drawn whiteboard animation style, minimalist black marker on white board: {prompt}. Any visible text MUST be in Portuguese."
+        img_prompt = f"Hand-drawn whiteboard animation style, minimalist black marker on white board: {prompt}. Focus on drawings and symbols. MINIMIZE text. Any visible text MUST be in Portuguese and very sparse."
 
         # Log the attempt
         logger.info(
@@ -254,7 +254,7 @@ def generate_lesson(self, user_id, lesson_id: int):
         [
         {{
             "narration": "Detailed and engaging narration for this segment (approx {int((lesson.duration / 5) * 2.5)} words)...",
-            "visual_prompt": "A simple image scene description for this part..."
+            "visual_prompt": "A simple image scene description for this part. Focus on SYMBOLS, DRAWINGS and OBJECTS. AVOID asking for text or labels."
         }}
         ]
         """
@@ -422,7 +422,7 @@ def generate_next_module(self, user_pk: int, course_pk: int, module_pk: int = No
         '      "duration": 480, '
         '      "narration": "Summary narration text (approx 200 words) that will be expanded later...",'
         '      "key_points": "Key takeaway 1, Key takeaway 2",'
-        '      "scene_suggestion": "Visual description for whiteboard animation"'
+        '      "scene_suggestion": "Visual description for whiteboard animation (Focus on symbols and drawings, avoid text-heavy descriptions)"'
         "    }\n"
         "  ]\n"
         "}\n\n"
@@ -796,22 +796,23 @@ def create_course_details(user_id: int, course_pk: int, prompt: str, level: str)
 def create_course_thumb(course_pk: str, prompt: str):
     client = get_openrouter_client()
     ai_prompt = f"""
-    Cria uma capa profissional de curso educacional.
-    Tema do curso: "{prompt}"
+    Uma capa profissional de curso educacional de alta qualidade (estilo Coursera/Masterclass).
+    Tema central: "{prompt}"
 
-    Estilo visual:
-    - Design moderno e limpo
-    - Cores adequadas ao tema
-    - Gradientes suaves se necessário
-    - Logos ou ilustrações no centro (não realistas)
-    - Faz uma thumb retângular, não quadrada
+    Estilo Visual:
+    - Design minimalista, moderno e premium.
+    - Foco em um objeto ou símbolo iconográfico central que represente o tema.
+    - Cores harmoniosas e profissionais, com gradientes suaves.
+    - Iluminação cinematográfica ou estilo ilustração vetorial limpa.
+    - Composição equilibrada (regra dos terços).
 
-    Regras:
-    - Todo o texto deve estar em português
-    - Não adicionar textos desnecessários, é apenas uma capa
-    - Não usar marcas d\'água
-    - Não coloca nenhum texto ou figura nos cantos
-    - Não coloca elementos aleatórios tipo logos que não estão relacionadas com o curso pedido
+    REGRAS CRÍTICAS (PARA EVITAR ERROS):
+    - NÃO escreva textos longos ou frases.
+    - EVITE colocar qualquer texto na imagem. Se colocar, deve ser APENAS uma ou duas palavras chave do tema central em fonte grande e limpa.
+    - ZERO textos aleatórios, legendas, ou caracteres borrados.
+    - SEM marcas d'água, assinaturas ou logos (exceto símbolos abstratos do tema).
+    - SEM elementos nos cantos da imagem.
+    - A imagem deve ser limpa e focar no simbolismo visual.
     """
 
     try:

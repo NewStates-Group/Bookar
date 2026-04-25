@@ -245,12 +245,9 @@ pydantic==2.11.10
     #   elevenlabs
     #   google-genai
     #   ollama
-<<<<<<< HEAD
     #   openai
     #   openrouter
-=======
     #   replicate
->>>>>>> main
 pydantic-core==2.33.2
     # via
     #   elevenlabs

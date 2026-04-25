@@ -89,7 +89,8 @@ CHANNEL_LAYERS = {
                 {
                     "address": env.str("REDIS_URL"),
                     "ssl_cert_reqs": None,
-                }
+                } if not DEBUG
+                else env.str("REDIS_URL")
             ],
         },
     },
@@ -165,7 +166,7 @@ AI = {
     "GENAI_MODEL_AUDIO": env("GENAI_MODEL_AUDIO"),
     "GENAI_MODEL_TEXT": env("GENAI_MODEL_TEXT"),
     "OPENROUTER_MODEL_TEXT": env(
-        "OPENROUTER_MODEL_TEXT", default="google/gemma-4-26b-a4b-it:free"
+        "OPENROUTER_MODEL_TEXT", default="inclusionai/ling-2.6-1t:free"
     ),
     "OPENROUTER_MODEL_IMAGE": env(
         "OPENROUTER_MODEL_IMAGE", default="sourceful/riverflow-v2-fast"
