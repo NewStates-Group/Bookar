@@ -155,12 +155,15 @@ CORS_EXPOSE_HEADERS = [
 ]
 
 AI = {
-    "OLLAMA_KEY": env("OLLAMA_KEY"),
-    "GENAI_KEY": env("GENAI_KEY"),
-    "OLLAMA_MODEL_TEXT": env("OLLAMA_MODEL_TEXT"),
-    "GENAI_MODEL_IMAGE": env("GENAI_MODEL_IMAGE"),
-    "GENAI_MODEL_AUDIO": env("GENAI_MODEL_AUDIO"),
-    "GENAI_MODEL_TEXT": env("GENAI_MODEL_TEXT"),
+    "OLLAMA_KEY": env("OLLAMA_KEY", default=""),
+    "GENAI_KEY": env("GENAI_KEY", default=""),
+    "OLLAMA_MODEL_TEXT": env("OLLAMA_MODEL_TEXT", default=""),
+    "GENAI_MODEL_IMAGE": env("GENAI_MODEL_IMAGE", default=""),
+    "GENAI_MODEL_AUDIO": env("GENAI_MODEL_AUDIO", default=""),
+    "GENAI_MODEL_TEXT": env("GENAI_MODEL_TEXT", default=""),
+    "AI_ENVIRONMENT": env("AI_ENVIRONMENT", default="production"),
+    "REPLICATE_API_TOKEN": env("REPLICATE_API_TOKEN", default=""),
+    "HF_API_KEY": env("HF_API_KEY", default=""),
 }
 
 GOOGLE_CLIENT_ID = env("GOOGLE_CLIENT_ID")
