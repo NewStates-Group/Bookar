@@ -40,7 +40,7 @@ from .models import (
 from .utils import (
     extract_json,
     get_genai_client,
-    genai_chat,
+    generate_text_with_fallback,
     safe_gemini_call,
     invalidate_course_cache,
 )
@@ -128,64 +128,155 @@ def _create_fallback_image(prompt, output_path):
         return False
 
 
-def _generate_image(client, prompt, output_path, timeout=30):
+def _generate_image_genai(client, prompt, output_path, timeout=30):
     try:
         img_prompt = f"Hand-drawn whiteboard animation style, minimalist black marker on white board: {prompt}. Any visible text MUST be in Portuguese."
         model_name = settings.AI.get("GENAI_MODEL_IMAGE", "gemini-2.5-flash-lite")
 
-        # Log the attempt
-        logger.info(
-            f"Generating image with model {model_name} for prompt: {prompt[:50]}..."
-        )
-
-        response = safe_gemini_call(
-            client.models.generate_content,
-            model=model_name,
-            contents=img_prompt,
-            config=types.GenerateContentConfig(
-                image_config=types.ImageConfig(aspect_ratio="16:9")
-            ),
-        )
-
-        if not response or not response.parts:
-            raise ValueError("Empty response from Gemini")
-
-        for part in response.parts:
-            if part.inline_data:
-                output_path.write_bytes(part.inline_data.data)
-                return True
-            # Some versions might return just 'image' or similar, though SDK usually gives inline_data
-            if hasattr(part, "image"):
-                # Check if part.image is bytes or have .data
-                data = (
-                    part.image
-                    if isinstance(part.image, bytes)
-                    else getattr(part.image, "data", None)
+        response = None
+        if "imagen" in model_name.lower() or "generate" in model_name.lower():
+            response = safe_gemini_call(
+                client.models.generate_images,
+                model=model_name,
+                prompt=img_prompt,
+                config=types.GenerateImagesConfig(
+                    number_of_images=1,
+                    aspect_ratio="16:9",
+                    output_mime_type="image/jpeg",
                 )
-                if data:
-                    output_path.write_bytes(data)
+            )
+            
+            if not response or not response.generated_images:
+                raise ValueError("Empty response from Gemini Images")
+                
+            for generated_image in response.generated_images:
+                output_path.write_bytes(generated_image.image.image_bytes)
+                return True
+        else:
+            response = safe_gemini_call(
+                client.models.generate_content,
+                model=model_name,
+                contents=img_prompt,
+                config=types.GenerateContentConfig(
+                    image_config=types.ImageConfig(aspect_ratio="16:9")
+                ),
+            )
+
+            if not response or not response.parts:
+                raise ValueError("Empty response from Gemini Content")
+
+            for part in response.parts:
+                if part.inline_data:
+                    output_path.write_bytes(part.inline_data.data)
                     return True
+                if hasattr(part, "image"):
+                    data = (
+                        part.image
+                        if isinstance(part.image, bytes)
+                        else getattr(part.image, "data", None)
+                    )
+                    if data:
+                        output_path.write_bytes(data)
+                        return True
         raise ValueError("No image part in response")
     except Exception as e:
-        logger.warning(f"Image generation failed for '{prompt[:50]}...': {str(e)}")
-        # If it's a BadRequest, it might be the config. Let's try once without image_config as a last resort
         if "BadRequest" in str(e) or "400" in str(e):
             try:
-                logger.info("Retrying without image_config...")
-                response = safe_gemini_call(
-                    client.models.generate_content,
-                    model=model_name,
-                    contents=img_prompt,
-                )
-                for part in response.parts:
-                    if part.inline_data:
-                        output_path.write_bytes(part.inline_data.data)
-                        return True
+                # If fallback logic for old models
+                if not ("imagen" in model_name.lower() or "generate" in model_name.lower()):
+                    response = safe_gemini_call(
+                        client.models.generate_content,
+                        model=model_name,
+                        contents=img_prompt,
+                    )
+                    for part in response.parts:
+                        if part.inline_data:
+                            output_path.write_bytes(part.inline_data.data)
+                            return True
             except Exception as retry_e:
-                logger.warning(f"Retry without config also failed: {retry_e}")
+                raise retry_e
+        raise e
 
-        logger.info("Using fallback image.")
-        return _create_fallback_image(prompt, output_path)
+def _generate_image_replicate(prompt, output_path, timeout=30):
+    import replicate
+    os.environ["REPLICATE_API_TOKEN"] = settings.AI.get("REPLICATE_API_TOKEN", "")
+    img_prompt = f"Hand-drawn whiteboard animation style, minimalist black marker on white board: {prompt}. Any visible text MUST be in Portuguese."
+    output = replicate.run(
+        "black-forest-labs/flux-schnell", 
+        input={"prompt": img_prompt, "aspect_ratio": "16:9"}
+    )
+    if not output:
+        raise ValueError("No output from Replicate")
+    
+    url = output[0] if isinstance(output, list) else output
+    import httpx
+    with httpx.Client() as c:
+        res = c.get(str(url), timeout=timeout)
+        res.raise_for_status()
+        output_path.write_bytes(res.content)
+    return True
+
+def _generate_image_pollinations(prompt, output_path, timeout=30):
+    import httpx
+    import urllib.parse
+    img_prompt = f"Hand-drawn whiteboard animation style, minimalist black marker on white board: {prompt}. Any visible text MUST be in Portuguese."
+    encoded_prompt = urllib.parse.quote(img_prompt)
+    url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1920&height=1080&nologo=true"
+    
+    with httpx.Client() as c:
+        res = c.get(url, timeout=timeout)
+        res.raise_for_status()
+        output_path.write_bytes(res.content)
+    return True
+
+def _generate_image_huggingface(prompt, output_path, timeout=30):
+    import httpx
+    token = settings.AI.get("HF_API_KEY", "")
+    if not token:
+        raise ValueError("HF_API_KEY not set")
+        
+    img_prompt = f"Hand-drawn whiteboard animation style, minimalist black marker on white board: {prompt}. Any visible text MUST be in Portuguese."
+    API_URL = "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0"
+    headers = {"Authorization": f"Bearer {token}"}
+    
+    with httpx.Client() as c:
+        res = c.post(API_URL, headers=headers, json={"inputs": img_prompt}, timeout=timeout)
+        res.raise_for_status()
+        output_path.write_bytes(res.content)
+    return True
+
+def _generate_image(client, prompt, output_path, timeout=30):
+    env = settings.AI.get("AI_ENVIRONMENT", "production")
+    
+    def call_genai():
+        return _generate_image_genai(client, prompt, output_path, timeout)
+        
+    if env == "testing":
+        providers = [
+            ("Pollinations", lambda: _generate_image_pollinations(prompt, output_path, timeout)),
+            ("HuggingFace", lambda: _generate_image_huggingface(prompt, output_path, timeout)),
+            ("Replicate", lambda: _generate_image_replicate(prompt, output_path, timeout)),
+            ("GenAI", call_genai),
+        ]
+    else:
+        providers = [
+            ("GenAI", call_genai),
+            ("Replicate", lambda: _generate_image_replicate(prompt, output_path, timeout)),
+            ("Pollinations", lambda: _generate_image_pollinations(prompt, output_path, timeout)),
+            ("HuggingFace", lambda: _generate_image_huggingface(prompt, output_path, timeout)),
+        ]
+
+    for name, provider in providers:
+        try:
+            logger.info(f"Attempting image generation with provider: {name} for prompt: {prompt[:50]}...")
+            if provider():
+                return True
+        except Exception as e:
+            logger.warning(f"Image provider {name} failed: {e}")
+            continue
+
+    logger.info("All image providers failed. Using fallback image.")
+    return _create_fallback_image(prompt, output_path)
 
 
 def _stitch_video(image, audio, output):
@@ -304,7 +395,7 @@ def generate_lesson(self, user_id, lesson_id: int):
         ]
         """
 
-        response = genai_chat([{"role": "user", "content": plan_prompt}])
+        response = generate_text_with_fallback([{"role": "user", "content": plan_prompt}])
         segments = (extract_json(response, isList=True) or [])[:5]  # hard cap at 5
 
         if not segments:
@@ -478,7 +569,7 @@ def generate_next_module(self, user_pk: int, course_pk: int, module_pk: int = No
     )
     module_object = None
     try:
-        response = genai_chat([{"role": "user", "content": prompt}])
+        response = generate_text_with_fallback([{"role": "user", "content": prompt}])
         module_data = extract_json(response)
 
         if not module_data:
@@ -606,7 +697,7 @@ def generate_module_quiz(module_id: int, user_id: int = None):
         }}
         """
 
-        response = genai_chat(prompt)
+        response = generate_text_with_fallback([{"role": "user", "content": prompt}])
         quiz_data = extract_json(response)
 
         if not quiz_data:
@@ -659,7 +750,7 @@ def generate_module_quiz(module_id: int, user_id: int = None):
 )
 def generate_module_material(module_id: int):
     from .models import Module, ModuleMaterial
-    from .utils import genai_chat
+    from .utils import generate_text_with_fallback
     import json
 
     module = Module.objects.filter(pk=module_id).first()
@@ -713,7 +804,7 @@ def generate_module_material(module_id: int):
         """
 
         # Generate content using AI
-        markdown_content = genai_chat(prompt)
+        markdown_content = generate_text_with_fallback([{"role": "user", "content": prompt}])
         
         if not markdown_content:
             raise Exception("AI failed to generate markdown content")
@@ -785,7 +876,7 @@ def create_course_details(user_id: int, course_pk: int, prompt: str, level: str)
             logger.info(f"Course {course_pk} generation cancelled.")
             return
 
-        response = genai_chat([{"role": "user", "content": ai_prompt}])
+        response = generate_text_with_fallback([{"role": "user", "content": ai_prompt}])
         course_outline = extract_json(response)
     except Exception as e:
         logger.error(f"Outline generation failed: {e}")
