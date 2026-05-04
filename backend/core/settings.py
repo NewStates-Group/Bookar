@@ -88,7 +88,7 @@ CHANNEL_LAYERS = {
                 {
                     "address": env.str("REDIS_URL"),
                     "ssl_cert_reqs": None,
-                }
+                } if not DEBUG else env.str("REDIS_URL")
             ],
         },
     },
