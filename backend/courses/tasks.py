@@ -130,7 +130,6 @@ def _create_fallback_image(prompt, output_path):
 
 def _generate_image_genai(client, prompt, output_path, timeout=30):
     try:
-        img_prompt = f"Hand-drawn whiteboard animation style, minimalist black marker on white board: {prompt}. Any visible text MUST be in Portuguese."
         model_name = settings.AI.get("GENAI_MODEL_IMAGE", "gemini-2.5-flash-lite")
 
         response = None
@@ -138,7 +137,7 @@ def _generate_image_genai(client, prompt, output_path, timeout=30):
             response = safe_gemini_call(
                 client.models.generate_images,
                 model=model_name,
-                prompt=img_prompt,
+                prompt=prompt,
                 config=types.GenerateImagesConfig(
                     number_of_images=1,
                     aspect_ratio="16:9",
@@ -156,7 +155,7 @@ def _generate_image_genai(client, prompt, output_path, timeout=30):
             response = safe_gemini_call(
                 client.models.generate_content,
                 model=model_name,
-                contents=img_prompt,
+                contents=prompt,
                 config=types.GenerateContentConfig(
                     image_config=types.ImageConfig(aspect_ratio="16:9")
                 ),
@@ -187,7 +186,7 @@ def _generate_image_genai(client, prompt, output_path, timeout=30):
                     response = safe_gemini_call(
                         client.models.generate_content,
                         model=model_name,
-                        contents=img_prompt,
+                        contents=prompt,
                     )
                     for part in response.parts:
                         if part.inline_data:
@@ -200,10 +199,9 @@ def _generate_image_genai(client, prompt, output_path, timeout=30):
 def _generate_image_replicate(prompt, output_path, timeout=30):
     import replicate
     os.environ["REPLICATE_API_TOKEN"] = settings.AI.get("REPLICATE_API_TOKEN", "")
-    img_prompt = f"Hand-drawn whiteboard animation style, minimalist black marker on white board: {prompt}. Any visible text MUST be in Portuguese."
     output = replicate.run(
         "black-forest-labs/flux-schnell", 
-        input={"prompt": img_prompt, "aspect_ratio": "16:9"}
+        input={"prompt": prompt, "aspect_ratio": "16:9"}
     )
     if not output:
         raise ValueError("No output from Replicate")
@@ -219,8 +217,7 @@ def _generate_image_replicate(prompt, output_path, timeout=30):
 def _generate_image_pollinations(prompt, output_path, timeout=30):
     import httpx
     import urllib.parse
-    img_prompt = f"Hand-drawn whiteboard animation style, minimalist black marker on white board: {prompt}. Any visible text MUST be in Portuguese."
-    encoded_prompt = urllib.parse.quote(img_prompt)
+    encoded_prompt = urllib.parse.quote(prompt)
     url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1920&height=1080&nologo=true"
     
     with httpx.Client() as c:
@@ -235,17 +232,16 @@ def _generate_image_huggingface(prompt, output_path, timeout=30):
     if not token:
         raise ValueError("HF_API_KEY not set")
         
-    img_prompt = f"Hand-drawn whiteboard animation style, minimalist black marker on white board: {prompt}. Any visible text MUST be in Portuguese."
     API_URL = "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0"
     headers = {"Authorization": f"Bearer {token}"}
     
     with httpx.Client() as c:
-        res = c.post(API_URL, headers=headers, json={"inputs": img_prompt}, timeout=timeout)
+        res = c.post(API_URL, headers=headers, json={"inputs": prompt}, timeout=timeout)
         res.raise_for_status()
         output_path.write_bytes(res.content)
     return True
 
-def _generate_image(client, prompt, output_path, timeout=30):
+def _run_image_providers(client, prompt, output_path, timeout=30, context=None):
     env = settings.AI.get("AI_ENVIRONMENT", "production")
     
     def call_genai():
@@ -266,17 +262,29 @@ def _generate_image(client, prompt, output_path, timeout=30):
             ("HuggingFace", lambda: _generate_image_huggingface(prompt, output_path, timeout)),
         ]
 
+    # Reorder if we already found a functional API
+    if context and context.get("working_provider"):
+        working_name = context.get("working_provider")
+        providers = sorted(providers, key=lambda p: 0 if p[0] == working_name else 1)
+
     for name, provider in providers:
         try:
             logger.info(f"Attempting image generation with provider: {name} for prompt: {prompt[:50]}...")
             if provider():
+                if context is not None and context.get("working_provider") != name:
+                    logger.info(f"Established functional image provider: {name}")
+                    context["working_provider"] = name
                 return True
         except Exception as e:
             logger.warning(f"Image provider {name} failed: {e}")
             continue
 
-    logger.info("All image providers failed. Using fallback image.")
-    return _create_fallback_image(prompt, output_path)
+    logger.error("All image providers failed to generate the image.")
+    return False
+
+def _generate_image(client, prompt, output_path, timeout=30, context=None):
+    img_prompt = f"Hand-drawn whiteboard animation style, minimalist black marker on white board: {prompt}. Any visible text MUST be in Portuguese."
+    return _run_image_providers(client, img_prompt, output_path, timeout, context)
 
 
 def _stitch_video(image, audio, output):
@@ -310,7 +318,7 @@ def _stitch_video(image, audio, output):
         return False
 
 
-def _process_segment(i, segment, client, temp_dir):
+def _process_segment(i, segment, client, temp_dir, context=None):
     narration = segment.get("narration")
     visual = segment.get("visual_prompt")
 
@@ -321,14 +329,14 @@ def _process_segment(i, segment, client, temp_dir):
     image = temp_dir / f"s{i}.png"
     video = temp_dir / f"s{i}.mp4"
 
-    # Concurrency restored to 2 for parallel audio/image generation
     with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
         audio_future = pool.submit(_generate_audio, client, narration, audio)
-        image_future = pool.submit(_generate_image, client, visual, image)
+        image_future = pool.submit(_generate_image, client, visual, image, 30, context)
 
         if not audio_future.result():
             return None
-        image_future.result()
+        if not image_future.result():
+            return None
 
     if not _stitch_video(image, audio, video):
         return None
@@ -401,20 +409,31 @@ def generate_lesson(self, user_id, lesson_id: int):
         if not segments:
             raise ValueError("No segments generated")
 
-        # --- RESTORED PARALLEL PROCESSING ---
+        # --- RESTORED LOGIC WITH INITIAL SEQUENTIAL CHECK ---
         videos = []
-        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
-            futures = [
-                executor.submit(_process_segment, i, seg, client, temp_dir)
-                for i, seg in enumerate(segments)
-            ]
-            for future in concurrent.futures.as_completed(futures):
-                try:
-                    video_path = future.result()
-                    if video_path:
-                        videos.append(video_path)
-                except Exception as e:
-                    logger.error(f"Segment processing failed: {e}")
+        context = {"working_provider": None}
+
+        if segments:
+            logger.info("Processing first segment sequentially to determine functional image provider")
+            first_video = _process_segment(0, segments[0], client, temp_dir, context)
+            if first_video:
+                videos.append(first_video)
+
+        # Process the rest concurrently, now benefiting from the established functional provider in `context`
+        remaining_segments = segments[1:]
+        if remaining_segments:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+                futures = [
+                    executor.submit(_process_segment, i, seg, client, temp_dir, context)
+                    for i, seg in enumerate(remaining_segments, start=1)
+                ]
+                for future in concurrent.futures.as_completed(futures):
+                    try:
+                        video_path = future.result()
+                        if video_path:
+                            videos.append(video_path)
+                    except Exception as e:
+                        logger.error(f"Segment processing failed: {e}")
 
         # Sort videos by segment index (s0.mp4, s1.mp4, etc.)
         videos.sort(key=lambda x: int(x.stem[1:]) if x.stem.startswith("s") else 999)
@@ -956,39 +975,26 @@ def create_course_thumb(course_pk: str, prompt: str):
             logger.info(f"Course {course_pk} thumbnail generation cancelled.")
             return
 
-        response = safe_gemini_call(
-            client.models.generate_content,
-            model=settings.AI.get("GENAI_MODEL_IMAGE", "gemini-2.5-flash-lite"),
-            contents=[ai_prompt],
-            config=types.GenerateContentConfig(
-                image_config=types.ImageConfig(aspect_ratio="16:9")
-            ),
-        )
-
-        image_data = None
-        for part in response.parts:
-            if part.inline_data:
-                image_data = part.inline_data.data
-                break
-            if hasattr(part, "image"):
-                image_data = (
-                    part.image
-                    if isinstance(part.image, bytes)
-                    else getattr(part.image, "data", None)
-                )
-                if image_data:
-                    break
-
-        if not image_data:
-            raise ThumbnailCreationError("IA não retornou uma imagem válida")
-
+        import tempfile
+        
+        with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp_file:
+            tmp_path = Path(tmp_file.name)
+            
         try:
-            image = Image.open(BytesIO(image_data))
-            image.verify()
-            image = Image.open(BytesIO(image_data)).convert("RGBA")
-        except Exception as e:
-            logger.error(f"Image processing error: {e}")
-            raise ThumbnailCreationError("Conteúdo retornado não é uma imagem válida")
+            success = _run_image_providers(client, ai_prompt, tmp_path, timeout=45)
+            if not success:
+                raise ThumbnailCreationError("Todos os provedores de imagem falharam")
+                
+            image_data = tmp_path.read_bytes()
+            try:
+                image = Image.open(BytesIO(image_data))
+                image.verify()
+                image = Image.open(BytesIO(image_data)).convert("RGBA")
+            except Exception as e:
+                logger.error(f"Image processing error: {e}")
+                raise ThumbnailCreationError("Conteúdo retornado não é uma imagem válida")
+        finally:
+            tmp_path.unlink(missing_ok=True)
 
         logo_path = settings.BASE_DIR / "static" / "logo.png"
         if logo_path.exists():
