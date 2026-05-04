@@ -9,7 +9,7 @@ from tenacity import (
     retry,
     stop_after_attempt,
     wait_exponential,
-    retry_if_exception_type,
+    retry_if_exception,
 )
 
 from .models import Lesson
@@ -41,14 +41,11 @@ limiter = RateLimiter(min_interval=settings.AI.get("GENAI_RATE_LIMIT", 5.0))
 def is_retryable_error(exception):
     """Check if the error is 429 Resource Exhausted."""
     exc_str = str(exception).upper()
-    if isinstance(exception, ClientError):
-        # The error message usually contains 429 or RESOURCE_EXHAUSTED
-        return "429" in exc_str or "RESOURCE_EXHAUSTED" in exc_str
-    return "429" in exc_str or "RESOURCE_EXHAUSTED" in exc_str
+    return "429" in exc_str or "RESOURCE_EXHAUSTED" in exc_str or "503" in exc_str
 
 
 @retry(
-    retry=retry_if_exception_type(ClientError),
+    retry=retry_if_exception(is_retryable_error),
     wait=wait_exponential(multiplier=2, min=15, max=120),
     stop=stop_after_attempt(5),
     reraise=True,
@@ -152,9 +149,48 @@ def genai_chat(messages, model=None):
     return response.text
 
 
+def generate_text_with_fallback(messages, model=None):
+    """
+    Wrapper for text generation with fallback chain (GenAI <-> Ollama).
+    Behavior changes based on AI_ENVIRONMENT setting.
+    """
+    env = settings.AI.get("AI_ENVIRONMENT", "production")
+    
+    def call_genai():
+        return genai_chat(messages, model)
+        
+    def call_ollama():
+        if isinstance(messages, list):
+            return ollama_chat(messages=messages)
+        else:
+            return ollama_chat(messages=[{"role": "user", "content": str(messages)}])
+            
+    if env == "testing":
+        providers = [
+            ("Ollama", call_ollama), 
+            ("GenAI", call_genai)
+        ]
+    else:
+        providers = [
+            ("GenAI", call_genai), 
+            ("Ollama", call_ollama)
+        ]
+
+    last_error = None
+    for name, provider in providers:
+        try:
+            logger.info(f"Attempting text generation with provider: {name}")
+            return provider()
+        except Exception as e:
+            logger.warning(f"Text provider {name} failed: {e}")
+            last_error = e
+            
+    raise RuntimeError(f"All text providers failed. Last error: {last_error}")
+
+
 def cached_genai_call(prompt: str, ttl: int = 86400) -> str:
     """
-    Cache Gemini text responses in Redis for 24h.
+    Cache textual responses in Redis for 24h.
     Prevents re-generating identical content (same topic, same lesson structure).
     """
     import hashlib
@@ -163,9 +199,9 @@ def cached_genai_call(prompt: str, ttl: int = 86400) -> str:
     key = "genai:" + hashlib.md5(prompt.encode()).hexdigest()
     cached = cache.get(key)
     if cached:
-        logger.info("Cache HIT for Gemini prompt")
+        logger.info("Cache HIT for text prompt")
         return cached
-    result = genai_chat([{"role": "user", "content": prompt}])
+    result = generate_text_with_fallback([{"role": "user", "content": prompt}])
     cache.set(key, result, ttl)
     return result
 
