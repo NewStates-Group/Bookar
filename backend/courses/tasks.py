@@ -7,44 +7,33 @@ import uuid
 import wave
 from io import BytesIO
 from pathlib import Path
-from typing import List, Optional
+
 from celery import shared_task
-from django.conf import settings
-from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import landscape, A4
-from reportlab.lib import colors
-from reportlab.lib.units import mm
-from pypdf import PdfReader, PdfWriter
 from core.mail import send_certificate_email
-import os
-import io
-import time
-from django.core.files.base import ContentFile
-from django.contrib.auth import get_user_model
-
-from django.core.files.storage import default_storage
-from google.genai import types
-from PIL import Image, ImageDraw, UnidentifiedImageError
-
 from core.utils import send_user_update
+from django.conf import settings
+from django.contrib.auth import get_user_model
+from django.core.files.base import ContentFile
+from google.genai import types
+from PIL import Image, ImageDraw
+
 from .exceptions import LessonDoesNotExist, ThumbnailCreationError
 from .models import (
     Choice,
     Course,
+    CourseGenerationContext,
     Lesson,
     Module,
     Question,
     Quiz,
-    CourseGenerationContext,
 )
 from .utils import (
     extract_json,
-    get_genai_client,
     genai_chat,
-    safe_gemini_call,
+    get_genai_client,
     invalidate_course_cache,
+    safe_gemini_call,
 )
-from django.core.cache import cache
 
 logger = logging.getLogger(__name__)
 
@@ -554,7 +543,7 @@ def generate_next_module(self, user_pk: int, course_pk: int, module_pk: int = No
             module_object.status = "FAILED"
             module_object.save(update_fields=["status"])
             logger.error(f"Module generation failed, status set to FAILED: {e}")
-        
+
         logger.error(f"Failed to generate next module: {e}")
         # Only set course to READY if it was processing the very first module
         if course.modules.count() <= 1:
@@ -658,9 +647,10 @@ def generate_module_quiz(module_id: int, user_id: int = None):
     default_retry_delay=40,
 )
 def generate_module_material(module_id: int):
+    import json
+
     from .models import Module, ModuleMaterial
     from .utils import genai_chat
-    import json
 
     module = Module.objects.filter(pk=module_id).first()
     if not module:
@@ -671,23 +661,31 @@ def generate_module_material(module_id: int):
     material, created = ModuleMaterial.objects.get_or_create(module=module)
     material.status = "PROCESSING"
     material.save(update_fields=["status"])
-    
+
     user_id = module.course.owner_id
     send_user_update(
         user_id,
-        {"type": "material_update", "module_id": str(module.uuid), "status": "PROCESSING"},
+        {
+            "type": "material_update",
+            "module_id": str(module.uuid),
+            "status": "PROCESSING",
+        },
     )
 
     try:
         # Aggregate content from all lessons
         lessons_data = []
-        for lesson in module.lessons.all().order_by('id'):
-            lessons_data.append({
-                "title": lesson.title,
-                "description": lesson.desc,
-                "key_points": lesson.key_points or "",
-                "narration_summary": (lesson.narration[:1000] + "...") if lesson.narration and len(lesson.narration) > 1000 else (lesson.narration or "")
-            })
+        for lesson in module.lessons.all().order_by("id"):
+            lessons_data.append(
+                {
+                    "title": lesson.title,
+                    "description": lesson.desc,
+                    "key_points": lesson.key_points or "",
+                    "narration_summary": (lesson.narration[:1000] + "...")
+                    if lesson.narration and len(lesson.narration) > 1000
+                    else (lesson.narration or ""),
+                }
+            )
 
         course_title = module.course.title
         module_name = module.name
@@ -714,7 +712,7 @@ def generate_module_material(module_id: int):
 
         # Generate content using AI
         markdown_content = genai_chat(prompt)
-        
+
         if not markdown_content:
             raise Exception("AI failed to generate markdown content")
 
@@ -722,23 +720,31 @@ def generate_module_material(module_id: int):
         material.content = markdown_content
         material.status = "READY"
         material.save()
-        
+
         send_user_update(
             user_id,
-            {"type": "material_update", "module_id": str(module.uuid), "status": "READY"},
+            {
+                "type": "material_update",
+                "module_id": str(module.uuid),
+                "status": "READY",
+            },
         )
-        
+
         logger.info(f"Markdown material generated for module {module_id}")
-        
+
     except Exception as e:
         material.status = "FAILED"
         material.save(update_fields=["status"])
-        
+
         send_user_update(
             user_id,
-            {"type": "material_update", "module_id": str(module.uuid), "status": "FAILED"},
+            {
+                "type": "material_update",
+                "module_id": str(module.uuid),
+                "status": "FAILED",
+            },
         )
-        
+
         logger.error(f"Failed to generate material for module {module_id}: {e}")
         raise e
 
@@ -956,12 +962,13 @@ def create_course_thumb(course_pk: str, prompt: str):
     default_retry_delay=40,
 )
 def generate_certificate_task(user_id: int, course_id: int, full_name: str):
-    from .models import Course, CourseEnrollment
-    from PIL import Image
-    import io
     import uuid
+
     from django.core.files.base import ContentFile
     from google.genai import types
+    from PIL import Image
+
+    from .models import Course, CourseEnrollment
 
     User = get_user_model()
     try:
