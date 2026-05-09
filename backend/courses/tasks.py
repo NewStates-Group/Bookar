@@ -88,32 +88,94 @@ def _normalize_audio(input_path, output_path):
         return False
 
 
-def _generate_audio(client, text, output_path):
-    try:
-        response = safe_gemini_call(
-            client.models.generate_content,
-            model=settings.AI.get("GENAI_MODEL_AUDIO", "gemini-2.5-flash-preview-tts"),
-            contents=text,
-            config=types.GenerateContentConfig(
-                response_modalities=["AUDIO"],
-                speech_config=types.SpeechConfig(
-                    voice_config=types.VoiceConfig(
-                        prebuilt_voice_config=types.PrebuiltVoiceConfig(
-                            voice_name="Puck"
-                        )
+def _generate_audio_gemini(client, text, output_path):
+    """Generate audio using Gemini TTS."""
+    response = safe_gemini_call(
+        client.models.generate_content,
+        model=settings.AI.get("GENAI_MODEL_AUDIO", "gemini-2.5-flash-preview-tts"),
+        contents=text,
+        config=types.GenerateContentConfig(
+            response_modalities=["AUDIO"],
+            speech_config=types.SpeechConfig(
+                voice_config=types.VoiceConfig(
+                    prebuilt_voice_config=types.PrebuiltVoiceConfig(
+                        voice_name="Puck"
                     )
-                ),
+                )
             ),
-        )
+        ),
+    )
 
-        if hasattr(response, "parts"):
-            for part in response.parts:
-                if part.inline_data:
-                    return _save_pcm_as_wav(output_path, part.inline_data.data)
-            raise ValueError("No audio data received from API")
-    except Exception as e:
-        logger.error(f"Audio generation failed: {e}")
-        return False
+    if hasattr(response, "parts"):
+        for part in response.parts:
+            if part.inline_data:
+                return _save_pcm_as_wav(output_path, part.inline_data.data)
+    raise ValueError("No audio data received from Gemini TTS")
+
+
+def _generate_audio_elevenlabs(text, output_path):
+    """Generate audio using ElevenLabs REST API as fallback."""
+    import httpx
+
+    api_key = settings.AI.get("ELEVENLABS_KEY", "")
+    if not api_key:
+        raise ValueError("ELEVENLABS_KEY not configured")
+
+    voice_id = "onyx"
+    url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
+    headers = {
+        "xi-api-key": api_key,
+        "Content-Type": "application/json",
+        "Accept": "audio/mpeg",
+    }
+    payload = {
+        "text": text,
+        "model_id": "eleven_multilingual_v2",
+        "voice_settings": {
+            "stability": 0.5,
+            "similarity_boost": 0.75,
+        },
+    }
+
+    with httpx.Client() as c:
+        res = c.post(url, headers=headers, json=payload, timeout=60)
+        res.raise_for_status()
+
+        # ElevenLabs returns MP3 — write it, then convert to WAV with ffmpeg
+        mp3_path = output_path.with_suffix(".mp3")
+        mp3_path.write_bytes(res.content)
+
+    # Convert MP3 → WAV for consistency with the rest of the pipeline
+    import subprocess
+    subprocess.run(
+        ["ffmpeg", "-y", "-i", str(mp3_path), "-ac", "1", "-ar", "24000", "-c:a", "pcm_s16le", str(output_path)],
+        check=True, capture_output=True, timeout=30,
+    )
+    mp3_path.unlink(missing_ok=True)
+    return True
+
+
+def _generate_audio(client, text, output_path):
+    """Generate audio with fallback chain: Gemini TTS → ElevenLabs."""
+    providers = [
+        ("Gemini TTS", lambda: _generate_audio_gemini(client, text, output_path)),
+        ("ElevenLabs", lambda: _generate_audio_elevenlabs(text, output_path)),
+    ]
+
+    for name, provider in providers:
+        try:
+            logger.info(f"Attempting audio generation with provider: {name}")
+            result = provider()
+            if result:
+                logger.info(f"Audio generated successfully with {name}")
+                return True
+        except Exception as e:
+            logger.warning(f"Audio provider {name} failed: {e}")
+            continue
+
+    logger.error("All audio providers failed.")
+    return False
+
 
 
 def _create_fallback_image(prompt, output_path):

@@ -164,6 +164,7 @@ AI = {
     "AI_ENVIRONMENT": env("AI_ENVIRONMENT", default="production"),
     "REPLICATE_API_TOKEN": env("REPLICATE_API_TOKEN", default=""),
     "HF_API_KEY": env("HF_API_KEY", default=""),
+    "ELEVENLABS_KEY": env("ELEVENLABS_KEY", default=""),
 }
 
 GOOGLE_CLIENT_ID = env("GOOGLE_CLIENT_ID")
