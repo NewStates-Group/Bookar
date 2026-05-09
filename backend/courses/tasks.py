@@ -320,14 +320,13 @@ def generate_lesson(self, user_id, lesson_id: int):
         )
 
         final_filename = f"{uuid.uuid4()}.mp4"
-        with final_temp_output.open("rb") as f:
-            lesson.lesson_file.save(
-                final_filename, ContentFile(f.read(), name=final_filename), save=False
-            )
-
         with transaction.atomic():
+            with final_temp_output.open("rb") as f:
+                lesson.lesson_file.save(
+                    final_filename, ContentFile(f.read(), name=final_filename), save=False
+                )
             lesson.status = "READY"
-            lesson.save()
+            lesson.save(update_fields=["lesson_file", "status"])
 
             def _on_success():
                 invalidate_course_cache(lesson.module.course.uuid, user_id)
