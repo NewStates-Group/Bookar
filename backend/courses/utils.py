@@ -1,10 +1,10 @@
 import logging
 import time
 import orjson
+import threading
 from django.conf import settings
 from google import genai
 from google.genai.errors import ClientError
-from ollama import Client as OllamaClient
 from tenacity import (
     retry,
     stop_after_attempt,
@@ -15,8 +15,6 @@ from tenacity import (
 from .models import Lesson
 
 logger = logging.getLogger(__name__)
-
-import threading
 
 
 # Simple rate limiter state
@@ -56,13 +54,10 @@ def safe_gemini_call(method, *args, **kwargs):
     """
     limiter.wait()
     try:
-        # If it's the generate_content method, it might be bound to the model
         return method(*args, **kwargs)
     except Exception as e:
         if is_retryable_error(e):
             logger.warning(f"Gemini API rate limit hit, retrying: {e}")
-        # Re-raise as a standard Exception if needed to avoid unpickleable ClientError in Celery
-        # if though we want to keep it if we catch it later
         raise e
 
 
@@ -76,7 +71,6 @@ def extract_json(response: str, isList: bool = False):
     if "```" in cleaned:
         import re
 
-        # Try to find content between ```json and ```
         match = re.search(r"```(?:json)?\s*([\s\S]*?)```", cleaned)
         if match:
             cleaned = match.group(1).strip()
@@ -91,12 +85,9 @@ def extract_json(response: str, isList: bool = False):
 
         json_str = cleaned[start_bracket : end_bracket + 1]
 
-        # Try orjson first for speed
         try:
             return orjson.loads(json_str)
         except orjson.JSONDecodeError:
-            # Fallback to standard json which is sometimes more lenient with trailing commans in some setups
-            # or just to provide a second chance
             import json
 
             return json.loads(json_str)
@@ -107,91 +98,23 @@ def extract_json(response: str, isList: bool = False):
         return None
 
 
-def get_ollama_client():
-    return OllamaClient(
-        host="https://ollama.com",
-        headers={"Authorization": "Bearer " + settings.AI["OLLAMA_KEY"]},
-    )
-
-
-def ollama_chat(*args, **kwargs):
-    client = get_ollama_client()
-    return client.chat(settings.AI["OLLAMA_MODEL_TEXT"], *args, **kwargs)["message"][
-        "content"
-    ]
-
-
 def get_genai_client():
     return genai.Client(api_key=settings.AI["GENAI_KEY"])
 
 
-def genai_chat(messages, model=None):
-    client = get_genai_client()
-    if model is None:
-        model = settings.AI.get("GENAI_MODEL_TEXT", "gemini-2.5-flash-lite")
-
-    # Extract content from the last message if it's a list of dicts (Ollama style)
-    if (
-        isinstance(messages, list)
-        and len(messages) > 0
-        and isinstance(messages[-1], dict)
-    ):
-        prompt = messages[-1].get("content", "")
-    else:
-        prompt = str(messages)
-
-    response = safe_gemini_call(
-        client.models.generate_content,
-        model=model,
-        contents=prompt,
-    )
-
-    return response.text
-
-
 def generate_text_with_fallback(messages, model=None):
     """
-    Wrapper for text generation with fallback chain (GenAI <-> Ollama).
-    Behavior changes based on AI_ENVIRONMENT setting.
+    Text generation with Chain of Responsibility fallback.
     """
-    env = settings.AI.get("AI_ENVIRONMENT", "production")
-    
-    def call_genai():
-        return genai_chat(messages, model)
-        
-    def call_ollama():
-        if isinstance(messages, list):
-            return ollama_chat(messages=messages)
-        else:
-            return ollama_chat(messages=[{"role": "user", "content": str(messages)}])
-            
-    if env == "testing":
-        providers = [
-            ("Ollama", call_ollama), 
-            ("GenAI", call_genai)
-        ]
-    else:
-        providers = [
-            ("GenAI", call_genai), 
-            ("Ollama", call_ollama)
-        ]
+    from .providers import get_text_chain
 
-    last_error = None
-    for name, provider in providers:
-        try:
-            logger.info(f"Attempting text generation with provider: {name}")
-            return provider()
-        except Exception as e:
-            logger.warning(f"Text provider {name} failed: {e}")
-            last_error = e
-            
-    raise RuntimeError(f"All text providers failed. Last error: {last_error}")
+    chain = get_text_chain()
+    return chain.handle(messages=messages, model=model)
 
 
 def cached_genai_call(prompt: str, ttl: int = 86400) -> str:
     """
     Cache textual responses in Redis for 24h.
-    Prevents re-generating identical content (same topic, same lesson structure).
     """
     import hashlib
     from django.core.cache import cache
@@ -216,14 +139,6 @@ def get_course_detail_cache_key(course_uuid):
 
 def get_lesson_detail_cache_key(lesson_short_id):
     return f"lesson_detail_{lesson_short_id}"
-
-
-def invalidate_course_cache(course_uuid, user_id=None):
-    from django.core.cache import cache
-
-    cache.delete(get_course_detail_cache_key(course_uuid))
-    if user_id:
-        cache.delete(get_course_list_cache_key(user_id))
 
 
 def invalidate_course_cache(course_uuid, user_id=None):

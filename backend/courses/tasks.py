@@ -4,10 +4,8 @@ import shutil
 import subprocess
 import tempfile
 import uuid
-import wave
 from io import BytesIO
 from pathlib import Path
-from typing import List, Optional
 from celery import shared_task
 from django.conf import settings
 from reportlab.pdfgen import canvas
@@ -44,26 +42,10 @@ from .utils import (
     safe_gemini_call,
     invalidate_course_cache,
 )
+from .providers import get_image_chain, get_audio_chain, AllProvidersFailed
 from django.core.cache import cache
 
 logger = logging.getLogger(__name__)
-
-
-def _save_pcm_as_wav(filename, pcm_bytes, channels=1, rate=24000, sample_width=2):
-    if pcm_bytes is None:
-        logger.error("PCM bytes is None, skipping WAV save")
-        return False
-
-    try:
-        with wave.open(str(filename), "wb") as wf:
-            wf.setnchannels(channels)
-            wf.setsampwidth(sample_width)
-            wf.setframerate(rate)
-            wf.writeframes(pcm_bytes)
-        return True
-    except Exception as e:
-        logger.error(f"Failed to save PCM as WAV: {e}")
-        return False
 
 
 def _normalize_audio(input_path, output_path):
@@ -88,267 +70,27 @@ def _normalize_audio(input_path, output_path):
         return False
 
 
-def _generate_audio_gemini(client, text, output_path):
-    """Generate audio using Gemini TTS."""
-    response = safe_gemini_call(
-        client.models.generate_content,
-        model=settings.AI.get("GENAI_MODEL_AUDIO", "gemini-2.5-flash-preview-tts"),
-        contents=text,
-        config=types.GenerateContentConfig(
-            response_modalities=["AUDIO"],
-            speech_config=types.SpeechConfig(
-                voice_config=types.VoiceConfig(
-                    prebuilt_voice_config=types.PrebuiltVoiceConfig(
-                        voice_name="Puck"
-                    )
-                )
-            ),
-        ),
-    )
-
-    if hasattr(response, "parts"):
-        for part in response.parts:
-            if part.inline_data:
-                return _save_pcm_as_wav(output_path, part.inline_data.data)
-    raise ValueError("No audio data received from Gemini TTS")
-
-
-def _generate_audio_elevenlabs(text, output_path):
-    """Generate audio using ElevenLabs REST API as fallback."""
-    import httpx
-
-    api_key = settings.AI.get("ELEVENLABS_KEY", "")
-    if not api_key:
-        raise ValueError("ELEVENLABS_KEY not configured")
-
-    voice_id = "onyx"
-    url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
-    headers = {
-        "xi-api-key": api_key,
-        "Content-Type": "application/json",
-        "Accept": "audio/mpeg",
-    }
-    payload = {
-        "text": text,
-        "model_id": "eleven_multilingual_v2",
-        "voice_settings": {
-            "stability": 0.5,
-            "similarity_boost": 0.75,
-        },
-    }
-
-    with httpx.Client() as c:
-        res = c.post(url, headers=headers, json=payload, timeout=60)
-        res.raise_for_status()
-
-        # ElevenLabs returns MP3 — write it, then convert to WAV with ffmpeg
-        mp3_path = output_path.with_suffix(".mp3")
-        mp3_path.write_bytes(res.content)
-
-    # Convert MP3 → WAV for consistency with the rest of the pipeline
-    import subprocess
-    subprocess.run(
-        ["ffmpeg", "-y", "-i", str(mp3_path), "-ac", "1", "-ar", "24000", "-c:a", "pcm_s16le", str(output_path)],
-        check=True, capture_output=True, timeout=30,
-    )
-    mp3_path.unlink(missing_ok=True)
-    return True
-
-
 def _generate_audio(client, text, output_path):
-    """Generate audio with fallback chain: Gemini TTS → ElevenLabs."""
-    providers = [
-        ("Gemini TTS", lambda: _generate_audio_gemini(client, text, output_path)),
-        ("ElevenLabs", lambda: _generate_audio_elevenlabs(text, output_path)),
-    ]
-
-    for name, provider in providers:
-        try:
-            logger.info(f"Attempting audio generation with provider: {name}")
-            result = provider()
-            if result:
-                logger.info(f"Audio generated successfully with {name}")
-                return True
-        except Exception as e:
-            logger.warning(f"Audio provider {name} failed: {e}")
-            continue
-
-    logger.error("All audio providers failed.")
-    return False
-
-
-
-def _create_fallback_image(prompt, output_path):
+    """Generate audio using Chain of Responsibility."""
     try:
-        img = Image.new("RGB", (1920, 1080), "white")
-        draw = ImageDraw.Draw(img)
-        draw.text((100, 500), prompt[:200], fill="black")
-        img.save(output_path)
+        chain = get_audio_chain()
+        chain.handle(text=text, output_path=output_path, client=client)
         return True
-    except Exception as e:
-        logger.error(f"Fallback image generation failed: {e}")
+    except AllProvidersFailed as e:
+        logger.error(f"All audio providers failed: {e}")
         return False
 
 
-def _generate_image_genai(client, prompt, output_path, timeout=30):
-    try:
-        model_name = settings.AI.get("GENAI_MODEL_IMAGE", "gemini-2.5-flash-lite")
-
-        response = None
-        if "imagen" in model_name.lower() or "generate" in model_name.lower():
-            response = safe_gemini_call(
-                client.models.generate_images,
-                model=model_name,
-                prompt=prompt,
-                config=types.GenerateImagesConfig(
-                    number_of_images=1,
-                    aspect_ratio="16:9",
-                    output_mime_type="image/jpeg",
-                )
-            )
-            
-            if not response or not response.generated_images:
-                raise ValueError("Empty response from Gemini Images")
-                
-            for generated_image in response.generated_images:
-                output_path.write_bytes(generated_image.image.image_bytes)
-                return True
-        else:
-            response = safe_gemini_call(
-                client.models.generate_content,
-                model=model_name,
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    image_config=types.ImageConfig(aspect_ratio="16:9")
-                ),
-            )
-
-            if not response or not response.parts:
-                raise ValueError("Empty response from Gemini Content")
-
-            for part in response.parts:
-                if part.inline_data:
-                    output_path.write_bytes(part.inline_data.data)
-                    return True
-                if hasattr(part, "image"):
-                    data = (
-                        part.image
-                        if isinstance(part.image, bytes)
-                        else getattr(part.image, "data", None)
-                    )
-                    if data:
-                        output_path.write_bytes(data)
-                        return True
-        raise ValueError("No image part in response")
-    except Exception as e:
-        if "BadRequest" in str(e) or "400" in str(e):
-            try:
-                # If fallback logic for old models
-                if not ("imagen" in model_name.lower() or "generate" in model_name.lower()):
-                    response = safe_gemini_call(
-                        client.models.generate_content,
-                        model=model_name,
-                        contents=prompt,
-                    )
-                    for part in response.parts:
-                        if part.inline_data:
-                            output_path.write_bytes(part.inline_data.data)
-                            return True
-            except Exception as retry_e:
-                raise retry_e
-        raise e
-
-def _generate_image_replicate(prompt, output_path, timeout=30):
-    import replicate
-    os.environ["REPLICATE_API_TOKEN"] = settings.AI.get("REPLICATE_API_TOKEN", "")
-    output = replicate.run(
-        "black-forest-labs/flux-schnell", 
-        input={"prompt": prompt, "aspect_ratio": "16:9"}
-    )
-    if not output:
-        raise ValueError("No output from Replicate")
-    
-    url = output[0] if isinstance(output, list) else output
-    import httpx
-    with httpx.Client() as c:
-        res = c.get(str(url), timeout=timeout)
-        res.raise_for_status()
-        output_path.write_bytes(res.content)
-    return True
-
-def _generate_image_pollinations(prompt, output_path, timeout=30):
-    import httpx
-    import urllib.parse
-    import uuid
-    encoded_prompt = urllib.parse.quote(prompt)
-    seed = uuid.uuid4().int % 100000000
-    url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1920&height=1080&nologo=true&seed={seed}"
-    
-    with httpx.Client() as c:
-        res = c.get(url, timeout=timeout)
-        res.raise_for_status()
-        output_path.write_bytes(res.content)
-    return True
-
-def _generate_image_huggingface(prompt, output_path, timeout=30):
-    import httpx
-    token = settings.AI.get("HF_API_KEY", "")
-    if not token:
-        raise ValueError("HF_API_KEY not set")
-        
-    API_URL = "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0"
-    headers = {"Authorization": f"Bearer {token}"}
-    
-    with httpx.Client() as c:
-        res = c.post(API_URL, headers=headers, json={"inputs": prompt}, timeout=timeout)
-        res.raise_for_status()
-        output_path.write_bytes(res.content)
-    return True
-
-def _run_image_providers(client, prompt, output_path, timeout=30, context=None):
-    env = settings.AI.get("AI_ENVIRONMENT", "production")
-    
-    def call_genai():
-        return _generate_image_genai(client, prompt, output_path, timeout)
-        
-    if env == "testing":
-        providers = [
-            ("Pollinations", lambda: _generate_image_pollinations(prompt, output_path, timeout)),
-            ("HuggingFace", lambda: _generate_image_huggingface(prompt, output_path, timeout)),
-            ("Replicate", lambda: _generate_image_replicate(prompt, output_path, timeout)),
-            ("GenAI", call_genai),
-        ]
-    else:
-        providers = [
-            ("GenAI", call_genai),
-            ("Replicate", lambda: _generate_image_replicate(prompt, output_path, timeout)),
-            ("Pollinations", lambda: _generate_image_pollinations(prompt, output_path, timeout)),
-            ("HuggingFace", lambda: _generate_image_huggingface(prompt, output_path, timeout)),
-        ]
-
-    # Reorder if we already found a functional API
-    if context and context.get("working_provider"):
-        working_name = context.get("working_provider")
-        providers = sorted(providers, key=lambda p: 0 if p[0] == working_name else 1)
-
-    for name, provider in providers:
-        try:
-            logger.info(f"Attempting image generation with provider: {name} for prompt: {prompt[:50]}...")
-            if provider():
-                if context is not None and context.get("working_provider") != name:
-                    logger.info(f"Established functional image provider: {name}")
-                    context["working_provider"] = name
-                return True
-        except Exception as e:
-            logger.warning(f"Image provider {name} failed: {e}")
-            continue
-
-    logger.error("All image providers failed to generate the image.")
-    return False
-
 def _generate_image(client, prompt, output_path, timeout=30, context=None):
+    """Generate image using Chain of Responsibility."""
     img_prompt = f"Hand-drawn whiteboard animation style, minimalist black marker on white board: {prompt}. Any visible text MUST be in Portuguese."
-    return _run_image_providers(client, img_prompt, output_path, timeout, context)
+    try:
+        chain = get_image_chain()
+        chain.handle(prompt=img_prompt, output_path=output_path, client=client, timeout=timeout)
+        return True
+    except AllProvidersFailed as e:
+        logger.error(f"All image providers failed: {e}")
+        return False
 
 
 def _stitch_video(image, audio, output):
@@ -1051,8 +793,10 @@ def create_course_thumb(course_pk: str, prompt: str, user_id=None):
             tmp_path = Path(tmp_file.name)
             
         try:
-            success = _run_image_providers(client, ai_prompt, tmp_path, timeout=45)
-            if not success:
+            try:
+                chain = get_image_chain()
+                chain.handle(prompt=ai_prompt, output_path=tmp_path, client=client, timeout=45)
+            except AllProvidersFailed:
                 raise ThumbnailCreationError("Todos os provedores de imagem falharam")
                 
             image_data = tmp_path.read_bytes()
