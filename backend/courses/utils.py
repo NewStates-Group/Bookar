@@ -224,3 +224,11 @@ def invalidate_course_cache(course_uuid, user_id=None):
     cache.delete(get_course_detail_cache_key(course_uuid))
     if user_id:
         cache.delete(get_course_list_cache_key(user_id))
+
+
+def invalidate_course_cache(course_uuid, user_id=None):
+    from django.core.cache import cache
+
+    cache.delete(get_course_detail_cache_key(course_uuid))
+    if user_id:
+        cache.delete(get_course_list_cache_key(user_id))

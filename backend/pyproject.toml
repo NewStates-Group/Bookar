@@ -36,4 +36,5 @@ dependencies = [
     "shortuuid>=1.0.13",
     "channels-redis>=4.2.1",
     "replicate>=1.0.7",
+    "elevenlabs>=2.46.0",
 ]

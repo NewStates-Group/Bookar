@@ -1008,7 +1008,7 @@ def create_course_details(user_id: int, course_pk: int, prompt: str, level: str)
     )
 
     # Trigger thumbnail and module generation in parallel
-    create_course_thumb.delay(course_pk, prompt)
+    create_course_thumb.delay(course_pk, prompt, user_id=user_id)
     generate_next_module.delay(user_id, course_pk)
 
 
@@ -1018,7 +1018,7 @@ def create_course_details(user_id: int, course_pk: int, prompt: str, level: str)
     retry_kwargs={"max_retries": 3},
     default_retry_delay=40,
 )
-def create_course_thumb(course_pk: str, prompt: str):
+def create_course_thumb(course_pk: str, prompt: str, user_id=None):
     client = get_genai_client()
     ai_prompt = f"""
     Cria uma capa profissional de curso educacional.
@@ -1098,7 +1098,7 @@ def create_course_thumb(course_pk: str, prompt: str):
         course.status = "READY"
         course.save()
         # Invalidate course cache
-        invalidate_course_cache(course.uuid)
+        invalidate_course_cache(course.uuid, user_id)
         send_user_update(
             course.owner.id if course.owner else None,
             {
