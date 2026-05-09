@@ -40,10 +40,6 @@ class AllProvidersFailed(Exception):
     pass
 
 
-# ---------------------------------------------------------------------------
-# Base
-# ---------------------------------------------------------------------------
-
 class BaseProvider(ABC):
     """Abstract handler in the Chain of Responsibility."""
 
@@ -74,10 +70,6 @@ class BaseProvider(ABC):
         """Provider-specific logic. Must raise on failure."""
         ...
 
-
-# ---------------------------------------------------------------------------
-# Text Providers
-# ---------------------------------------------------------------------------
 
 class GeminiTextProvider(BaseProvider):
     name = "GenAI"
@@ -119,10 +111,6 @@ class OllamaTextProvider(BaseProvider):
 
         return client.chat(settings.AI["OLLAMA_MODEL_TEXT"], messages=msgs)["message"]["content"]
 
-
-# ---------------------------------------------------------------------------
-# Image Providers
-# ---------------------------------------------------------------------------
 
 class GeminiImageProvider(BaseProvider):
     name = "GenAI"
@@ -232,10 +220,6 @@ class HuggingFaceImageProvider(BaseProvider):
         return True
 
 
-# ---------------------------------------------------------------------------
-# Audio Providers
-# ---------------------------------------------------------------------------
-
 def _save_pcm_as_wav(filename, pcm_bytes, channels=1, rate=24000, sample_width=2):
     """Write raw PCM bytes as a WAV file."""
     if pcm_bytes is None:
@@ -318,11 +302,6 @@ class ElevenLabsAudioProvider(BaseProvider):
         )
         mp3_path.unlink(missing_ok=True)
         return True
-
-
-# ---------------------------------------------------------------------------
-# Chain factories
-# ---------------------------------------------------------------------------
 
 def _build_chain(providers: list[BaseProvider]) -> BaseProvider:
     """Link a list of providers into a chain and return the head."""

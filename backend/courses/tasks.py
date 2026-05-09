@@ -21,6 +21,7 @@ from django.core.files.base import ContentFile
 from django.contrib.auth import get_user_model
 
 from django.core.files.storage import default_storage
+from django.db import transaction
 from google.genai import types
 from PIL import Image, ImageDraw, UnidentifiedImageError
 
@@ -165,9 +166,9 @@ def generate_lesson(self, user_id, lesson_id: int):
     if not lesson:
         raise LessonDoesNotExist()
 
-    if lesson.status == "READY":
-        logger.info(f"Lesson {lesson_id} already READY, skipping generation.")
-        return lesson.lesson_file
+    if lesson.status == "READY" and bool(lesson.lesson_file):
+        logger.info(f"Lesson {lesson_id} already READY and file exists, skipping generation.")
+        return lesson.lesson_file.url
 
     # if Lesson.objects.filter(
     #     module__course__user_id=user_id, status="PROCESSING"
@@ -320,27 +321,34 @@ def generate_lesson(self, user_id, lesson_id: int):
                 final_filename, ContentFile(f.read(), name=final_filename), save=False
             )
 
-        lesson.status = "READY"
-        lesson.save()
-        # Invalidate course cache
-        invalidate_course_cache(lesson.module.course.uuid, user_id)
-        send_user_update(
-            user_id,
-            {
-                "type": "lesson_update",
-                "id": lesson.short_id,
-                "status": "READY",
-                "lesson_file": lesson.lesson_file.url if lesson.lesson_file else "",
-            },
-        )
+        with transaction.atomic():
+            lesson.status = "READY"
+            lesson.save()
+
+            def _on_success():
+                invalidate_course_cache(lesson.module.course.uuid, user_id)
+                send_user_update(
+                    user_id,
+                    {
+                        "type": "lesson_update",
+                        "id": lesson.short_id,
+                        "status": "READY",
+                        "lesson_file": lesson.lesson_file.url if lesson.lesson_file else "",
+                    },
+                )
+            transaction.on_commit(_on_success)
 
         return lesson.lesson_file.url if lesson.lesson_file else None
     except Exception as e:
-        lesson.status = "ERROR"
-        lesson.save(update_fields=["status"])
-        send_user_update(
-            user_id, {"type": "lesson_update", "id": lesson.short_id, "status": "ERROR"}
-        )
+        with transaction.atomic():
+            lesson.status = "ERROR"
+            lesson.save(update_fields=["status"])
+            
+            def _on_error():
+                send_user_update(
+                    user_id, {"type": "lesson_update", "id": lesson.short_id, "status": "ERROR"}
+                )
+            transaction.on_commit(_on_error)
         raise e
     finally:
         shutil.rmtree(temp_dir, ignore_errors=True)
