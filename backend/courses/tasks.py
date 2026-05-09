@@ -1,50 +1,50 @@
 import concurrent.futures
+import io
 import logging
+import os
 import shutil
 import subprocess
 import tempfile
+import time
 import uuid
 from io import BytesIO
 from pathlib import Path
-from celery import shared_task
-from django.conf import settings
-from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import landscape, A4
-from reportlab.lib import colors
-from reportlab.lib.units import mm
-from pypdf import PdfReader, PdfWriter
-from core.mail import send_certificate_email
-import os
-import io
-import time
-from django.core.files.base import ContentFile
-from django.contrib.auth import get_user_model
 
+from celery import shared_task
+from core.mail import send_certificate_email
+from core.utils import send_user_update
+from django.conf import settings
+from django.contrib.auth import get_user_model
+from django.core.cache import cache
+from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from django.db import transaction
 from google.genai import types
 from PIL import Image, ImageDraw, UnidentifiedImageError
+from pypdf import PdfReader, PdfWriter
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import A4, landscape
+from reportlab.lib.units import mm
+from reportlab.pdfgen import canvas
 
-from core.utils import send_user_update
 from .exceptions import LessonDoesNotExist, ThumbnailCreationError
 from .models import (
     Choice,
     Course,
+    CourseGenerationContext,
     Lesson,
     Module,
     Question,
     Quiz,
-    CourseGenerationContext,
 )
+from .providers import AllProvidersFailed, get_audio_chain, get_image_chain
 from .utils import (
     extract_json,
-    get_genai_client,
     generate_text_with_fallback,
-    safe_gemini_call,
+    get_genai_client,
     invalidate_course_cache,
+    safe_gemini_call,
 )
-from .providers import get_image_chain, get_audio_chain, AllProvidersFailed
-from django.core.cache import cache
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +64,9 @@ def _normalize_audio(input_path, output_path):
         str(output_path),
     ]
     try:
-        subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.run(
+            cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+        )
         return True
     except subprocess.CalledProcessError as e:
         logger.error(f"Audio normalization failed for {input_path}: {e}")
@@ -87,7 +89,9 @@ def _generate_image(client, prompt, output_path, timeout=30, context=None):
     img_prompt = f"Hand-drawn whiteboard animation style, minimalist black marker on white board: {prompt}. Any visible text MUST be in Portuguese."
     try:
         chain = get_image_chain()
-        chain.handle(prompt=img_prompt, output_path=output_path, client=client, timeout=timeout)
+        chain.handle(
+            prompt=img_prompt, output_path=output_path, client=client, timeout=timeout
+        )
         return True
     except AllProvidersFailed as e:
         logger.error(f"All image providers failed: {e}")
@@ -122,7 +126,13 @@ def _stitch_video(image, audio, output):
         str(output),
     ]
     try:
-        subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=15 * 60)
+        subprocess.run(
+            cmd,
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=15 * 60,
+        )
         return True
     except Exception as e:
         logger.error(f"FFmpeg failed: {e}")
@@ -161,35 +171,34 @@ def _process_segment(i, segment, client, temp_dir, context=None):
     retry_kwargs={"max_retries": 3},
     default_retry_delay=40,
 )
-def generate_lesson(self, user_id, lesson_id: int):
+def generate_lesson_plan(self, user_id, lesson_id: int):
     lesson = Lesson.objects.filter(id=lesson_id).first()
     if not lesson:
         raise LessonDoesNotExist()
 
     if lesson.status == "READY" and bool(lesson.lesson_file):
-        logger.info(f"Lesson {lesson_id} already READY and file exists, skipping generation.")
+        logger.info(
+            f"Lesson {lesson_id} already READY and file exists, skipping generation."
+        )
         return lesson.lesson_file.url
 
-    # if Lesson.objects.filter(
-    #     module__course__user_id=user_id, status="PROCESSING"
-    # ).exclude(id=lesson_id).exists():
-    #     raise RuntimeError("Only one lesson at a time")
-
-    lesson.status = "PROCESSING"
+    lesson.status = "PLANNING"
     lesson.save(update_fields=["status"])
     send_user_update(
         user_id,
-        {"type": "lesson_update", "id": lesson.short_id, "status": "PROCESSING"},
+        {"type": "lesson_update", "id": lesson.short_id, "status": "PLANNING"},
     )
 
-    # Check for cancellation before starting heavy work
     lesson.refresh_from_db()
     if lesson.status == "CANCELLED" or lesson.module.course.status == "CANCELLED":
         logger.info(f"Lesson {lesson_id} generation cancelled early.")
         return None
 
-    temp_dir = Path(tempfile.mkdtemp())
-    client = get_genai_client()
+    if lesson.segments_data:
+        logger.info(f"Lesson {lesson_id} already has segments_data, jumping to media generation.")
+        generate_lesson_media.delay(user_id, lesson_id)
+        return
+
     try:
         num_segments = max(1, int(lesson.duration / 30))
         if num_segments > 30:
@@ -222,18 +231,79 @@ def generate_lesson(self, user_id, lesson_id: int):
         Make sure the list has EXACTLY {num_segments} objects.
         """
 
-        response = generate_text_with_fallback([{"role": "user", "content": plan_prompt}])
+        response = generate_text_with_fallback(
+            [{"role": "user", "content": plan_prompt}]
+        )
         segments = (extract_json(response, isList=True) or [])[:num_segments]
 
         if not segments:
             raise ValueError("No segments generated")
+
+        lesson.segments_data = segments
+        lesson.save(update_fields=["segments_data"])
+        
+        generate_lesson_media.delay(user_id, lesson_id)
+        return
+        
+    except Exception as e:
+        with transaction.atomic():
+            lesson.status = "ERROR"
+            lesson.save(update_fields=["status"])
+            
+            def _on_error():
+                send_user_update(
+                    user_id, {"type": "lesson_update", "id": lesson.short_id, "status": "ERROR"}
+                )
+            transaction.on_commit(_on_error)
+        raise e
+
+
+@shared_task(
+    bind=True,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_kwargs={"max_retries": 3},
+    default_retry_delay=40,
+)
+def generate_lesson_media(self, user_id, lesson_id: int):
+    lesson = Lesson.objects.filter(id=lesson_id).first()
+    if not lesson:
+        raise LessonDoesNotExist()
+
+    if lesson.status == "READY" and bool(lesson.lesson_file):
+        logger.info(
+            f"Lesson {lesson_id} already READY and file exists, skipping generation."
+        )
+        return lesson.lesson_file.url
+
+    lesson.status = "GENERATING_MEDIA"
+    lesson.save(update_fields=["status"])
+    send_user_update(
+        user_id,
+        {"type": "lesson_update", "id": lesson.short_id, "status": "GENERATING_MEDIA"},
+    )
+
+    lesson.refresh_from_db()
+    if lesson.status == "CANCELLED" or lesson.module.course.status == "CANCELLED":
+        logger.info(f"Lesson {lesson_id} media generation cancelled early.")
+        return None
+
+    segments = lesson.segments_data
+    if not segments:
+        raise ValueError("Cannot generate media: segments_data is empty.")
+
+    temp_dir = Path(tempfile.mkdtemp())
+    client = get_genai_client()
+    try:
 
         # --- RESTORED LOGIC WITH INITIAL SEQUENTIAL CHECK ---
         videos = []
         context = {"working_provider": None}
 
         if segments:
-            logger.info("Processing first segment sequentially to determine functional image provider")
+            logger.info(
+                "Processing first segment sequentially to determine functional image provider"
+            )
             first_video = _process_segment(0, segments[0], client, temp_dir, context)
             if first_video:
                 videos.append(first_video)
@@ -323,7 +393,9 @@ def generate_lesson(self, user_id, lesson_id: int):
         with transaction.atomic():
             with final_temp_output.open("rb") as f:
                 lesson.lesson_file.save(
-                    final_filename, ContentFile(f.read(), name=final_filename), save=False
+                    final_filename,
+                    ContentFile(f.read(), name=final_filename),
+                    save=False,
                 )
             lesson.status = "READY"
             lesson.save(update_fields=["lesson_file", "status"])
@@ -336,9 +408,12 @@ def generate_lesson(self, user_id, lesson_id: int):
                         "type": "lesson_update",
                         "id": lesson.short_id,
                         "status": "READY",
-                        "lesson_file": lesson.lesson_file.url if lesson.lesson_file else "",
+                        "lesson_file": lesson.lesson_file.url
+                        if lesson.lesson_file
+                        else "",
                     },
                 )
+
             transaction.on_commit(_on_success)
 
         return lesson.lesson_file.url if lesson.lesson_file else None
@@ -346,11 +421,13 @@ def generate_lesson(self, user_id, lesson_id: int):
         with transaction.atomic():
             lesson.status = "ERROR"
             lesson.save(update_fields=["status"])
-            
+
             def _on_error():
                 send_user_update(
-                    user_id, {"type": "lesson_update", "id": lesson.short_id, "status": "ERROR"}
+                    user_id,
+                    {"type": "lesson_update", "id": lesson.short_id, "status": "ERROR"},
                 )
+
             transaction.on_commit(_on_error)
         raise e
     finally:
@@ -458,7 +535,7 @@ def generate_next_module(self, user_pk: int, course_pk: int, module_pk: int = No
             .first()
         )
         if first_lesson:
-            generate_lesson.delay(user_pk, first_lesson.id)
+            generate_lesson_plan.delay(user_pk, first_lesson.id)
 
         # For the first module, mark course as READY to show in dashboard
         if course.modules.count() == 1:
@@ -487,7 +564,7 @@ def generate_next_module(self, user_pk: int, course_pk: int, module_pk: int = No
             module_object.status = "FAILED"
             module_object.save(update_fields=["status"])
             logger.error(f"Module generation failed, status set to FAILED: {e}")
-        
+
         logger.error(f"Failed to generate next module: {e}")
         # Only set course to READY if it was processing the very first module
         if course.modules.count() <= 1:
@@ -591,9 +668,10 @@ def generate_module_quiz(module_id: int, user_id: int = None):
     default_retry_delay=40,
 )
 def generate_module_material(module_id: int):
+    import json
+
     from .models import Module, ModuleMaterial
     from .utils import generate_text_with_fallback
-    import json
 
     module = Module.objects.filter(pk=module_id).first()
     if not module:
@@ -604,23 +682,31 @@ def generate_module_material(module_id: int):
     material, created = ModuleMaterial.objects.get_or_create(module=module)
     material.status = "PROCESSING"
     material.save(update_fields=["status"])
-    
+
     user_id = module.course.owner_id
     send_user_update(
         user_id,
-        {"type": "material_update", "module_id": str(module.uuid), "status": "PROCESSING"},
+        {
+            "type": "material_update",
+            "module_id": str(module.uuid),
+            "status": "PROCESSING",
+        },
     )
 
     try:
         # Aggregate content from all lessons
         lessons_data = []
-        for lesson in module.lessons.all().order_by('id'):
-            lessons_data.append({
-                "title": lesson.title,
-                "description": lesson.desc,
-                "key_points": lesson.key_points or "",
-                "narration_summary": (lesson.narration[:1000] + "...") if lesson.narration and len(lesson.narration) > 1000 else (lesson.narration or "")
-            })
+        for lesson in module.lessons.all().order_by("id"):
+            lessons_data.append(
+                {
+                    "title": lesson.title,
+                    "description": lesson.desc,
+                    "key_points": lesson.key_points or "",
+                    "narration_summary": (lesson.narration[:1000] + "...")
+                    if lesson.narration and len(lesson.narration) > 1000
+                    else (lesson.narration or ""),
+                }
+            )
 
         course_title = module.course.title
         module_name = module.name
@@ -646,8 +732,10 @@ def generate_module_material(module_id: int):
         """
 
         # Generate content using AI
-        markdown_content = generate_text_with_fallback([{"role": "user", "content": prompt}])
-        
+        markdown_content = generate_text_with_fallback(
+            [{"role": "user", "content": prompt}]
+        )
+
         if not markdown_content:
             raise Exception("AI failed to generate markdown content")
 
@@ -655,23 +743,31 @@ def generate_module_material(module_id: int):
         material.content = markdown_content
         material.status = "READY"
         material.save()
-        
+
         send_user_update(
             user_id,
-            {"type": "material_update", "module_id": str(module.uuid), "status": "READY"},
+            {
+                "type": "material_update",
+                "module_id": str(module.uuid),
+                "status": "READY",
+            },
         )
-        
+
         logger.info(f"Markdown material generated for module {module_id}")
-        
+
     except Exception as e:
         material.status = "FAILED"
         material.save(update_fields=["status"])
-        
+
         send_user_update(
             user_id,
-            {"type": "material_update", "module_id": str(module.uuid), "status": "FAILED"},
+            {
+                "type": "material_update",
+                "module_id": str(module.uuid),
+                "status": "FAILED",
+            },
         )
-        
+
         logger.error(f"Failed to generate material for module {module_id}: {e}")
         raise e
 
@@ -799,17 +895,19 @@ def create_course_thumb(course_pk: str, prompt: str, user_id=None):
             return
 
         import tempfile
-        
+
         with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp_file:
             tmp_path = Path(tmp_file.name)
-            
+
         try:
             try:
                 chain = get_image_chain()
-                chain.handle(prompt=ai_prompt, output_path=tmp_path, client=client, timeout=45)
+                chain.handle(
+                    prompt=ai_prompt, output_path=tmp_path, client=client, timeout=45
+                )
             except AllProvidersFailed:
                 raise ThumbnailCreationError("Todos os provedores de imagem falharam")
-                
+
             image_data = tmp_path.read_bytes()
             try:
                 image = Image.open(BytesIO(image_data))
@@ -817,7 +915,9 @@ def create_course_thumb(course_pk: str, prompt: str, user_id=None):
                 image = Image.open(BytesIO(image_data)).convert("RGBA")
             except Exception as e:
                 logger.error(f"Image processing error: {e}")
-                raise ThumbnailCreationError("Conteúdo retornado não é uma imagem válida")
+                raise ThumbnailCreationError(
+                    "Conteúdo retornado não é uma imagem válida"
+                )
         finally:
             tmp_path.unlink(missing_ok=True)
 
@@ -878,12 +978,14 @@ def create_course_thumb(course_pk: str, prompt: str, user_id=None):
     default_retry_delay=40,
 )
 def generate_certificate_task(user_id: int, course_id: int, full_name: str):
-    from .models import Course, CourseEnrollment
-    from PIL import Image
     import io
     import uuid
+
     from django.core.files.base import ContentFile
     from google.genai import types
+    from PIL import Image
+
+    from .models import Course, CourseEnrollment
 
     User = get_user_model()
     try:

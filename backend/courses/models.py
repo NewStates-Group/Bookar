@@ -27,6 +27,8 @@ class CertificateStatus(models.TextChoices):
 
 class LessonStatus(models.TextChoices):
     PENDING = "PENDING", "Pendente"
+    PLANNING = "PLANNING", "Planeando Conteúdo"
+    GENERATING_MEDIA = "GENERATING_MEDIA", "Gerando Vídeo"
     PROCESSING = "PROCESSING", "Processando"
     READY = "READY", "Pronto"
     ERROR = "ERROR", "Erro"
@@ -172,6 +174,7 @@ class Lesson(models.Model):
     narration = models.TextField(null=True, blank=True)
     key_points = models.CharField(max_length=150, null=True, blank=True)
     scene_suggestion = models.TextField(null=True, blank=True)
+    segments_data = models.JSONField(null=True, blank=True, help_text="Cache do guião gerado pela Task 1")
     created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)
 
 

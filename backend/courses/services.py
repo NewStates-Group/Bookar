@@ -1,39 +1,39 @@
 import logging
+import uuid
+
+from core.utils import send_user_update
 from django.conf import settings
+from django.core.cache import cache
 from django.db.models import Prefetch
 from django.db.models.query import QuerySet
-from ninja.errors import HttpError
 from django.utils import timezone
-
-from django.core.cache import cache
-from .utils import (
-    get_course_list_cache_key,
-    get_course_detail_cache_key,
-    get_lesson_detail_cache_key,
-    invalidate_course_cache,
-)
+from ninja.errors import HttpError
 
 from .models import (
     Choice,
     Course,
+    CourseEnrollment,
+    CourseShare,
+    CourseShareClaim,
     Lesson,
+    LessonProgress,
+    Module,
     Question,
     Quiz,
     QuizAttempt,
-    Module,
-    CourseEnrollment,
-    LessonProgress,
-    CourseShare,
-    CourseShareClaim,
 )
-import uuid
 from .tasks import (
     create_course_details,
-    generate_lesson,
-    generate_next_module,
     generate_certificate_task,
+    generate_lesson_plan,
+    generate_next_module,
 )
-from core.utils import send_user_update
+from .utils import (
+    get_course_detail_cache_key,
+    get_course_list_cache_key,
+    get_lesson_detail_cache_key,
+    invalidate_course_cache,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -471,13 +471,16 @@ class CourseService:
 
     def get_module_material(self, user, module_id: str) -> dict:
         from .models import ModuleMaterial
+
         try:
             module = Module.objects.get(uuid=module_id)
         except Module.DoesNotExist:
             raise HttpError(404, "Módulo não encontrado")
 
         # Verify user is enrolled
-        if not CourseEnrollment.objects.filter(course=module.course, user=user, deleted=False).exists():
+        if not CourseEnrollment.objects.filter(
+            course=module.course, user=user, deleted=False
+        ).exists():
             raise HttpError(403, "Sem acesso a este módulo")
 
         try:
@@ -556,7 +559,7 @@ class LessonService:
                     next_undelivered_lesson
                     and next_undelivered_lesson.status == "PENDING"
                 ):
-                    generate_lesson.delay(user.id, next_undelivered_lesson.id)
+                    generate_lesson_plan.delay(user.id, next_undelivered_lesson.id)
 
                 # Invalidate course cache as a lesson was marked delivered (status might have changed)
                 invalidate_course_cache(course.uuid, user.id)
