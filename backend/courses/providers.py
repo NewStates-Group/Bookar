@@ -297,7 +297,8 @@ class ElevenLabsAudioProvider(BaseProvider):
                 str(output_path),
             ],
             check=True,
-            capture_output=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
             timeout=30,
         )
         mp3_path.unlink(missing_ok=True)

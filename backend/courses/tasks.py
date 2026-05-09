@@ -64,10 +64,10 @@ def _normalize_audio(input_path, output_path):
         str(output_path),
     ]
     try:
-        subprocess.run(cmd, check=True, capture_output=True)
+        subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         return True
     except subprocess.CalledProcessError as e:
-        logger.error(f"Audio normalization failed for {input_path}: {e.stderr}")
+        logger.error(f"Audio normalization failed for {input_path}: {e}")
         return False
 
 
@@ -122,7 +122,7 @@ def _stitch_video(image, audio, output):
         str(output),
     ]
     try:
-        subprocess.run(cmd, check=True, capture_output=True, timeout=15 * 60)
+        subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=15 * 60)
         return True
     except Exception as e:
         logger.error(f"FFmpeg failed: {e}")
@@ -285,6 +285,8 @@ def generate_lesson(self, user_id, lesson_id: int):
                 str(concat_output),
             ],
             check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
             timeout=15 * 60,
         )
 
@@ -312,6 +314,8 @@ def generate_lesson(self, user_id, lesson_id: int):
                 str(final_temp_output),
             ],
             check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
             timeout=15 * 60,
         )
 
