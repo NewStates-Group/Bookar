@@ -14,21 +14,21 @@ export default function DefinitiveHomePage() {
         <nav className="fixed top-0 left-0 w-full z-[100] backdrop-blur-md bg-white/70 border-b border-black/[0.05]">
           <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Image src="/logo.png" alt="Logo" width={35} height={35} />
-              <span className="text-xl font-bold tracking-tight">Bookar</span>
+              <Image src="/logo.png" alt="Logo" width={36} height={36} />
+              <span className="text-3xl font-bold tracking-tight">Bookar</span>
             </div>
 
             <div className="hidden md:flex items-center gap-10">
-              <a href="#features" className="text-sm font-medium hover:text-cyan-600 transition-colors">Funcionalidades</a>
-              <a href="#about" className="text-sm font-medium hover:text-cyan-600 transition-colors">Sobre</a>
-              <a href="#pricing" className="text-sm font-medium hover:text-cyan-600 transition-colors">Preços</a>
+              <a href="#features" className="text-lg font-medium hover:text-cyan-600 transition-colors">Funcionalidades</a>
+              <a href="#about" className="text-lg font-medium hover:text-cyan-600 transition-colors">Sobre</a>
+              <a href="#pricing" className="text-lg font-medium hover:text-cyan-600 transition-colors">Preços</a>
             </div>
 
             <div className="flex items-center gap-4">
-              <Link href="/login" className="text-sm font-medium hover:text-black/60 transition-colors">Entrar</Link>
+              <Link href="/login" className="text-lg font-medium hover:text-cyan-600 transition-colors">Entrar</Link>
               <Link href="/signup">
-                <Button className="rounded-full bg-[#111] text-white hover:bg-black/90 px-8 transition-transform hover:scale-105">
-                  Começar Grátis
+                <Button className="rounded-full bg-cyan-500 hover:bg-cyan-600 text-white font-bold text-lg shadow-xl shadow-cyan-200 transition-all hover:-translate-y-1">
+                  Cadastrar-se
                 </Button>
               </Link>
             </div>
@@ -46,22 +46,17 @@ export default function DefinitiveHomePage() {
             className="space-y-6"
           >
             <h1 className="text-6xl md:text-8xl font-black tracking-tighter leading-[0.9] text-balance">
-              Aprende <span className="bg-clip-text text-transparent bg-gradient-to-r from-cyan-600 to-blue-600 italic">Mais Rápido</span> <br /> com IA.
+              Aprende <span className="bg-clip-text text-transparent bg-gradient-to-r from-cyan-600 to-blue-600 italic">Mais Rápido</span> <br /> utilizando IA.
             </h1>
 
-            <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto text-balance font-light leading-relaxed">
-              A Bookar transforma a forma como consomes conteúdo educacional. Criamos cursos personalizados, tutorias 2.0 e certificações inteligentes para acelerar o teu futuro.
+            <p className="text-xl md:text-2xl text-muted-foreground max-w-2xl mx-auto text-balance font-light leading-relaxed">
+              Transforme a forma como consomes conteúdo educacional. Acelere o seu aprendizado com IA.
             </p>
 
-            <div className="pt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
-              <Link href="/signup">
+            <div className="pt-3 flex flex-col sm:flex-row items-center justify-center gap-4">
+              <Link href="/login">
                 <Button className="h-14 px-10 rounded-2xl bg-cyan-500 hover:bg-cyan-600 text-white font-bold text-lg shadow-xl shadow-cyan-200 transition-all hover:-translate-y-1">
                   Experimentar Agora
-                </Button>
-              </Link>
-              <Link href="/app/courses">
-                <Button variant="outline" className="h-14 px-10 rounded-2xl border-black/10 font-bold text-lg transition-all hover:bg-neutral-50">
-                  Ver Catálogo
                 </Button>
               </Link>
             </div>
@@ -77,7 +72,7 @@ export default function DefinitiveHomePage() {
 
           <div className="grid md:grid-cols-3 gap-8">
             {[
-              { title: "Tutor IA 24/7", desc: "Dúvidas resolvidas instantaneamente com contexto direto das tuas aulas.", icon: <Zap className="w-6 h-6" /> },
+              { title: "Tutor IA", desc: "Dúvidas resolvidas instantaneamente com contexto direto das tuas aulas.", icon: <Zap className="w-6 h-6" /> },
               { title: "Cursos Personalizados", desc: "Avança ao teu ritmo com percursos adaptativos baseados no teu progresso.", icon: <Smartphone className="w-6 h-6" /> },
               { title: "Certificados com IA", desc: "Certificados profissionais gerados dinamicamente com validação Gemini.", icon: <Sparkles className="w-6 h-6" /> }
             ].map((feature, idx) => (
