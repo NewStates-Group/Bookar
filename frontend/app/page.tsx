@@ -10,22 +10,6 @@ import { toast } from "sonner";
 import { Sparkles, ArrowRight, Zap, Shield, Smartphone, PlayCircle } from "lucide-react";
 import { Turnstile } from "next-turnstile";
 
-function AnimatedCounter({ value }: { value: number }) {
-  const count = useSpring(0, {
-    stiffness: 100,
-    damping: 30,
-    restDelta: 0.001
-  });
-
-  useEffect(() => {
-    count.set(value);
-  }, [value, count]);
-
-  const display = useTransform(count, (latest) => Math.floor(latest).toLocaleString());
-
-  return <motion.span>{display}</motion.span>;
-}
-
 function CountdownTimer({ onComplete }: { onComplete: () => void }) {
   const [timeLeft, setTimeLeft] = useState({
     days: 0,
@@ -85,7 +69,6 @@ function CountdownTimer({ onComplete }: { onComplete: () => void }) {
 export default function HomePage() {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
-  const [waitingCount, setWaitingCount] = useState(0);
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [isTimerComplete, setIsTimerComplete] = useState(false);
   const [step, setStep] = useState<"email" | "code" | "turnstile">("email");
@@ -111,22 +94,6 @@ export default function HomePage() {
     if (subscribed === "true") {
       setIsSubscribed(true);
     }
-
-    const fetchCount = async () => {
-      try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL;
-        const response = await fetch(`${apiUrl}/auth/waitlist/count`);
-        if (response.ok) {
-          const data = await response.json();
-          setWaitingCount(data.count);
-        }
-      } catch (error) {
-        setWaitingCount(1243);
-      }
-    };
-    fetchCount();
-    const interval = setInterval(fetchCount, 30000);
-    return () => clearInterval(interval);
   }, []);
 
   const handleSendVerification = async (e: React.FormEvent) => {
@@ -202,7 +169,6 @@ export default function HomePage() {
       });
 
       if (response.ok) {
-        setWaitingCount(prev => prev + 1);
         setIsSubscribed(true);
         localStorage.setItem("bookar_waitlist_subscribed", "true");
         toast.success("Bem-vindo à lista de espera!");
@@ -271,18 +237,7 @@ export default function HomePage() {
                 </div>
 
                 <div className="flex flex-col items-center gap-4 md:gap-6 mt-2">
-                  <div className="flex items-center gap-3">
-                    <div className="flex -space-x-2">
-                      {[1, 2, 3].map((i) => (
-                        <div key={i} className="inline-block h-8 w-8 rounded-full border-2 border-white bg-neutral-100 overflow-hidden">
-                          <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${i + waitingCount}`} alt="" />
-                        </div>
-                      ))}
-                    </div>
-                    <p className="text-sm font-semibold text-black/40">
-                      <span className="text-black font-bold"><AnimatedCounter value={waitingCount} /></span> pessoas já estão na lista
-                    </p>
-                  </div>
+
 
                   {!isSubscribed ? (
                     <div className="w-full max-w-md">

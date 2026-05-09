@@ -217,8 +217,10 @@ def _generate_image_replicate(prompt, output_path, timeout=30):
 def _generate_image_pollinations(prompt, output_path, timeout=30):
     import httpx
     import urllib.parse
+    import uuid
     encoded_prompt = urllib.parse.quote(prompt)
-    url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1920&height=1080&nologo=true"
+    seed = uuid.uuid4().int % 100000000
+    url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1920&height=1080&nologo=true&seed={seed}"
     
     with httpx.Client() as c:
         res = c.get(url, timeout=timeout)
@@ -293,6 +295,8 @@ def _stitch_video(image, audio, output):
         "-y",
         "-loop",
         "1",
+        "-framerate",
+        "25",
         "-i",
         str(image),
         "-i",
@@ -303,6 +307,8 @@ def _stitch_video(image, audio, output):
         "stillimage",
         "-preset",
         "ultrafast",
+        "-r",
+        "25",
         "-pix_fmt",
         "yuv420p",
         "-shortest",
@@ -393,14 +399,20 @@ def generate_lesson(self, user_id, lesson_id: int):
         The total content MUST correspond to {lesson.duration} seconds (~150 words per minute).
         Each segment should have approximately {int(lesson.duration / 5)} seconds of audio.
         This means each of the 5 segments should have a narration text of roughly {int((lesson.duration / 5) * 2.5)} words.
+        Ensure each 'visual_prompt' is visually unique and describes a DIFFERENT scene progression.
         
         Generate a JSON list of 5 segments:
         [
         {{
             "narration": "Detailed and engaging narration for this segment (approx {int((lesson.duration / 5) * 2.5)} words)...",
-            "visual_prompt": "A simple image scene description for this part..."
+            "visual_prompt": "A simple and UNIQUE image scene description for this part..."
+        }},
+        {{
+            "narration": "...",
+            "visual_prompt": "..."
         }}
         ]
+        Make sure the list has EXACTLY 5 objects.
         """
 
         response = generate_text_with_fallback([{"role": "user", "content": plan_prompt}])
@@ -461,14 +473,8 @@ def generate_lesson(self, user_id, lesson_id: int):
                 "0",
                 "-i",
                 str(list_file),
-                "-c:v",
-                "libx264",
-                "-preset",
-                "veryfast",
-                "-pix_fmt",
-                "yuv420p",
-                "-c:a",
-                "aac",
+                "-c",
+                "copy",
                 str(concat_output),
             ],
             check=True,
