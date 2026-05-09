@@ -386,6 +386,11 @@ def generate_lesson(self, user_id, lesson_id: int):
     temp_dir = Path(tempfile.mkdtemp())
     client = get_genai_client()
     try:
+        num_segments = max(1, int(lesson.duration / 30))
+        if num_segments > 30:
+            num_segments = 30
+        words_per_segment = int((lesson.duration / num_segments) * 2.5)
+
         plan_prompt = f"""
         Title: {lesson.title}
         Description: {lesson.desc}
@@ -395,28 +400,25 @@ def generate_lesson(self, user_id, lesson_id: int):
         **KEYS MUST KEEP THE ORIGINAL ENGLISH NAMES**
         
         Task:
-        Generate EXACTLY 5 segments.
+        Generate EXACTLY {num_segments} segments.
         The total content MUST correspond to {lesson.duration} seconds (~150 words per minute).
-        Each segment should have approximately {int(lesson.duration / 5)} seconds of audio.
-        This means each of the 5 segments should have a narration text of roughly {int((lesson.duration / 5) * 2.5)} words.
+        Each segment should have approximately {int(lesson.duration / num_segments)} seconds of audio.
+        This means each of the {num_segments} segments should have a narration text of roughly {words_per_segment} words.
         Ensure each 'visual_prompt' is visually unique and describes a DIFFERENT scene progression.
         
-        Generate a JSON list of 5 segments:
+        Generate a JSON list of {num_segments} segments:
         [
         {{
-            "narration": "Detailed and engaging narration for this segment (approx {int((lesson.duration / 5) * 2.5)} words)...",
+            "narration": "Detailed and engaging narration for this segment (approx {words_per_segment} words)...",
             "visual_prompt": "A simple and UNIQUE image scene description for this part..."
         }},
-        {{
-            "narration": "...",
-            "visual_prompt": "..."
-        }}
+        ...
         ]
-        Make sure the list has EXACTLY 5 objects.
+        Make sure the list has EXACTLY {num_segments} objects.
         """
 
         response = generate_text_with_fallback([{"role": "user", "content": plan_prompt}])
-        segments = (extract_json(response, isList=True) or [])[:5]  # hard cap at 5
+        segments = (extract_json(response, isList=True) or [])[:num_segments]
 
         if not segments:
             raise ValueError("No segments generated")
@@ -1036,7 +1038,7 @@ def create_course_thumb(course_pk: str, prompt: str):
         # Invalidate course cache
         invalidate_course_cache(course.uuid)
         send_user_update(
-            course.enrollments.first().user.id if course.enrollments.exists() else None,
+            course.owner.id if course.owner else None,
             {
                 "type": "course_update",
                 "id": str(course.uuid),
