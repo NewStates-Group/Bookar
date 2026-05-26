@@ -4,15 +4,14 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('courses', '0028_add_module_material'),
+        ("courses", "0028_add_module_material"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='modulematerial',
-            name='content',
+            model_name="modulematerial",
+            name="content",
             field=models.TextField(blank=True, null=True),
         ),
     ]

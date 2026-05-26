@@ -27,13 +27,18 @@ from .schemas import (
 from .throttling import AnonRateThrottle, DynamicRateThrottle
 from ninja_jwt.controller import schema
 
+
 @api_controller("auth/", tags=["Auth"])
 class AuthController(NinjaJWTDefaultController):
     @inject
     def __init__(self, auth_service: AuthService):
         self.auth_service = auth_service
 
-    @route.post("pair", response=schema.obtain_pair_schema.get_response_schema(), throttle=AnonRateThrottle())
+    @route.post(
+        "pair",
+        response=schema.obtain_pair_schema.get_response_schema(),
+        throttle=AnonRateThrottle(),
+    )
     def pair(self, data: LoginIn):
         payload = data.dict()
         if not self.verify_turnstile(data.token):
@@ -59,7 +64,11 @@ class AuthController(NinjaJWTDefaultController):
             return {"success": True}
         raise HttpError(400, "Código de verificação inválido")
 
-    @route.post("check-email", response=EmailCheckOut, throttle=DynamicRateThrottle(scope="email_check"))
+    @route.post(
+        "check-email",
+        response=EmailCheckOut,
+        throttle=DynamicRateThrottle(scope="email_check"),
+    )
     def check_email(self, data: EmailCheckIn):
         exists = self.auth_service.user_exists(data.email)
         return {"exists": exists}
@@ -95,11 +104,17 @@ class AuthController(NinjaJWTDefaultController):
         tokens = self.auth_service.google_callback(data.id_token)
         return tokens
 
-    @route.post("password-reset/request", throttle=DynamicRateThrottle(scope="password_reset_request"))
+    @route.post(
+        "password-reset/request",
+        throttle=DynamicRateThrottle(scope="password_reset_request"),
+    )
     def password_reset_request(self, data: PasswordResetRequestIn):
         return self.auth_service.request_password_reset(data.email)
 
-    @route.post("password-reset/confirm", throttle=DynamicRateThrottle(scope="password_reset_confirm"))
+    @route.post(
+        "password-reset/confirm",
+        throttle=DynamicRateThrottle(scope="password_reset_confirm"),
+    )
     def password_reset_confirm(self, data: PasswordResetConfirmIn):
         return self.auth_service.confirm_password_reset(data.token, data.new_password)
 

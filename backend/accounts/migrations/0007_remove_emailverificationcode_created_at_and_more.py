@@ -4,19 +4,18 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('accounts', '0006_alter_user_avatar'),
+        ("accounts", "0006_alter_user_avatar"),
     ]
 
     operations = [
         migrations.RemoveField(
-            model_name='emailverificationcode',
-            name='created_at',
+            model_name="emailverificationcode",
+            name="created_at",
         ),
         migrations.AddField(
-            model_name='emailverificationcode',
-            name='updated_at',
+            model_name="emailverificationcode",
+            name="updated_at",
             field=models.DateTimeField(auto_now=True),
         ),
     ]

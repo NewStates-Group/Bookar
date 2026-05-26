@@ -37,6 +37,7 @@ logger = logging.getLogger(__name__)
 
 class AllProvidersFailed(Exception):
     """Raised when every provider in the chain has failed."""
+
     pass
 
 
@@ -109,7 +110,9 @@ class OllamaTextProvider(BaseProvider):
         else:
             msgs = [{"role": "user", "content": str(messages)}]
 
-        return client.chat(settings.AI["OLLAMA_MODEL_TEXT"], messages=msgs)["message"]["content"]
+        return client.chat(settings.AI["OLLAMA_MODEL_TEXT"], messages=msgs)["message"][
+            "content"
+        ]
 
 
 class GeminiImageProvider(BaseProvider):
@@ -214,7 +217,9 @@ class HuggingFaceImageProvider(BaseProvider):
         headers = {"Authorization": f"Bearer {token}"}
 
         with httpx.Client() as c:
-            res = c.post(api_url, headers=headers, json={"inputs": prompt}, timeout=timeout)
+            res = c.post(
+                api_url, headers=headers, json={"inputs": prompt}, timeout=timeout
+            )
             res.raise_for_status()
             output_path.write_bytes(res.content)
         return True
@@ -292,8 +297,16 @@ class ElevenLabsAudioProvider(BaseProvider):
         # Convert MP3 → WAV for pipeline consistency
         subprocess.run(
             [
-                "ffmpeg", "-y", "-i", str(mp3_path),
-                "-ac", "1", "-ar", "24000", "-c:a", "pcm_s16le",
+                "ffmpeg",
+                "-y",
+                "-i",
+                str(mp3_path),
+                "-ac",
+                "1",
+                "-ar",
+                "24000",
+                "-c:a",
+                "pcm_s16le",
                 str(output_path),
             ],
             check=True,
@@ -303,6 +316,7 @@ class ElevenLabsAudioProvider(BaseProvider):
         )
         mp3_path.unlink(missing_ok=True)
         return True
+
 
 def _build_chain(providers: list[BaseProvider]) -> BaseProvider:
     """Link a list of providers into a chain and return the head."""
@@ -323,18 +337,22 @@ def get_image_chain() -> BaseProvider:
     """Build the image generation chain based on environment."""
     env = settings.AI.get("AI_ENVIRONMENT", "production")
     if env == "testing":
-        return _build_chain([
+        return _build_chain(
+            [
+                PollinationsImageProvider(),
+                HuggingFaceImageProvider(),
+                ReplicateImageProvider(),
+                GeminiImageProvider(),
+            ]
+        )
+    return _build_chain(
+        [
+            GeminiImageProvider(),
+            ReplicateImageProvider(),
             PollinationsImageProvider(),
             HuggingFaceImageProvider(),
-            ReplicateImageProvider(),
-            GeminiImageProvider(),
-        ])
-    return _build_chain([
-        GeminiImageProvider(),
-        ReplicateImageProvider(),
-        PollinationsImageProvider(),
-        HuggingFaceImageProvider(),
-    ])
+        ]
+    )
 
 
 def get_audio_chain() -> BaseProvider:

@@ -36,6 +36,7 @@ INSTALLED_APPS = [
     "courses",
     "accounts",
     "channels",
+    "mind_maps",
 ]
 
 MIDDLEWARE = [
@@ -88,7 +89,9 @@ CHANNEL_LAYERS = {
                 {
                     "address": env.str("REDIS_URL"),
                     "ssl_cert_reqs": None,
-                } if not DEBUG else env.str("REDIS_URL")
+                }
+                if not DEBUG
+                else env.str("REDIS_URL")
             ],
         },
     },

@@ -1,0 +1,310 @@
+"use client";
+
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Plus, Loader2, Trash2, X, Network, ExternalLink } from "lucide-react";
+import { useEffect, useState } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { toast } from "sonner";
+import useSWR from "swr";
+import { authenticatedFetcher, apiRequest } from "@/lib/api";
+import { useWebSocket } from "@/context/WebSocketContext";
+
+interface MindMap {
+  id: string;
+  topic: string;
+  title?: string;
+  desc?: string;
+  status: "PROCESSING" | "READY" | "FAILED";
+  created_at: string;
+}
+
+export default function MindMapsPage() {
+  const { data: session, status } = useSession();
+  const router = useRouter();
+  const [topic, setTopic] = useState("");
+  const [language, setLanguage] = useState("pt");
+  const [isCreating, setIsCreating] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState<string | null>(null);
+
+  const { data: mindMaps, mutate: mutateMindMaps, isLoading } = useSWR<
+    MindMap[]
+  >(
+    session?.accessToken
+      ? [`${process.env.NEXT_PUBLIC_API_URL}/mind-maps`, session.accessToken]
+      : null,
+    authenticatedFetcher,
+    {
+      revalidateOnFocus: false,
+      dedupingInterval: 30000,
+    }
+  );
+
+  const { addListener } = useWebSocket();
+
+  useEffect(() => {
+    const removeListener = addListener((data) => {
+      if (data.type === "mind_map_update") {
+        mutateMindMaps();
+        if (data.status === "READY") {
+          toast.success(`Mapa Mental "${data.title}" está pronto!`);
+        } else if (data.status === "FAILED") {
+          toast.error("Ocorreu um erro ao gerar o mapa mental.");
+        }
+      }
+    });
+
+    return () => removeListener();
+  }, [addListener, mutateMindMaps]);
+
+  const handleCreateMindMap = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!topic.trim()) return;
+
+    setIsCreating(true);
+    try {
+      await apiRequest(`${process.env.NEXT_PUBLIC_API_URL}/mind-maps`, {
+        method: "POST",
+        body: JSON.stringify({ topic, language }),
+      });
+      toast.success("Geração do mapa mental iniciada no worker!");
+      setTopic("");
+      setLanguage("pt");
+      setOpen(false);
+      mutateMindMaps();
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao iniciar geração do mapa mental.");
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  const handleDeleteMindMap = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!window.confirm("Deseja mesmo remover este mapa mental?")) return;
+
+    setIsDeleting(id);
+    try {
+      await apiRequest(`${process.env.NEXT_PUBLIC_API_URL}/mind-maps/${id}`, {
+        method: "DELETE",
+      });
+      toast.success("Mapa mental removido.");
+      mutateMindMaps();
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao deletar mapa mental.");
+    } finally {
+      setIsDeleting(null);
+    }
+  };
+
+  if (status === "loading" || (session?.accessToken && isLoading)) {
+    return (
+      <div className="flex items-center justify-center min-h-[70vh]">
+        <div className="text-center space-y-4">
+          <Loader2 className="w-10 h-10 animate-spin text-cyan-500 mx-auto" />
+          <p className="text-muted-foreground font-medium">
+            Carregando seus mapas mentais...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (status === "unauthenticated") {
+    router.replace("/login");
+    return null;
+  }
+
+  return (
+    <div className="max-w-7xl mx-auto px-4 md:px-8 py-8">
+      <div className="flex justify-between items-center mb-8">
+        <div>
+          <h1 className="text-3xl font-bold">Mapas Mentais</h1>
+          <span className="text-sm text-gray-700">
+            Crie trilhas de aprendizagem visuais interativas a partir de qualquer
+            assunto com ajuda de inteligência artificial.
+          </span>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+        {/* Creator Card */}
+        <Dialog open={open} onOpenChange={setOpen}>
+          <DialogTrigger asChild>
+            <Card className="group flex flex-col items-center justify-center p-6 border-2 border-dashed border-cyan-500/30 hover:border-cyan-500 cursor-pointer bg-cyan-500/[0.02] hover:bg-cyan-500/[0.05] hover:shadow-[0_0_20px_rgba(6,182,212,0.15)] transition-all duration-300 min-h-[220px] rounded-2xl">
+              <div className="w-12 h-12 rounded-full bg-cyan-500/10 flex items-center justify-center group-hover:scale-110 group-hover:bg-cyan-500/20 transition-all duration-300">
+                <Plus className="w-6 h-6 text-cyan-500" />
+              </div>
+              <span className="font-bold text-gray-700 mt-4 group-hover:text-cyan-500 transition-colors">
+                Novo Mapa Mental
+              </span>
+              <span className="text-xs text-muted-foreground text-center mt-1 px-4">
+                Digite um tema e assista às aulas organizadas em ordem
+              </span>
+            </Card>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-[500px] border border-cyan-500/20 bg-background shadow-2xl">
+            <div className="space-y-4 pt-4">
+              <div className="w-12 h-12 bg-cyan-500/10 rounded-full flex items-center justify-center mx-auto">
+                <Network className="w-6 h-6 text-cyan-500" />
+              </div>
+              <DialogTitle className="text-2xl font-bold text-center">
+                Criar Mapa Mental
+              </DialogTitle>
+              <DialogDescription className="text-center text-sm text-muted-foreground">
+                Qual assunto você deseja dominar hoje? Nossa IA vai construir um
+                caminho estruturado de videoaulas para você.
+              </DialogDescription>
+            </div>
+
+            <form onSubmit={handleCreateMindMap} className="space-y-4 mt-4">
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wide">Assunto</label>
+                <Input
+                  placeholder="Ex: Introdução ao React Hooks, Docker do zero, Microserviços..."
+                  value={topic}
+                  onChange={(e) => setTopic(e.target.value)}
+                  className="h-12 border-cyan-500/20 focus:border-cyan-500 focus:ring-cyan-500 focus:ring-1"
+                  required
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wide">Idioma das Aulas / Pesquisa</label>
+                <select
+                  value={language}
+                  onChange={(e) => setLanguage(e.target.value)}
+                  className="w-full h-12 px-3.5 rounded-lg border border-cyan-500/20 bg-background focus:border-cyan-500 focus:outline-none text-sm text-slate-700 font-medium"
+                >
+                  <option value="pt">🇵🇹 Português (Brasil)</option>
+                  <option value="en">🇺🇸 Inglês (English)</option>
+                  <option value="es">🇪🇸 Espanhol (Español)</option>
+                </select>
+              </div>
+
+              <div className="flex gap-3 justify-end pt-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => setOpen(false)}
+                  disabled={isCreating}
+                  className="rounded-full h-11"
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={isCreating || !topic.trim()}
+                  className="bg-cyan-500 hover:bg-cyan-600 text-white font-semibold rounded-full h-11 px-6 shadow-md shadow-cyan-500/25"
+                >
+                  {isCreating ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                      Gerando...
+                    </>
+                  ) : (
+                    "Gerar Roadmap"
+                  )}
+                </Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Existing Mind Maps */}
+        {mindMaps?.map((map) => (
+          <Card
+            key={map.id}
+            onClick={() => {
+              if (map.status === "READY") {
+                router.push(`/app/mind-maps/${map.id}`);
+              }
+            }}
+            className={`group relative flex flex-col justify-between p-6 border border-border bg-card rounded-2xl transition-all duration-300 min-h-[220px] ${
+              map.status === "READY"
+                ? "cursor-pointer hover:border-cyan-500/30 hover:shadow-lg hover:shadow-cyan-500/[0.05]"
+                : ""
+            }`}
+          >
+            {/* Delete button */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-red-500 hover:bg-red-50/50 rounded-full transition-all duration-300"
+              onClick={(e) => handleDeleteMindMap(map.id, e)}
+              disabled={isDeleting === map.id}
+            >
+              {isDeleting === map.id ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Trash2 className="w-4 h-4" />
+              )}
+            </Button>
+
+            {/* PROCESSING CARD */}
+            {map.status === "PROCESSING" && (
+              <div className="flex flex-col items-center justify-center flex-1 py-4">
+                <Loader2 className="w-10 h-10 text-cyan-500 animate-spin mb-3" />
+                <h3 className="font-bold text-center text-sm text-gray-700 capitalize max-w-[80%] line-clamp-1">
+                  {map.topic}
+                </h3>
+                <span className="text-xs text-muted-foreground mt-1">
+                  Estruturando mapa...
+                </span>
+              </div>
+            )}
+
+            {/* FAILED CARD */}
+            {map.status === "FAILED" && (
+              <div className="flex flex-col items-center justify-center flex-1 py-4 gap-2">
+                <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+                  <X className="w-5 h-5 text-red-500" />
+                </div>
+                <h3 className="font-bold text-center text-sm text-red-500 capitalize max-w-[80%] line-clamp-1">
+                  Falha: {map.topic}
+                </h3>
+                <span className="text-xs text-muted-foreground text-center">
+                  Tente criar novamente
+                </span>
+              </div>
+            )}
+
+            {/* READY CARD */}
+            {map.status === "READY" && (
+              <>
+                <div className="space-y-2">
+                  <div className="w-8 h-8 rounded-lg bg-cyan-500/10 flex items-center justify-center">
+                    <Network className="w-4 h-4 text-cyan-500" />
+                  </div>
+                  <h3 className="font-bold text-gray-800 text-lg capitalize line-clamp-2 leading-snug group-hover:text-cyan-500 transition-colors">
+                    {map.title}
+                  </h3>
+                  <p className="text-xs text-muted-foreground capitalize">
+                    Assunto: {map.topic}
+                  </p>
+                  <p className="text-sm text-gray-500 line-clamp-3 leading-relaxed mt-1">
+                    {map.desc}
+                  </p>
+                </div>
+                <div className="flex items-center text-cyan-500 text-xs font-semibold mt-4 gap-1">
+                  Ver Mapa Mental
+                  <ExternalLink className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
+                </div>
+              </>
+            )}
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+}

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { BookOpen, GraduationCap, User, LogOut, Settings } from 'lucide-react'
+import { BookOpen, GraduationCap, User, LogOut, Settings, Network } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useSession, signOut } from 'next-auth/react'
@@ -28,6 +28,7 @@ import { Sparkles } from 'lucide-react'
 export function FloatingNavbar() {
     const { data: session } = useSession()
     const [showCursosText, setShowCursosText] = useState(false)
+    const [showMindMapsText, setShowMindMapsText] = useState(false)
     const [showTutorText, setShowTutorText] = useState(false)
 
     const user = session?.user as any
@@ -61,6 +62,22 @@ export function FloatingNavbar() {
                                 }`}
                         >
                             Cursos
+                        </span>
+                    </Link>
+
+                    <Link
+                        href="/app/mind-maps"
+                        className="cursor-pointer flex items-center gap-2 px-2 md:px-3 py-2 transition-all duration-300 hover:bg-cyan-300/10 group"
+                        onMouseEnter={() => setShowMindMapsText(true)}
+                        onMouseLeave={() => setShowMindMapsText(false)}
+                    >
+                        <Network
+                            className="w-7 h-7 pl-1 group-hover:text-cyan-300 transition-colors" />
+                        <span
+                            className={`m-0 text-lg font-medium whitespace-nowrap transition-all duration-300 overflow-hidden ${showMindMapsText ? 'w-32 opacity-100' : 'w-0 opacity-0'
+                                }`}
+                        >
+                            Mapas Mentais
                         </span>
                     </Link>
 
