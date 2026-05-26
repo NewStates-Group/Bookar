@@ -262,28 +262,32 @@ export default function MindMapDetailPage() {
               {showRoadmap ? "Ocultar Trilha" : "Ver Trilha / Mapa"}
             </Button>
             
-            <div className="h-4 w-px bg-slate-300 mx-1" />
+            {showRoadmap && (
+              <>
+                <div className="h-4 w-px bg-slate-300 mx-1" />
 
-            <Button
-              size="sm"
-              variant={viewMode === "canvas" ? "secondary" : "ghost"}
-              onClick={() => setViewMode("canvas")}
-              className={`rounded-full gap-1.5 h-8 text-xs font-semibold px-4 transition-all duration-300 ${viewMode === "canvas" ? "bg-white text-cyan-600 shadow-sm" : "text-muted-foreground hover:text-foreground"
-                }`}
-            >
-              <Tv className="w-3.5 h-3.5" />
-              Mapa Canvas
-            </Button>
-            <Button
-              size="sm"
-              variant={viewMode === "list" ? "secondary" : "ghost"}
-              onClick={() => setViewMode("list")}
-              className={`rounded-full gap-1.5 h-8 text-xs font-semibold px-4 transition-all duration-300 ${viewMode === "list" ? "bg-white text-cyan-600 shadow-sm" : "text-muted-foreground hover:text-foreground"
-                }`}
-            >
-              <List className="w-3.5 h-3.5" />
-              Visualização em Lista
-            </Button>
+                <Button
+                  size="sm"
+                  variant={viewMode === "canvas" ? "secondary" : "ghost"}
+                  onClick={() => setViewMode("canvas")}
+                  className={`rounded-full gap-1.5 h-8 text-xs font-semibold px-4 transition-all duration-300 ${viewMode === "canvas" ? "bg-white text-cyan-600 shadow-sm" : "text-muted-foreground hover:text-foreground"
+                    }`}
+                >
+                  <Tv className="w-3.5 h-3.5" />
+                  Mapa Canvas
+                </Button>
+                <Button
+                  size="sm"
+                  variant={viewMode === "list" ? "secondary" : "ghost"}
+                  onClick={() => setViewMode("list")}
+                  className={`rounded-full gap-1.5 h-8 text-xs font-semibold px-4 transition-all duration-300 ${viewMode === "list" ? "bg-white text-cyan-600 shadow-sm" : "text-muted-foreground hover:text-foreground"
+                    }`}
+                >
+                  <List className="w-3.5 h-3.5" />
+                  Visualização em Lista
+                </Button>
+              </>
+            )}
           </div>
         </div>
 
