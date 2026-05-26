@@ -59,7 +59,7 @@ interface MindMapDetail {
   created_at: string;
 }
 
-type SelectedNodeType = 
+type SelectedNodeType =
   | { type: 1; data: MindMapNode1 }
   | { type: 2; data: MindMapNode2 }
   | { type: 3; data: MindMapNode3 };
@@ -68,20 +68,21 @@ export default function MindMapDetailPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const params = useParams();
-  
+
   // Toggles between "canvas" (dotted flowchart) and "list" (vertical course outlines)
   const [viewMode, setViewMode] = useState<"canvas" | "list">("canvas");
+  const [showRoadmap, setShowRoadmap] = useState(false);
   const [selectedNode, setSelectedNode] = useState<SelectedNodeType | null>(null);
-  
+
   const canvasRef = useRef<HTMLDivElement>(null);
 
   // SWR for Mind Map Detail
   const { data: mindMap, isLoading } = useSWR<MindMapDetail>(
     session?.accessToken && params?.id
       ? [
-          `${process.env.NEXT_PUBLIC_API_URL}/mind-maps/${params.id}`,
-          session.accessToken,
-        ]
+        `${process.env.NEXT_PUBLIC_API_URL}/mind-maps/${params.id}`,
+        session.accessToken,
+      ]
       : null,
     authenticatedFetcher,
     {
@@ -146,7 +147,7 @@ export default function MindMapDetailPage() {
   // Visual Node Positioning Coordinates Calculation Engine
   const positions: Record<string, { x: number; y: number }> = {};
   const connections: Array<{ from: string; to: string }> = [];
-  
+
   let totalRow = 0;
   const cardWidth = 230;
   const cardHeight = 86;
@@ -233,7 +234,7 @@ export default function MindMapDetailPage() {
   return (
     <div className="min-h-screen bg-background p-4 md:p-8">
       <div className="max-w-7xl mx-auto space-y-8">
-        
+
         {/* Back and View Toggle Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <Link href="/app/mind-maps">
@@ -249,11 +250,26 @@ export default function MindMapDetailPage() {
           <div className="flex items-center bg-muted/60 p-1.5 rounded-full border border-slate-200/50 self-start sm:self-center shadow-inner">
             <Button
               size="sm"
+              variant={showRoadmap ? "secondary" : "ghost"}
+              onClick={() => setShowRoadmap(!showRoadmap)}
+              className={`rounded-full gap-1.5 h-8 text-xs font-bold px-4 transition-all duration-300 ${
+                showRoadmap 
+                  ? "bg-cyan-500 text-white shadow-sm hover:bg-cyan-600" 
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Network className="w-3.5 h-3.5" />
+              {showRoadmap ? "Ocultar Trilha" : "Ver Trilha / Mapa"}
+            </Button>
+            
+            <div className="h-4 w-px bg-slate-300 mx-1" />
+
+            <Button
+              size="sm"
               variant={viewMode === "canvas" ? "secondary" : "ghost"}
               onClick={() => setViewMode("canvas")}
-              className={`rounded-full gap-1.5 h-8 text-xs font-semibold px-4 transition-all duration-300 ${
-                viewMode === "canvas" ? "bg-white text-cyan-600 shadow-sm" : "text-muted-foreground hover:text-foreground"
-              }`}
+              className={`rounded-full gap-1.5 h-8 text-xs font-semibold px-4 transition-all duration-300 ${viewMode === "canvas" ? "bg-white text-cyan-600 shadow-sm" : "text-muted-foreground hover:text-foreground"
+                }`}
             >
               <Tv className="w-3.5 h-3.5" />
               Mapa Canvas
@@ -262,9 +278,8 @@ export default function MindMapDetailPage() {
               size="sm"
               variant={viewMode === "list" ? "secondary" : "ghost"}
               onClick={() => setViewMode("list")}
-              className={`rounded-full gap-1.5 h-8 text-xs font-semibold px-4 transition-all duration-300 ${
-                viewMode === "list" ? "bg-white text-cyan-600 shadow-sm" : "text-muted-foreground hover:text-foreground"
-              }`}
+              className={`rounded-full gap-1.5 h-8 text-xs font-semibold px-4 transition-all duration-300 ${viewMode === "list" ? "bg-white text-cyan-600 shadow-sm" : "text-muted-foreground hover:text-foreground"
+                }`}
             >
               <List className="w-3.5 h-3.5" />
               Visualização em Lista
@@ -272,15 +287,11 @@ export default function MindMapDetailPage() {
           </div>
         </div>
 
-        {/* General Subject Banner */}
         <div className="p-6 md:p-8 rounded-3xl bg-gradient-to-r from-cyan-500/10 via-blue-500/5 to-transparent border border-cyan-500/10 shadow-sm relative overflow-hidden">
           <div className="absolute right-8 top-1/2 -translate-y-1/2 opacity-5 hidden lg:block">
             <Network className="w-40 h-40 text-cyan-500" />
           </div>
           <div className="max-w-3xl space-y-2">
-            <div className="inline-flex items-center gap-1 bg-cyan-500/10 text-cyan-600 border border-cyan-500/20 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide">
-              <Sparkles className="w-3.5 h-3.5 animate-pulse" /> Mapa de 3 Níveis
-            </div>
             <h1 className="text-3xl md:text-4xl font-extrabold capitalize text-gray-900 leading-tight">
               {mindMap.title}
             </h1>
@@ -290,12 +301,9 @@ export default function MindMapDetailPage() {
           </div>
         </div>
 
-        {/* Dynamic Split Screen Panel Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-          
-          {/* LEFT Roadmap Workspace (Canvas or List Outline) */}
-          <div className="lg:col-span-7 space-y-6">
-            
+          {showRoadmap && (
+            <div className="lg:col-span-7 space-y-6">
             {viewMode === "canvas" ? (
               // 1. DOTTED MAP CANVAS CONTAINER (NotebookLM Styled)
               <div className="space-y-3">
@@ -357,7 +365,7 @@ export default function MindMapDetailPage() {
                     {mindMap.nodes?.map((n1) => {
                       const pos1 = positions[n1.id];
                       const isSel1 = selectedNode?.type === 1 && selectedNode.data.id === n1.id;
-                      
+
                       return (
                         <div key={n1.id}>
                           {/* Level 1 Node (Module Card) */}
@@ -373,11 +381,10 @@ export default function MindMapDetailPage() {
                               }}
                             >
                               <Card
-                                className={`w-full h-full p-4.5 rounded-2xl flex flex-col justify-center border-2 border-t-[6px] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md ${
-                                  isSel1
+                                className={`w-full h-full p-4.5 rounded-2xl flex flex-col justify-center border-2 border-t-[6px] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md ${isSel1
                                     ? "bg-cyan-50/50 border-cyan-500 border-t-cyan-500 shadow-[0_0_15px_rgba(6,182,212,0.15)]"
                                     : "bg-slate-50/80 border-slate-200 border-t-slate-700 hover:border-cyan-500/40"
-                                }`}
+                                  }`}
                               >
                                 <div className="flex gap-2.5 items-center">
                                   <div className={`p-1.5 rounded-lg ${isSel1 ? 'bg-cyan-500/10 text-cyan-600' : 'bg-slate-200/80 text-slate-600'}`}>
@@ -397,7 +404,7 @@ export default function MindMapDetailPage() {
                           {n1.children?.map((n2) => {
                             const pos2 = positions[n2.id];
                             const isSel2 = selectedNode?.type === 2 && selectedNode.data.id === n2.id;
-                            
+
                             return (
                               <div key={n2.id}>
                                 {/* Level 2 Node (Subtopic Card) */}
@@ -413,11 +420,10 @@ export default function MindMapDetailPage() {
                                     }}
                                   >
                                     <Card
-                                      className={`w-full h-full p-4.5 rounded-2xl flex flex-col justify-center border transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md ${
-                                        isSel2
+                                      className={`w-full h-full p-4.5 rounded-2xl flex flex-col justify-center border transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md ${isSel2
                                           ? "bg-cyan-50/30 border-cyan-500 shadow-[0_0_15px_rgba(6,182,212,0.12)]"
                                           : "bg-white border-slate-200/90 hover:border-cyan-500/30"
-                                      }`}
+                                        }`}
                                     >
                                       <div className="flex gap-2.5 items-center">
                                         <div className={`p-1.5 rounded-lg ${isSel2 ? 'bg-cyan-500/10 text-cyan-600' : 'bg-slate-100 text-slate-500'}`}>
@@ -437,7 +443,7 @@ export default function MindMapDetailPage() {
                                 {n2.children?.map((n3) => {
                                   const pos3 = positions[n3.id];
                                   const isSel3 = selectedNode?.type === 3 && selectedNode.data.id === n3.id;
-                                  
+
                                   return (
                                     pos3 && (
                                       <div
@@ -453,16 +459,14 @@ export default function MindMapDetailPage() {
                                       >
                                         {/* Level 3 Node (Lesson Card) */}
                                         <Card
-                                          className={`w-full h-full p-4.5 rounded-2xl flex flex-col justify-center border-2 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md ${
-                                            isSel3
+                                          className={`w-full h-full p-4.5 rounded-2xl flex flex-col justify-center border-2 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md ${isSel3
                                               ? "bg-cyan-500/[0.04] border-cyan-500 shadow-[0_0_15px_rgba(6,182,212,0.2)]"
                                               : "bg-white border-cyan-500/20 hover:border-cyan-500/40"
-                                          }`}
+                                            }`}
                                         >
                                           <div className="flex gap-2.5 items-center">
-                                            <div className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs transition-colors ${
-                                              isSel3 ? 'bg-cyan-500 text-white' : 'bg-cyan-50 text-cyan-500'
-                                            }`}>
+                                            <div className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs transition-colors ${isSel3 ? 'bg-cyan-500 text-white' : 'bg-cyan-50 text-cyan-500'
+                                              }`}>
                                               ▶
                                             </div>
                                             <div className="space-y-0.5 min-w-0 flex-1">
@@ -542,15 +546,13 @@ export default function MindMapDetailPage() {
                                   <Card
                                     key={n3.id}
                                     onClick={() => setSelectedNode({ type: 3, data: n3 })}
-                                    className={`p-3 cursor-pointer rounded-xl border transition-all duration-300 flex items-center gap-2.5 ${
-                                      isSel3
+                                    className={`p-3 cursor-pointer rounded-xl border transition-all duration-300 flex items-center gap-2.5 ${isSel3
                                         ? "bg-cyan-50/50 border-cyan-500 shadow-sm"
                                         : "bg-white border-slate-100 hover:border-cyan-500/20 hover:bg-slate-50/30"
-                                    }`}
+                                      }`}
                                   >
-                                    <div className={`w-6 h-6 rounded-lg flex items-center justify-center text-[10px] ${
-                                      isSel3 ? 'bg-cyan-500 text-white' : 'bg-slate-100 text-slate-500'
-                                    }`}>
+                                    <div className={`w-6 h-6 rounded-lg flex items-center justify-center text-[10px] ${isSel3 ? 'bg-cyan-500 text-white' : 'bg-slate-100 text-slate-500'
+                                      }`}>
                                       ▶
                                     </div>
                                     <div className="min-w-0 flex-1">
@@ -571,9 +573,10 @@ export default function MindMapDetailPage() {
               </div>
             )}
           </div>
+          )}
 
           {/* RIGHT Syllabus and Video Details Panel */}
-          <div className="lg:col-span-5 lg:sticky lg:top-24">
+          <div className={`${showRoadmap ? "lg:col-span-5" : "lg:col-span-12 max-w-4xl mx-auto"} w-full lg:sticky lg:top-24`}>
             <AnimatePresence mode="wait">
               {selectedNode ? (
                 <motion.div
@@ -585,7 +588,7 @@ export default function MindMapDetailPage() {
                   className="space-y-6"
                 >
                   <Card className="bg-card border border-slate-200/90 rounded-3xl overflow-hidden shadow-xl shadow-slate-100/40">
-                    
+
                     {/* Level 3 Node -> Renders Iframe Player */}
                     {selectedNode.type === 3 && (
                       <div className="aspect-video relative bg-slate-900 border-b border-slate-100">
@@ -627,20 +630,19 @@ export default function MindMapDetailPage() {
 
                     {/* Meta details text */}
                     <div className="p-6 md:p-8 space-y-4">
-                      
+
                       {/* Node Headers */}
                       <div>
                         <div className="flex items-center gap-1.5 mb-1.5">
-                          <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${
-                            selectedNode.type === 1 
-                              ? 'bg-slate-100 text-slate-700' 
-                              : selectedNode.type === 2 
-                              ? 'bg-cyan-50 text-cyan-600 border border-cyan-100' 
-                              : 'bg-emerald-50 text-emerald-600 border border-emerald-100'
-                          }`}>
+                          <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${selectedNode.type === 1
+                              ? 'bg-slate-100 text-slate-700'
+                              : selectedNode.type === 2
+                                ? 'bg-cyan-50 text-cyan-600 border border-cyan-100'
+                                : 'bg-emerald-50 text-emerald-600 border border-emerald-100'
+                            }`}>
                             {selectedNode.type === 1 ? 'Módulo Principal' : selectedNode.type === 2 ? 'Subtópico' : 'Aula Prática'}
                           </span>
-                          
+
                           {selectedNode.type === 3 && selectedNode.data.youtube_url && (
                             <a
                               href={selectedNode.data.youtube_url}
@@ -681,7 +683,7 @@ export default function MindMapDetailPage() {
                                 onClick={() => setSelectedNode({ type: 2, data: subNode })}
                                 className="p-3 bg-slate-50 hover:bg-cyan-50/30 border border-slate-100 rounded-xl cursor-pointer transition-all flex items-center justify-between text-xs"
                               >
-                                <span className="font-bold text-slate-700 capitalize">{sIdx+1}. {subNode.title}</span>
+                                <span className="font-bold text-slate-700 capitalize">{sIdx + 1}. {subNode.title}</span>
                                 <span className="text-[10px] text-cyan-500 font-bold">{subNode.children?.length || 0} aulas</span>
                               </div>
                             ))}
@@ -699,7 +701,7 @@ export default function MindMapDetailPage() {
                                 onClick={() => setSelectedNode({ type: 3, data: lessonNode })}
                                 className="p-3 bg-slate-50 hover:bg-cyan-50/30 border border-slate-100 rounded-xl cursor-pointer transition-all flex items-center gap-2 text-xs"
                               >
-                                <span className="w-5 h-5 rounded bg-cyan-100/50 text-cyan-600 font-bold flex items-center justify-center text-[10px]">{lIdx+1}</span>
+                                <span className="w-5 h-5 rounded bg-cyan-100/50 text-cyan-600 font-bold flex items-center justify-center text-[10px]">{lIdx + 1}</span>
                                 <span className="font-bold text-slate-700 capitalize truncate flex-1">{lessonNode.title}</span>
                                 <span className="text-[10px] text-slate-400">Assistir aula</span>
                               </div>
@@ -720,7 +722,7 @@ export default function MindMapDetailPage() {
               )}
             </AnimatePresence>
           </div>
-          
+
         </div>
       </div>
     </div>
