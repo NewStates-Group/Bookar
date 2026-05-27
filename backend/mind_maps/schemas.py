@@ -36,6 +36,8 @@ class MindMapNode1Out(Schema):
 
 class MindMapOut(ModelSchema):
     nodes: Optional[List[MindMapNode1Out]] = None
+    completed_nodes: Optional[List[str]] = None
+    notes: Optional[dict] = None
     id: str = None
 
     class Meta:
@@ -46,9 +48,35 @@ class MindMapOut(ModelSchema):
             "desc",
             "status",
             "language",
+            "completed_nodes",
+            "notes",
             "created_at",
         ]
 
     @staticmethod
     def resolve_id(obj):
         return str(obj.uuid)
+
+
+class NodeContentOut(Schema):
+    text_content: str
+    additional_resources: Optional[List[Any]] = None
+
+
+class QuizQuestionOut(Schema):
+    id: int
+    type: str  # multiple_choice, true_false, short_answer
+    question: str
+    options: Optional[List[str]] = None
+
+
+class QuizOut(Schema):
+    questions: List[QuizQuestionOut]
+
+
+class QuizSubmitIn(Schema):
+    answers: dict
+
+
+class NoteUpdateIn(Schema):
+    content: str
