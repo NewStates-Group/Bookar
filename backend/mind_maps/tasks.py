@@ -77,25 +77,25 @@ def generate_mind_map_task(self, user_id: int, mind_map_id: int):
         lang = getattr(mind_map, "language", "pt")
         if lang == "en":
             lang_instruction = "Todos os valores de texto devem ser em Inglês (English)."
-            level1_ex = "Module 1: Foundations of " + mind_map.topic
-            level2_ex = "Subtopic 1.1: Core Syntax and Setup"
-            level3_ex = "Lesson 1.1.1: What is " + mind_map.topic + " and why use it"
+            level1_ex = "Foundations of " + mind_map.topic
+            level2_ex = "Core Syntax and Setup"
+            level3_ex = "What is " + mind_map.topic + " and why use it"
             youtube_ex = f"{mind_map.topic} course for beginners"
             title_ex = f"Mastering {mind_map.topic}: The Complete Guide"
             search_lang = "english"
         elif lang == "es":
             lang_instruction = "Todos os valores de texto devem ser em Espanhol (Spanish)."
-            level1_ex = "Módulo 1: Fundamentos de " + mind_map.topic
-            level2_ex = "Subtema 1.1: Sintaxis y Primeros Pasos"
-            level3_ex = "Lección 1.1.1: Qué es " + mind_map.topic + " y por qué usarlo"
+            level1_ex = "Fundamentos de " + mind_map.topic
+            level2_ex = "Sintaxis y Primeros Pasos"
+            level3_ex = "Qué es " + mind_map.topic + " y por qué usarlo"
             youtube_ex = f"que es {mind_map.topic} tutorial español completo"
             title_ex = f"Dominando {mind_map.topic}: La Guía Completa"
             search_lang = "espanol"
         else:  # pt
             lang_instruction = "Todos os valores de texto devem ser em Português do Brasil."
-            level1_ex = "Módulo 1: Fundamentos de " + mind_map.topic
-            level2_ex = "Subtópico 1.1: Primeiro contato com a Sintaxe"
-            level3_ex = "Aula 1.1.1: O que é e por que usar " + mind_map.topic
+            level1_ex = "Fundamentos de " + mind_map.topic
+            level2_ex = "Primeiro contato com a Sintaxe"
+            level3_ex = "O que é e por que usar " + mind_map.topic
             youtube_ex = f"o que e {mind_map.topic} tutorial para iniciantes"
             title_ex = f"Dominando {mind_map.topic}: O Guia Completo"
             search_lang = "portugues"
@@ -104,11 +104,12 @@ def generate_mind_map_task(self, user_id: int, mind_map_id: int):
         Você é um especialista em educação e criação de trilhas de aprendizagem (roadmaps / mapas mentais).
         Sua tarefa é criar um mapa mental estruturado e progressivo com 3 NÍVEIS de profundidade para aprender sobre o assunto: "{mind_map.topic}".
 
-        Regras:
+        Regras Cruciais de Conteúdo:
         - Retorne APENAS um JSON válido.
         - NUNCA inclua markdown extra, texto fora do JSON ou explicações.
         - {lang_instruction}
         - As chaves do JSON devem permanecer em Inglês.
+        - NUNCA inclua qualquer tipo de numeração, prefixo numérico ou enumeração nos títulos ("title") de qualquer nível (como "Módulo 1:", "Subtópico 1.1:", "Aula 1.1.1:", "1.", "1.1", etc.). Os títulos devem ser limpos, diretos e conter apenas o nome do assunto/tópico (ex: "Fundamentos de Python", e não "Módulo 1: Fundamentos de Python").
         
         Regras de Estrutura de 3 Níveis:
         1. O JSON deve conter "title" e "desc" gerais do mapa.
