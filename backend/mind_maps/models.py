@@ -38,6 +38,9 @@ class MindMap(models.Model):
     # ]
     language = models.CharField(max_length=10, default="pt")
     nodes = models.JSONField(null=True, blank=True)
+    completed_nodes = models.JSONField(default=list, blank=True)
+    notes = models.JSONField(default=dict, blank=True)
+    quizzes = models.JSONField(default=dict, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
