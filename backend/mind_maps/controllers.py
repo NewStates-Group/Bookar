@@ -2,7 +2,7 @@ from typing import List
 from injector import inject
 from ninja_extra import api_controller, route
 from ninja_jwt.authentication import JWTAuth
-from .schemas import MindMapIn, MindMapOut
+from .schemas import MindMapIn, MindMapOut, NodeContentOut, QuizOut, QuizSubmitIn, NoteUpdateIn
 from .services import MindMapService
 
 
@@ -28,3 +28,19 @@ class MindMapController:
     @route.delete("{mind_map_id}")
     def delete_mind_map(self, request, mind_map_id: str):
         return self.mind_map_service.delete_mind_map(mind_map_id, request.user)
+
+    @route.get("{mind_map_id}/node/{node_id}/content", response=NodeContentOut)
+    def get_node_content(self, request, mind_map_id: str, node_id: str):
+        return self.mind_map_service.get_node_content(mind_map_id, node_id, request.user)
+
+    @route.get("{mind_map_id}/node/{node_id}/quiz", response=QuizOut)
+    def get_node_quiz(self, request, mind_map_id: str, node_id: str):
+        return self.mind_map_service.get_or_create_node_quiz(mind_map_id, node_id, request.user)
+
+    @route.post("{mind_map_id}/node/{node_id}/quiz/submit")
+    def submit_node_quiz(self, request, mind_map_id: str, node_id: str, data: QuizSubmitIn):
+        return self.mind_map_service.submit_node_quiz(mind_map_id, node_id, data.answers, request.user)
+
+    @route.post("{mind_map_id}/node/{node_id}/note")
+    def update_node_note(self, request, mind_map_id: str, node_id: str, data: NoteUpdateIn):
+        return self.mind_map_service.update_node_note(mind_map_id, node_id, data.content, request.user)
