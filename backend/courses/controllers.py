@@ -18,6 +18,8 @@ from .schemas import (
     ShareClaimOut,
     ShareClaimListOut,
     ModuleMaterialSchema,
+    CourseFeaturedOut,
+    CoursePreviewOut,
 )
 from .services import CourseService, LessonService
 
@@ -38,13 +40,22 @@ class CourseController:
             request.user, data.prompt, data.level, data.num_modules
         )
 
-    @route.get("{course_id}", response=CourseDetailSchema)
-    def get_course(self, request, course_id: str):
-        return self.course_service.get_course(course_id, request.user)
+    @route.get("featured", response=List[CourseFeaturedOut], auth=None)
+    def list_featured_courses(self, request):
+        """Public endpoint – returns all READY courses for the discovery carousel."""
+        return self.course_service.list_featured_courses()
 
-    @route.delete("{course_id}")
-    def delete_course(self, request, course_id: str):
-        return self.course_service.delete_course(course_id, request.user)
+    @route.get("share/{token}", response=CourseShareOut, auth=None)
+    def get_share_info(self, request, token: str):
+        return self.get_share_info_data(token)
+
+    def get_share_info_data(self, token: str):
+        return self.course_service.get_share_info(token)
+
+    @route.get("{course_id}/preview", response=CoursePreviewOut, auth=None)
+    def get_course_preview(self, request, course_id: str):
+        """Public endpoint – full course details for the preview modal."""
+        return self.course_service.get_course_preview(course_id)
 
     @route.get("{course_id}/get-next-lesson")
     def get_next_lesson(self, request, course_id: str, current_lesson: str = "0"):
@@ -54,6 +65,14 @@ class CourseController:
         if not lesson:
             return {"finished": True}
         return GetNextLessonSchema.from_orm(lesson)
+
+    @route.get("{course_id}", response=CourseDetailSchema)
+    def get_course(self, request, course_id: str):
+        return self.course_service.get_course(course_id, request.user)
+
+    @route.delete("{course_id}")
+    def delete_course(self, request, course_id: str):
+        return self.course_service.delete_course(course_id, request.user)
 
     @route.post("{course_id}/generate-module")
     def generate_module(self, request, course_id: str):
@@ -83,10 +102,6 @@ class CourseController:
     def share_course(self, request, course_id: str):
         return self.course_service.generate_share_token(request.user, course_id)
 
-    @route.get("share/{token}", response=CourseShareOut, auth=None)
-    def get_share_info(self, request, token: str):
-        return self.course_service.get_share_info(token)
-
     @route.post("share/{token}/claim", response=ShareClaimOut)
     def claim_share(self, request, token: str):
         return self.course_service.claim_share(request.user, token)
@@ -98,6 +113,12 @@ class CourseController:
     @route.get("module-material/{module_id}", response=ModuleMaterialSchema)
     def get_module_material(self, request, module_id: str):
         return self.course_service.get_module_material(request.user, module_id)
+
+    @route.post("{course_id}/clone", response=MessageSchema)
+    def clone_course(self, request, course_id: str):
+        """Authenticated – enroll the user in any existing READY course."""
+        result = self.course_service.clone_course(request.user, course_id)
+        return {"msg": result.get("course_id", "")}
 
 
 @api_controller("lessons", tags=["Lesson"], auth=JWTAuth())

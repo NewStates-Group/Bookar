@@ -1,3 +1,4 @@
+from django.db import models
 from ninja.errors import HttpError
 from .models import MindMap
 from .tasks import generate_mind_map_task
@@ -6,7 +7,10 @@ from .tasks import generate_mind_map_task
 class MindMapService:
 
     def list_mind_maps(self, user):
-        return MindMap.objects.filter(user=user).order_by("-created_at")
+        maps = MindMap.objects.filter(user=user).order_by("-created_at")
+        for m in maps:
+            m.is_owner = True
+        return maps
 
     def create_mind_map(self, user, topic: str, language: str = "pt"):
         mind_map = MindMap.objects.create(
@@ -21,19 +25,29 @@ class MindMapService:
         )
 
         generate_mind_map_task.delay(user.pk, mind_map.pk)
+        mind_map.is_owner = True
         return mind_map
 
     def get_mind_map(self, uuid_str: str, user):
         try:
-            return MindMap.objects.get(uuid=uuid_str, user=user)
+            mind_map = MindMap.objects.get(uuid=uuid_str, user=user)
+            mind_map.is_owner = True
+            return mind_map
         except MindMap.DoesNotExist:
-            raise HttpError(
-                404,
-                "Mapa mental não encontrado ou você não tem acesso a ele.",
-            )
+            try:
+                mind_map = MindMap.objects.get(uuid=uuid_str, is_shared=True)
+                mind_map.is_owner = False
+                return mind_map
+            except MindMap.DoesNotExist:
+                raise HttpError(
+                    404,
+                    "Mapa mental não encontrado ou você não tem acesso a ele.",
+                )
 
     def delete_mind_map(self, uuid_str: str, user):
         mind_map = self.get_mind_map(uuid_str, user)
+        if mind_map.user != user:
+            raise HttpError(403, "Você não tem permissão para eliminar este mapa mental.")
         mind_map.delete()
         return {"success": True, "message": "Mapa mental eliminado."}
 
@@ -272,6 +286,9 @@ class MindMapService:
 
     def submit_node_quiz(self, uuid_str: str, node_id: str, answers: dict, user):
         mind_map = self.get_mind_map(uuid_str, user)
+        if mind_map.user != user:
+            raise HttpError(403, "Você precisa importar este mapa mental para salvar progresso e fazer o teste.")
+
         if not mind_map.quizzes or node_id not in mind_map.quizzes:
             raise HttpError(400, "O questionário para esta aula não existe ou ainda não foi gerado.")
 
@@ -313,6 +330,8 @@ class MindMapService:
 
     def update_node_note(self, uuid_str: str, node_id: str, content: str, user):
         mind_map = self.get_mind_map(uuid_str, user)
+        if mind_map.user != user:
+            raise HttpError(403, "Você precisa importar este mapa mental para salvar anotações.")
         
         if not mind_map.notes:
             mind_map.notes = {}
@@ -323,3 +342,59 @@ class MindMapService:
         mind_map.save(update_fields=["notes"])
 
         return {"success": True, "notes": mind_map.notes}
+
+    def toggle_share(self, uuid_str: str, user):
+        mind_map = self.get_mind_map(uuid_str, user)
+        if mind_map.user != user:
+            raise HttpError(403, "Apenas o proprietário pode partilhar este mapa mental.")
+        
+        mind_map.is_shared = not mind_map.is_shared
+        mind_map.save(update_fields=["is_shared"])
+        return {"success": True, "is_shared": mind_map.is_shared}
+
+    def duplicate_mind_map(self, uuid_str: str, user):
+        try:
+            original = MindMap.objects.get(uuid=uuid_str)
+            # Ensure they own it or it's public
+            if original.user != user and not original.is_shared:
+                raise HttpError(403, "Você não tem permissão para duplicar este mapa mental.")
+        except MindMap.DoesNotExist:
+            raise HttpError(404, "Mapa mental original não encontrado.")
+
+        copy_mind_map = MindMap.objects.create(
+            user=user,
+            topic=original.topic,
+            title=f"{original.title} (Cópia)" if not original.title.endswith("(Cópia)") else original.title,
+            desc=original.desc,
+            status=original.status,
+            language=original.language,
+            nodes=original.nodes,
+            completed_nodes=[],
+            notes={},
+            quizzes=original.quizzes or {},
+        )
+
+        # Atomically increment the import counter on the original map
+        MindMap.objects.filter(pk=original.pk).update(import_count=models.F("import_count") + 1)
+
+        copy_mind_map.is_owner = True
+        return copy_mind_map
+
+    def skip_node(self, uuid_str: str, node_id: str, user):
+        mind_map = self.get_mind_map(uuid_str, user)
+        if mind_map.user != user:
+            raise HttpError(403, "Você precisa importar este mapa mental para alterar o progresso.")
+
+        if not mind_map.completed_nodes:
+            mind_map.completed_nodes = []
+
+        updated_completed = list(mind_map.completed_nodes)
+        if node_id not in updated_completed:
+            updated_completed.append(node_id)
+            mind_map.completed_nodes = updated_completed
+            mind_map.save(update_fields=["completed_nodes"])
+
+        return {
+            "success": True,
+            "completed_nodes": mind_map.completed_nodes,
+        }

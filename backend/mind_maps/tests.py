@@ -219,3 +219,77 @@ class MindMapInteractiveLearningTests(TestCase):
         res = extract_json('{"text_content": "Severely truncated content...')
         self.assertEqual(res["text_content"], "Severely truncated content...")
 
+    def test_sharing_access_control(self):
+        """Verify that shared mind maps are accessible by other users, while unshared are not."""
+        other_user = User.objects.create_user(
+            username="otheruser",
+            email="other@example.com",
+            password="Password123"
+        )
+        
+        # 1. By default, it's not shared. Other user gets 404/HttpError
+        with self.assertRaises(HttpError):
+            self.service.get_mind_map(str(self.mind_map.uuid), other_user)
+            
+        # 2. Toggle share to True
+        self.service.toggle_share(str(self.mind_map.uuid), self.user)
+        self.assertTrue(MindMap.objects.get(uuid=self.mind_map.uuid).is_shared)
+        
+        # 3. Now other user can view it, but is_owner should be False
+        shared_map = self.service.get_mind_map(str(self.mind_map.uuid), other_user)
+        self.assertEqual(shared_map.uuid, self.mind_map.uuid)
+        self.assertFalse(shared_map.is_owner)
+        
+        # 4. Other user cannot write notes or do quiz
+        with self.assertRaises(HttpError):
+            self.service.update_node_note(str(self.mind_map.uuid), "lesson_1", "Test note", other_user)
+            
+        with self.assertRaises(HttpError):
+            self.service.submit_node_quiz(str(self.mind_map.uuid), "lesson_1", {"1": "True"}, other_user)
+
+    def test_duplicate_mind_map(self):
+        """Verify that duplicating a shared mind map clones it for the new user with empty progress."""
+        other_user = User.objects.create_user(
+            username="otheruser2",
+            email="other2@example.com",
+            password="Password123"
+        )
+        
+        # Enable sharing
+        self.mind_map.is_shared = True
+        self.mind_map.save()
+        
+        # Add some initial progress/notes to original map to make sure they are NOT copied
+        self.mind_map.completed_nodes = ["lesson_1"]
+        self.mind_map.notes = {"lesson_1": "My secret notes"}
+        self.mind_map.save()
+        
+        # Duplicate for other user
+        copy_map = self.service.duplicate_mind_map(str(self.mind_map.uuid), other_user)
+        
+        self.assertEqual(copy_map.user, other_user)
+        self.assertEqual(copy_map.topic, self.mind_map.topic)
+        self.assertEqual(copy_map.title, f"{self.mind_map.title} (Cópia)")
+        self.assertTrue(copy_map.is_owner)
+        
+        # Progress must be empty
+        self.assertEqual(copy_map.completed_nodes, [])
+        self.assertEqual(copy_map.notes, {})
+        
+        # Structure must remain same
+        self.assertEqual(copy_map.nodes, self.mind_map.nodes)
+
+    def test_skip_node_progression(self):
+        """Verify that skip_node allows the owner to mark a node as completed directly."""
+        # Unlocked by default initially
+        self.assertEqual(self.mind_map.completed_nodes, [])
+        
+        # Call skip node
+        res = self.service.skip_node(str(self.mind_map.uuid), "lesson_1", self.user)
+        
+        self.assertIn("lesson_1", res["completed_nodes"])
+        
+        # Check database
+        updated_map = MindMap.objects.get(uuid=self.mind_map.uuid)
+        self.assertIn("lesson_1", updated_map.completed_nodes)
+

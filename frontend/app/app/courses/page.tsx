@@ -4,7 +4,7 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { BookOpen, Plus, Loader2, ArrowRight, ArrowUp, ImageOff, Sparkles, GraduationCap, Award, FileDown, X, Trash2, Share2 } from "lucide-react";
+import { BookOpen, Plus, Loader2, ArrowRight, ArrowUp, ImageOff, Sparkles, GraduationCap, Award, FileDown, X, Trash2, Share2, Heart, Compass, Layers } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
 import { Label } from "@/components/ui/label";
 import {
@@ -44,6 +44,40 @@ interface Course {
   is_fully_completed: boolean;
 }
 
+interface FeaturedCourse {
+  id: string;
+  title: string;
+  desc: string;
+  level: string;
+  thumb: string | null;
+  module_count: number;
+  owner_name: string | null;
+}
+
+interface PreviewLesson {
+  title: string;
+  desc: string;
+}
+
+interface PreviewModule {
+  id: string;
+  name: string;
+  desc: string;
+  lesson_count: number;
+  lessons: PreviewLesson[];
+}
+
+interface CoursePreviewDetail {
+  id: string;
+  title: string;
+  desc: string;
+  level: string;
+  thumb: string | null;
+  owner_name: string | null;
+  module_count: number;
+  modules: PreviewModule[];
+}
+
 export default function CoursesPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -59,6 +93,77 @@ export default function CoursesPage() {
   const [isDownloading, setIsDownloading] = useState(false);
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const [isDeletingCourse, setIsDeletingCourse] = useState<number | null>(null);
+
+  // Community discovery states
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewData, setPreviewData] = useState<CoursePreviewDetail | null>(null);
+  const [isCloning, setIsCloning] = useState(false);
+
+  // SWR to fetch all ready courses for community discovery (no auth header needed)
+  const { data: featuredCourses, mutate: mutateFeatured } = useSWR<FeaturedCourse[]>(
+    `${process.env.NEXT_PUBLIC_API_URL}/courses/featured`,
+    async (url: string) => {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("Failed to fetch featured courses");
+      return res.json();
+    },
+    {
+      revalidateOnFocus: false,
+      dedupingInterval: 30000,
+    }
+  );
+
+  const handleOpenPreview = async (courseId: string) => {
+    setShowPreviewModal(true);
+    setPreviewLoading(true);
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/courses/${courseId}/preview`);
+      if (res.ok) {
+        const data = await res.json();
+        setPreviewData(data);
+      } else {
+        toast.error("Erro ao obter pré-visualização do curso.");
+        setShowPreviewModal(false);
+      }
+    } catch {
+      toast.error("Erro de conexão.");
+      setShowPreviewModal(false);
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
+  const handleCloneCourse = async (courseId: string) => {
+    // @ts-ignore
+    if (!session?.accessToken) {
+      toast.error("Por favor, faça login para importar este curso.");
+      return;
+    }
+    setIsCloning(true);
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/courses/${courseId}/clone`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          // @ts-ignore
+          Authorization: `Bearer ${session.accessToken}`,
+        },
+      });
+      if (res.ok) {
+        toast.success("Curso importado com sucesso! 🎓");
+        mutateCourses();
+        setShowPreviewModal(false);
+      } else {
+        const err = await res.json();
+        toast.error(err.message || "Erro ao importar curso.");
+      }
+    } catch {
+      toast.error("Erro ao importar curso.");
+    } finally {
+      setIsCloning(false);
+    }
+  };
 
   const { data: swrCourses, mutate: mutateCourses } = useSWR(
     // @ts-ignore
@@ -448,58 +553,246 @@ export default function CoursesPage() {
                 </span>
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[650px] p-0 overflow-hidden border-0 shadow-2xl">
-              <div className="relative overflow-hidden">
-                <div className="p-8 pb-3">
-                  <DialogTitle className="text-center text-3xl font-bold">
-                    Criar Novo Curso
-                  </DialogTitle>
-                  <DialogDescription className="mt-2 text-center  text-base">
-                    {steps[step - 1]?.desc}
-                  </DialogDescription>
+            <DialogContent className="sm:max-w-[480px] p-6 overflow-hidden border border-slate-100 rounded-3xl shadow-2xl bg-white">
+              <div className="text-center space-y-5 pt-4">
+                <div className="w-16 h-16 bg-rose-500/10 rounded-2xl flex items-center justify-center mx-auto border border-rose-500/10 animate-pulse">
+                  <Heart className="w-8 h-8 text-rose-500 fill-rose-500/20" />
                 </div>
+                
+                <DialogTitle className="text-xl font-extrabold text-slate-800 leading-tight">
+                  Serviço Temporariamente Indisponível
+                </DialogTitle>
+                
+                <DialogDescription className="text-xs text-slate-500 leading-relaxed max-w-sm mx-auto">
+                  Devido aos elevados custos operacionais das APIs de Inteligência Artificial e à falta de lucro da empresa para sustentar os custos dos servidores, a funcionalidade de criação de novos cursos está temporariamente suspensa.
+                </DialogDescription>
+              </div>
 
-                <div className="px-8 pb-8">
-                  {steps[step - 1].content}
-                  <div className="w-full flex gap-2 justify-end mt-6">
-                    {step > 1 && (
-                      <Button
-                        type="button"
-                        onClick={prevStep}
-                        variant="outline"
-                      >
-                        Voltar
-                      </Button>
-                    )}
-                    {step < steps.length ? (
-                      <Button
-                        type="button"
-                        onClick={nextStep}
-                        disabled={step === 1 && !prompt.trim()}
-                      >
-                        Avançar
-                      </Button>
-                    ) : (
-                      <Button
-                        type="button"
-                        onClick={handleCreateCourse}
-                        disabled={isCreating}
-                      >
-                        {isCreating ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <ArrowUp className="h-4 w-4" />
-                        )}
-                        {isCreating ? "Criando..." : "Criar Curso"}
-                      </Button>
-                    )}
-                  </div>
-                </div>
+              <div className="p-4 rounded-2xl bg-gradient-to-r from-rose-50/50 via-slate-50 to-slate-50 border border-slate-100 my-5 text-left space-y-2">
+                <h4 className="text-xs font-bold text-slate-700">Como posso ajudar? 🤔</h4>
+                <p className="text-[11px] text-slate-500 leading-relaxed">
+                  Para podermos reativar a IA de geração de cursos, dependemos do apoio da nossa comunidade. Se valoriza o Bookar, considere contribuir para ajudar a manter o projeto ativo e sustentável!
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-2.5 pb-2">
+                <Button
+                  asChild
+                  className="w-full h-11 bg-rose-500 hover:bg-rose-600 text-white font-bold rounded-full shadow-md shadow-rose-500/15 flex items-center justify-center gap-2 transition-all hover:scale-[1.02] active:scale-95 cursor-pointer"
+                >
+                  <a href="https://patreon.com/bookar" target="_blank" rel="noopener noreferrer">
+                    <Heart className="w-4 h-4 fill-white" />
+                    Apoiar o Projeto (Patreon / Stripe)
+                  </a>
+                </Button>
+                
+                <Button
+                  variant="ghost"
+                  className="w-full h-11 rounded-full text-xs text-slate-450 hover:text-slate-700 transition-colors"
+                  onClick={() => setOpen(false)}
+                >
+                  Fechar
+                </Button>
               </div>
             </DialogContent>
           </Dialog>
         </div>
       </div>
+
+      {/* ── SECTION: EXPLORAR CURSOS DA COMUNIDADE ── */}
+      {featuredCourses && featuredCourses.length > 0 && (
+        <div className="mb-10 bg-gradient-to-br from-slate-50/40 via-cyan-50/10 to-transparent p-5 rounded-3xl border border-slate-100/60 shadow-sm">
+          <div className="flex items-center gap-2.5 mb-5">
+            <div className="w-9 h-9 rounded-xl bg-cyan-500/10 flex items-center justify-center border border-cyan-500/15">
+              <Compass className="w-5 h-5 text-cyan-500" />
+            </div>
+            <div>
+              <h2 className="text-lg md:text-xl font-bold text-slate-800 flex items-center gap-2">
+                Explorar Cursos da Comunidade
+                <span className="px-2.5 py-0.5 rounded-full bg-cyan-100 text-cyan-700 text-[10px] font-black uppercase tracking-wider">
+                  Novidades
+                </span>
+              </h2>
+              <p className="text-xs text-slate-500">Aprenda com cursos criados por outros estudantes e adicione-os à sua conta!</p>
+            </div>
+          </div>
+
+          <div className="relative">
+            <div className="flex gap-5 overflow-x-auto pb-4 scroll-smooth snap-x snap-mandatory scrollbar-thin scrollbar-thumb-slate-200 hover:scrollbar-thumb-slate-300 scrollbar-track-transparent">
+              {featuredCourses.map((fc) => (
+                <div
+                  key={fc.id}
+                  onClick={() => handleOpenPreview(fc.id)}
+                  className="flex-shrink-0 w-[280px] sm:w-[320px] bg-white border border-slate-100/80 rounded-2xl p-3.5 shadow-sm hover:shadow-md hover:border-cyan-200/50 hover:translate-y-[-2px] transition-all duration-300 cursor-pointer snap-start group relative overflow-hidden flex flex-col justify-between"
+                >
+                  <div>
+                    <div className="aspect-video w-full rounded-xl overflow-hidden mb-3.5 relative bg-slate-50 border border-slate-100">
+                      {fc.thumb ? (
+                        <img
+                          src={fc.thumb.startsWith('http') ? fc.thumb : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/media/${fc.thumb}`}
+                          alt={fc.title}
+                          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                        />
+                      ) : (
+                        <div className="flex flex-col items-center justify-center h-full text-slate-400">
+                          <ImageOff className="w-8 h-8 text-slate-350" />
+                          <span className="text-[10px] mt-1 text-slate-450">Sem Capa</span>
+                        </div>
+                      )}
+                      <div className="absolute top-2 left-2">
+                        <span className="inline-flex items-center rounded-md bg-white/90 backdrop-blur-sm px-2 py-0.5 text-[9px] font-extrabold text-slate-800 shadow-sm border border-slate-100 uppercase">
+                          {fc.level === 'B' ? 'Iniciante' : fc.level === 'IT' ? 'Intermediário' : 'Avançado'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <h3 className="font-extrabold text-sm text-slate-800 line-clamp-1 group-hover:text-cyan-500 transition-colors capitalize leading-snug">
+                      {fc.title || "Curso sem título"}
+                    </h3>
+                    <p className="text-[11px] text-slate-500 line-clamp-2 mt-1.5 mb-3 leading-relaxed">
+                      {fc.desc || "Sem descrição disponível para este curso da comunidade."}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center justify-between mt-auto pt-3 border-t border-slate-50 text-[10px] text-slate-400 font-medium">
+                    <span className="flex items-center gap-1">
+                      <Layers className="w-3.5 h-3.5 text-slate-450" />
+                      {fc.module_count} {fc.module_count === 1 ? 'Módulo' : 'Módulos'}
+                    </span>
+                    {fc.owner_name && (
+                      <span className="max-w-[130px] truncate text-[9px] text-slate-500 bg-slate-50 px-2.5 py-0.5 rounded-full border border-slate-100/50">
+                        Por: {fc.owner_name}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── SECTION: MEUS CURSOS ── */}
+      <div className="mb-6">
+        <h2 className="text-lg md:text-xl font-bold text-slate-800">Os Meus Cursos</h2>
+        <p className="text-xs text-slate-500">Veja abaixo os cursos que você está a frequentar e acompanhe o seu progresso.</p>
+      </div>
+
+      {/* ── MODAL: PREVIEW DO CURSO DA COMUNIDADE ── */}
+      <Dialog open={showPreviewModal} onOpenChange={setShowPreviewModal}>
+        <DialogContent className="sm:max-w-[520px] p-6 max-h-[85vh] overflow-y-auto border border-slate-100 rounded-3xl shadow-2xl bg-white scrollbar-thin">
+          {previewLoading ? (
+            <div className="flex flex-col items-center justify-center py-20 gap-4">
+              <Loader2 className="w-10 h-10 animate-spin text-cyan-500" />
+              <p className="text-xs font-bold text-slate-500 animate-pulse">Obtendo detalhes do curso...</p>
+            </div>
+          ) : previewData ? (
+            <div className="space-y-5">
+              <div className="aspect-video w-full rounded-2xl overflow-hidden relative bg-slate-50 border border-slate-100">
+                {previewData.thumb ? (
+                  <img
+                    src={previewData.thumb.startsWith('http') ? previewData.thumb : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/media/${previewData.thumb}`}
+                    alt={previewData.title}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="flex flex-col items-center justify-center h-full text-slate-400">
+                    <ImageOff className="w-12 h-12 text-slate-350" />
+                  </div>
+                )}
+                <div className="absolute top-3 left-3 flex gap-2">
+                  <span className="inline-flex items-center rounded-full bg-cyan-500 text-white px-3 py-1 text-xs font-extrabold shadow-md">
+                    {previewData.level === 'B' ? 'Iniciante' : previewData.level === 'IT' ? 'Intermediário' : 'Avançado'}
+                  </span>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <DialogTitle className="text-xl md:text-2xl font-black text-slate-800 leading-snug capitalize">
+                  {previewData.title}
+                </DialogTitle>
+                {previewData.owner_name && (
+                  <p className="text-xs text-slate-400 font-medium">
+                    Criado por <span className="text-slate-600 font-bold">{previewData.owner_name}</span>
+                  </p>
+                )}
+                <DialogDescription className="text-xs md:text-sm text-slate-500 leading-relaxed">
+                  {previewData.desc || "Sem descrição disponível para este curso."}
+                </DialogDescription>
+              </div>
+
+              {/* Modules list preview */}
+              <div className="space-y-3">
+                <h4 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                  <Layers className="w-3.5 h-3.5 text-cyan-500" />
+                  Grade Curricular ({previewData.module_count} Módulos)
+                </h4>
+
+                <div className="space-y-2.5 max-h-[220px] overflow-y-auto pr-1.5 scrollbar-thin">
+                  {previewData.modules.map((mod, idx) => (
+                    <div key={mod.id} className="p-3 rounded-2xl bg-slate-50 border border-slate-100 space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-extrabold text-slate-700 capitalize">
+                          Módulo {idx + 1}: {mod.name}
+                        </span>
+                        <span className="text-[10px] font-bold text-cyan-600 bg-cyan-50 px-2 py-0.5 rounded-full">
+                          {mod.lesson_count} Aulas
+                        </span>
+                      </div>
+                      {mod.desc && <p className="text-[10px] text-slate-400 line-clamp-1">{mod.desc}</p>}
+                      
+                      {/* Lesson title listing */}
+                      {mod.lessons && mod.lessons.length > 0 && (
+                        <div className="pl-3 border-l-2 border-slate-200 pt-1 space-y-1">
+                          {mod.lessons.map((lesson, lIdx) => (
+                            <div key={lIdx} className="text-[10px] text-slate-500 flex items-center gap-1">
+                              <span className="w-1 h-1 rounded-full bg-cyan-400 flex-shrink-0" />
+                              <span className="font-semibold line-clamp-1">{lesson.title}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Action buttons */}
+              <div className="flex flex-col sm:flex-row gap-2.5 pt-2">
+                <Button
+                  onClick={() => handleCloneCourse(previewData.id)}
+                  disabled={isCloning}
+                  className="flex-1 h-11 bg-cyan-500 hover:bg-cyan-600 text-white font-extrabold rounded-full gap-2 transition-all hover:scale-[1.01] active:scale-[0.99] shadow-md shadow-cyan-500/10 cursor-pointer"
+                >
+                  {isCloning ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Importando...
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="w-4 h-4" />
+                      Importar para a Minha Biblioteca
+                    </>
+                  )}
+                </Button>
+                <Button
+                  variant="ghost"
+                  onClick={() => setShowPreviewModal(false)}
+                  className="h-11 rounded-full text-xs font-bold text-slate-450 hover:bg-slate-50 hover:text-slate-700 transition-colors"
+                >
+                  Fechar
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-8 text-slate-400">
+              Erro ao carregar pré-visualização.
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       {isLoading ? (
         <div className="flex items-center justify-center py-20">
           <div className="text-center space-y-4">

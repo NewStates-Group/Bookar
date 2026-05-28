@@ -29,6 +29,18 @@ class MindMapController:
     def delete_mind_map(self, request, mind_map_id: str):
         return self.mind_map_service.delete_mind_map(mind_map_id, request.user)
 
+    @route.post("{mind_map_id}/share")
+    def toggle_share(self, request, mind_map_id: str):
+        return self.mind_map_service.toggle_share(mind_map_id, request.user)
+
+    @route.post("{mind_map_id}/duplicate", response=MindMapOut)
+    def duplicate_mind_map(self, request, mind_map_id: str):
+        return self.mind_map_service.duplicate_mind_map(mind_map_id, request.user)
+
+    @route.post("{mind_map_id}/node/{node_id}/skip")
+    def skip_node(self, request, mind_map_id: str, node_id: str):
+        return self.mind_map_service.skip_node(mind_map_id, node_id, request.user)
+
     @route.get("{mind_map_id}/node/{node_id}/content", response=NodeContentOut)
     def get_node_content(self, request, mind_map_id: str, node_id: str):
         return self.mind_map_service.get_node_content(mind_map_id, node_id, request.user)

@@ -39,6 +39,9 @@ class MindMapOut(ModelSchema):
     completed_nodes: Optional[List[str]] = None
     notes: Optional[dict] = None
     id: str = None
+    is_shared: bool = False
+    is_owner: Optional[bool] = None
+    import_count: int = 0
 
     class Meta:
         model = MindMap
@@ -51,6 +54,8 @@ class MindMapOut(ModelSchema):
             "completed_nodes",
             "notes",
             "created_at",
+            "is_shared",
+            "import_count",
         ]
 
     @staticmethod

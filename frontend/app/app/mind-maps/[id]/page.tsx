@@ -28,6 +28,11 @@ import {
   Lock,
   Eye,
   X,
+  Share2,
+  Copy,
+  Check,
+  Download,
+  Users,
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState, useRef } from "react";
@@ -73,6 +78,10 @@ interface MindMapDetail {
   completed_nodes?: string[];
   notes?: Record<string, string>;
   created_at: string;
+  is_owner?: boolean;
+  is_shared?: boolean;
+  language?: string;
+  import_count?: number;
 }
 
 type SelectedNodeType =
@@ -247,31 +256,57 @@ export default function MindMapDetailPage() {
   };
   // ─────────────────────────────────────────────────────────────────────────
 
+  // --- Sharing, Duplication, and progression skipping states ---
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [isSharingLoading, setIsSharingLoading] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  // Deriving isOwner safely
+  const isOwner = mindMap?.is_owner !== false;
+
+  const toggleShare = async () => {
+    setIsSharingLoading(true);
+    try {
+      const res = await apiRequest(
+        `${process.env.NEXT_PUBLIC_API_URL}/mind-maps/${params.id}/share`,
+        { method: "POST" }
+      );
+      toast.success(res.is_shared ? "Mapa mental agora é público! 🌐" : "Acesso público removido.");
+      mutateMindMap();
+    } catch (err) {
+      toast.error("Erro ao alterar as definições de partilha.");
+    } finally {
+      setIsSharingLoading(false);
+    }
+  };
+
+  const importMindMap = async () => {
+    setIsImporting(true);
+    try {
+      const res = await apiRequest(
+        `${process.env.NEXT_PUBLIC_API_URL}/mind-maps/${params.id}/duplicate`,
+        { method: "POST" }
+      );
+      toast.success("Mapa mental importado com sucesso! 📥");
+      router.push(`/app/mind-maps/${res.id}`);
+    } catch (err) {
+      toast.error("Erro ao importar o mapa mental.");
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+  // All nodes are unlocked and accessible by default
+  const isNodeLocked = (nodeId: string): boolean => {
+    return false;
+  };
+
   // Reset side tab when node changes
   useEffect(() => {
     setActiveSideTab("video");
     setIsEditingNotes(false);
   }, [selectedNode?.data.id]);
-
-  // Establish a flattened pathway of all level 3 nodes
-  const flatLessons: MindMapNode3[] = [];
-  if (mindMap?.nodes) {
-    mindMap.nodes.forEach((n1) => {
-      (n1.children || []).forEach((n2) => {
-        (n2.children || []).forEach((n3) => {
-          flatLessons.push(n3);
-        });
-      });
-    });
-  }
-
-  // A Level 3 lesson is locked if it is not the first one AND its predecessor's ID is not in completed_nodes
-  const isNodeLocked = (nodeId: string): boolean => {
-    const idx = flatLessons.findIndex((l) => l.id === nodeId);
-    if (idx === -1 || idx === 0) return false;
-    const prevLesson = flatLessons[idx - 1];
-    return !mindMap?.completed_nodes?.includes(prevLesson.id);
-  };
 
   // --- Dynamic Reading Material On-Demand Content Generation ---
   const [nodeContent, setNodeContent] = useState<{ text_content: string; additional_resources?: any[] } | null>(null);
@@ -715,8 +750,133 @@ export default function MindMapDetailPage() {
                 )}
               </>
             )}
+
+            {isOwner && (
+              <>
+                <div className="h-4 w-px bg-slate-300 mx-1" />
+                <div className="relative">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setShowShareModal(!showShareModal)}
+                    className="rounded-full gap-1.5 h-8 text-xs font-bold px-3 text-slate-650 hover:text-slate-800 hover:bg-slate-100/80 transition-all duration-300"
+                  >
+                    <Share2 className="w-3.5 h-3.5 text-cyan-500 animate-pulse" />
+                    Partilhar
+                  </Button>
+                  
+                  {/* Share Dropdown Tooltip */}
+                  <AnimatePresence>
+                    {showShareModal && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 8, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 8, scale: 0.95 }}
+                        className="absolute right-0 mt-2 w-72 bg-white border border-slate-200 p-4 rounded-2xl shadow-xl z-50 space-y-3"
+                      >
+                        <div className="flex justify-between items-center">
+                          <h4 className="text-xs font-extrabold text-slate-800">Partilhar Mapa Mental</h4>
+                          <button onClick={() => setShowShareModal(false)} className="text-slate-400 hover:text-slate-600 transition-colors">
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                        <p className="text-[10px] text-slate-400 font-medium leading-relaxed">Ative a partilha pública para gerar um link de acesso direto que pode enviar a qualquer pessoa.</p>
+
+                        {/* Import counter badge */}
+                        <div className="flex items-center gap-2 p-2.5 rounded-xl bg-gradient-to-r from-cyan-50 to-slate-50 border border-cyan-100">
+                          <div className="w-7 h-7 rounded-lg bg-cyan-500/10 flex items-center justify-center flex-shrink-0">
+                            <Users className="w-3.5 h-3.5 text-cyan-600" />
+                          </div>
+                          <div>
+                            <p className="text-[10px] text-slate-400 font-medium leading-none mb-0.5">Importações</p>
+                            <p className="text-sm font-extrabold text-slate-800 leading-none">
+                              {mindMap.import_count ?? 0}
+                              <span className="text-[10px] font-medium text-slate-400 ml-1">
+                                {(mindMap.import_count ?? 0) === 1 ? "pessoa importou" : "pessoas importaram"}
+                              </span>
+                            </p>
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-center justify-between p-2 rounded-xl bg-slate-50 border border-slate-100">
+                          <span className="text-[11px] font-bold text-slate-700">Link Público</span>
+                          <button
+                            onClick={toggleShare}
+                            disabled={isSharingLoading}
+                            className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                              mindMap.is_shared ? "bg-cyan-500" : "bg-slate-200"
+                            }`}
+                          >
+                            <span
+                              className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                                mindMap.is_shared ? "translate-x-4" : "translate-x-0"
+                              }`}
+                            />
+                          </button>
+                        </div>
+
+                        {mindMap.is_shared && (
+                          <div className="space-y-2 pt-1">
+                            <div className="flex gap-1.5">
+                              <Input
+                                readOnly
+                                value={typeof window !== "undefined" ? `${window.location.origin}/app/mind-maps/${mindMap.id}` : ""}
+                                className="h-8 text-[10px] font-mono select-all bg-slate-50 border-slate-200"
+                              />
+                              <Button
+                                size="sm"
+                                className="h-8 bg-cyan-500 hover:bg-cyan-600 text-white rounded-lg px-2.5 flex-shrink-0 transition-transform active:scale-95"
+                                onClick={() => {
+                                  if (typeof window !== "undefined") {
+                                    navigator.clipboard.writeText(`${window.location.origin}/app/mind-maps/${mindMap.id}`);
+                                    toast.success("Link de partilha copiado! 📋");
+                                    setCopied(true);
+                                    setTimeout(() => setCopied(false), 2000);
+                                  }
+                                }}
+                              >
+                                {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              </>
+            )}
           </div>
         </div>
+
+        {/* Premium Shared Mind Map Preview Banner */}
+        {!isOwner && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="p-5 rounded-3xl bg-gradient-to-r from-cyan-500 via-blue-500 to-indigo-600 border border-cyan-400/20 shadow-lg flex flex-col md:flex-row items-center justify-between gap-4 text-white"
+          >
+            <div className="flex items-center gap-3.5">
+              <div className="w-11 h-11 rounded-2xl bg-white/10 flex items-center justify-center border border-white/10 backdrop-blur-md">
+                <Sparkles className="w-5.5 h-5.5 text-white animate-pulse" />
+              </div>
+              <div className="space-y-0.5 text-left">
+                <h3 className="font-extrabold text-sm md:text-base tracking-tight">Mapa Mental Partilhado! 🌐</h3>
+                <p className="text-[11px] md:text-xs text-cyan-50/90 leading-relaxed max-w-xl">
+                  Este roteiro de aprendizagem foi partilhado consigo! Importe-o agora para guardar o seu próprio progresso, realizar os testes e fazer anotações de estudo personalizadas.
+                </p>
+              </div>
+            </div>
+            <Button
+              onClick={importMindMap}
+              disabled={isImporting}
+              className="bg-white hover:bg-cyan-50 text-cyan-600 font-extrabold rounded-full px-6 py-2 text-xs flex items-center gap-1.5 shadow-md flex-shrink-0 transition-all hover:scale-[1.03] active:scale-95"
+            >
+              {isImporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+              Importar para Minha Conta
+            </Button>
+          </motion.div>
+        )}
 
         <div className="p-6 md:p-8 rounded-3xl bg-gradient-to-r from-cyan-500/10 via-blue-500/5 to-transparent border border-cyan-500/10 shadow-sm relative overflow-hidden">
           <div className="absolute right-8 top-1/2 -translate-y-1/2 opacity-5 hidden lg:block">
@@ -1218,14 +1378,22 @@ export default function MindMapDetailPage() {
 
                         {
                           (selectedNode.type !== 3 || activeSideTab === "video") && (
-                            <>
-                              <h2 className="text-xl md:text-2xl font-bold text-gray-900 capitalize leading-snug">
-                                {selectedNode.data.title}
-                              </h2>
-                              <p className="text-sm md:text-base text-gray-600">
-                                {selectedNode.data.desc}
-                              </p>
-                            </>
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+                              <div className="space-y-1">
+                                <h2 className="text-xl md:text-2xl font-bold text-gray-900 capitalize leading-snug">
+                                  {selectedNode.data.title}
+                                </h2>
+                                <p className="text-sm md:text-base text-gray-600">
+                                  {selectedNode.data.desc}
+                                </p>
+                              </div>
+                              {selectedNode.type === 3 && mindMap.completed_nodes?.includes(selectedNode.data.id) && (
+                                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100 text-xs font-bold self-start sm:self-center">
+                                  <CheckCircle2 className="w-3.5 h-3.5" />
+                                  Concluído
+                                </div>
+                              )}
+                            </div>
                           )
                         }
 
@@ -1393,140 +1561,154 @@ export default function MindMapDetailPage() {
                       {/* 3. INTERACTIVE QUIZ TAB */}
                       {selectedNode.type === 3 && activeSideTab === "quiz" && (
                         <div className="">
-                          {loadingQuiz ? (
-                            <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
-                              <Loader2 className="w-8 h-8 animate-spin text-cyan-500" />
-                              <div className="space-y-1">
-                                <p className="text-sm font-bold text-slate-700">Construindo questionário sob demanda...</p>
-                                <p className="text-xs text-muted-foreground max-w-xs">Nossa IA está preparando um teste prático com questões adaptadas para o seu nível.</p>
-                              </div>
-                            </div>
-                          ) : quizData ? (
-                            <div className="space-y-4">
-                              <h1 className="text-md text-center font-bold text-slate-700">Questionário da Trilha</h1>
-                              <div className="border-t border-dashed my-3" />
-
-                              {/* Case 1: Already passed previously */}
-                              {mindMap?.completed_nodes?.includes(selectedNode.data.id) ? (
-                                <div className="p-6 rounded-2xl bg-emerald-50/50 border border-emerald-100 flex flex-col items-center justify-center text-center gap-3">
-                                  <div className="w-12 h-12 bg-emerald-500/15 rounded-full flex items-center justify-center text-emerald-600">
-                                    <CheckCircle2 className="w-6 h-6" />
-                                  </div>
-                                  <div className="space-y-1">
-                                    <h3 className="font-bold text-emerald-800">Aprovado no Teste!</h3>
-                                    <p className="text-xs text-emerald-600 max-w-xs">Você demonstrou domínio nesta matéria e a próxima fase foi desbloqueada com sucesso!</p>
-                                  </div>
-                                  <Button onClick={() => fetchQuiz(selectedNode.data.id)} variant="outline" className="border-emerald-200 text-emerald-700 hover:bg-emerald-100 rounded-full text-xs h-9 px-5 mt-1">
-                                    Refazer Avaliação
-                                  </Button>
-                                </div>
-                              ) : (
-                                <>
-                                  {/* Case 2: Feedback banner from recent grading */}
-                                  {quizFeedback && (
-                                    <div className={`p-5 rounded-2xl border flex flex-col items-center justify-center text-center gap-2.5 ${quizFeedback.passed ? "bg-emerald-50 border-emerald-200" : "bg-red-50 border-red-200"
-                                      }`}>
-                                      {quizFeedback.passed ? (
-                                        <>
-                                          <Award className="w-12 h-12 text-emerald-500 animate-bounce" />
-                                          <h3 className="font-bold text-emerald-800">Aprovado com {quizFeedback.score.toFixed(0)}%!</h3>
-                                          <p className="text-xs text-emerald-600">Acertou {quizFeedback.correct_count} de {quizFeedback.total_questions} questões. Ótimo trabalho!</p>
-                                        </>
-                                      ) : (
-                                        <>
-                                          <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center text-red-500 font-bold">✗</div>
-                                          <h3 className="font-bold text-red-800">Tente Novamente ({quizFeedback.score.toFixed(0)}%)</h3>
-                                          <p className="text-xs text-red-600">Acertou {quizFeedback.correct_count} de {quizFeedback.total_questions} questões. Estude um pouco mais o texto.</p>
-                                          <Button onClick={() => setQuizFeedback(null)} className="bg-red-500 hover:bg-red-600 text-white rounded-full text-xs px-4 h-8 mt-1.5">
-                                            Refazer Questões
-                                          </Button>
-                                        </>
-                                      )}
-                                    </div>
-                                  )}
-
-                                  {/* Case 3: Quiz questions form */}
-                                  {!quizFeedback && (
-                                    <form onSubmit={handleQuizSubmit} className="space-y-6 pt-2">
-                                      {quizData.questions.map((q: any, qIdx: number) => (
-                                        <div key={q.id} className="space-y-2.5 bg-slate-50/50 p-4 border border-slate-100 rounded-2xl">
-                                          <p className="text-xs sm:text-sm font-bold text-slate-800 leading-snug">
-                                            <span className="text-cyan-500 mr-1.5">{qIdx + 1}.</span> {q.question}
-                                          </p>
-
-                                          {/* Multiple choice type */}
-                                          {q.type === "multiple_choice" && (
-                                            <div className="space-y-2 pl-2">
-                                              {q.options?.map((opt: string) => (
-                                                <label key={opt} className="flex items-start gap-2.5 text-xs text-slate-600 font-medium cursor-pointer hover:text-slate-800 select-none">
-                                                  <input
-                                                    type="radio"
-                                                    name={`q-${q.id}`}
-                                                    value={opt}
-                                                    checked={quizAnswers[q.id] === opt}
-                                                    onChange={(e) => setQuizAnswers({ ...quizAnswers, [q.id]: e.target.value })}
-                                                    className="mt-0.5 text-cyan-500 focus:ring-cyan-400"
-                                                    required
-                                                  />
-                                                  <span>{opt}</span>
-                                                </label>
-                                              ))}
-                                            </div>
-                                          )}
-
-                                          {/* True / False type */}
-                                          {q.type === "true_false" && (
-                                            <div className="flex gap-6 pl-2">
-                                              {q.options?.map((opt: string) => (
-                                                <label key={opt} className="flex items-center gap-2 text-xs text-slate-600 font-medium cursor-pointer hover:text-slate-800 select-none">
-                                                  <input
-                                                    type="radio"
-                                                    name={`q-${q.id}`}
-                                                    value={opt}
-                                                    checked={quizAnswers[q.id] === opt}
-                                                    onChange={(e) => setQuizAnswers({ ...quizAnswers, [q.id]: e.target.value })}
-                                                    className="text-cyan-500 focus:ring-cyan-400"
-                                                    required
-                                                  />
-                                                  <span>{opt}</span>
-                                                </label>
-                                              ))}
-                                            </div>
-                                          )}
-
-                                          {/* Direct Short Answer type */}
-                                          {q.type === "short_answer" && (
-                                            <div className="pl-2">
-                                              <Input
-                                                type="text"
-                                                placeholder="Digite sua resposta curta (ex: uma palavra)"
-                                                value={quizAnswers[q.id] || ""}
-                                                onChange={(e) => setQuizAnswers({ ...quizAnswers, [q.id]: e.target.value })}
-                                                className="h-10 text-xs border-slate-200 focus:border-cyan-500 focus:ring-cyan-500 rounded-lg max-w-sm bg-white"
-                                                required
-                                              />
-                                            </div>
-                                          )}
-                                        </div>
-                                      ))}
-
-                                      <Button type="submit" disabled={submittingQuiz} className="bg-cyan-500 hover:bg-cyan-600 text-white rounded-full w-full font-bold h-11 shadow-md shadow-cyan-500/20">
-                                        {submittingQuiz ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <CheckCircle2 className="w-4 h-4 mr-2" />} Enviar Teste de Progresso
-                                      </Button>
-                                    </form>
-                                  )}
-                                </>
-                              )}
-
-                            </div>
-                          ) : (
-                            <div className="text-center py-10 bg-slate-50 border border-dashed rounded-2xl p-6">
-                              <Award className="w-10 h-10 text-slate-300 mx-auto mb-2" />
-                              <p className="font-bold text-xs text-slate-700">Quiz ainda não inicializado</p>
-                              <Button onClick={() => fetchQuiz(selectedNode.data.id)} className="bg-cyan-500 hover:bg-cyan-600 text-white rounded-full text-xs mt-3">
-                                Carregar Questões do Teste
+                          {!isOwner ? (
+                            <div className="p-6 rounded-2xl bg-slate-50 border border-slate-200/50 flex flex-col items-center justify-center text-center gap-3">
+                              <Award className="w-10 h-10 text-cyan-500/30" />
+                              <h3 className="font-bold text-slate-800 text-xs sm:text-sm">Teste Bloqueado 🔒</h3>
+                              <p className="text-xs text-slate-550 max-w-xs leading-relaxed">
+                                Para responder a questionários, obter notas de avaliação e acompanhar o seu progresso neste mapa mental, importe-o primeiro para a sua conta.
+                              </p>
+                              <Button onClick={importMindMap} disabled={isImporting} className="bg-cyan-500 hover:bg-cyan-600 text-white rounded-full text-xs font-bold px-6 h-9 transition-transform active:scale-95 shadow-sm shadow-cyan-500/10">
+                                {isImporting ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : <Download className="w-3.5 h-3.5 mr-1.5" />}
+                                Importar Mapa Mental
                               </Button>
                             </div>
+                          ) : (
+                            loadingQuiz ? (
+                              <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
+                                <Loader2 className="w-8 h-8 animate-spin text-cyan-500" />
+                                <div className="space-y-1">
+                                  <p className="text-sm font-bold text-slate-700">Construindo questionário sob demanda...</p>
+                                  <p className="text-xs text-muted-foreground max-w-xs">Nossa IA está preparando um teste prático com questões adaptadas para o seu nível.</p>
+                                </div>
+                              </div>
+                            ) : quizData ? (
+                              <div className="space-y-4">
+                                <h1 className="text-md text-center font-bold text-slate-700">Questionário da Trilha</h1>
+                                <div className="border-t border-dashed my-3" />
+
+                                {/* Case 1: Already passed previously */}
+                                {mindMap?.completed_nodes?.includes(selectedNode.data.id) ? (
+                                  <div className="p-6 rounded-2xl bg-emerald-50/50 border border-emerald-100 flex flex-col items-center justify-center text-center gap-3">
+                                    <div className="w-12 h-12 bg-emerald-500/15 rounded-full flex items-center justify-center text-emerald-600">
+                                      <CheckCircle2 className="w-6 h-6" />
+                                    </div>
+                                    <div className="space-y-1">
+                                      <h3 className="font-bold text-emerald-800">Aprovado no Teste!</h3>
+                                      <p className="text-xs text-emerald-600 max-w-xs">Você demonstrou domínio nesta matéria e a próxima fase foi desbloqueada com sucesso!</p>
+                                    </div>
+                                    <Button onClick={() => fetchQuiz(selectedNode.data.id)} variant="outline" className="border-emerald-200 text-emerald-700 hover:bg-emerald-100 rounded-full text-xs h-9 px-5 mt-1">
+                                      Refazer Avaliação
+                                    </Button>
+                                  </div>
+                                ) : (
+                                  <>
+                                    {/* Case 2: Feedback banner from recent grading */}
+                                    {quizFeedback && (
+                                      <div className={`p-5 rounded-2xl border flex flex-col items-center justify-center text-center gap-2.5 ${quizFeedback.passed ? "bg-emerald-50 border-emerald-200" : "bg-red-50 border-red-200"
+                                        }`}>
+                                        {quizFeedback.passed ? (
+                                          <>
+                                            <Award className="w-12 h-12 text-emerald-500 animate-bounce" />
+                                            <h3 className="font-bold text-emerald-800">Aprovado com {quizFeedback.score.toFixed(0)}%!</h3>
+                                            <p className="text-xs text-emerald-600">Acertou {quizFeedback.correct_count} de {quizFeedback.total_questions} questões. Ótimo trabalho!</p>
+                                          </>
+                                        ) : (
+                                          <>
+                                            <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center text-red-500 font-bold">✗</div>
+                                            <h3 className="font-bold text-red-800">Tente Novamente ({quizFeedback.score.toFixed(0)}%)</h3>
+                                            <p className="text-xs text-red-600">Acertou {quizFeedback.correct_count} de {quizFeedback.total_questions} questões. Estude um pouco mais o texto.</p>
+                                            <Button onClick={() => setQuizFeedback(null)} className="bg-red-500 hover:bg-red-600 text-white rounded-full text-xs px-4 h-8 mt-1.5">
+                                              Refazer Questões
+                                            </Button>
+                                          </>
+                                        )}
+                                      </div>
+                                    )}
+
+                                    {/* Case 3: Quiz questions form */}
+                                    {!quizFeedback && (
+                                      <form onSubmit={handleQuizSubmit} className="space-y-6 pt-2">
+                                        {quizData.questions.map((q: any, qIdx: number) => (
+                                          <div key={q.id} className="space-y-2.5 bg-slate-50/50 p-4 border border-slate-100 rounded-2xl">
+                                            <p className="text-xs sm:text-sm font-bold text-slate-800 leading-snug">
+                                              <span className="text-cyan-500 mr-1.5">{qIdx + 1}.</span> {q.question}
+                                            </p>
+
+                                            {/* Multiple choice type */}
+                                            {q.type === "multiple_choice" && (
+                                              <div className="space-y-2 pl-2">
+                                                {q.options?.map((opt: string) => (
+                                                  <label key={opt} className="flex items-start gap-2.5 text-xs text-slate-600 font-medium cursor-pointer hover:text-slate-800 select-none">
+                                                    <input
+                                                      type="radio"
+                                                      name={`q-${q.id}`}
+                                                      value={opt}
+                                                      checked={quizAnswers[q.id] === opt}
+                                                      onChange={(e) => setQuizAnswers({ ...quizAnswers, [q.id]: e.target.value })}
+                                                      className="mt-0.5 text-cyan-500 focus:ring-cyan-400"
+                                                      required
+                                                    />
+                                                    <span>{opt}</span>
+                                                  </label>
+                                                ))}
+                                              </div>
+                                            )}
+
+                                            {/* True / False type */}
+                                            {q.type === "true_false" && (
+                                              <div className="flex gap-6 pl-2">
+                                                {q.options?.map((opt: string) => (
+                                                  <label key={opt} className="flex items-center gap-2 text-xs text-slate-600 font-medium cursor-pointer hover:text-slate-800 select-none">
+                                                    <input
+                                                      type="radio"
+                                                      name={`q-${q.id}`}
+                                                      value={opt}
+                                                      checked={quizAnswers[q.id] === opt}
+                                                      onChange={(e) => setQuizAnswers({ ...quizAnswers, [q.id]: e.target.value })}
+                                                      className="text-cyan-500 focus:ring-cyan-400"
+                                                      required
+                                                    />
+                                                    <span>{opt}</span>
+                                                  </label>
+                                                ))}
+                                              </div>
+                                            )}
+
+                                            {/* Direct Short Answer type */}
+                                            {q.type === "short_answer" && (
+                                              <div className="pl-2">
+                                                <Input
+                                                  type="text"
+                                                  placeholder="Digite sua resposta curta (ex: uma palavra)"
+                                                  value={quizAnswers[q.id] || ""}
+                                                  onChange={(e) => setQuizAnswers({ ...quizAnswers, [q.id]: e.target.value })}
+                                                  className="h-10 text-xs border-slate-200 focus:border-cyan-500 focus:ring-cyan-500 rounded-lg max-w-sm bg-white"
+                                                  required
+                                                />
+                                              </div>
+                                            )}
+                                          </div>
+                                        ))}
+
+                                        <Button type="submit" disabled={submittingQuiz} className="bg-cyan-500 hover:bg-cyan-600 text-white rounded-full w-full font-bold h-11 shadow-md shadow-cyan-500/20 animate-none">
+                                          {submittingQuiz ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <CheckCircle2 className="w-4 h-4 mr-2" />} Enviar Teste de Progresso
+                                        </Button>
+                                      </form>
+                                    )}
+                                  </>
+                                )}
+
+                              </div>
+                            ) : (
+                              <div className="text-center py-10 bg-slate-50 border border-dashed rounded-2xl p-6">
+                                <Award className="w-10 h-10 text-slate-300 mx-auto mb-2" />
+                                <p className="font-bold text-xs text-slate-700">Quiz ainda não inicializado</p>
+                                <Button onClick={() => fetchQuiz(selectedNode.data.id)} className="bg-cyan-500 hover:bg-cyan-600 text-white rounded-full text-xs mt-3">
+                                  Carregar Questões do Teste
+                                </Button>
+                              </div>
+                            )
                           )}
                         </div>
                       )}
@@ -1534,77 +1716,91 @@ export default function MindMapDetailPage() {
                       {/* 4. AUTO-SAVING NOTES TAB */}
                       {selectedNode.type === 3 && activeSideTab === "notes" && (
                         <div className="">
-                          {/* Paper-styled Minimalist Document Card */}
-                          <div className="bg-[#FAF9F6] border shadow-sm p-5 min-h-[380px] flex flex-col transition-all duration-300 hover:shadow-md relative group">
-
-                            {/* Paper Header / Control Bar */}
-                            <div className="flex items-center justify-between pb-3.5 mb-3 border-b border-stone-200/40 select-none">
-                              <div className="flex items-center gap-2">
-                                <div className={`w-2 h-2 rounded-full transition-all ${saveStatus === "saving" ? "bg-amber-400 animate-pulse" : "bg-emerald-400"
-                                  }`} />
-                                <span className="text-[10px] font-extrabold text-stone-400 uppercase tracking-wider">
-                                  {saveStatus === "saving" ? "Salvando Notas..." : "Notas Salvas"}
-                                </span>
-                              </div>
-
-                              <div className="flex bg-stone-200/50 p-0.5 rounded-lg gap-0.5">
-                                <button
-                                  type="button"
-                                  onClick={(e) => { e.stopPropagation(); setIsEditingNotes(true); }}
-                                  className={`flex items-center gap-1.5 px-3 py-1 text-[10px] font-bold rounded-md transition-all ${isEditingNotes
-                                    ? "bg-white text-stone-900 shadow-sm"
-                                    : "text-stone-500 hover:text-stone-850"
-                                    }`}
-                                >
-                                  <PenTool className="w-3 h-3" />
-                                  Escrever
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={(e) => { e.stopPropagation(); setIsEditingNotes(false); }}
-                                  className={`flex items-center gap-1.5 px-3 py-1 text-[10px] font-bold rounded-md transition-all ${!isEditingNotes
-                                    ? "bg-white text-stone-900 shadow-sm"
-                                    : "text-stone-500 hover:text-stone-850"
-                                    }`}
-                                >
-                                  <Eye className="w-3 h-3" />
-                                  Visualizar
-                                </button>
-                              </div>
+                          {!isOwner ? (
+                            <div className="p-6 rounded-2xl bg-stone-50 border border-stone-200/50 flex flex-col items-center justify-center text-center gap-3">
+                              <PenTool className="w-10 h-10 text-stone-400/40 animate-bounce" />
+                              <h3 className="font-bold text-stone-850 text-xs sm:text-sm">Notas Bloqueadas 🔒</h3>
+                              <p className="text-xs text-stone-450 max-w-xs leading-relaxed">
+                                Para escrever anotações de estudo personalizadas e salvá-las no seu perfil, importe este mapa mental.
+                              </p>
+                              <Button onClick={importMindMap} disabled={isImporting} className="bg-cyan-500 hover:bg-cyan-600 text-white rounded-full text-xs font-bold px-6 h-9 transition-transform active:scale-95 shadow-sm shadow-cyan-500/10">
+                                {isImporting ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : <Download className="w-3.5 h-3.5 mr-1.5" />}
+                                Importar Mapa Mental
+                              </Button>
                             </div>
+                          ) : (
+                            /* Paper-styled Minimalist Document Card */
+                            <div className="bg-[#FAF9F6] border shadow-sm p-5 min-h-[380px] flex flex-col transition-all duration-300 hover:shadow-md relative group">
 
-                            {/* Paper Writing Area */}
-                            <div className="flex-1 flex flex-col">
-                              {isEditingNotes ? (
-                                <textarea
-                                  placeholder="Escreva suas anotações aqui usando Markdown... 
-# Títulos
-* Tópicos
-**Negrito** ou `código`."
-                                  value={noteText}
-                                  onChange={handleNoteChange}
-                                  autoFocus
-                                  className="w-full flex-1 min-h-[300px] resize-none border-none focus:ring-0 focus:outline-none bg-transparent text-stone-800 text-xs sm:text-sm leading-relaxed font-sans placeholder-stone-300"
-                                />
-                              ) : (
-                                <div
-                                  onClick={() => setIsEditingNotes(true)}
-                                  className="w-full flex-1 min-h-[300px] cursor-text prose prose-stone prose-sm max-w-none text-stone-800 focus:outline-none"
-                                >
-                                  {noteText.trim() ? (
-                                    <ReactMarkdown>{noteText}</ReactMarkdown>
-                                  ) : (
-                                    <div className="flex flex-col items-center justify-center py-20 text-stone-300 text-center gap-2 select-none">
-                                      <PenTool className="w-8 h-8 opacity-45 text-stone-400" />
-                                      <p className="text-xs font-bold text-stone-400">Folha em Branco</p>
-                                      <p className="text-[10px] max-w-[220px] text-stone-400/80">Clique em qualquer lugar do papel para começar a digitar suas anotações com suporte a Markdown...</p>
-                                    </div>
-                                  )}
+                              {/* Paper Header / Control Bar */}
+                              <div className="flex items-center justify-between pb-3.5 mb-3 border-b border-stone-200/40 select-none">
+                                <div className="flex items-center gap-2">
+                                  <div className={`w-2 h-2 rounded-full transition-all ${saveStatus === "saving" ? "bg-amber-400 animate-pulse" : "bg-emerald-400"
+                                    }`} />
+                                  <span className="text-[10px] font-extrabold text-stone-400 uppercase tracking-wider">
+                                    {saveStatus === "saving" ? "Salvando Notas..." : "Notas Salvas"}
+                                  </span>
                                 </div>
-                              )}
-                            </div>
 
-                          </div>
+                                <div className="flex bg-stone-200/50 p-0.5 rounded-lg gap-0.5">
+                                  <button
+                                    type="button"
+                                    onClick={(e) => { e.stopPropagation(); setIsEditingNotes(true); }}
+                                    className={`flex items-center gap-1.5 px-3 py-1 text-[10px] font-bold rounded-md transition-all ${isEditingNotes
+                                      ? "bg-white text-stone-900 shadow-sm"
+                                      : "text-stone-500 hover:text-stone-850"
+                                      }`}
+                                  >
+                                    <PenTool className="w-3 h-3" />
+                                    Escrever
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => { e.stopPropagation(); setIsEditingNotes(false); }}
+                                    className={`flex items-center gap-1.5 px-3 py-1 text-[10px] font-bold rounded-md transition-all ${!isEditingNotes
+                                      ? "bg-white text-stone-900 shadow-sm"
+                                      : "text-stone-500 hover:text-stone-850"
+                                      }`}
+                                  >
+                                    <Eye className="w-3 h-3" />
+                                    Visualizar
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* Paper Writing Area */}
+                              <div className="flex-1 flex flex-col">
+                                {isEditingNotes ? (
+                                  <textarea
+                                    placeholder="Escreva suas anotações aqui usando Markdown... 
+  # Títulos
+  * Tópicos
+  **Negrito** ou `código`."
+                                    value={noteText}
+                                    onChange={handleNoteChange}
+                                    autoFocus
+                                    className="w-full flex-1 min-h-[300px] resize-none border-none focus:ring-0 focus:outline-none bg-transparent text-stone-800 text-xs sm:text-sm leading-relaxed font-sans placeholder-stone-300"
+                                  />
+                                ) : (
+                                  <div
+                                    onClick={() => setIsEditingNotes(true)}
+                                    className="w-full flex-1 min-h-[300px] cursor-text prose prose-stone prose-sm max-w-none text-stone-800 focus:outline-none"
+                                  >
+                                    {noteText.trim() ? (
+                                      <ReactMarkdown>{noteText}</ReactMarkdown>
+                                    ) : (
+                                      <div className="flex flex-col items-center justify-center py-20 text-stone-300 text-center gap-2 select-none">
+                                        <PenTool className="w-8 h-8 opacity-45 text-stone-400" />
+                                        <p className="text-xs font-bold text-stone-400">Folha em Branco</p>
+                                        <p className="text-[10px] max-w-[220px] text-stone-400/80">Clique em qualquer lugar do papel para começar a digitar suas anotações com suporte a Markdown...</p>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+
+                            </div>
+                          )}
                         </div>
                       )}
 

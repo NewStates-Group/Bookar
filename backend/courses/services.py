@@ -495,6 +495,102 @@ class CourseService:
         except Exception:
             return {"status": "PROCESSING", "pdf_url": None}
 
+    def list_featured_courses(self) -> list:
+        """Return all READY courses for the public discovery carousel."""
+        courses = (
+            Course.objects.filter(status="READY")
+            .prefetch_related("modules")
+            .select_related("owner")
+            .order_by("-created_at")[:30]
+        )
+        result = []
+        for course in courses:
+            thumb_url = None
+            if course.thumb:
+                try:
+                    thumb_url = course.thumb.url
+                except Exception:
+                    thumb_url = str(course.thumb)
+
+            owner = course.owner
+            owner_name = None
+            if owner:
+                owner_name = f"{owner.first_name} {owner.last_name}".strip() or owner.username
+
+            result.append({
+                "id": str(course.uuid),
+                "title": course.title,
+                "desc": course.desc,
+                "level": course.level,
+                "thumb": thumb_url,
+                "module_count": course.modules.count(),
+                "owner_name": owner_name,
+            })
+        return result
+
+    def get_course_preview(self, course_id: str) -> dict:
+        """Return full public preview details (no auth required)."""
+        try:
+            course = (
+                Course.objects.prefetch_related(
+                    "modules__lessons"
+                ).select_related("owner").get(uuid=course_id, status="READY")
+            )
+        except Course.DoesNotExist:
+            raise HttpError(404, "Curso não encontrado")
+
+        thumb_url = None
+        if course.thumb:
+            try:
+                thumb_url = course.thumb.url
+            except Exception:
+                thumb_url = str(course.thumb)
+
+        owner = course.owner
+        owner_name = None
+        if owner:
+            owner_name = f"{owner.first_name} {owner.last_name}".strip() or owner.username
+
+        modules_data = []
+        for module in course.modules.order_by("created_at"):
+            lessons = list(module.lessons.values("title", "desc"))
+            modules_data.append({
+                "id": str(module.uuid),
+                "name": module.name,
+                "desc": module.desc,
+                "lesson_count": len(lessons),
+                "lessons": lessons,
+            })
+
+        return {
+            "id": str(course.uuid),
+            "title": course.title,
+            "desc": course.desc,
+            "level": course.level,
+            "thumb": thumb_url,
+            "owner_name": owner_name,
+            "module_count": len(modules_data),
+            "modules": modules_data,
+        }
+
+    def clone_course(self, user, course_id: str) -> dict:
+        """Enroll a user in any existing READY course (no token needed)."""
+        try:
+            course = Course.objects.get(uuid=course_id, status="READY")
+        except Course.DoesNotExist:
+            raise HttpError(404, "Curso não encontrado")
+
+        # Idempotent – if already enrolled just return
+        enrollment, created = CourseEnrollment.objects.get_or_create(
+            user=user, course=course, defaults={"deleted": False}
+        )
+        if not created and enrollment.deleted:
+            enrollment.deleted = False
+            enrollment.save(update_fields=["deleted"])
+
+        cache.delete(get_course_list_cache_key(user.id))
+        return {"success": True, "course_id": str(course.uuid)}
+
 
 class LessonService:
     def get_lesson(self, user, lesson_id: str):

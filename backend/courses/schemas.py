@@ -325,3 +325,41 @@ class ModuleMaterialSchema(Schema):
     status: str
     pdf_url: Optional[str] = None
     content: Optional[str] = None
+
+
+# ── Public featured / discovery schemas ──────────────────────────────────────
+
+class CourseFeaturedOut(Schema):
+    """Lightweight card schema for the public courses carousel."""
+    id: str
+    title: Optional[str] = None
+    desc: Optional[str] = None
+    level: Optional[str] = None
+    thumb: Optional[str] = None
+    module_count: int = 0
+    owner_name: Optional[str] = None
+
+
+class CoursePreviewLessonOut(Schema):
+    title: str
+    desc: str
+
+
+class CoursePreviewModuleOut(Schema):
+    id: str
+    name: Optional[str] = None
+    desc: Optional[str] = None
+    lesson_count: int = 0
+    lessons: List[CoursePreviewLessonOut] = []
+
+
+class CoursePreviewOut(Schema):
+    """Full detail schema for the public preview modal, no auth required."""
+    id: str
+    title: Optional[str] = None
+    desc: Optional[str] = None
+    level: Optional[str] = None
+    thumb: Optional[str] = None
+    owner_name: Optional[str] = None
+    module_count: int = 0
+    modules: List[CoursePreviewModuleOut] = []

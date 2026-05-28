@@ -37,6 +37,8 @@ class MindMap(models.Model):
     #   }
     # ]
     language = models.CharField(max_length=10, default="pt")
+    is_shared = models.BooleanField(default=False)
+    import_count = models.PositiveIntegerField(default=0)
     nodes = models.JSONField(null=True, blank=True)
     completed_nodes = models.JSONField(default=list, blank=True)
     notes = models.JSONField(default=dict, blank=True)
