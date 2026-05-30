@@ -5,6 +5,7 @@ from pydantic import ValidationError as PydanticValidationError
 from accounts.controllers import AuthController
 from courses.controllers import CourseController, LessonController
 from mind_maps.controllers import MindMapController
+from explicador.controllers import ExplicadorController
 
 api = NinjaExtraAPI(
     title="Bookar API",
@@ -13,7 +14,13 @@ api = NinjaExtraAPI(
     version="0.0.1",
 )
 
-api.register_controllers(AuthController, CourseController, LessonController, MindMapController)
+api.register_controllers(
+    AuthController,
+    CourseController,
+    LessonController,
+    MindMapController,
+    ExplicadorController,
+)
 
 
 @api.exception_handler(NinjaValidationError)

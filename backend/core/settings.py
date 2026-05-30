@@ -37,6 +37,7 @@ INSTALLED_APPS = [
     "accounts",
     "channels",
     "mind_maps",
+    "explicador",
 ]
 
 MIDDLEWARE = [

@@ -240,6 +240,17 @@ export default function CoursesPage() {
     }
   }, [session]);
 
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const searchParams = new URLSearchParams(window.location.search);
+      if (searchParams.get("create") === "true") {
+        setOpen(true);
+        const newUrl = window.location.pathname;
+        window.history.replaceState({ path: newUrl }, "", newUrl);
+      }
+    }
+  }, []);
+
 
   const checkPendingShare = async () => {
     const token = localStorage.getItem("pending_share_token");

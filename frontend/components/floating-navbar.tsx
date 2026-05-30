@@ -29,6 +29,7 @@ export function FloatingNavbar() {
     const { data: session } = useSession()
     const [showCursosText, setShowCursosText] = useState(false)
     const [showMindMapsText, setShowMindMapsText] = useState(false)
+    const [showExplicadorText, setShowExplicadorText] = useState(false)
     const [showTutorText, setShowTutorText] = useState(false)
 
     const user = session?.user as any
@@ -78,6 +79,22 @@ export function FloatingNavbar() {
                                 }`}
                         >
                             Mapas Mentais
+                        </span>
+                    </Link>
+
+                    <Link
+                        href="/app/explicador"
+                        className="cursor-pointer flex items-center gap-2 px-2 md:px-3 py-2 transition-all duration-300 hover:bg-cyan-300/10 group"
+                        onMouseEnter={() => setShowExplicadorText(true)}
+                        onMouseLeave={() => setShowExplicadorText(false)}
+                    >
+                        <Sparkles
+                            className="w-7 h-7 pl-1 group-hover:text-cyan-300 transition-colors" />
+                        <span
+                            className={`m-0 text-lg font-medium whitespace-nowrap transition-all duration-300 overflow-hidden ${showExplicadorText ? 'w-24 opacity-100' : 'w-0 opacity-0'
+                                }`}
+                        >
+                            Explicador
                         </span>
                     </Link>
 
