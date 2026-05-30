@@ -11,11 +11,16 @@ import {
   PanelLeftClose,
   X,
   ChevronRight,
+  Trash2,
+  Loader2,
+  Plus,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
+import useSWR from "swr";
+import { authenticatedFetcher, apiRequest } from "@/lib/api";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -34,12 +39,20 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { toast } from "sonner";
 
 interface PlatformSidebarProps {
   isOpen: boolean;
   toggleSidebar: () => void;
   isMobileOpen: boolean;
   closeMobile: () => void;
+}
+
+interface ExplicadorRoom {
+  id: string;
+  title: string;
+  is_active: boolean;
+  created_at: string;
 }
 
 const menuItems = [
@@ -56,7 +69,41 @@ export function PlatformSidebar({
 }: PlatformSidebarProps) {
   const { data: session } = useSession();
   const pathname = usePathname();
+  const router = useRouter();
   const user = session?.user as any;
+
+  const isExplicadorActive = pathname.startsWith("/app/explicador");
+
+  const { data: rooms, mutate: mutateRooms } = useSWR<ExplicadorRoom[]>(
+    session?.accessToken && isExplicadorActive
+      ? [`${process.env.NEXT_PUBLIC_API_URL}/explicador`, session.accessToken]
+      : null,
+    authenticatedFetcher,
+    { revalidateOnFocus: false, dedupingInterval: 10000 }
+  );
+
+  const [deletingId, setDeletingId] = React.useState<string | null>(null);
+
+  const handleDeleteRoom = async (id: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDeletingId(id);
+    try {
+      await apiRequest(`${process.env.NEXT_PUBLIC_API_URL}/explicador/${id}`, {
+        method: "DELETE",
+      });
+      mutateRooms();
+      toast.success("Sala removida.");
+      // If currently inside this room, navigate back to explicador home
+      if (pathname === `/app/explicador/${id}`) {
+        router.push("/app/explicador");
+      }
+    } catch {
+      toast.error("Erro ao remover sala.");
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   // Render the core sidebar content. We support both expanded and collapsed responsive states.
   const renderContent = (isExpanded: boolean) => (
@@ -164,6 +211,57 @@ export function PlatformSidebar({
             </DialogHeader>
           </DialogContent>
         </Dialog>
+
+        {/* ── Explicador Rooms History (shown only when Explicador is active) ── */}
+        {isExpanded && isExplicadorActive && rooms && rooms.length > 0 && (
+          <div className="pt-3">
+            <div className="flex items-center justify-between px-3 pb-1.5">
+              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">
+                Salas Anteriores
+              </span>
+              <Link
+                href="/app/explicador"
+                onClick={closeMobile}
+                title="Nova Sala"
+                className="w-5 h-5 flex items-center justify-center rounded text-slate-400 hover:text-cyan-600 hover:bg-slate-200/60 transition-colors cursor-pointer"
+              >
+                <Plus className="w-3 h-3" />
+              </Link>
+            </div>
+            <div className="space-y-0.5">
+              {rooms.map((room) => {
+                const isRoomActive = pathname === `/app/explicador/${room.id}`;
+                return (
+                  <div key={room.id} className="group relative flex items-center">
+                    <Link
+                      href={`/app/explicador/${room.id}`}
+                      onClick={closeMobile}
+                      className={`flex-1 min-w-0 flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium transition-all duration-200 pr-8 ${
+                        isRoomActive
+                          ? "bg-white text-slate-900 border border-slate-200/80 shadow-sm"
+                          : "text-slate-500 hover:text-slate-800 hover:bg-slate-200/40 border border-transparent"
+                      }`}
+                    >
+                      <span className="truncate">{room.title}</span>
+                    </Link>
+                    <button
+                      onClick={(e) => handleDeleteRoom(room.id, e)}
+                      disabled={deletingId === room.id}
+                      className="absolute right-1.5 opacity-0 group-hover:opacity-100 w-6 h-6 flex items-center justify-center rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all duration-200 cursor-pointer"
+                      title="Remover sala"
+                    >
+                      {deletingId === room.id ? (
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                      ) : (
+                        <Trash2 className="w-3 h-3" />
+                      )}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </nav>
 
       {/* Desktop collapse toggle (bottom, right above the profile avatar) */}
