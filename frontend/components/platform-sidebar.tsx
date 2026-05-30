@@ -167,9 +167,6 @@ export function PlatformSidebar({
                 }`}
               />
               {isExpanded && <span className="truncate">{item.title}</span>}
-              {isExpanded && isActive && (
-                <div className="ml-auto w-1.5 h-1.5 rounded-full bg-cyan-500 flex-shrink-0" />
-              )}
             </Link>
           );
         })}
