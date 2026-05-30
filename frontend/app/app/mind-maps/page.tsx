@@ -79,7 +79,6 @@ export default function MindMapsPage() {
       });
       toast.success("Geração do mapa mental iniciada no worker!");
       setTopic("");
-      setLanguage("pt");
       setOpen(false);
       mutateMindMaps();
     } catch (err: any) {
@@ -148,9 +147,6 @@ export default function MindMapsPage() {
               <span className="font-bold text-gray-700 mt-4 group-hover:text-cyan-500 transition-colors">
                 Novo Mapa Mental
               </span>
-              <span className="text-xs text-muted-foreground text-center mt-1 px-4">
-                Digite um tema e assista às aulas organizadas em ordem
-              </span>
             </Card>
           </DialogTrigger>
           <DialogContent className="sm:max-w-[500px] border border-cyan-500/20 bg-background shadow-2xl">
@@ -178,19 +174,6 @@ export default function MindMapsPage() {
                   required
                 />
               </div>
-              
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wide">Idioma das Aulas / Pesquisa</label>
-                <select
-                  value={language}
-                  onChange={(e) => setLanguage(e.target.value)}
-                  className="w-full h-12 px-3.5 rounded-lg border border-cyan-500/20 bg-background focus:border-cyan-500 focus:outline-none text-sm text-slate-700 font-medium"
-                >
-                  <option value="pt">🇵🇹 Português (Brasil)</option>
-                  <option value="en">🇺🇸 Inglês (English)</option>
-                  <option value="es">🇪🇸 Espanhol (Español)</option>
-                </select>
-              </div>
 
               <div className="flex gap-3 justify-end pt-2">
                 <Button
@@ -210,7 +193,7 @@ export default function MindMapsPage() {
                   {isCreating ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                      Gerando...
+                      Em geração...
                     </>
                   ) : (
                     "Gerar Roadmap"
@@ -225,16 +208,10 @@ export default function MindMapsPage() {
         {mindMaps?.map((map) => (
           <Card
             key={map.id}
-            onClick={() => {
-              if (map.status === "READY") {
-                router.push(`/app/mind-maps/${map.id}`);
-              }
-            }}
-            className={`group relative flex flex-col justify-between p-6 border border-border bg-card rounded-2xl transition-all duration-300 min-h-[220px] ${
-              map.status === "READY"
-                ? "cursor-pointer hover:border-cyan-500/30 hover:shadow-lg hover:shadow-cyan-500/[0.05]"
-                : ""
-            }`}
+            className={`group relative flex flex-col justify-between px-6 pt-6 border border-border bg-card rounded-2xl transition-all duration-300 min-h-[220px] ${map.status === "READY"
+              ? "hover:border-cyan-500/30 hover:shadow-lg hover:shadow-cyan-500/[0.05]"
+              : ""
+              }`}
           >
             {/* Delete button */}
             <Button
@@ -283,22 +260,25 @@ export default function MindMapsPage() {
             {map.status === "READY" && (
               <>
                 <div className="space-y-2">
-                  <div className="w-8 h-8 rounded-lg bg-cyan-500/10 flex items-center justify-center">
-                    <Network className="w-4 h-4 text-cyan-500" />
-                  </div>
-                  <h3 className="font-bold text-gray-800 text-lg capitalize line-clamp-2 leading-snug group-hover:text-cyan-500 transition-colors">
+                  <h3
+                    onClick={() => {
+                      if (map.status === "READY") {
+                        router.push(`/app/mind-maps/${map.id}`);
+                      }
+                    }}
+                    className="font-medium hover:underline cursor-pointer text-gray-800 text-lg capitalize line-clamp-2 leading-snug hover:text-cyan-500 transition-colors">
                     {map.title}
                   </h3>
-                  <p className="text-xs text-muted-foreground capitalize">
-                    Assunto: {map.topic}
-                  </p>
+
                   <p className="text-sm text-gray-500 line-clamp-3 leading-relaxed mt-1">
                     {map.desc}
                   </p>
-                </div>
-                <div className="flex items-center text-cyan-500 text-xs font-semibold mt-4 gap-1">
-                  Ver Mapa Mental
-                  <ExternalLink className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
+
+                  <div className="flex items-center justify-left gap-2 mt-3">
+                    <p className="text-xs border rounded-sm p-1 px-2 font-light capitalize">
+                      {map.topic}
+                    </p>
+                  </div>
                 </div>
               </>
             )}

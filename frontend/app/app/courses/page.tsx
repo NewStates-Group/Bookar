@@ -583,11 +583,11 @@ export default function CoursesPage() {
                 <div className="w-16 h-16 bg-rose-500/10 rounded-2xl flex items-center justify-center mx-auto border border-rose-500/10 animate-pulse">
                   <Heart className="w-8 h-8 text-rose-500 fill-rose-500/20" />
                 </div>
-                
+
                 <DialogTitle className="text-xl font-extrabold text-slate-800 leading-tight">
                   Serviço Temporariamente Indisponível
                 </DialogTitle>
-                
+
                 <DialogDescription className="text-xs text-slate-500 leading-relaxed max-w-sm mx-auto">
                   Devido aos elevados custos operacionais das APIs de Inteligência Artificial e à falta de lucro da empresa para sustentar os custos dos servidores, a funcionalidade de criação de novos cursos está temporariamente suspensa.
                 </DialogDescription>
@@ -610,7 +610,7 @@ export default function CoursesPage() {
                     Apoiar o Projeto (Patreon / Stripe)
                   </a>
                 </Button>
-                
+
                 <Button
                   variant="ghost"
                   className="w-full h-11 rounded-full text-xs text-slate-450 hover:text-slate-700 transition-colors"
@@ -629,13 +629,13 @@ export default function CoursesPage() {
         <div className="pb-6 border-b border-slate-200">
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h2 className="text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
+              <h2 className="text-lg font-bold text-slate-900 tracking-tight flex items-center gap-2">
                 Explore os Cursos
                 <span className="px-2 py-0.5 rounded bg-cyan-50 text-cyan-600 text-[9px] font-black uppercase tracking-wider border border-cyan-100">
                   Destaque
                 </span>
               </h2>
-              <p className="text-xs text-slate-500 mt-0.5">Aprenda com cursos criados por outros estudantes e adicione-os à sua conta</p>
+              <p className="text-sm text-slate-500 mt-0.5">Aprenda com cursos criados por outros estudantes e adicione-os à sua conta</p>
             </div>
 
             {/* Navigation Arrows (Udemy/Coursera style) */}
@@ -666,9 +666,21 @@ export default function CoursesPage() {
                 <div
                   key={fc.id}
                   onClick={() => handleOpenPreview(fc.id)}
-                  className="flex-shrink-0 w-[220px] sm:w-[245px] bg-white border border-slate-200/70 rounded-2xl p-3 group cursor-pointer snap-start flex flex-col transition-all duration-300"
+                  className="snap-start
+        flex-shrink-0
+        w-full
+        sm:w-[calc((100%-1.5rem)/2)]
+        lg:w-[calc((100%-4.5rem)/4)]
+        bg-white
+        border
+        border-slate-200/70
+        rounded-lg
+        p-3
+        group
+        cursor-pointer
+        flex flex-col"
                 >
-                  <div className="aspect-[16/10] w-full rounded-lg overflow-hidden mb-3 relative bg-slate-50 border border-slate-200/60 shadow-xs">
+                  <div className="aspect-[16/9] w-full rounded-sm overflow-hidden mb-3 relative bg-slate-50 border border-slate-200/60 shadow-xs">
                     {fc.thumb ? (
                       <img
                         src={fc.thumb.startsWith('http') ? fc.thumb : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/media/${fc.thumb}`}
@@ -687,20 +699,29 @@ export default function CoursesPage() {
                     {fc.title}
                   </h3>
 
-                  <p className="line-clamp-1 text-[13px] text-slate-500 line-clamp-2">
-                    {fc.desc}
+                  <p className="line-clamp-1 text-xs text-slate-500 line-clamp-2">
+                    {fc.owner_name}
                   </p>
+
+                  <div className="flex items-center gap-2 mt-3">
+                    <p className="text-xs text-cyan-700 font-bold bg-cyan-100 px-2 py-0.5 rounded-sm">
+                      {fc.level === 'B' ? 'Iniciante' : fc.level === 'I' ? 'Intermediário' : 'Avançado'}
+                    </p>
+                    <p className="text-xs font-light border border-slate-300 px-2 py-0.5 rounded-sm">
+                      {fc.module_count} módulo{fc.module_count !== 1 ? 's' : ''}
+                    </p>
+                  </div>
                 </div>
               ))}
             </div>
           </div>
         </div>
       )}
-      
+
       {/* ── SECTION: MEUS CURSOS ── */}
       <div className="pt-6">
-        <h2 className="text-xl md:text-2xl font-bold text-slate-800">Os Meus Cursos</h2>
-        <p className="text-md text-slate-500">Veja abaixo os cursos que você está a frequentar e acompanhe o seu progresso.</p>
+        <h2 className="text-lg md:text-2xl font-bold text-slate-800">Os Meus Cursos</h2>
+        <p className="text-sm text-slate-500">Veja abaixo os cursos que você está a frequentar e acompanhe o seu progresso.</p>
       </div>
 
       {/* ── MODAL: PREVIEW DO CURSO DA COMUNIDADE ── */}
@@ -765,7 +786,7 @@ export default function CoursesPage() {
                         </span>
                       </div>
                       {mod.desc && <p className="text-[10px] text-slate-400 line-clamp-1">{mod.desc}</p>}
-                      
+
                       {/* Lesson title listing */}
                       {mod.lessons && mod.lessons.length > 0 && (
                         <div className="pl-3 border-l-2 border-slate-200 pt-1 space-y-1">
