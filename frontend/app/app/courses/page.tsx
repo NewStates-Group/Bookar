@@ -565,7 +565,7 @@ export default function CoursesPage() {
 
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="text-3xl font-bold">Cursos</h1>
+          <h1 className="text-2xl md:text-3xl font-bold">Os Meus Cursos</h1>
           <span className="text-sm text-gray-700">Crie cursos com IA e aprenda com eles!</span>
         </div>
         <div>
@@ -585,18 +585,18 @@ export default function CoursesPage() {
                 </div>
 
                 <DialogTitle className="text-xl font-extrabold text-slate-800 leading-tight">
-                  Serviço Temporariamente Indisponível
+                  Serviço Indisponível
                 </DialogTitle>
 
-                <DialogDescription className="text-xs text-slate-500 leading-relaxed max-w-sm mx-auto">
-                  Devido aos elevados custos operacionais das APIs de Inteligência Artificial e à falta de lucro da empresa para sustentar os custos dos servidores, a funcionalidade de criação de novos cursos está temporariamente suspensa.
+                <DialogDescription className="text-base text-slate-500 leading-relaxed max-w-sm mx-auto text-center">
+                  Devido aos custos operacionais das APIs de IAs a funcionalidade de criação de novos cursos está temporariamente suspensa.
                 </DialogDescription>
               </div>
 
               <div className="p-4 rounded-2xl bg-gradient-to-r from-rose-50/50 via-slate-50 to-slate-50 border border-slate-100 my-5 text-left space-y-2">
-                <h4 className="text-xs font-bold text-slate-700">Como posso ajudar? 🤔</h4>
-                <p className="text-[11px] text-slate-500 leading-relaxed">
-                  Para podermos reativar a IA de geração de cursos, dependemos do apoio da nossa comunidade. Se valoriza o Bookar, considere contribuir para ajudar a manter o projeto ativo e sustentável!
+                <h4 className="text-base font-bold text-slate-700">Como posso ajudar?</h4>
+                <p className="text-base text-slate-500 leading-relaxed">
+                  Se valoriza o Bookar, considere contribuir para ajudar na retomada da funcionalidade!
                 </p>
               </div>
 
@@ -610,30 +610,143 @@ export default function CoursesPage() {
                     Apoiar o Projeto (Patreon / Stripe)
                   </a>
                 </Button>
-
-                <Button
-                  variant="ghost"
-                  className="w-full h-11 rounded-full text-xs text-slate-450 hover:text-slate-700 transition-colors"
-                  onClick={() => setOpen(false)}
-                >
-                  Fechar
-                </Button>
               </div>
             </DialogContent>
           </Dialog>
         </div>
       </div>
 
-      {/* ── SECTION: EXPLORAR CURSOS DA COMUNIDADE ── */}
+      {isLoading ? (
+        <div className="flex items-center justify-center py-20">
+          <div className="text-center space-y-4">
+            <Loader2 className="w-10 h-10 animate-spin text-primary mx-auto" />
+            <p className="text-muted-foreground">Carregando seus dados...</p>
+          </div>
+        </div>
+      ) : courses.length === 0 ? (
+        <div className="flex flex-col items-center justify-center px-4">
+          <div className="mb-4">
+            <BookOpen className="w-10 h-10 text-primary/60" />
+          </div>
+          <h3 className="text-xl font-semibold mb-2">Nenhum curso</h3>
+          <p className="text-muted-foreground text-center max-w-md mb-6">
+            Comece sua jornada, crie um curso personalizado.
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {courses.map((course) => (
+            <Card
+              key={`${course.id}`}
+              className="group md:max-w-sm p-4 bg-white border border-slate-200/70 rounded-2xl shadow-sm hover:shadow-md hover:border-slate-300 transition-all duration-300 flex flex-col gap-0 overflow-hidden"
+            >
+              {course.status === "PROCESSING" && !course.title && !course.thumb ? (
+                <div className="flex flex-col items-center justify-center h-full rounded-lg py-8 relative">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="absolute top-0 right-0 text-gray-400 hover:text-red-500 hover:bg-red-50"
+                    onClick={() => handleDeleteCourse(course.id)}
+                    disabled={isDeletingCourse === course.id}
+                  >
+                    {isDeletingCourse === course.id ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <X className="w-4 h-4" />
+                    )}
+                  </Button>
+                  <Loader2 className="w-12 h-12 text-slate-600 animate-spin" />
+                  <span className="text-gray-500 mt-2">Gerando curso...</span>
+                </div>
+              ) : course.status === "FAILED" || course.status === "ERROR" ? (
+                <div className="flex flex-col items-center justify-center h-full rounded-lg py-8 gap-3">
+                  <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center">
+                    <X className="w-6 h-6 text-red-500" />
+                  </div>
+                  <div className="text-center">
+                    <p className="font-semibold text-red-600">Geração Falhou</p>
+                    <p className="text-sm text-gray-400 mt-1">{course.title || "Curso sem título"}</p>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="border-red-200 text-red-500 hover:bg-red-50 gap-2"
+                    onClick={() => handleDeleteCourse(course.id)}
+                    disabled={isDeletingCourse === course.id}
+                  >
+                    {isDeletingCourse === course.id ? (
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                    ) : (
+                      <Trash2 className="w-3 h-3" />
+                    )}
+                    Eliminar Curso
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  <div
+                    className="aspect-video mb-3 cursor-pointer"
+                    onClick={() => router.push('/app/courses/' + course.id)}
+                  >
+                    {course.thumb ? (
+                      <img
+                        src={course.thumb.startsWith('http') ? course.thumb : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/media/${course.thumb}`}
+                        alt={course.title}
+                        className="rounded-xl object-cover w-full h-full"
+                      />
+                    ) : (
+                      <div className="flex flex-col items-center justify-center h-full border rounded-lg">
+                        <ImageOff className="w-12 h-12 text-slate-400" />
+                        <span className="text-gray-500">
+                          Capa Indisponível
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex items-center justify-between mb-1">
+                    <h1 className="text-lg">{course.title}</h1>
+                  </div>
+                  <p className="line-clamp-2 text-gray-600 text-base">{course.desc}</p>
+                  <Link href={'/app/courses/' + course.id} className="text-blue-600 mt-2 mb-4">Veja mais</Link>
+                  <div className="flex items-center justify-between mt-auto">
+                    <div className="flex items-center gap-2">
+                      <span className="inline-flex items-center rounded-md bg-cyan-300/10 px-2 py-1 text-xs font-medium text-blue-400 inset-ring inset-ring-blue-300/30">
+                        {course.level === 'B' ? 'Iniciante' : course.level === 'IT' ? 'Intermediário' : 'Avançado'}
+                      </span>
+                    </div>
+                    {course.is_fully_completed && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-cyan-500 hover:text-cyan-600 hover:bg-cyan-50 gap-1 h-8"
+                        disabled={isDownloading && selectedCourse?.id === course.id}
+                      >
+                        {isDownloading && selectedCourse?.id === course.id ? (
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                        ) : (
+                          <Award className="w-3 h-3" />
+                        )}
+                        Certificado
+                      </Button>
+                    )}
+                  </div>
+                </>
+              )}
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {/* <div className="border w-full mt-5 mb-5 border-slate-200"></div> */}
       {featuredCourses && featuredCourses.length > 0 && (
-        <div className="pb-6 border-b border-slate-200">
+        <div className="pt-10">
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h2 className="text-lg font-bold text-slate-900 tracking-tight flex items-center gap-2">
-                Explore os Cursos
-                <span className="px-2 py-0.5 rounded bg-cyan-50 text-cyan-600 text-[9px] font-black uppercase tracking-wider border border-cyan-100">
+              <h2 className="text-xl md:text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
+                Explore Cursos da Comunidade
+                {/* <span className="px-2 py-0.5 rounded bg-cyan-50 text-cyan-600 text-[9px] font-black uppercase tracking-wider border border-cyan-100">
                   Destaque
-                </span>
+                </span> */}
               </h2>
               <p className="text-sm text-slate-500 mt-0.5">Aprenda com cursos criados por outros estudantes e adicione-os à sua conta</p>
             </div>
@@ -717,12 +830,6 @@ export default function CoursesPage() {
           </div>
         </div>
       )}
-
-      {/* ── SECTION: MEUS CURSOS ── */}
-      <div className="pt-6">
-        <h2 className="text-lg md:text-2xl font-bold text-slate-800">Os Meus Cursos</h2>
-        <p className="text-sm text-slate-500">Veja abaixo os cursos que você está a frequentar e acompanhe o seu progresso.</p>
-      </div>
 
       {/* ── MODAL: PREVIEW DO CURSO DA COMUNIDADE ── */}
       <Dialog open={showPreviewModal} onOpenChange={setShowPreviewModal}>
@@ -838,129 +945,6 @@ export default function CoursesPage() {
           )}
         </DialogContent>
       </Dialog>
-
-      {isLoading ? (
-        <div className="flex items-center justify-center py-20">
-          <div className="text-center space-y-4">
-            <Loader2 className="w-10 h-10 animate-spin text-primary mx-auto" />
-            <p className="text-muted-foreground">Carregando seus dados...</p>
-          </div>
-        </div>
-      ) : courses.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 px-4">
-          <div className="mb-4">
-            <BookOpen className="w-10 h-10 text-primary/60" />
-          </div>
-          <h3 className="text-xl font-semibold mb-2">Nenhum curso</h3>
-          <p className="text-muted-foreground text-center max-w-md mb-6">
-            Comece sua jornada, crie um curso personalizado.
-          </p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {courses.map((course) => (
-            <Card
-              key={`${course.id}`}
-              className="group md:max-w-sm p-4 bg-white border border-slate-200/70 rounded-2xl shadow-sm hover:shadow-md hover:border-slate-300 transition-all duration-300 flex flex-col gap-0 overflow-hidden"
-            >
-              {/* Early PROCESSING: no title or thumb yet — show spinner */}
-              {course.status === "PROCESSING" && !course.title && !course.thumb ? (
-                <div className="flex flex-col items-center justify-center h-full rounded-lg py-8 relative">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="absolute top-0 right-0 text-gray-400 hover:text-red-500 hover:bg-red-50"
-                    onClick={() => handleDeleteCourse(course.id)}
-                    disabled={isDeletingCourse === course.id}
-                  >
-                    {isDeletingCourse === course.id ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <X className="w-4 h-4" />
-                    )}
-                  </Button>
-                  <Loader2 className="w-12 h-12 text-slate-600 animate-spin" />
-                  <span className="text-gray-500 mt-2">Gerando curso...</span>
-                </div>
-              ) : course.status === "FAILED" || course.status === "ERROR" ? (
-                <div className="flex flex-col items-center justify-center h-full rounded-lg py-8 gap-3">
-                  <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center">
-                    <X className="w-6 h-6 text-red-500" />
-                  </div>
-                  <div className="text-center">
-                    <p className="font-semibold text-red-600">Geração Falhou</p>
-                    <p className="text-sm text-gray-400 mt-1">{course.title || "Curso sem título"}</p>
-                  </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="border-red-200 text-red-500 hover:bg-red-50 gap-2"
-                    onClick={() => handleDeleteCourse(course.id)}
-                    disabled={isDeletingCourse === course.id}
-                  >
-                    {isDeletingCourse === course.id ? (
-                      <Loader2 className="w-3 h-3 animate-spin" />
-                    ) : (
-                      <Trash2 className="w-3 h-3" />
-                    )}
-                    Eliminar Curso
-                  </Button>
-                </div>
-              ) : (
-                <>
-                  <div
-                    className="aspect-video mb-3 cursor-pointer"
-                    onClick={() => router.push('/app/courses/' + course.id)}
-                  >
-                    {course.thumb ? (
-                      <img
-                        src={course.thumb.startsWith('http') ? course.thumb : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/media/${course.thumb}`}
-                        alt={course.title}
-                        className="rounded-xl object-cover w-full h-full"
-                      />
-                    ) : (
-                      <div className="flex flex-col items-center justify-center h-full border rounded-lg">
-                        <ImageOff className="w-12 h-12 text-slate-400" />
-                        <span className="text-gray-500">
-                          Capa Indisponível
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex items-center justify-between mb-1">
-                    <h1 className="text-lg">{course.title}</h1>
-                  </div>
-                  <p className="line-clamp-2 text-gray-600 text-base">{course.desc}</p>
-                  <Link href={'/app/courses/' + course.id} className="text-blue-600 mt-2 mb-4">Veja mais</Link>
-                  <div className="flex items-center justify-between mt-auto">
-                    <div className="flex items-center gap-2">
-                      <span className="inline-flex items-center rounded-md bg-cyan-300/10 px-2 py-1 text-xs font-medium text-blue-400 inset-ring inset-ring-blue-300/30">
-                        {course.level === 'B' ? 'Iniciante' : course.level === 'IT' ? 'Intermediário' : 'Avançado'}
-                      </span>
-                    </div>
-                    {course.is_fully_completed && (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="text-cyan-500 hover:text-cyan-600 hover:bg-cyan-50 gap-1 h-8"
-                        disabled={isDownloading && selectedCourse?.id === course.id}
-                      >
-                        {isDownloading && selectedCourse?.id === course.id ? (
-                          <Loader2 className="w-3 h-3 animate-spin" />
-                        ) : (
-                          <Award className="w-3 h-3" />
-                        )}
-                        Certificado
-                      </Button>
-                    )}
-                  </div>
-                </>
-              )}
-
-            </Card>
-          ))}
-        </div>
-      )}
     </div>
   );
 }
