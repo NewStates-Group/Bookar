@@ -4,7 +4,7 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { BookOpen, Plus, Loader2, ArrowRight, ArrowUp, ImageOff, Sparkles, GraduationCap, Award, FileDown, X, Trash2, Share2, Heart, Compass, Layers } from "lucide-react";
+import { BookOpen, Plus, Loader2, ArrowRight, ArrowUp, ImageOff, Sparkles, GraduationCap, Award, FileDown, X, Trash2, Share2, Heart, Compass, Layers, ChevronLeft, ChevronRight } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
 import { Label } from "@/components/ui/label";
 import {
@@ -81,6 +81,20 @@ interface CoursePreviewDetail {
 export default function CoursesPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const communityScrollRef = useRef<HTMLDivElement>(null);
+
+  const scrollCommunity = (direction: "left" | "right") => {
+    if (communityScrollRef.current) {
+      const { scrollLeft, clientWidth } = communityScrollRef.current;
+      const scrollAmount = clientWidth * 0.75;
+      const targetScroll = direction === "left" ? scrollLeft - scrollAmount : scrollLeft + scrollAmount;
+      communityScrollRef.current.scrollTo({
+        left: targetScroll,
+        behavior: "smooth",
+      });
+    }
+  };
+
   const [courses, setCourses] = useState<Course[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
@@ -612,81 +626,81 @@ export default function CoursesPage() {
 
       {/* ── SECTION: EXPLORAR CURSOS DA COMUNIDADE ── */}
       {featuredCourses && featuredCourses.length > 0 && (
-        <div className="mb-10 bg-gradient-to-br from-slate-50/40 via-cyan-50/10 to-transparent p-5 rounded-3xl border border-slate-100/60 shadow-sm">
-          <div className="flex items-center gap-2.5 mb-5">
-            <div className="w-9 h-9 rounded-xl bg-cyan-500/10 flex items-center justify-center border border-cyan-500/15">
-              <Compass className="w-5 h-5 text-cyan-500" />
-            </div>
+        <div className="pb-6 border-b border-slate-200">
+          <div className="flex items-center justify-between mb-6">
             <div>
-              <h2 className="text-lg md:text-xl font-bold text-slate-800 flex items-center gap-2">
-                Explorar Cursos da Comunidade
-                <span className="px-2.5 py-0.5 rounded-full bg-cyan-100 text-cyan-700 text-[10px] font-black uppercase tracking-wider">
-                  Novidades
+              <h2 className="text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
+                Explore os Cursos
+                <span className="px-2 py-0.5 rounded bg-cyan-50 text-cyan-600 text-[9px] font-black uppercase tracking-wider border border-cyan-100">
+                  Destaque
                 </span>
               </h2>
-              <p className="text-xs text-slate-500">Aprenda com cursos criados por outros estudantes e adicione-os à sua conta!</p>
+              <p className="text-xs text-slate-500 mt-0.5">Aprenda com cursos criados por outros estudantes e adicione-os à sua conta</p>
+            </div>
+
+            {/* Navigation Arrows (Udemy/Coursera style) */}
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <button
+                onClick={() => scrollCommunity("left")}
+                className="w-8 h-8 rounded-full border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 hover:border-slate-300 active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-sm"
+                title="Anterior"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => scrollCommunity("right")}
+                className="w-8 h-8 rounded-full border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 hover:border-slate-300 active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-sm"
+                title="Próximo"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
             </div>
           </div>
 
           <div className="relative">
-            <div className="flex gap-5 overflow-x-auto pb-4 scroll-smooth snap-x snap-mandatory scrollbar-thin scrollbar-thumb-slate-200 hover:scrollbar-thumb-slate-300 scrollbar-track-transparent">
+            <div
+              ref={communityScrollRef}
+              className="flex gap-6 overflow-x-auto pb-2 scroll-smooth snap-x snap-mandatory [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+            >
               {featuredCourses.map((fc) => (
                 <div
                   key={fc.id}
                   onClick={() => handleOpenPreview(fc.id)}
-                  className="flex-shrink-0 w-[280px] sm:w-[320px] bg-white border border-slate-100/80 rounded-2xl p-3.5 shadow-sm hover:shadow-md hover:border-cyan-200/50 hover:translate-y-[-2px] transition-all duration-300 cursor-pointer snap-start group relative overflow-hidden flex flex-col justify-between"
+                  className="flex-shrink-0 w-[220px] sm:w-[245px] bg-white border border-slate-200/70 rounded-2xl p-3 group cursor-pointer snap-start flex flex-col transition-all duration-300"
                 >
-                  <div>
-                    <div className="aspect-video w-full rounded-xl overflow-hidden mb-3.5 relative bg-slate-50 border border-slate-100">
-                      {fc.thumb ? (
-                        <img
-                          src={fc.thumb.startsWith('http') ? fc.thumb : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/media/${fc.thumb}`}
-                          alt={fc.title}
-                          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                        />
-                      ) : (
-                        <div className="flex flex-col items-center justify-center h-full text-slate-400">
-                          <ImageOff className="w-8 h-8 text-slate-350" />
-                          <span className="text-[10px] mt-1 text-slate-450">Sem Capa</span>
-                        </div>
-                      )}
-                      <div className="absolute top-2 left-2">
-                        <span className="inline-flex items-center rounded-md bg-white/90 backdrop-blur-sm px-2 py-0.5 text-[9px] font-extrabold text-slate-800 shadow-sm border border-slate-100 uppercase">
-                          {fc.level === 'B' ? 'Iniciante' : fc.level === 'IT' ? 'Intermediário' : 'Avançado'}
-                        </span>
+                  <div className="aspect-[16/10] w-full rounded-lg overflow-hidden mb-3 relative bg-slate-50 border border-slate-200/60 shadow-xs">
+                    {fc.thumb ? (
+                      <img
+                        src={fc.thumb.startsWith('http') ? fc.thumb : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/media/${fc.thumb}`}
+                        alt={fc.title}
+                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                      />
+                    ) : (
+                      <div className="flex flex-col items-center justify-center h-full text-slate-400 bg-slate-50">
+                        <ImageOff className="w-7 h-7 text-slate-300" />
+                        <span className="text-[9px] mt-1 text-slate-440">Sem Capa</span>
                       </div>
-                    </div>
-
-                    <h3 className="font-extrabold text-sm text-slate-800 line-clamp-1 group-hover:text-cyan-500 transition-colors capitalize leading-snug">
-                      {fc.title || "Curso sem título"}
-                    </h3>
-                    <p className="text-[11px] text-slate-500 line-clamp-2 mt-1.5 mb-3 leading-relaxed">
-                      {fc.desc || "Sem descrição disponível para este curso da comunidade."}
-                    </p>
-                  </div>
-
-                  <div className="flex items-center justify-between mt-auto pt-3 border-t border-slate-50 text-[10px] text-slate-400 font-medium">
-                    <span className="flex items-center gap-1">
-                      <Layers className="w-3.5 h-3.5 text-slate-450" />
-                      {fc.module_count} {fc.module_count === 1 ? 'Módulo' : 'Módulos'}
-                    </span>
-                    {fc.owner_name && (
-                      <span className="max-w-[130px] truncate text-[9px] text-slate-500 bg-slate-50 px-2.5 py-0.5 rounded-full border border-slate-100/50">
-                        Por: {fc.owner_name}
-                      </span>
                     )}
                   </div>
+
+                  <h3 className="font-semibold text-base text-slate-800 line-clamp-2 group-hover:text-cyan-650 transition-colors leading-tight mb-1 capitalize">
+                    {fc.title}
+                  </h3>
+
+                  <p className="line-clamp-1 text-[13px] text-slate-500 line-clamp-2">
+                    {fc.desc}
+                  </p>
                 </div>
               ))}
             </div>
           </div>
         </div>
       )}
-
+      
       {/* ── SECTION: MEUS CURSOS ── */}
-      <div className="mb-6">
-        <h2 className="text-lg md:text-xl font-bold text-slate-800">Os Meus Cursos</h2>
-        <p className="text-xs text-slate-500">Veja abaixo os cursos que você está a frequentar e acompanhe o seu progresso.</p>
+      <div className="pt-6">
+        <h2 className="text-xl md:text-2xl font-bold text-slate-800">Os Meus Cursos</h2>
+        <p className="text-md text-slate-500">Veja abaixo os cursos que você está a frequentar e acompanhe o seu progresso.</p>
       </div>
 
       {/* ── MODAL: PREVIEW DO CURSO DA COMUNIDADE ── */}
@@ -826,7 +840,7 @@ export default function CoursesPage() {
           {courses.map((course) => (
             <Card
               key={`${course.id}`}
-              className="group md:max-w-sm p-4 border overflow-hidden shadow-none bg-transparent hover:bg-gray-50 transition-all duration-300 gap-0"
+              className="group md:max-w-sm p-4 bg-white border border-slate-200/70 rounded-2xl shadow-sm hover:shadow-md hover:border-slate-300 transition-all duration-300 flex flex-col gap-0 overflow-hidden"
             >
               {/* Early PROCESSING: no title or thumb yet — show spinner */}
               {course.status === "PROCESSING" && !course.title && !course.thumb ? (

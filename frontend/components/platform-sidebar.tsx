@@ -98,12 +98,6 @@ export function PlatformSidebar({
 
       {/* ── Navigation Links ── */}
       <nav className="flex-1 px-3 py-3 overflow-y-auto space-y-0.5 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
-        {isExpanded && (
-          <p className="px-3 py-2 text-[10px] font-semibold text-slate-400 uppercase tracking-widest">
-            Ferramentas
-          </p>
-        )}
-
         {menuItems.map((item) => {
           const isActive = pathname.startsWith(item.href);
           return (
