@@ -8,13 +8,6 @@ import { useState, useMemo, useRef } from "react";
 import { toast } from "sonner";
 import { apiRequest } from "@/lib/api";
 
-const SUGGESTIONS = [
-  "O que são pronomes?",
-  "Explica o Teorema de Pitágoras",
-  "Prova-me que 1+1 = 2",
-  "O que é o amor?",
-];
-
 export default function ExplicadorPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -138,24 +131,6 @@ export default function ExplicadorPage() {
             </Button>
           </div>
         </form>
-
-        {/* Suggestion Pills */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {SUGGESTIONS.map((suggestion, index) => (
-            <button
-              key={index}
-              type="button"
-              onClick={() => handleSubmitPrompt(undefined, suggestion)}
-              disabled={isCreating}
-              className="hover:cursor-pointer text-center px-4 py-3 rounded-2xl border border-slate-200 bg-white hover:border-cyan-400 hover:bg-cyan-500/[0.02] hover:shadow-[0_4px_12px_rgba(6,182,212,0.06)] transition-all duration-200 group flex items-center justify-center gap-3"
-            >
-              <p className="text-xs font-semibold text-slate-600 leading-snug group-hover:text-cyan-600 transition-colors">
-                {suggestion}
-              </p>
-            </button>
-          ))}
-        </div>
-
       </div>
     </div>
   );
