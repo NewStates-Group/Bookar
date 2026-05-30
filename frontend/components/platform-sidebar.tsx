@@ -7,13 +7,13 @@ import {
   User,
   LogOut,
   Network,
-  Sparkles,
   PanelLeftClose,
   X,
   ChevronRight,
   Trash2,
   Loader2,
   Plus,
+  Bot,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -58,7 +58,7 @@ interface ExplicadorRoom {
 const menuItems = [
   { title: "Cursos", href: "/app/courses", icon: BookOpen },
   { title: "Mapas Mentais", href: "/app/mind-maps", icon: Network },
-  { title: "Explicador", href: "/app/explicador", icon: Sparkles },
+  { title: "Explicador", href: "/app/explicador", icon: Bot },
 ];
 
 export function PlatformSidebar({

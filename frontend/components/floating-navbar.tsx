@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { BookOpen, GraduationCap, User, LogOut, Settings, Network } from 'lucide-react'
+import { BookOpen, GraduationCap, User, LogOut, Settings, Network, Bot } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useSession, signOut } from 'next-auth/react'
@@ -88,7 +88,7 @@ export function FloatingNavbar() {
                         onMouseEnter={() => setShowExplicadorText(true)}
                         onMouseLeave={() => setShowExplicadorText(false)}
                     >
-                        <Sparkles
+                        <Bot
                             className="w-7 h-7 pl-1 group-hover:text-cyan-300 transition-colors" />
                         <span
                             className={`m-0 text-lg font-medium whitespace-nowrap transition-all duration-300 overflow-hidden ${showExplicadorText ? 'w-24 opacity-100' : 'w-0 opacity-0'
