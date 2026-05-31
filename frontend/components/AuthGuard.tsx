@@ -4,6 +4,7 @@ import { useSession } from "next-auth/react";
 import { Loader2 } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
+import { isExplicadorRoomPath, savePendingExplicadorRoom } from "@/lib/pending-explicador-room";
 
 const PUBLIC_ROUTES = ["/", "/login", "/signup", "/forgot-password", "/reset-password"];
 
@@ -20,7 +21,10 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
 
         if (status === "unauthenticated" || session?.error === "RefreshAccessTokenError") {
             if (isAppRoute) {
-                // console.log("[AuthGuard] Unauthenticated on protected route, redirecting to /login");
+                if (typeof window !== "undefined" && isExplicadorRoomPath(pathname)) {
+                    const pendingPath = pathname + window.location.search;
+                    savePendingExplicadorRoom(pendingPath);
+                }
                 router.replace("/login");
             }
         } else if (status === "authenticated" && session?.user) {
