@@ -7,6 +7,7 @@ import { Loader2, Send, Mic, MessageSquare } from "lucide-react";
 import { useState, useMemo, useRef } from "react";
 import { toast } from "sonner";
 import { apiRequest } from "@/lib/api";
+import { mutate } from "swr";
 
 export default function ExplicadorPage() {
   const { data: session, status } = useSession();
@@ -40,7 +41,13 @@ export default function ExplicadorPage() {
         method: "POST",
         body: JSON.stringify({ title: finalPrompt }),
       });
-      toast.success("Sala de explicação criada!");
+      
+      // Mutate room list so sidebar updates automatically!
+      if (session?.accessToken) {
+        mutate([`${process.env.NEXT_PUBLIC_API_URL}/explicador`, session.accessToken]);
+      }
+
+      // toast.success("Sala de explicação criada!");
       setPrompt("");
       router.push(`/app/explicador/${res.id}?prompt=${encodeURIComponent(finalPrompt)}`);
     } catch (err: any) {

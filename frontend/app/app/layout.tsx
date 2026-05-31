@@ -45,6 +45,8 @@ export default function AppLayout({
     );
   }
 
+  const isExplicadorRoom = pathname.startsWith("/app/explicador/") && pathname !== "/app/explicador";
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50 text-slate-800 antialiased">
       {/* Side Navigation Component */}
@@ -76,7 +78,7 @@ export default function AppLayout({
           mounted && isSidebarOpen ? "md:pl-[260px]" : "md:pl-[68px]"
         }`}
       >
-        <main className="w-full px-0 py-4 md:py-6">
+        <main className={`w-full ${isExplicadorRoom ? "py-0" : "py-4 md:py-6"}`}>
           {children}
         </main>
       </div>

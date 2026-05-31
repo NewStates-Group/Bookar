@@ -3,6 +3,7 @@
 import { useSession } from "next-auth/react";
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
@@ -17,11 +18,20 @@ import {
   Pencil,
   Sparkles,
   PenTool,
-  Share2
+  Share2,
+  Bot,
+  Lock,
+  X
 } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface LockObject {
   connection_id: string;
@@ -31,6 +41,7 @@ interface LockObject {
 interface WhiteboardData {
   summary?: string;
   lock?: LockObject | null;
+  show_whiteboard?: boolean;
 }
 
 interface ChatMessage {
@@ -43,6 +54,44 @@ interface Participant {
   name: string;
   isOwner: boolean;
   hasAudio: boolean;
+  avatar?: string | null;
+  userId?: number | null;
+  isMicOn?: boolean;
+  isListening?: boolean;
+}
+
+function StreamingMessage({ content, active }: { content: string; active: boolean }) {
+  const [displayedText, setDisplayedText] = useState(active ? "" : content);
+
+  useEffect(() => {
+    if (!active) {
+      setDisplayedText(content);
+      return;
+    }
+
+    const words = content.split(" ");
+    let currentText = "";
+    let wordIndex = 0;
+
+    const interval = setInterval(() => {
+      if (wordIndex < words.length) {
+        currentText += (wordIndex === 0 ? "" : " ") + words[wordIndex];
+        setDisplayedText(currentText);
+        wordIndex++;
+
+        // Dispatch event so parent layout can auto-scroll
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("chat-stream-tick"));
+        }
+      } else {
+        clearInterval(interval);
+      }
+    }, 45); // Snappy, readable word streaming speed
+
+    return () => clearInterval(interval);
+  }, [content, active]);
+
+  return <ReactMarkdown>{displayedText}</ReactMarkdown>;
 }
 
 export default function ExplicadorRoomPage() {
@@ -50,6 +99,11 @@ export default function ExplicadorRoomPage() {
   const router = useRouter();
   const params = useParams();
   const roomId = params.id as string;
+  const isMobile = useIsMobile();
+
+  // Loading / lobby states
+  const [roomReady, setRoomReady] = useState(false);
+  const [lobbyStatus, setLobbyStatus] = useState("Solicitando permissão do microfone...");
 
   // Connection & Room states
   const [isConnected, setIsConnected] = useState(false);
@@ -57,8 +111,10 @@ export default function ExplicadorRoomPage() {
   const [isOwner, setIsOwner] = useState(false);
   const [whiteboardData, setWhiteboardData] = useState<WhiteboardData>({ summary: "", lock: null });
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
+  const [activeStreamingMessageIndex, setActiveStreamingMessageIndex] = useState<number | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [participants, setParticipants] = useState<Participant[]>([]);
+  const [showParticipantsModal, setShowParticipantsModal] = useState(false);
 
   // Splitter Resizing states
   const [splitPct, setSplitPct] = useState<number>(35); // Left chat starts at 35%
@@ -70,6 +126,7 @@ export default function ExplicadorRoomPage() {
 
   // Input fields
   const [message, setMessage] = useState("");
+  const [isInputSubmitting, setIsInputSubmitting] = useState(false);
 
   // WebRTC Audio States
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
@@ -80,8 +137,10 @@ export default function ExplicadorRoomPage() {
 
   // WebSocket Ref
   const socketRef = useRef<WebSocket | null>(null);
+  const connectionIdRef = useRef<string | null>(null);
   const peerConnectionsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const chatInputRef = useRef<HTMLInputElement>(null);
 
   // Load Handwriting Font
   useEffect(() => {
@@ -96,38 +155,66 @@ export default function ExplicadorRoomPage() {
     };
   }, []);
 
-  // 1. Establish WebSocket Connection
+  // 1. Request mic permission first, then establish WebSocket
   useEffect(() => {
     if (status === "loading") return;
+    let cancelled = false;
 
-    const token = session?.accessToken || "";
-    const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "";
-    const wsUrl = `${apiUrl.replace(/^http/, "ws")}/ws/explicador/${roomId}/?token=${token}`;
-
-    const socket = new WebSocket(wsUrl);
-
-    socket.onopen = () => {
-      setIsConnected(true);
-    };
-
-    socket.onmessage = (event) => {
+    const init = async () => {
+      // Step 1: Request microphone permission
+      setLobbyStatus("Solicitando permissão do microfone...");
       try {
-        const data = JSON.parse(event.data);
-        handleWebSocketMessage(data);
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        // Mute all tracks immediately — user starts silent
+        stream.getAudioTracks().forEach((track) => { track.enabled = false; });
+        if (!cancelled) {
+          setLocalStream(stream);
+          setIsMicMuted(true);
+          setAudioApproved(true);
+        }
       } catch (err) {
-        console.error("Error parsing websocket message", err);
+        console.warn("Mic permission denied or unavailable", err);
       }
+
+      if (cancelled) return;
+
+      // Step 2: Connect WebSocket
+      setLobbyStatus("Conectando à sala...");
+      const token = session?.accessToken || "";
+      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "";
+      const wsUrl = `${apiUrl.replace(/^http/, "ws")}/ws/explicador/${roomId}/?token=${token}`;
+
+      const socket = new WebSocket(wsUrl);
+
+      socket.onopen = () => {
+        if (!cancelled) setIsConnected(true);
+      };
+
+      socket.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          handleWebSocketMessage(data);
+        } catch (err) {
+          console.error("Error parsing websocket message", err);
+        }
+      };
+
+      socket.onclose = () => {
+        if (!cancelled) {
+          setIsConnected(false);
+          setRoomReady(false);
+          // toast.error("Ligação perdida. Tentando reconectar...");
+          closeAllPeerConnections();
+        }
+      };
+
+      socketRef.current = socket;
     };
 
-    socket.onclose = () => {
-      setIsConnected(false);
-      toast.error("Ligação perdida. Tentando reconectar...");
-      closeAllPeerConnections();
-    };
-
-    socketRef.current = socket;
+    init();
 
     return () => {
+      cancelled = true;
       if (socketRef.current) {
         socketRef.current.close();
       }
@@ -147,7 +234,15 @@ export default function ExplicadorRoomPage() {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatHistory, isGenerating]);
 
-  // Character-by-character marker writing effect
+  useEffect(() => {
+    const handleStreamTick = () => {
+      chatEndRef.current?.scrollIntoView({ behavior: "auto" });
+    };
+    window.addEventListener("chat-stream-tick", handleStreamTick);
+    return () => window.removeEventListener("chat-stream-tick", handleStreamTick);
+  }, []);
+
+  // Word-by-word marker writing effect
   useEffect(() => {
     if (!whiteboardData.summary) {
       setDisplayedBoardText("");
@@ -155,20 +250,21 @@ export default function ExplicadorRoomPage() {
     }
 
     const targetText = whiteboardData.summary;
+    const words = targetText.split(/(\s+)/); // Keep spaces and newlines
     let currentText = "";
     let index = 0;
 
     setDisplayedBoardText("");
 
     const interval = setInterval(() => {
-      if (index < targetText.length) {
-        currentText += targetText[index];
+      if (index < words.length) {
+        currentText += words[index];
         setDisplayedBoardText(currentText);
         index++;
       } else {
         clearInterval(interval);
       }
-    }, 6); // Snappy, visually organic handwriting stream
+    }, 20); // Fast word/whitespace streaming
 
     return () => clearInterval(interval);
   }, [whiteboardData.summary]);
@@ -184,9 +280,27 @@ export default function ExplicadorRoomPage() {
     switch (data.type) {
       case "welcome":
         setConnectionId(data.connection_id);
+        connectionIdRef.current = data.connection_id;
         setIsOwner(data.is_owner);
-        setWhiteboardData(data.whiteboard_data || { summary: "", lock: null });
+        if (data.whiteboard_data) {
+          setWhiteboardData({
+            ...data.whiteboard_data,
+            show_whiteboard: false // Keep whiteboard closed on load to optimize responsiveness
+          });
+        } else {
+          setWhiteboardData({ summary: "", lock: null, show_whiteboard: false });
+        }
         setChatHistory(data.chat_history || []);
+
+        // Broadcast initial audio state (mic already acquired in lobby)
+        sendWSMessage({
+          type: "audio_state",
+          is_mic_on: false,
+          is_listening: true,
+        });
+
+        // Room is now fully ready
+        setRoomReady(true);
 
         // Auto-submit initial prompt if present in URL query params (ChatGPT onboarding)
         if (typeof window !== "undefined") {
@@ -212,6 +326,7 @@ export default function ExplicadorRoomPage() {
       case "user_joined":
         setParticipants((prev) => {
           if (prev.some((p) => p.connectionId === data.connection_id)) return prev;
+          if (data.connection_id === connectionIdRef.current) return prev;
           return [
             ...prev,
             {
@@ -219,9 +334,42 @@ export default function ExplicadorRoomPage() {
               name: data.name,
               isOwner: data.is_owner,
               hasAudio: false,
+              avatar: data.avatar,
+              userId: data.user_id,
+              isMicOn: false,
+              isListening: true,
             },
           ];
         });
+        break;
+
+      case "presence_sync":
+        if (data.members) {
+          // Filter out our own connection from the participants list
+          const membersList = data.members
+            .filter((m: any) => m.connection_id !== connectionIdRef.current)
+            .map((m: any) => ({
+              connectionId: m.connection_id,
+              name: m.name,
+              isOwner: m.is_owner,
+              hasAudio: m.is_mic_on || false,
+              avatar: m.avatar,
+              userId: m.user_id,
+              isMicOn: m.is_mic_on || false,
+              isListening: m.is_listening !== false,
+            }));
+          setParticipants(membersList);
+        }
+        break;
+
+      case "audio_state":
+        setParticipants((prev) =>
+          prev.map((p) =>
+            p.connectionId === data.connection_id
+              ? { ...p, isMicOn: data.is_mic_on, isListening: data.is_listening }
+              : p
+          )
+        );
         break;
 
       case "user_left":
@@ -236,9 +384,28 @@ export default function ExplicadorRoomPage() {
         break;
 
       case "chat_update":
-        if (data.chat_history) setChatHistory(data.chat_history);
-        if (data.whiteboard_data) setWhiteboardData(data.whiteboard_data);
+        if (data.chat_history) {
+          setChatHistory((prev) => {
+            const hasNewAssistantMessage =
+              data.chat_history.length > prev.length &&
+              data.chat_history[data.chat_history.length - 1].role === "assistant";
+            if (hasNewAssistantMessage) {
+              setActiveStreamingMessageIndex(data.chat_history.length - 1);
+            }
+            return data.chat_history;
+          });
+        }
         setIsGenerating(data.is_generating || false);
+
+        // Delay whiteboard sync if AI generation just completed to allow organic text stream first
+        if (data.is_generating === false) {
+          setTimeout(() => {
+            if (data.whiteboard_data) setWhiteboardData(data.whiteboard_data);
+          }, 1200);
+        } else {
+          // Sync immediately during loading or manual updates (e.g. lock releases)
+          if (data.whiteboard_data) setWhiteboardData(data.whiteboard_data);
+        }
         break;
 
       case "voice_request":
@@ -286,7 +453,7 @@ export default function ExplicadorRoomPage() {
 
     if (signal.type === "offer") {
       await pc.setRemoteDescription(new RTCSessionDescription(signal));
-      
+
       let stream = localStream;
       if (!stream) {
         try {
@@ -343,14 +510,14 @@ export default function ExplicadorRoomPage() {
     pc.ontrack = (event) => {
       const remoteStream = event.streams[0];
       let audioEl = document.getElementById(`audio-${targetId}`) as HTMLAudioElement;
-      
+
       if (!audioEl) {
         audioEl = document.createElement("audio");
         audioEl.id = `audio-${targetId}`;
         audioEl.autoplay = true;
         document.body.appendChild(audioEl);
       }
-      
+
       audioEl.srcObject = remoteStream;
     };
 
@@ -362,19 +529,32 @@ export default function ExplicadorRoomPage() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       setLocalStream(stream);
-      const host = participants.find((p) => p.isOwner) || { connectionId: "host" };
-      const pc = createPeerConnection(host.connectionId);
-      stream.getTracks().forEach((track) => pc.addTrack(track, stream));
 
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
-      
       sendWSMessage({
-        type: "webrtc_signal",
-        target_connection_id: host.connectionId,
-        signal: { type: "offer", sdp: offer.sdp },
+        type: "audio_state",
+        is_mic_on: true,
+        is_listening: true,
       });
-      
+
+      // Initiate WebRTC mesh connections with everyone in the room
+      participants.forEach(async (p) => {
+        try {
+          const pc = createPeerConnection(p.connectionId);
+          stream.getTracks().forEach((track) => pc.addTrack(track, stream));
+
+          const offer = await pc.createOffer();
+          await pc.setLocalDescription(offer);
+
+          sendWSMessage({
+            type: "webrtc_signal",
+            target_connection_id: p.connectionId,
+            signal: { type: "offer", sdp: offer.sdp },
+          });
+        } catch (err) {
+          console.error(`Failed to connect peer connection with ${p.name}`, err);
+        }
+      });
+
       toast.success("Microfone ativado!");
     } catch (err) {
       console.error("Error accessing microphone", err);
@@ -387,6 +567,32 @@ export default function ExplicadorRoomPage() {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       setLocalStream(stream);
       setAudioApproved(true);
+
+      sendWSMessage({
+        type: "audio_state",
+        is_mic_on: true,
+        is_listening: true,
+      });
+
+      // Host initiates WebRTC mesh connections with everyone in the room
+      participants.forEach(async (p) => {
+        try {
+          const pc = createPeerConnection(p.connectionId);
+          stream.getTracks().forEach((track) => pc.addTrack(track, stream));
+
+          const offer = await pc.createOffer();
+          await pc.setLocalDescription(offer);
+
+          sendWSMessage({
+            type: "webrtc_signal",
+            target_connection_id: p.connectionId,
+            signal: { type: "offer", sdp: offer.sdp },
+          });
+        } catch (err) {
+          console.error(`Failed to connect peer connection with ${p.name}`, err);
+        }
+      });
+
       toast.success("Canal de voz ativado!");
     } catch (err) {
       console.error("Error accessing microphone", err);
@@ -396,10 +602,38 @@ export default function ExplicadorRoomPage() {
 
   const toggleMute = () => {
     if (localStream) {
+      const nextMuted = !isMicMuted;
       localStream.getAudioTracks().forEach((track) => {
-        track.enabled = !track.enabled;
+        track.enabled = !nextMuted;
       });
-      setIsMicMuted(!isMicMuted);
+      setIsMicMuted(nextMuted);
+
+      sendWSMessage({
+        type: "audio_state",
+        is_mic_on: !nextMuted,
+        is_listening: true,
+      });
+
+      // On first unmute, establish WebRTC mesh connections with all participants
+      if (!nextMuted && peerConnectionsRef.current.size === 0 && participants.length > 0) {
+        participants.forEach(async (p) => {
+          try {
+            const pc = createPeerConnection(p.connectionId);
+            localStream.getTracks().forEach((track) => pc.addTrack(track, localStream));
+
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+
+            sendWSMessage({
+              type: "webrtc_signal",
+              target_connection_id: p.connectionId,
+              signal: { type: "offer", sdp: offer.sdp },
+            });
+          } catch (err) {
+            console.error(`Failed to connect peer with ${p.name}`, err);
+          }
+        });
+      }
     }
   };
 
@@ -408,12 +642,16 @@ export default function ExplicadorRoomPage() {
     e.preventDefault();
     if (!message.trim() || isGenerating) return;
 
+    setIsInputSubmitting(true);
     sendWSMessage({
       type: "chat_message",
       message: message,
     });
 
     setMessage("");
+    setTimeout(() => {
+      setIsInputSubmitting(false);
+    }, 450); // Match animation duration
   };
 
   // Draggable Splitter Pointer Events
@@ -462,6 +700,26 @@ export default function ExplicadorRoomPage() {
     }
   };
 
+  // Speech-to-text for the chat input (matching landing page)
+  const handleChatMic = () => {
+    const SpeechRecognition =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      toast.error("O seu navegador não suporta reconhecimento de voz.");
+      return;
+    }
+    const recognition = new SpeechRecognition();
+    recognition.lang = "pt-PT";
+    recognition.interimResults = false;
+    recognition.onresult = (event: any) => {
+      const transcript = event.results[0][0].transcript;
+      setMessage(transcript);
+      chatInputRef.current?.focus();
+    };
+    recognition.onerror = () => toast.error("Erro ao capturar voz.");
+    recognition.start();
+  };
+
   // Chalk Lock action triggers
   const grabLock = () => {
     sendWSMessage({ type: "grab_lock" });
@@ -474,19 +732,72 @@ export default function ExplicadorRoomPage() {
   const handleShareRoom = () => {
     if (typeof window !== "undefined") {
       navigator.clipboard.writeText(window.location.href);
-      toast.success("Link da sala copiado! Envie aos seus colegas para assistirem em tempo real.");
+      toast.success("Link copiado!");
     }
   };
 
   // Derived lock state values
   const currentLock = whiteboardData.lock;
   const isLockHolder = currentLock && currentLock.connection_id === connectionId;
+  const showWhiteboard = whiteboardData.show_whiteboard === true;
+
+  const combinedRoster = [
+    {
+      connectionId: connectionId || "self",
+      name: (session?.user as any)?.first_name
+        ? `${(session?.user as any)?.first_name} ${(session?.user as any)?.last_name || ""}`.trim()
+        : (session?.user?.name || "Eu"),
+      isOwner: isOwner,
+      avatar: (session?.user as any)?.avatar || null,
+      isMicOn: !isMicMuted && localStream !== null,
+      isListening: true,
+      isSelf: true,
+    },
+    ...participants
+      .filter((p) => p.connectionId !== connectionId && p.connectionId !== connectionIdRef.current)
+      .map((p) => ({
+        connectionId: p.connectionId,
+        name: p.name,
+        isOwner: p.isOwner,
+        avatar: p.avatar || null,
+        isMicOn: p.isMicOn || false,
+        isListening: p.isListening !== false,
+        isSelf: false,
+      })),
+  ];
+
+  // ── Loading / Lobby Screen ──
+  if (!roomReady) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[calc(100vh-56px)] md:h-screen w-full bg-white">
+        <div className="flex flex-col items-center gap-6 animate-in fade-in duration-500">
+          <div className="relative">
+            <div className="w-16 h-16 rounded-2xl bg-cyan-500/10 flex items-center justify-center">
+              <Bot className="w-8 h-8 text-cyan-600" />
+            </div>
+            <span className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-cyan-500 border-2 border-white flex items-center justify-center">
+              <Loader2 className="w-3 h-3 animate-spin text-white" />
+            </span>
+          </div>
+          <div className="text-center space-y-2">
+            <h2 className="text-lg font-bold text-slate-800">Explicador</h2>
+            <p className="text-sm text-slate-500 font-medium">{lobbyStatus}</p>
+          </div>
+          <div className="flex gap-1.5 mt-2">
+            <span className="w-2 h-2 rounded-full bg-cyan-500 animate-bounce" style={{ animationDelay: "0ms" }} />
+            <span className="w-2 h-2 rounded-full bg-cyan-400 animate-bounce" style={{ animationDelay: "150ms" }} />
+            <span className="w-2 h-2 rounded-full bg-cyan-300 animate-bounce" style={{ animationDelay: "300ms" }} />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
       ref={splitContainerRef}
       onPointerMove={handleSplitterPointerMove}
-      className="flex h-[calc(100vh-64px)] w-full overflow-hidden bg-slate-50 text-slate-800 relative select-none"
+      className="flex h-[calc(100vh-56px)] md:h-screen w-full overflow-hidden bg-slate-50 text-slate-800 relative select-none"
     >
       <style>{`
         .font-handwriting {
@@ -495,6 +806,19 @@ export default function ExplicadorRoomPage() {
         .blackboard-grid {
           background-image: radial-gradient(rgba(0, 0, 0, 0.05) 1px, transparent 1px);
           background-size: 20px 20px;
+        }
+        @keyframes slideUpFade {
+          from {
+            opacity: 0;
+            transform: translateY(10px) scale(0.98);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+          }
+        }
+        .message-bubble-animate {
+          animation: slideUpFade 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
         }
       `}</style>
 
@@ -541,293 +865,383 @@ export default function ExplicadorRoomPage() {
 
       {/* LEFT SIDEBAR: Chat History */}
       <div
-        style={{ width: `${splitPct}%` }}
-        className="border-r border-slate-200 bg-white flex flex-col shrink-0 h-full select-text"
+        style={{ width: isMobile ? (showWhiteboard ? "0%" : "100%") : (showWhiteboard ? `${splitPct}%` : "100%") }}
+        className={`bg-white flex flex-col shrink-0 h-full select-text transition-[width] duration-500 ease-in-out ${showWhiteboard ? (isMobile ? "hidden" : "border-r border-slate-200") : ""
+          }`}
       >
-        {/* Header section with back button & connection status */}
-        <div className="p-4 border-b border-slate-200 flex justify-between items-center bg-white">
+        {/* Header section with connection status */}
+        <div className="px-4 py-3 border-b border-slate-200 flex justify-between items-center bg-white select-none">
           <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => router.push("/app/explicador")}
-              className="rounded-full w-8 h-8 text-slate-500 hover:text-slate-850 hover:bg-slate-50"
-            >
-              <ArrowLeft className="w-4 h-4" />
-            </Button>
-            <div>
-              <span className="text-xs font-bold text-slate-400 uppercase tracking-widest block">Sala Ativa</span>
-              <span className="text-sm font-bold text-slate-855 flex items-center gap-1.5">
-                Explicador AI
-                <span className={`w-1.5 h-1.5 rounded-full ${isConnected ? "bg-emerald-500 animate-pulse" : "bg-red-500"}`} />
-                <span className="text-xs font-normal text-slate-400">({participants.length + 1} online)</span>
-              </span>
-            </div>
-          </div>
-          
-          {/* Voice status controls */}
-          <div className="flex items-center gap-1.5">
-            {isOwner ? (
-              <Button
-                size="sm"
-                variant={audioApproved ? "secondary" : "ghost"}
-                onClick={audioApproved ? toggleMute : startHostAudio}
-                className={`rounded-full h-8 px-3 gap-1.5 text-xs ${
-                  audioApproved 
-                    ? isMicMuted 
-                      ? "bg-red-500/10 text-red-650 border border-red-200 hover:bg-red-500/20" 
-                      : "bg-emerald-500/10 text-emerald-655 border border-emerald-200 hover:bg-emerald-500/20"
-                    : "text-slate-500 hover:bg-slate-100"
-                }`}
+            <span className="text-sm font-bold text-slate-800 flex items-center gap-2">
+              <Bot className="w-5 h-5 text-cyan-600" />
+              Explicador
+            </span>
+            {combinedRoster.length > 1 ? (
+              <button
+                onClick={() => setShowParticipantsModal(true)}
+                className="flex items-center -space-x-1.5 hover:opacity-90 transition-opacity bg-slate-100 hover:bg-slate-200/80 px-2.5 py-1 rounded-full border border-slate-200/60 cursor-pointer ml-2"
+                title="Ver participantes"
               >
-                {audioApproved ? (
-                  isMicMuted ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5 animate-pulse" />
-                ) : (
-                  <Mic className="w-3.5 h-3.5" />
-                )}
-                {audioApproved ? (isMicMuted ? "Silenciado" : "Voz Ativa") : "Ativar Voz"}
-              </Button>
-            ) : (
-              <Button
-                size="sm"
-                onClick={requestVoice}
-                disabled={audioApproved || audioRequestPending}
-                className={`rounded-full h-8 px-3 gap-1.5 text-xs ${
-                  audioApproved
-                    ? isMicMuted 
-                      ? "bg-red-500/10 text-red-650 border border-red-200"
-                      : "bg-emerald-500/10 text-emerald-650 border border-emerald-200"
-                    : audioRequestPending
-                      ? "bg-slate-100 text-slate-400 border border-slate-200"
-                      : "bg-cyan-500 hover:bg-cyan-600 text-white shadow-sm"
-                }`}
-              >
-                {audioApproved ? (
-                  <Volume2 className="w-3.5 h-3.5" />
-                ) : (
-                  <Mic className="w-3.5 h-3.5" />
-                )}
-                {audioApproved ? "Voz Conectada" : audioRequestPending ? "Pendente..." : "Pedir Voz"}
-              </Button>
-            )}
-            
-            {audioApproved && !isOwner && (
-              <Button
-                size="icon"
-                variant="ghost"
-                onClick={toggleMute}
-                className="rounded-full w-8 h-8 text-slate-500 hover:text-slate-800 hover:bg-slate-100"
-              >
-                {isMicMuted ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5 text-emerald-500" />}
-              </Button>
-            )}
-          </div>
-        </div>
-
-        {/* Chalk/Lock status banner */}
-        <div className="p-3 border-b border-slate-100 bg-slate-50/30">
-          {!currentLock ? (
-            <div className="flex items-center justify-between text-xs px-1 text-slate-500">
-              <span className="flex items-center gap-1.5 font-medium">
-                <Pencil className="w-3.5 h-3.5 text-slate-400" />
-                Giz livre
-              </span>
-              <Button
-                size="sm"
-                onClick={grabLock}
-                className="h-7 bg-cyan-500 hover:bg-cyan-600 text-white rounded-full px-3 text-[10px] font-bold shadow-sm shadow-cyan-500/10"
-              >
-                Escrever
-              </Button>
-            </div>
-          ) : isLockHolder ? (
-            <div className="flex items-center justify-between text-xs px-1 text-cyan-600">
-              <span className="flex items-center gap-1.5 font-semibold">
-                <Sparkles className="w-3.5 h-3.5 text-cyan-500 animate-pulse" />
-                Tens o Giz!
-              </span>
-              <Button
-                size="sm"
-                onClick={releaseLock}
-                className="h-7 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-full px-3 text-[10px] font-bold"
-              >
-                Largar
-              </Button>
-            </div>
-          ) : (
-            <div className="flex items-center justify-between text-xs px-1 text-slate-400">
-              <span className="flex items-center gap-1.5 font-medium truncate pr-2">
-                <Pencil className="w-3.5 h-3.5 text-slate-350" />
-                Giz com: <strong>{currentLock.name}</strong>
-              </span>
-              <Button
-                size="sm"
-                disabled
-                className="h-7 bg-slate-50 text-slate-300 border border-slate-100 rounded-full px-3 text-[10px] font-bold cursor-not-allowed"
-              >
-                Ocupado
-              </Button>
-            </div>
-          )}
-        </div>
-
-        {/* Messages List Area */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0 bg-slate-50/30 scrollbar-thin">
-          {chatHistory.map((msg, i) => (
-            <div
-              key={i}
-              className={`flex flex-col max-w-[85%] ${
-                msg.role === "user" ? "ml-auto items-end" : "mr-auto items-start"
-              }`}
-            >
-              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wide mb-1 px-1">
-                {msg.role === "user" ? "Remetente" : "Explicador AI"}
-              </span>
-              <div
-                className={`p-3.5 rounded-2xl text-sm leading-relaxed ${
-                  msg.role === "user"
-                    ? "bg-cyan-500 text-white rounded-tr-none shadow-sm shadow-cyan-500/10"
-                    : "bg-white border border-slate-200 text-slate-700 rounded-tl-none shadow-sm"
-                }`}
-              >
-                <div className="prose prose-slate max-w-none text-xs leading-relaxed">
-                  <ReactMarkdown>{msg.content}</ReactMarkdown>
+                <div className="flex -space-x-2 mr-2">
+                  {combinedRoster.slice(0, 3).map((member) => (
+                    <div
+                      key={member.connectionId}
+                      className="w-5 h-5 rounded-full border-2 border-white overflow-hidden bg-slate-200 flex-shrink-0 flex items-center justify-center shadow-sm"
+                    >
+                      {member.avatar ? (
+                        <img
+                          src={member.avatar.startsWith("http") ? member.avatar : `${process.env.NEXT_PUBLIC_API_URL}${member.avatar}`}
+                          alt={member.name}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <span className="text-[8px] font-bold text-slate-500 uppercase select-none">
+                          {member.name[0]}
+                        </span>
+                      )}
+                    </div>
+                  ))}
                 </div>
-              </div>
-            </div>
-          ))}
-          {isGenerating && (
-            <div className="flex flex-col items-start max-w-[85%] mr-auto">
-              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wide mb-1 px-1">
-                Explicador AI
-              </span>
-              <div className="p-3.5 rounded-2xl bg-white border border-slate-200 rounded-tl-none flex items-center gap-3 shadow-sm">
-                <Loader2 className="w-4 h-4 animate-spin text-cyan-500" />
-                <span className="text-xs text-slate-500 font-medium">Escrevendo e atualizando o quadro...</span>
-              </div>
-            </div>
-          )}
-          <div ref={chatEndRef} />
-        </div>
-
-        {/* Message Input (lock holder only) */}
-        <div className="p-4 border-t border-slate-200 bg-white">
-          <form onSubmit={handleSendMessage} className="flex gap-2">
-            <Input
-              placeholder={
-                isLockHolder 
-                  ? "Pergunte ao explicador..." 
-                  : currentLock 
-                    ? `${currentLock.name} está a escrever...` 
-                    : "Pegue o Giz acima para escrever..."
-              }
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              disabled={!isLockHolder || isGenerating}
-              className="h-11 bg-white border-slate-200 text-sm focus-visible:border-cyan-500 text-slate-800 disabled:bg-slate-50 disabled:text-slate-400 placeholder:text-slate-450"
-            />
-            <Button
-              type="submit"
-              size="icon"
-              disabled={!isLockHolder || !message.trim() || isGenerating}
-              className="h-11 w-11 bg-cyan-500 hover:bg-cyan-600 text-white shrink-0 rounded-lg shadow-sm shadow-cyan-500/10"
-            >
-              <Send className="w-4 h-4" />
-            </Button>
-          </form>
-        </div>
-      </div>
-
-      {/* Draggable Vertical Splitter */}
-      <div
-        onPointerDown={handleSplitterPointerDown}
-        onPointerUp={handleSplitterPointerUp}
-        className="w-1.5 hover:w-2 bg-slate-200 hover:bg-cyan-500 cursor-col-resize transition-all shrink-0 z-40 relative h-full flex items-center justify-center group"
-      >
-        <div className="w-0.5 h-8 rounded-full bg-slate-400 group-hover:bg-white" />
-      </div>
-
-      {/* RIGHT WORKSPACE: Dotted Whiteboard Summary Panel */}
-      <div className="flex-1 h-full bg-[#fafafa] flex flex-col justify-start relative overflow-hidden p-6 md:p-10 select-text">
-        
-        {/* Header of the Board */}
-        <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-200/60 shrink-0">
-          <div className="flex items-center gap-2">
-            <PenTool className="w-5 h-5 text-cyan-600" />
-            <h2 className="text-sm font-bold text-slate-700 tracking-wide">
-              Quadro de Resumo & Fórmulas
-            </h2>
+                <span className="text-[10px] font-bold text-slate-500 select-none">
+                  {combinedRoster.length}
+                </span>
+              </button>
+            ) : (
+              <span className={`w-2 h-2 rounded-full ml-2 ${isConnected ? "bg-emerald-500 animate-pulse" : "bg-red-500"}`} />
+            )}
           </div>
+          <div className="flex items-center gap-1">
+            <div>
+              {!currentLock ? (
+                <div onClick={grabLock} className="cursor-pointer gap-1 flex items-center justify-between text-xs px-1 text-slate-800">
+                  <Pencil className="w-3.5 h-3.5 text-slate-800" />
+                  <span className="hidden sm:block flex items-center gap-1.5 font-medium">
+                    Lápis livre
+                  </span>
+                </div>
+              ) : isLockHolder ? (
+                <div onClick={releaseLock} className="flex items-center gap-1 justify-between text-xs px-1 text-cyan-600">
+                  <Lock className="w-3.5 h-3.5 text-cyan-600" />
+                  <span className="hidden sm:block flex items-center gap-1.5 font-semibold">
+                    Tens o lápis!
+                  </span>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between gap-1 text-xs px-1 text-slate-800">
+                  <Lock className="w-3.5 h-3.5 text-slate-350" />
+                  <span className="hidden sm:block flex items-center gap-1.5 font-medium truncate pr-2">
+                    Lápiz com: <strong>{currentLock.name}</strong>
+                  </span>
+                </div>
+              )}
+            </div>
 
-          <div className="flex items-center gap-3">
-            {/* Partilhar button */}
+            {/* Share room link */}
             <Button
               size="sm"
               variant="outline"
               onClick={handleShareRoom}
-              className="h-8 rounded-full border-cyan-100 text-cyan-600 hover:bg-cyan-50/50 hover:text-cyan-700 text-xs font-semibold gap-1.5 flex items-center shadow-sm"
+              className="hover:bg-transparent! h-8 shadow-none border-none rounded-full text-xs flex items-center"
             >
               <Share2 className="w-3.5 h-3.5" />
-              Partilhar Aula
+              <span className="hidden sm:block">Partilhar</span>
             </Button>
 
-            {/* Active Streaming Indicator */}
-            <div className="flex items-center gap-2 bg-slate-50 border border-slate-150 px-3 py-1 rounded-full text-[10px] text-slate-500 font-bold uppercase tracking-wider">
+            <div className="flex items-center gap-1.5">
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={toggleMute}
+                className={`hover:bg-transparent! rounded-full h-8 px-3 gap-1.5 text-xs`}
+              >
+                {isMicMuted ?
+                  <MicOff className="w-3.5 h-3.5 text-red-650" />
+                  : <Mic className="w-3.5 h-3.5 text-slate-800" />}
+                <span className="hidden sm:block">
+                  {isMicMuted ? "Silenciado" : "Voz Ativa"}
+                </span>
+
+              </Button>
+            </div>
+          </div>
+
+        </div>
+
+        {/* Messages List Area */}
+        <div className="flex-1 overflow-y-auto p-4 min-h-0 bg-slate-50/30 scrollbar-thin">
+          <div className="max-w-3xl mx-auto w-full space-y-4">
+            {chatHistory.map((msg, i) => (
+              <div
+                key={i}
+                className={`flex flex-col message-bubble-animate ${msg.role === "user"
+                  ? "max-w-[85%] ml-auto items-end"
+                  : "w-full"
+                  }`}
+              >
+                {/* <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wide mb-1 px-1">
+                  {msg.role !== "user" && (
+                    <div className="flex items-center justify-start gap-1.5">
+                      <Bot className="w-4 h-4 text-slate-600" />
+                      Explicador
+                    </div>
+                  )}
+                </span> */}
+                <div
+                  className={`p-3.5 rounded-2xl text-base leading-relaxed ${msg.role === "user"
+                    ? "bg-cyan-500 text-white rounded-tr-none shadow-sm shadow-cyan-500/10"
+                    : "text-slate-700"
+                    }`}
+                >
+                  <div className="prose prose-slate max-w-none text-xs leading-relaxed">
+                    {msg.role === "assistant" ? (
+                      <StreamingMessage
+                        content={msg.content}
+                        active={activeStreamingMessageIndex === i}
+                      />
+                    ) : (
+                      <ReactMarkdown>{msg.content}</ReactMarkdown>
+                    )}
+                  </div>
+
+                  {msg.role === "assistant" && whiteboardData.summary && !showWhiteboard && i === chatHistory.length - 1 && (
+                    <button
+                      onClick={() => setWhiteboardData((prev) => ({ ...prev, show_whiteboard: true }))}
+                      className="mt-2.5 flex items-center gap-1.5 px-3 py-1.5 bg-cyan-50 hover:bg-cyan-100 text-cyan-600 text-[10px] font-bold rounded-full transition-all border border-cyan-100/50 cursor-pointer select-none"
+                    >
+                      <PenTool className="w-3.5 h-3.5 animate-pulse" />
+                      Ver no quadro
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+            {isGenerating && (
+              <div className="flex flex-col items-start max-w-[85%] mr-auto">
+                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wide mb-1 px-1">
+                  Explicador
+                </span>
+                <div className="p-3.5 rounded-2xl bg-white border border-slate-200 rounded-tl-none flex items-center gap-3 shadow-sm">
+                  <Loader2 className="w-4 h-4 animate-spin text-cyan-500" />
+                  <span className="text-xs text-slate-500 font-medium">Escrevendo e atualizando o quadro...</span>
+                </div>
+              </div>
+            )}
+          </div>
+          <div ref={chatEndRef} />
+        </div>
+
+        {/* Message Input — pill style matching the landing page */}
+        <form
+          onSubmit={handleSendMessage}
+          className={`p-3 overflow-hidden transition-all duration-500 cubic-bezier(0.16, 1, 0.3, 1) transform max-w-3xl mx-auto w-full ${isInputSubmitting ? "translate-y-14 opacity-0 scale-95" : "translate-y-0 opacity-100 scale-100"
+            }`}
+        >
+          <div className="flex items-center gap-2 bg-white border border-slate-200 focus-within:border-cyan-400 focus-within:ring-4 focus-within:ring-cyan-500/10 rounded-full px-4 py-1.5 shadow-sm transition-all duration-300">
+            <input
+              ref={chatInputRef}
+              placeholder={
+                isLockHolder
+                  ? "Pergunte ao explicador..."
+                  : currentLock
+                    ? `${currentLock.name} está a escrever...`
+                    : "Pegue o Lápis acima para escrever..."
+              }
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              disabled={!isLockHolder || isGenerating}
+              className="flex-1 h-10 bg-transparent text-slate-800 placeholder:text-slate-400 text-sm px-1 outline-none border-0 focus:ring-0 disabled:text-slate-400"
+            />
+
+            {/* Mic button */}
+            <button
+              type="button"
+              onClick={handleChatMic}
+              disabled={!isLockHolder || isGenerating}
+              title="Falar"
+              className="w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:text-cyan-600 hover:bg-cyan-50 disabled:opacity-40 transition-all duration-200 flex-shrink-0 cursor-pointer"
+            >
+              <Mic className="w-4 h-4" />
+            </button>
+
+            {/* Send button */}
+            <Button
+              type="submit"
+              disabled={!isLockHolder || !message.trim() || isGenerating}
+              className="w-8 h-8 p-0 bg-cyan-500 hover:bg-cyan-600 disabled:bg-slate-200 disabled:text-slate-400 text-white rounded-full flex items-center justify-center shadow-sm shadow-cyan-500/20 transition-all duration-200 flex-shrink-0"
+            >
               {isGenerating ? (
-                <>
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Send className="w-3.5 h-3.5" />
+              )}
+            </Button>
+          </div>
+        </form>
+      </div>
+
+      {/* Draggable Vertical Splitter */}
+      {showWhiteboard && !isMobile && (
+        <div
+          onPointerDown={handleSplitterPointerDown}
+          onPointerUp={handleSplitterPointerUp}
+          className="w-1.5 hover:w-2 bg-slate-200 hover:bg-cyan-500 cursor-col-resize transition-all shrink-0 z-40 relative h-full flex items-center justify-center group"
+        >
+          <div className="w-0.5 h-8 rounded-full bg-slate-400 group-hover:bg-white" />
+        </div>
+      )}
+
+      {/* RIGHT WORKSPACE: Dotted Whiteboard Summary Panel */}
+      {showWhiteboard && (
+        <div className={`flex-1 h-full bg-[#fafafa] flex flex-col justify-start relative overflow-hidden select-text animate-in fade-in slide-in-from-right duration-500 ${isMobile ? "p-4 w-full absolute inset-0 z-50" : "p-6 md:p-10"
+          }`}>
+
+          {/* Header of the Board */}
+          <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-200/60 shrink-0">
+            <div className="flex items-center gap-2">
+              <PenTool className="w-5 h-5 text-cyan-600" />
+              <h2 className="text-sm font-bold text-slate-700 tracking-wide">
+                Quadro
+              </h2>
+            </div>
+
+            <div className="flex items-center gap-3">
+
+              {/* Active Streaming Indicator */}
+              {isGenerating && (
+                <div className="flex items-center gap-2 bg-slate-50 border border-slate-150 px-3 py-1 rounded-full text-[10px] text-slate-500 font-bold uppercase tracking-wider">
                   <span className="w-2.5 h-2.5 rounded-full bg-cyan-500 animate-ping" />
                   <span className="text-cyan-600">Escrevendo...</span>
-                </>
-              ) : (
-                <>
-                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-                  <span>Quadro Atualizado</span>
-                </>
+                </div>
               )}
-            </div>
-          </div>
-        </div>
 
-        {/* Dotted blackboard writing sheet */}
-        <div className="flex-1 blackboard-grid overflow-y-auto font-handwriting text-slate-700 relative leading-relaxed scrollbar-thin">
-          {displayedBoardText ? (
-            <article className="prose max-w-none prose-slate font-handwriting prose-headings:font-handwriting prose-strong:font-handwriting text-slate-700 text-2xl md:text-3xl leading-loose">
-              <ReactMarkdown
-                components={{
-                  h1: ({ node, ...props }: any) => <h1 className="text-cyan-600 font-bold text-4xl md:text-5xl border-b-2 border-cyan-100/50 pb-3 mb-8" {...props} />,
-                  h2: ({ node, ...props }: any) => <h2 className="text-slate-850 font-bold text-3xl md:text-4xl mt-8 mb-4" {...props} />,
-                  h3: ({ node, ...props }: any) => <h3 className="text-slate-750 font-semibold text-2xl md:text-3xl mt-6 mb-3" {...props} />,
-                  li: ({ node, ...props }: any) => <li className="text-slate-650 my-2 md:my-3 list-disc pl-1 text-xl md:text-2xl" {...props} />,
-                  p: ({ node, ...props }: any) => <p className="text-slate-650 mb-6 text-xl md:text-2xl" {...props} />,
-                  strong: ({ node, ...props }: any) => <strong className="text-slate-900 font-bold text-xl md:text-2xl" {...props} />,
-                }}
+              {/* Close whiteboard panel */}
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={() => setWhiteboardData((prev) => ({ ...prev, show_whiteboard: false }))}
+                className="w-8 h-8 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 cursor-pointer"
+                title="Fechar Quadro"
               >
-                {displayedBoardText}
-              </ReactMarkdown>
-            </article>
-          ) : (
-            <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6 space-y-4">
-              <Pencil className="w-10 h-10 text-slate-350 stroke-[1.5] animate-bounce" />
-              <div>
-                <h3 className="text-slate-400 font-bold text-lg">Quadro em Branco</h3>
-                <p className="text-slate-400 text-xs mt-1 max-w-xs mx-auto">
-                  O resumo das ideias e cálculos será escrito aqui dinamicamente sempre que fizer uma pergunta ao explicador no chat lateral.
-                </p>
-              </div>
+                <X className="w-4 h-4" />
+              </Button>
             </div>
-          )}
-        </div>
-
-        {/* Local voice stream indicators */}
-        {localStream && (
-          <div className="absolute top-12 left-12 z-20 bg-white border border-emerald-300 px-3.5 py-2 rounded-full shadow-md flex items-center gap-2 text-slate-700 font-medium text-xs">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span>
-              {isMicMuted ? "Modo Ouvinte (Silenciado)" : "Chamada Ativa (Fala)"}
-            </span>
           </div>
-        )}
-      </div>
+
+          {/* Dotted blackboard writing sheet */}
+          <div className="flex-1 blackboard-grid overflow-y-auto font-handwriting text-slate-700 relative leading-relaxed scrollbar-thin">
+            {displayedBoardText ? (
+              <article className="prose max-w-none prose-slate font-handwriting prose-headings:font-handwriting prose-strong:font-handwriting text-slate-700 text-lg md:text-2xl leading-loose">
+                <ReactMarkdown
+                  components={{
+                    h1: ({ node, ...props }: any) => <h1 className="text-cyan-600 font-bold text-2xl md:text-4xl border-b-2 border-cyan-100/50 pb-2 mb-6" {...props} />,
+                    h2: ({ node, ...props }: any) => <h2 className="text-slate-850 font-bold text-xl md:text-3xl mt-6 mb-3" {...props} />,
+                    h3: ({ node, ...props }: any) => <h3 className="text-slate-750 font-semibold text-lg md:text-2xl mt-4 mb-2" {...props} />,
+                    li: ({ node, ...props }: any) => <li className="text-slate-650 my-1 md:my-2 list-disc pl-1 text-base md:text-xl" {...props} />,
+                    p: ({ node, ...props }: any) => <p className="text-slate-650 mb-4 text-base md:text-xl" {...props} />,
+                    strong: ({ node, ...props }: any) => <strong className="text-slate-900 font-bold text-base md:text-xl" {...props} />,
+                  }}
+                >
+                  {displayedBoardText}
+                </ReactMarkdown>
+              </article>
+            ) : (
+              <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6 space-y-4">
+                <Pencil className="w-10 h-10 text-slate-350 stroke-[1.5] animate-bounce" />
+                <div>
+                  <h3 className="text-slate-400 font-bold text-lg">Quadro em Branco</h3>
+                  <p className="text-slate-400 text-xs mt-1 max-w-xs mx-auto">
+                    O resumo das ideias e cálculos será escrito aqui dinamicamente sempre que fizer uma pergunta ao explicador no chat lateral.
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Local voice stream indicators
+          {localStream && (
+            <div className="absolute top-12 left-12 z-20 bg-white border border-emerald-300 px-3.5 py-2 rounded-full shadow-md flex items-center gap-2 text-slate-700 font-medium text-xs">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span>
+                {isMicMuted ? "Modo Ouvinte (Silenciado)" : "Chamada Ativa (Fala)"}
+              </span>
+            </div>
+          )} */}
+        </div>
+      )}
+      {/* Roster / Participants Modal */}
+      <Dialog open={showParticipantsModal} onOpenChange={setShowParticipantsModal}>
+        <DialogContent className="sm:max-w-md border-slate-200 bg-white text-slate-800 shadow-2xl rounded-2xl p-6">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold flex items-center gap-2 text-slate-800">
+              <Users className="w-5 h-5 text-cyan-600" />
+              Pessoas na Sala
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-3.5 mt-4">
+            {combinedRoster.map((member) => (
+              <div key={member.connectionId} className="flex items-center justify-between p-2 rounded-xl hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-100">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-full border border-slate-200 overflow-hidden bg-slate-100 flex items-center justify-center relative shadow-sm">
+                    {member.avatar ? (
+                      <img
+                        src={member.avatar.startsWith("http") ? member.avatar : `${process.env.NEXT_PUBLIC_API_URL}${member.avatar}`}
+                        alt={member.name}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <span className="text-sm font-bold text-slate-500 uppercase">
+                        {member.name[0]}
+                      </span>
+                    )}
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-sm text-slate-750 flex items-center gap-1.5">
+                      {member.name}
+                      {member.isSelf && (
+                        <span className="text-[9px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-md border border-slate-200/60 font-medium">
+                          Tu
+                        </span>
+                      )}
+                      {member.isOwner && (
+                        <span className="text-[9px] bg-cyan-50 text-cyan-600 px-1.5 py-0.5 rounded-md border border-cyan-100 font-bold">
+                          Anfitrião
+                        </span>
+                      )}
+                    </h4>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2.5">
+                  {/* Mic status */}
+                  <div className="flex items-center gap-1">
+                    {member.isMicOn ? (
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" title="Microfone ativo" />
+                    ) : (
+                      <span className="w-2 h-2 rounded-full bg-slate-350" title="Microfone desligado" />
+                    )}
+                    <span className="text-[10px] text-slate-400 font-semibold select-none">
+                      {member.isMicOn ? "A falar" : "Mudo"}
+                    </span>
+                  </div>
+
+                  {/* Listening status */}
+                  <div className="flex items-center gap-1 border-l border-slate-200 pl-2.5">
+                    {member.isListening ? (
+                      <Volume2 className="w-3.5 h-3.5 text-cyan-600 animate-pulse" title="A ouvir" />
+                    ) : (
+                      <Volume2 className="w-3.5 h-3.5 text-slate-350" title="Sem áudio" />
+                    )}
+                    <span className="text-[10px] text-slate-400 font-semibold select-none">
+                      {member.isListening ? "A ouvir" : "Sem áudio"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

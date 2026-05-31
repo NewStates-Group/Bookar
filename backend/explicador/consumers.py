@@ -12,6 +12,10 @@ from .models import ExplicadorRoom
 logger = logging.getLogger(__name__)
 User = get_user_model()
 
+# Server-side presence tracking: { room_uuid: { connection_id: { name, avatar, user_id, is_owner, is_mic_on, is_listening } } }
+_room_members = {}
+
+
 
 class ExplicadorConsumer(AsyncWebsocketConsumer):
     async def connect(self):
@@ -35,6 +39,44 @@ class ExplicadorConsumer(AsyncWebsocketConsumer):
         self.is_owner = self.user.is_authenticated and (self.room.owner_id == self.user.id)
         self.group_name = f"explicador_{self.room_uuid}"
 
+        # Resolve user name and avatar
+        self.user_name = (
+            f"{self.user.first_name} {self.user.last_name}".strip() or self.user.username 
+            if self.user.is_authenticated 
+            else "Visitante"
+        )
+        avatar_url = None
+        if self.user.is_authenticated and hasattr(self.user, 'avatar') and self.user.avatar:
+            try:
+                avatar_url = self.user.avatar.url
+            except Exception:
+                pass
+        self.user_avatar = avatar_url
+        self.user_id = self.user.id if self.user.is_authenticated else None
+
+        # Add to room members (evict stale connections from same user on reload)
+        if self.room_uuid not in _room_members:
+            _room_members[self.room_uuid] = {}
+        
+        if self.user_id is not None:
+            stale_ids = [
+                cid for cid, info in _room_members[self.room_uuid].items()
+                if info.get("user_id") == self.user_id
+            ]
+            for cid in stale_ids:
+                _room_members[self.room_uuid].pop(cid, None)
+                logger.info(f"Evicted stale connection {cid} for user {self.user_id} in room {self.room_uuid}")
+
+        _room_members[self.room_uuid][self.connection_id] = {
+            "connection_id": self.connection_id,
+            "name": self.user_name,
+            "avatar": self.user_avatar,
+            "user_id": self.user_id,
+            "is_owner": self.is_owner,
+            "is_mic_on": False,
+            "is_listening": True,
+        }
+
         # 2. Join room group
         await self.channel_layer.group_add(self.group_name, self.channel_name)
         await self.accept()
@@ -53,12 +95,6 @@ class ExplicadorConsumer(AsyncWebsocketConsumer):
         )
 
         # 4. Broadcast join event to all other members
-        user_name = (
-            f"{self.user.first_name} {self.user.last_name}".strip() or self.user.username 
-            if self.user.is_authenticated 
-            else "Visitante"
-        )
-        
         await self.channel_layer.group_send(
             self.group_name,
             {
@@ -66,14 +102,25 @@ class ExplicadorConsumer(AsyncWebsocketConsumer):
                 "message": {
                     "type": "user_joined",
                     "connection_id": self.connection_id,
-                    "name": user_name,
+                    "name": self.user_name,
                     "is_owner": self.is_owner,
+                    "avatar": self.user_avatar,
+                    "user_id": self.user_id,
                 },
             },
         )
 
+        # Broadcast the full current membership to sync all frontends
+        await self._broadcast_presence_sync()
+
     async def disconnect(self, close_code):
         if hasattr(self, "group_name"):
+            # Remove from presence tracking
+            if self.room_uuid in _room_members:
+                _room_members[self.room_uuid].pop(self.connection_id, None)
+                if not _room_members[self.room_uuid]:
+                    del _room_members[self.room_uuid]
+
             # Check if this connection held the lock
             self.room = await self.get_room(self.room_uuid)
             if self.room:
@@ -95,11 +142,6 @@ class ExplicadorConsumer(AsyncWebsocketConsumer):
                     )
 
             # Broadcast leave event
-            user_name = (
-                f"{self.user.first_name} {self.user.last_name}".strip() or self.user.username 
-                if self.user.is_authenticated 
-                else "Visitante"
-            )
             await self.channel_layer.group_send(
                 self.group_name,
                 {
@@ -107,10 +149,14 @@ class ExplicadorConsumer(AsyncWebsocketConsumer):
                     "message": {
                         "type": "user_left",
                         "connection_id": self.connection_id,
-                        "name": user_name,
+                        "name": getattr(self, "user_name", "Visitante"),
                     },
                 },
             )
+
+            # Broadcast the updated presence roster
+            await self._broadcast_presence_sync()
+
             await self.channel_layer.group_discard(self.group_name, self.channel_name)
 
     async def receive(self, text_data):
@@ -137,6 +183,8 @@ class ExplicadorConsumer(AsyncWebsocketConsumer):
             await self.handle_grab_lock(data)
         elif action_type == "release_lock":
             await self.handle_release_lock(data)
+        elif action_type == "audio_state":
+            await self.handle_audio_state(data)
 
     async def handle_grab_lock(self, data):
         """Allows a user to grab the chalk (lock) to write on the board."""
@@ -382,6 +430,43 @@ class ExplicadorConsumer(AsyncWebsocketConsumer):
                     "target_connection_id": data.get("target_connection_id"),
                     "sender_connection_id": self.connection_id,
                     "signal": data.get("signal"),
+                },
+            },
+        )
+
+    async def handle_audio_state(self, data):
+        """Broadcast a user's mic/audio state change to the room and update presence."""
+        is_mic_on = data.get("is_mic_on", False)
+        is_listening = data.get("is_listening", True)
+
+        # Update in-memory presence details
+        if self.room_uuid in _room_members and self.connection_id in _room_members[self.room_uuid]:
+            _room_members[self.room_uuid][self.connection_id]["is_mic_on"] = is_mic_on
+            _room_members[self.room_uuid][self.connection_id]["is_listening"] = is_listening
+
+        await self.channel_layer.group_send(
+            self.group_name,
+            {
+                "type": "broadcast_message",
+                "message": {
+                    "type": "audio_state",
+                    "connection_id": self.connection_id,
+                    "is_mic_on": is_mic_on,
+                    "is_listening": is_listening,
+                },
+            },
+        )
+
+    async def _broadcast_presence_sync(self):
+        """Broadcast the full presence roster to all members in the room."""
+        members = list(_room_members.get(self.room_uuid, {}).values())
+        await self.channel_layer.group_send(
+            self.group_name,
+            {
+                "type": "broadcast_message",
+                "message": {
+                    "type": "presence_sync",
+                    "members": members,
                 },
             },
         )

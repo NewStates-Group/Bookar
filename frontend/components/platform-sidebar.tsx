@@ -93,8 +93,6 @@ export function PlatformSidebar({
         method: "DELETE",
       });
       mutateRooms();
-      toast.success("Sala removida.");
-      // If currently inside this room, navigate back to explicador home
       if (pathname === `/app/explicador/${id}`) {
         router.push("/app/explicador");
       }
