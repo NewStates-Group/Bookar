@@ -1,0 +1,51 @@
+Copyright (c) 2026 NewStates Group. All rights reserved.
+
+PROPRIETARY SOFTWARE LICENSE
+
+This software and associated documentation files (the "Software") are the
+exclusive property of NewStates Group ("Licensor"). The Software includes,
+without limitation, the Bookar application, its source code, design assets,
+documentation, and all related materials in this repository.
+
+PERMITTED USE
+
+You may view, clone, or fork this repository only for personal, non-commercial,
+and non-production purposes, such as evaluation, learning, or contributing with
+the Licensor's prior written approval.
+
+RESTRICTIONS
+
+Without the Licensor's prior written permission, you may NOT:
+
+1. Use the Software, in whole or in part, for any commercial purpose;
+2. Sell, license, sublicense, rent, lease, or otherwise distribute the
+   Software or any derivative work;
+3. Deploy the Software in production or offer it as a service to third parties;
+4. Remove or alter copyright, trademark, or proprietary notices;
+5. Use the Software in a manner that competes with Bookar or NewStates Group;
+6. Reverse engineer, decompile, or disassemble the Software except where
+   expressly permitted by applicable law.
+
+CONTRIBUTIONS
+
+By submitting contributions to this repository, you grant NewStates Group a
+perpetual, worldwide, royalty-free license to use, modify, and distribute
+those contributions as part of the Software.
+
+NO WARRANTY
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+LICENSOR BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY ARISING FROM THE
+USE OF THE SOFTWARE.
+
+PERMISSION REQUESTS
+
+For commercial use, production deployment, sublicensing, or any use not
+expressly permitted above, contact:
+
+  NewStates Group
+  https://github.com/NewStates-Group/Bookar
+
+Unauthorized use may result in legal action.
