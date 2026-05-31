@@ -10,3 +10,9 @@ qnd alguem entrar na sala as mensagens antigas devem aparecer sem streaming elas
 a pagina fica fazendo streaming varias vezes sem necessidade, deve ser so para as mensagens sendo recebidas do websockets
 ao inves de aparecer 2 online apareceram as fotos de perfil uma atras das outras ate 3 e se ele clicar abrira um modal q mostra todos na sala, se o seu microfone esta ligado ou nao e se estao ouvindo ou nao
 qnd uma sala nova é criada as salas da sidebar devem ser actualizadas tambem
+
+
+==================
+MESMO APOS EU E A OUTRA PESSOA DA SALA ABRIRMOS O MICROFONE NAO CONSEGUIMOS OUVIR UM AO OUTRO, PQ? RESOLVE ISSO!
+
+ALEM DISSO AS PESSOAS QUE ESTAO NA SALA DEVEM APARECER PARa o dono e para os outros, todo deve poder saber quem esta na sala
