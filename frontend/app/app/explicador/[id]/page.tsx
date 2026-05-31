@@ -135,12 +135,23 @@ export default function ExplicadorRoomPage() {
   const [audioRequestPending, setAudioRequestPending] = useState(false);
   const [activeVoiceRequests, setActiveVoiceRequests] = useState<{ connectionId: string; name: string }[]>([]);
 
-  // WebSocket Ref
+  // WebSocket & WebRTC Refs (refs avoid stale closures in the WS handler)
   const socketRef = useRef<WebSocket | null>(null);
   const connectionIdRef = useRef<string | null>(null);
   const peerConnectionsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
+  const pendingIceCandidatesRef = useRef<Map<string, RTCIceCandidateInit[]>>(new Map());
+  const localStreamRef = useRef<MediaStream | null>(null);
+  const isMicMutedRef = useRef(true);
+  const isOwnerRef = useRef(false);
+  const participantsRef = useRef<Participant[]>([]);
+  const wsMessageHandlerRef = useRef<(data: any) => void>(() => {});
   const chatEndRef = useRef<HTMLDivElement>(null);
   const chatInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => { localStreamRef.current = localStream; }, [localStream]);
+  useEffect(() => { isMicMutedRef.current = isMicMuted; }, [isMicMuted]);
+  useEffect(() => { isOwnerRef.current = isOwner; }, [isOwner]);
+  useEffect(() => { participantsRef.current = participants; }, [participants]);
 
   // Load Handwriting Font
   useEffect(() => {
@@ -168,7 +179,9 @@ export default function ExplicadorRoomPage() {
         // Mute all tracks immediately — user starts silent
         stream.getAudioTracks().forEach((track) => { track.enabled = false; });
         if (!cancelled) {
+          localStreamRef.current = stream;
           setLocalStream(stream);
+          isMicMutedRef.current = true;
           setIsMicMuted(true);
           setAudioApproved(true);
         }
@@ -193,7 +206,7 @@ export default function ExplicadorRoomPage() {
       socket.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          handleWebSocketMessage(data);
+          wsMessageHandlerRef.current(data);
         } catch (err) {
           console.error("Error parsing websocket message", err);
         }
@@ -225,9 +238,104 @@ export default function ExplicadorRoomPage() {
   const closeAllPeerConnections = () => {
     peerConnectionsRef.current.forEach((pc) => pc.close());
     peerConnectionsRef.current.clear();
-    if (localStream) {
-      localStream.getTracks().forEach((track) => track.stop());
+    pendingIceCandidatesRef.current.clear();
+    const stream = localStreamRef.current;
+    if (stream) {
+      stream.getTracks().forEach((track) => track.stop());
+      localStreamRef.current = null;
     }
+  };
+
+  // Deterministic offerer to avoid WebRTC glare when both peers unmute at once
+  const shouldInitiateOffer = (myId: string, peerId: string) => myId > peerId;
+
+  const flushPendingIceCandidates = async (peerId: string, pc: RTCPeerConnection) => {
+    const pending = pendingIceCandidatesRef.current.get(peerId) || [];
+    pendingIceCandidatesRef.current.delete(peerId);
+    for (const candidate of pending) {
+      try {
+        await pc.addIceCandidate(new RTCIceCandidate(candidate));
+      } catch (e) {
+        console.error("Error flushing ICE candidate", e);
+      }
+    }
+  };
+
+  const createPeerConnection = (targetId: string): RTCPeerConnection => {
+    const pc = new RTCPeerConnection({
+      iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+    });
+
+    pc.onicecandidate = (event) => {
+      if (event.candidate) {
+        sendWSMessage({
+          type: "webrtc_signal",
+          target_connection_id: targetId,
+          signal: { type: "candidate", candidate: event.candidate },
+        });
+      }
+    };
+
+    pc.ontrack = (event) => {
+      const remoteStream = event.streams[0];
+      let audioEl = document.getElementById(`audio-${targetId}`) as HTMLAudioElement;
+
+      if (!audioEl) {
+        audioEl = document.createElement("audio");
+        audioEl.id = `audio-${targetId}`;
+        audioEl.autoplay = true;
+        document.body.appendChild(audioEl);
+      }
+
+      audioEl.srcObject = remoteStream;
+      audioEl.play().catch(() => {});
+    };
+
+    peerConnectionsRef.current.set(targetId, pc);
+    return pc;
+  };
+
+  const connectToPeer = async (peerId: string) => {
+    const myId = connectionIdRef.current;
+    if (!myId || peerId === myId) return;
+
+    const stream = localStreamRef.current;
+    if (!stream || isMicMutedRef.current) return;
+    if (!shouldInitiateOffer(myId, peerId)) return;
+
+    const existing = peerConnectionsRef.current.get(peerId);
+    if (existing && (existing.connectionState === "connected" || existing.connectionState === "connecting")) {
+      return;
+    }
+    if (existing && existing.signalingState !== "stable") {
+      existing.close();
+      peerConnectionsRef.current.delete(peerId);
+    }
+
+    try {
+      const pc = createPeerConnection(peerId);
+      stream.getTracks().forEach((track) => {
+        if (!pc.getSenders().some((s) => s.track === track)) {
+          pc.addTrack(track, stream);
+        }
+      });
+
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      sendWSMessage({
+        type: "webrtc_signal",
+        target_connection_id: peerId,
+        signal: { type: "offer", sdp: offer.sdp },
+      });
+    } catch (err) {
+      console.error(`Failed to connect to peer ${peerId}`, err);
+    }
+  };
+
+  const connectToAllPeers = () => {
+    participantsRef.current.forEach((p) => {
+      connectToPeer(p.connectionId);
+    });
   };
 
   useEffect(() => {
@@ -282,6 +390,7 @@ export default function ExplicadorRoomPage() {
         setConnectionId(data.connection_id);
         connectionIdRef.current = data.connection_id;
         setIsOwner(data.is_owner);
+        isOwnerRef.current = data.is_owner;
         if (data.whiteboard_data) {
           setWhiteboardData({
             ...data.whiteboard_data,
@@ -301,6 +410,24 @@ export default function ExplicadorRoomPage() {
 
         // Room is now fully ready
         setRoomReady(true);
+
+        // Sync participants from welcome payload (other members already in room)
+        if (data.members) {
+          const membersList = data.members
+            .filter((m: any) => m.connection_id !== connectionIdRef.current)
+            .map((m: any) => ({
+              connectionId: m.connection_id,
+              name: m.name,
+              isOwner: m.is_owner,
+              hasAudio: m.is_mic_on || false,
+              avatar: m.avatar,
+              userId: m.user_id,
+              isMicOn: m.is_mic_on || false,
+              isListening: m.is_listening !== false,
+            }));
+          setParticipants(membersList);
+          participantsRef.current = membersList;
+        }
 
         // Auto-submit initial prompt if present in URL query params (ChatGPT onboarding)
         if (typeof window !== "undefined") {
@@ -341,11 +468,13 @@ export default function ExplicadorRoomPage() {
             },
           ];
         });
+        if (!isMicMutedRef.current && localStreamRef.current) {
+          connectToPeer(data.connection_id);
+        }
         break;
 
       case "presence_sync":
         if (data.members) {
-          // Filter out our own connection from the participants list
           const membersList = data.members
             .filter((m: any) => m.connection_id !== connectionIdRef.current)
             .map((m: any) => ({
@@ -359,6 +488,10 @@ export default function ExplicadorRoomPage() {
               isListening: m.is_listening !== false,
             }));
           setParticipants(membersList);
+          participantsRef.current = membersList;
+          if (!isMicMutedRef.current && localStreamRef.current) {
+            membersList.forEach((m: Participant) => connectToPeer(m.connectionId));
+          }
         }
         break;
 
@@ -377,6 +510,7 @@ export default function ExplicadorRoomPage() {
         if (peerConnectionsRef.current.has(data.connection_id)) {
           peerConnectionsRef.current.get(data.connection_id)?.close();
           peerConnectionsRef.current.delete(data.connection_id);
+          pendingIceCandidatesRef.current.delete(data.connection_id);
           const el = document.getElementById(`audio-${data.connection_id}`);
           el?.remove();
         }
@@ -409,7 +543,7 @@ export default function ExplicadorRoomPage() {
         break;
 
       case "voice_request":
-        if (isOwner) {
+        if (isOwnerRef.current) {
           toast.info(`${data.name} solicitou entrar na chamada de voz.`);
           setActiveVoiceRequests((prev) => {
             if (prev.some((r) => r.connectionId === data.sender_connection_id)) return prev;
@@ -419,7 +553,7 @@ export default function ExplicadorRoomPage() {
         break;
 
       case "voice_response":
-        if (data.target_connection_id === connectionId) {
+        if (data.target_connection_id === connectionIdRef.current) {
           setAudioRequestPending(false);
           if (data.allowed) {
             setAudioApproved(true);
@@ -432,7 +566,7 @@ export default function ExplicadorRoomPage() {
         break;
 
       case "webrtc_signal":
-        if (data.target_connection_id === connectionId) {
+        if (data.target_connection_id === connectionIdRef.current) {
           await handleWebRTCSignal(data.sender_connection_id, data.signal);
         }
         break;
@@ -443,21 +577,32 @@ export default function ExplicadorRoomPage() {
     }
   };
 
-  // WebRTC
+  // WebRTC signal handling
   const handleWebRTCSignal = async (senderId: string, signal: any) => {
     let pc = peerConnectionsRef.current.get(senderId);
 
-    if (!pc) {
-      pc = createPeerConnection(senderId);
-    }
-
     if (signal.type === "offer") {
+      const myId = connectionIdRef.current;
+      if (myId && shouldInitiateOffer(myId, senderId) && pc?.signalingState === "have-local-offer") {
+        return;
+      }
+
+      if (!pc) {
+        pc = createPeerConnection(senderId);
+      } else if (pc.signalingState === "have-local-offer") {
+        await pc.setLocalDescription({ type: "rollback" } as RTCSessionDescriptionInit);
+      }
+
       await pc.setRemoteDescription(new RTCSessionDescription(signal));
 
-      let stream = localStream;
+      let stream = localStreamRef.current;
       if (!stream) {
         try {
           stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          stream.getAudioTracks().forEach((track) => {
+            track.enabled = !isMicMutedRef.current;
+          });
+          localStreamRef.current = stream;
           setLocalStream(stream);
         } catch (err) {
           console.warn("Failed to capture microphone on offer", err);
@@ -465,10 +610,9 @@ export default function ExplicadorRoomPage() {
       }
 
       if (stream) {
-        const senders = pc.getSenders();
         stream.getTracks().forEach((track) => {
-          if (!senders.some((s) => s.track === track)) {
-            pc.addTrack(track, stream);
+          if (!pc!.getSenders().some((s) => s.track === track)) {
+            pc!.addTrack(track, stream!);
           }
         });
       }
@@ -481,54 +625,40 @@ export default function ExplicadorRoomPage() {
         signal: { type: "answer", sdp: answer.sdp },
       });
 
+      await flushPendingIceCandidates(senderId, pc);
     } else if (signal.type === "answer") {
+      if (!pc) return;
       await pc.setRemoteDescription(new RTCSessionDescription(signal));
+      await flushPendingIceCandidates(senderId, pc);
     } else if (signal.type === "candidate") {
-      try {
-        await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
-      } catch (e) {
-        console.error("Error adding received ice candidate", e);
+      if (!pc) {
+        pc = createPeerConnection(senderId);
+      }
+      if (pc.remoteDescription) {
+        try {
+          await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
+        } catch (e) {
+          console.error("Error adding received ice candidate", e);
+        }
+      } else {
+        const pending = pendingIceCandidatesRef.current.get(senderId) || [];
+        pending.push(signal.candidate);
+        pendingIceCandidatesRef.current.set(senderId, pending);
       }
     }
   };
 
-  const createPeerConnection = (targetId: string): RTCPeerConnection => {
-    const pc = new RTCPeerConnection({
-      iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
-    });
-
-    pc.onicecandidate = (event) => {
-      if (event.candidate) {
-        sendWSMessage({
-          type: "webrtc_signal",
-          target_connection_id: targetId,
-          signal: { type: "candidate", candidate: event.candidate },
-        });
-      }
-    };
-
-    pc.ontrack = (event) => {
-      const remoteStream = event.streams[0];
-      let audioEl = document.getElementById(`audio-${targetId}`) as HTMLAudioElement;
-
-      if (!audioEl) {
-        audioEl = document.createElement("audio");
-        audioEl.id = `audio-${targetId}`;
-        audioEl.autoplay = true;
-        document.body.appendChild(audioEl);
-      }
-
-      audioEl.srcObject = remoteStream;
-    };
-
-    peerConnectionsRef.current.set(targetId, pc);
-    return pc;
-  };
-
   const startLocalAudio = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      setLocalStream(stream);
+      let stream = localStreamRef.current;
+      if (!stream) {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        localStreamRef.current = stream;
+        setLocalStream(stream);
+      }
+      stream.getAudioTracks().forEach((track) => { track.enabled = true; });
+      isMicMutedRef.current = false;
+      setIsMicMuted(false);
 
       sendWSMessage({
         type: "audio_state",
@@ -536,25 +666,7 @@ export default function ExplicadorRoomPage() {
         is_listening: true,
       });
 
-      // Initiate WebRTC mesh connections with everyone in the room
-      participants.forEach(async (p) => {
-        try {
-          const pc = createPeerConnection(p.connectionId);
-          stream.getTracks().forEach((track) => pc.addTrack(track, stream));
-
-          const offer = await pc.createOffer();
-          await pc.setLocalDescription(offer);
-
-          sendWSMessage({
-            type: "webrtc_signal",
-            target_connection_id: p.connectionId,
-            signal: { type: "offer", sdp: offer.sdp },
-          });
-        } catch (err) {
-          console.error(`Failed to connect peer connection with ${p.name}`, err);
-        }
-      });
-
+      connectToAllPeers();
       toast.success("Microfone ativado!");
     } catch (err) {
       console.error("Error accessing microphone", err);
@@ -564,8 +676,15 @@ export default function ExplicadorRoomPage() {
 
   const startHostAudio = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      setLocalStream(stream);
+      let stream = localStreamRef.current;
+      if (!stream) {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        localStreamRef.current = stream;
+        setLocalStream(stream);
+      }
+      stream.getAudioTracks().forEach((track) => { track.enabled = true; });
+      isMicMutedRef.current = false;
+      setIsMicMuted(false);
       setAudioApproved(true);
 
       sendWSMessage({
@@ -574,25 +693,7 @@ export default function ExplicadorRoomPage() {
         is_listening: true,
       });
 
-      // Host initiates WebRTC mesh connections with everyone in the room
-      participants.forEach(async (p) => {
-        try {
-          const pc = createPeerConnection(p.connectionId);
-          stream.getTracks().forEach((track) => pc.addTrack(track, stream));
-
-          const offer = await pc.createOffer();
-          await pc.setLocalDescription(offer);
-
-          sendWSMessage({
-            type: "webrtc_signal",
-            target_connection_id: p.connectionId,
-            signal: { type: "offer", sdp: offer.sdp },
-          });
-        } catch (err) {
-          console.error(`Failed to connect peer connection with ${p.name}`, err);
-        }
-      });
-
+      connectToAllPeers();
       toast.success("Canal de voz ativado!");
     } catch (err) {
       console.error("Error accessing microphone", err);
@@ -601,41 +702,29 @@ export default function ExplicadorRoomPage() {
   };
 
   const toggleMute = () => {
-    if (localStream) {
-      const nextMuted = !isMicMuted;
-      localStream.getAudioTracks().forEach((track) => {
-        track.enabled = !nextMuted;
-      });
-      setIsMicMuted(nextMuted);
+    const stream = localStreamRef.current;
+    if (!stream) return;
 
-      sendWSMessage({
-        type: "audio_state",
-        is_mic_on: !nextMuted,
-        is_listening: true,
-      });
+    const nextMuted = !isMicMutedRef.current;
+    stream.getAudioTracks().forEach((track) => {
+      track.enabled = !nextMuted;
+    });
+    isMicMutedRef.current = nextMuted;
+    setIsMicMuted(nextMuted);
 
-      // On first unmute, establish WebRTC mesh connections with all participants
-      if (!nextMuted && peerConnectionsRef.current.size === 0 && participants.length > 0) {
-        participants.forEach(async (p) => {
-          try {
-            const pc = createPeerConnection(p.connectionId);
-            localStream.getTracks().forEach((track) => pc.addTrack(track, localStream));
+    sendWSMessage({
+      type: "audio_state",
+      is_mic_on: !nextMuted,
+      is_listening: true,
+    });
 
-            const offer = await pc.createOffer();
-            await pc.setLocalDescription(offer);
-
-            sendWSMessage({
-              type: "webrtc_signal",
-              target_connection_id: p.connectionId,
-              signal: { type: "offer", sdp: offer.sdp },
-            });
-          } catch (err) {
-            console.error(`Failed to connect peer with ${p.name}`, err);
-          }
-        });
-      }
+    if (!nextMuted) {
+      connectToAllPeers();
     }
   };
+
+  // Keep WS handler ref fresh so socket.onmessage never uses a stale closure
+  wsMessageHandlerRef.current = handleWebSocketMessage;
 
   // 3. Message sending (restricted to lock holder)
   const handleSendMessage = (e: React.FormEvent) => {
@@ -876,7 +965,7 @@ export default function ExplicadorRoomPage() {
               <Bot className="w-5 h-5 text-cyan-600" />
               Explicador
             </span>
-            {combinedRoster.length > 1 ? (
+            {combinedRoster.length >= 1 ? (
               <button
                 onClick={() => setShowParticipantsModal(true)}
                 className="flex items-center -space-x-1.5 hover:opacity-90 transition-opacity bg-slate-100 hover:bg-slate-200/80 px-2.5 py-1 rounded-full border border-slate-200/60 cursor-pointer ml-2"
@@ -906,9 +995,8 @@ export default function ExplicadorRoomPage() {
                   {combinedRoster.length}
                 </span>
               </button>
-            ) : (
-              <span className={`w-2 h-2 rounded-full ml-2 ${isConnected ? "bg-emerald-500 animate-pulse" : "bg-red-500"}`} />
-            )}
+            ) : null}
+            <span className={`w-2 h-2 rounded-full ml-1 ${isConnected ? "bg-emerald-500 animate-pulse" : "bg-red-500"}`} />
           </div>
           <div className="flex items-center gap-1">
             <div>

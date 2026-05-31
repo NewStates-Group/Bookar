@@ -82,6 +82,7 @@ class ExplicadorConsumer(AsyncWebsocketConsumer):
         await self.accept()
 
         # 3. Send welcome payload to newly connected user
+        members = list(_room_members.get(self.room_uuid, {}).values())
         await self.send(
             text_data=json.dumps(
                 {
@@ -90,6 +91,7 @@ class ExplicadorConsumer(AsyncWebsocketConsumer):
                     "is_owner": self.is_owner,
                     "whiteboard_data": self.room.whiteboard_data,
                     "chat_history": self.room.chat_history,
+                    "members": members,
                 }
             )
         )
