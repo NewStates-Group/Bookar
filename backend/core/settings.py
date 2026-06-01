@@ -22,6 +22,8 @@ SECRET_KEY = env("SECRET_KEY")
 
 DEBUG = env("DEBUG")
 
+ENV = env.str("ENV", default="prod")
+
 ALLOWED_HOSTS = env.list("ALLOWED_HOSTS")
 
 INSTALLED_APPS = [
@@ -92,7 +94,7 @@ CHANNEL_LAYERS = {
                     "address": env.str("REDIS_URL"),
                     "ssl_cert_reqs": None,
                 }
-                if not DEBUG
+                if ENV == "prod"
                 else env.str("REDIS_URL")
             ],
         },
