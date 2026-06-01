@@ -884,12 +884,16 @@ export default function ExplicadorRoomPage() {
     return u?.name || "Eu";
   };
 
-  // 3. Message sending (restricted to lock holder) — UI otimista
+  // 3. Message sending — lock required only for @explicador (tutor) messages
   const submitChatMessage = (rawMessage: string) => {
     const trimmed = rawMessage.trim();
     if (!trimmed || isGenerating) return;
 
     const mentionsTutor = messageMentionsExplicador(trimmed);
+    if (mentionsTutor && !isLockHolder) {
+      toast.error("Pega o lápis primeiro para falar com o explicador.");
+      return;
+    }
 
     setChatHistory((prev) => [
       ...prev,
@@ -917,7 +921,11 @@ export default function ExplicadorRoomPage() {
   };
 
   const handleMentionExplicador = () => {
-    if (!isLockHolder || isGenerating) return;
+    if (isGenerating) return;
+    if (!isLockHolder) {
+      toast.error("Pega o lápis primeiro para falar com o explicador.");
+      return;
+    }
 
     const withMention = ensureExplicadorMention(message);
     setMessage(withMention);
@@ -1195,7 +1203,7 @@ export default function ExplicadorRoomPage() {
                 <div onClick={grabLock} className="cursor-pointer gap-1 flex items-center justify-between text-xs px-1 text-slate-800">
                   <Pencil className="w-3.5 h-3.5 text-slate-800" />
                   <span className="hidden sm:block flex items-center gap-1.5 font-medium">
-                    Lápis livre
+                    Lápis (tutor)
                   </span>
                 </div>
               ) : isLockHolder ? (
@@ -1330,15 +1338,15 @@ export default function ExplicadorRoomPage() {
             <input
               ref={chatInputRef}
               placeholder={
-                isLockHolder
-                  ? "Escreve no chat... usa @explicador para o tutor responder"
-                  : currentLock
-                    ? `${currentLock.name} está a escrever...`
-                    : "Pegue o Lápis acima para escrever..."
+                isGenerating
+                  ? "A aguardar resposta do explicador..."
+                  : mentionsExplicadorInInput && !isLockHolder
+                    ? "Pega o lápis para falar com o explicador"
+                    : "Escreve no chat com os outros..."
               }
               value={message}
               onChange={(e) => setMessage(e.target.value)}
-              disabled={!isLockHolder || isGenerating}
+              disabled={isGenerating}
               className="flex-1 h-10 bg-transparent text-slate-800 placeholder:text-slate-400 text-sm px-1 outline-none border-0 focus:ring-0 disabled:text-slate-400"
             />
 
@@ -1346,7 +1354,7 @@ export default function ExplicadorRoomPage() {
             <button
               type="button"
               onClick={handleChatMic}
-              disabled={!isLockHolder || isGenerating}
+              disabled={isGenerating}
               title="Falar"
               className="w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:text-cyan-600 hover:bg-cyan-50 disabled:opacity-40 transition-all duration-200 flex-shrink-0 cursor-pointer"
             >
@@ -1356,8 +1364,8 @@ export default function ExplicadorRoomPage() {
             <button
               type="button"
               onClick={handleMentionExplicador}
-              disabled={!isLockHolder || isGenerating}
-              title="Mencionar @explicador e pedir resposta"
+              disabled={isGenerating}
+              title="Mencionar @explicador e pedir resposta (precisas do lápis)"
               className={`w-8 h-8 flex items-center justify-center rounded-full transition-all duration-200 flex-shrink-0 cursor-pointer disabled:opacity-40 ${
                 mentionsExplicadorInInput
                   ? "bg-cyan-100 text-cyan-700 ring-2 ring-cyan-300/60"
@@ -1370,7 +1378,11 @@ export default function ExplicadorRoomPage() {
             {/* Send button */}
             <Button
               type="submit"
-              disabled={!isLockHolder || !message.trim() || isGenerating}
+              disabled={
+                !message.trim() ||
+                isGenerating ||
+                (mentionsExplicadorInInput && !isLockHolder)
+              }
               className="w-8 h-8 p-0 bg-cyan-500 hover:bg-cyan-600 disabled:bg-slate-200 disabled:text-slate-400 text-white rounded-full flex items-center justify-center shadow-sm shadow-cyan-500/20 transition-all duration-200 flex-shrink-0"
             >
               {isGenerating ? (

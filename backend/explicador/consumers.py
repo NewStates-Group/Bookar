@@ -165,7 +165,7 @@ class ExplicadorConsumer(AsyncWebsocketConsumer):
             await self.handle_request_presence()
 
     async def handle_grab_lock(self, data):
-        """Allows a user to grab the chalk (lock) to write on the board."""
+        """Allows a user to grab the pencil (lock) to send messages to the tutor."""
         # Refresh room data
         self.room = await self.get_room(self.room_uuid)
         if not self.room:
@@ -223,19 +223,9 @@ class ExplicadorConsumer(AsyncWebsocketConsumer):
             )
 
     async def handle_chat_message(self, data):
-        """Processes a chat message from the lock holder and queries AI."""
-        # Refresh room data to get latest lock state
+        """Processes chat messages. Lock is required only for @explicador (tutor) messages."""
         self.room = await self.get_room(self.room_uuid)
         if not self.room:
-            return
-
-        lock = self.room.whiteboard_data.get("lock")
-        if not lock or lock.get("connection_id") != self.connection_id:
-            await self.send(
-                text_data=json.dumps(
-                    {"type": "error", "message": "Você precisa pegar o Giz primeiro para poder falar com a IA."}
-                )
-            )
             return
 
         message_content = data.get("message", "").strip()
@@ -243,10 +233,24 @@ class ExplicadorConsumer(AsyncWebsocketConsumer):
             return
 
         mentions_tutor = message_mentions_explicador(message_content)
-        prompt_for_ai = strip_explicador_mention(message_content) if mentions_tutor else ""
+        lock = self.room.whiteboard_data.get("lock")
 
-        # 1. Update chat history with user message (always visible in the room)
-        user_name = lock.get("name", "Usuário")
+        if mentions_tutor:
+            if not lock or lock.get("connection_id") != self.connection_id:
+                await self.send(
+                    text_data=json.dumps(
+                        {
+                            "type": "error",
+                            "message": "Precisas de pegar o lápis primeiro para falar com o explicador.",
+                        }
+                    )
+                )
+                return
+            user_name = lock.get("name", "Usuário")
+        else:
+            user_name = self.user_name
+
+        prompt_for_ai = strip_explicador_mention(message_content) if mentions_tutor else ""
         user_msg = {"role": "user", "content": f"**[{user_name}]**: {message_content}"}
         self.room.chat_history.append(user_msg)
         await self.save_room()
