@@ -90,7 +90,9 @@ REDIS_URL = env.str("REDIS_URL")
 PROD_REDIS_URL = REDIS_URL + env.str("REDIS_URL_PARAMS", default="/?ssl_cert_reqs=CERT_NONE")
 
 CACHES = {
-    "default": env.cache_url_config(PROD_REDIS_URL if ENV == "prod" else REDIS_URL)
+    # "default": env.cache_url_config(PROD_REDIS_URL if ENV == "prod" else REDIS_URL)
+        "default": env.cache_url_config(REDIS_URL)
+
 }
 
 CHANNEL_LAYERS = {
