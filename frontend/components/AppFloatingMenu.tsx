@@ -16,6 +16,13 @@ import { mutate } from "swr";
 import { toast } from "sonner";
 import { apiRequest } from "@/lib/api";
 import { useNotebook } from "@/context/NotebookContext";
+import {
+  platformDialog,
+  platformDialogHeaderIcon,
+  platformFab,
+  platformFabOpen,
+  platformQuickAction,
+} from "@/lib/platform-ui";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -99,7 +106,7 @@ export function AppFloatingMenu() {
 
   return (
     <>
-      <div className="fixed bottom-6 right-6 z-40 flex flex-col items-end gap-3">
+      <div className="fixed bottom-6 right-6 z-40 flex flex-col items-end gap-2.5">
         {menuOpen && (
           <div className="flex flex-col gap-2 animate-in fade-in slide-in-from-bottom-2 duration-200">
             <button
@@ -108,14 +115,18 @@ export function AppFloatingMenu() {
                 setMenuOpen(false);
                 openCaderno();
               }}
-              className="flex items-center gap-3 pl-4 pr-5 py-3 rounded-2xl bg-white border border-slate-200/80 shadow-lg shadow-slate-200/50 hover:border-amber-200 hover:bg-amber-50/50 transition-all text-left min-w-[200px] cursor-pointer"
+              className={platformQuickAction}
             >
-              <span className="w-9 h-9 rounded-xl bg-amber-100 flex items-center justify-center shrink-0">
-                <BookMarked className="w-4 h-4 text-amber-700" />
+              <span className={platformDialogHeaderIcon}>
+                <BookMarked className="w-4 h-4 text-cyan-600" />
               </span>
               <span>
-                <span className="block text-sm font-bold text-slate-800">Caderno de Notas</span>
-                <span className="block text-[11px] text-slate-500">Folhas de estudo</span>
+                <span className="block text-sm font-semibold text-slate-800">
+                  Caderno de Notas
+                </span>
+                <span className="block text-[11px] text-slate-500 font-medium">
+                  Folhas de estudo
+                </span>
               </span>
             </button>
 
@@ -125,14 +136,16 @@ export function AppFloatingMenu() {
                 setMenuOpen(false);
                 setExplicadorOpen(true);
               }}
-              className="flex items-center gap-3 pl-4 pr-5 py-3 rounded-2xl bg-white border border-slate-200/80 shadow-lg shadow-slate-200/50 hover:border-cyan-200 hover:bg-cyan-50/50 transition-all text-left min-w-[200px] cursor-pointer"
+              className={platformQuickAction}
             >
-              <span className="w-9 h-9 rounded-xl bg-cyan-100 flex items-center justify-center shrink-0">
-                <Bot className="w-4 h-4 text-cyan-700" />
+              <span className={platformDialogHeaderIcon}>
+                <Bot className="w-4 h-4 text-cyan-600" />
               </span>
               <span>
-                <span className="block text-sm font-bold text-slate-800">Explicador</span>
-                <span className="block text-[11px] text-slate-500">Tira dúvidas com IA</span>
+                <span className="block text-sm font-semibold text-slate-800">Explicador</span>
+                <span className="block text-[11px] text-slate-500 font-medium">
+                  Tira dúvidas com IA
+                </span>
               </span>
             </button>
           </div>
@@ -141,39 +154,41 @@ export function AppFloatingMenu() {
         <button
           type="button"
           onClick={() => setMenuOpen((v) => !v)}
-          title="Ferramentas rápidas"
-          aria-label="Ferramentas rápidas"
+          title="Ferramentas de IA"
+          aria-label="Ferramentas de IA"
           aria-expanded={menuOpen}
-          className={`w-14 h-14 rounded-full text-white shadow-lg flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer ${
-            menuOpen
-              ? "bg-slate-700 hover:bg-slate-800 shadow-slate-400/30 rotate-0"
-              : "bg-gradient-to-br from-cyan-500 to-cyan-600 hover:from-cyan-600 hover:to-cyan-700 shadow-cyan-500/30"
-          }`}
+          className={menuOpen ? platformFabOpen : platformFab}
         >
-          {menuOpen ? <Plus className="w-7 h-7 rotate-45" /> : <Sparkles className="w-7 h-7" />}
+          {menuOpen ? (
+            <Plus className="w-6 h-6 rotate-45" />
+          ) : (
+            <span className="relative flex items-center justify-center">
+              <span className="absolute inset-0 rounded-2xl bg-gradient-to-br from-cyan-400/20 to-blue-500/10 blur-sm" />
+              <Sparkles className="w-6 h-6 relative text-cyan-600" />
+            </span>
+          )}
         </button>
       </div>
 
       <Dialog open={explicadorOpen} onOpenChange={handleExplicadorOpenChange}>
         <DialogContent
-          className="sm:max-w-lg border-slate-200 bg-white text-slate-800 shadow-2xl rounded-2xl"
+          className={`sm:max-w-lg ${platformDialog} p-6`}
           onOpenAutoFocus={(e) => {
             e.preventDefault();
             inputRef.current?.focus();
           }}
         >
-          <DialogHeader>
-            <DialogTitle className="text-xl font-bold flex items-center gap-2 text-slate-800">
-              <Bot className="w-5 h-5 text-cyan-600" />
+          <DialogHeader className="flex items-center justify-center">
+            <DialogTitle className="text-lg font-bold flex items-center gap-2.5 text-slate-800">
               Explicador
             </DialogTitle>
-            <DialogDescription className="text-sm text-slate-500">
+            <DialogDescription className="text-sm text-center text-slate-500">
               Escreve a tua dúvida e abrimos uma sala para te explicar o assunto.
             </DialogDescription>
           </DialogHeader>
 
-          <form onSubmit={handleSubmitExplicador} className="mt-2">
-            <div className="flex items-center gap-2 bg-white border border-slate-200 focus-within:border-cyan-400 focus-within:ring-4 focus-within:ring-cyan-500/10 rounded-full px-4 py-2 shadow-sm transition-all duration-300">
+          <form onSubmit={handleSubmitExplicador} className="mt-4">
+            <div className="flex items-center gap-2 bg-white border border-slate-200/80 focus-within:border-cyan-400 focus-within:ring-4 focus-within:ring-cyan-500/10 rounded-full px-4 py-2 shadow-sm transition-all">
               <input
                 ref={inputRef}
                 placeholder="Qual é a tua dúvida?"
@@ -188,7 +203,7 @@ export function AppFloatingMenu() {
                 onClick={handleMic}
                 disabled={isCreating}
                 title="Falar"
-                className="w-9 h-9 flex items-center justify-center rounded-full text-slate-400 hover:text-cyan-600 hover:bg-cyan-50 transition-all duration-200 flex-shrink-0 cursor-pointer"
+                className="w-9 h-9 flex items-center justify-center rounded-full text-slate-400 hover:text-cyan-600 hover:bg-cyan-50 transition-all flex-shrink-0 cursor-pointer"
               >
                 <Mic className="w-4 h-4" />
               </button>
@@ -196,7 +211,7 @@ export function AppFloatingMenu() {
               <Button
                 type="submit"
                 disabled={isCreating || !prompt.trim()}
-                className="w-9 h-9 p-0 bg-cyan-500 hover:bg-cyan-600 disabled:bg-slate-200 disabled:text-slate-400 text-white rounded-full flex items-center justify-center shadow-sm shadow-cyan-500/20 transition-all duration-200 flex-shrink-0"
+                className="w-9 h-9 p-0 bg-cyan-500 hover:bg-cyan-600 disabled:bg-slate-200 disabled:text-slate-400 text-white rounded-full flex items-center justify-center shadow-sm shadow-cyan-500/20 flex-shrink-0"
               >
                 {isCreating ? (
                   <Loader2 className="w-4 h-4 animate-spin" />

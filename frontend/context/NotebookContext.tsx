@@ -86,7 +86,6 @@ export function NotebookProvider({ children }: { children: React.ReactNode }) {
           refreshFolhas();
           setEditorFolhaId(created.id);
           setCadernoOpen(false);
-          toast.success("Folha criada para este nó.");
         } catch (err: any) {
           toast.error(err.message || "Erro ao criar folha de anotação.");
         }

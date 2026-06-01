@@ -31,8 +31,9 @@ import {
   Check,
   Download,
   Users,
-  StickyNote,
+  BookMarked,
 } from "lucide-react";
+import { platformSegmentTab } from "@/lib/platform-ui";
 import Link from "next/link";
 import { useEffect, useState, useRef } from "react";
 import useSWR from "swr";
@@ -648,14 +649,14 @@ export default function MindMapDetailPage() {
       <div className="max-w-7xl mx-auto space-y-8">
 
         {/* Back and View Toggle Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex flex-row sm:flex-row sm:items-center justify-between gap-4">
           <Link href="/app/mind-maps">
             <Button
               variant="ghost"
               className="pl-0 hover:pl-2 transition-all gap-2 group text-muted-foreground hover:text-foreground"
             >
               <ArrowLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" />
-              Voltar para Mapas Mentais
+              Voltar
             </Button>
           </Link>
 
@@ -670,7 +671,7 @@ export default function MindMapDetailPage() {
                 }`}
             >
               <Network className="w-3.5 h-3.5" />
-              {showRoadmap ? "Ocultar Trilha" : "Ver Trilha / Mapa"}
+              <span className="hidden md:block">{showRoadmap ? "Ocultar Trilha" : "Ver Trilha / Mapa"}</span>
             </Button>
 
             {showRoadmap && (
@@ -685,7 +686,7 @@ export default function MindMapDetailPage() {
                     }`}
                 >
                   <Tv className="w-3.5 h-3.5" />
-                  Mapa Canvas
+                  <span className="hidden md:block">Mapa Canvas</span>
                 </Button>
                 <Button
                   size="sm"
@@ -695,7 +696,7 @@ export default function MindMapDetailPage() {
                     }`}
                 >
                   <List className="w-3.5 h-3.5" />
-                  Visualização em Lista
+                  <span className="hidden md:block">Visualização em Lista</span>
                 </Button>
 
                 {viewMode === "canvas" && (Object.keys(customPositions).length > 0 || Object.keys(customSizes).length > 0) && (
@@ -711,7 +712,8 @@ export default function MindMapDetailPage() {
                       className="rounded-full gap-1.5 h-8 text-xs font-bold px-3 text-cyan-600 hover:text-cyan-750 hover:bg-cyan-50/50 transition-all duration-300 animate-fade-in"
                     >
                       <Sparkles className="w-3.5 h-3.5 text-cyan-500 animate-pulse" />
-                      Resetar Mapa
+                      Resetar 
+                      <span className="hidden md:block">Resetar Mapa</span>
                     </Button>
                   </>
                 )}
@@ -729,7 +731,7 @@ export default function MindMapDetailPage() {
                     className="rounded-full gap-1.5 h-8 text-xs font-bold px-3 text-slate-650 hover:text-slate-800 hover:bg-slate-100/80 transition-all duration-300"
                   >
                     <Share2 className="w-3.5 h-3.5 text-cyan-500 animate-pulse" />
-                    Partilhar
+                    <span className="hidden md:block">Partilhar</span>
                   </Button>
                   
                   {/* Share Dropdown Tooltip */}
@@ -1285,45 +1287,39 @@ export default function MindMapDetailPage() {
                           </div>
                         )}
 
-                        <div className="flex border-b border-slate-100 bg-slate-50/50 p-1.5 gap-1 shadow-inner">
+                        <div className="flex border-b border-slate-200/60 bg-slate-50 p-1.5 gap-1 rounded-t-xl">
                           <button
+                            type="button"
                             onClick={() => setActiveSideTab("video")}
-                            className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-bold rounded-xl transition-all ${activeSideTab === "video"
-                              ? "bg-white text-cyan-600 shadow-sm border border-slate-200/40"
-                              : "text-muted-foreground hover:text-foreground hover:bg-white/40"
-                              }`}
+                            className={platformSegmentTab(activeSideTab === "video") + " cursor-pointer"}
                           >
-                            <Tv className="w-3.5 h-3.5" />
+                            <Tv className="w-3.5 h-3.5 shrink-0" />
                             Vídeo
                           </button>
                           <button
+                            type="button"
                             onClick={() => setActiveSideTab("reading")}
-                            className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-bold rounded-xl transition-all ${activeSideTab === "reading"
-                              ? "bg-white text-cyan-600 shadow-sm border border-slate-200/40"
-                              : "text-muted-foreground hover:text-foreground hover:bg-white/40"
-                              }`}
+                            className={platformSegmentTab(activeSideTab === "reading") + " cursor-pointer"}
                           >
-                            <BookOpen className="w-3.5 h-3.5" />
+                            <BookOpen className="w-3.5 h-3.5 shrink-0" />
                             Leitura
                           </button>
                           <button
+                            type="button"
                             onClick={() => setActiveSideTab("quiz")}
-                            className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-bold rounded-xl transition-all ${activeSideTab === "quiz"
-                              ? "bg-white text-cyan-600 shadow-sm border border-slate-200/40"
-                              : "text-muted-foreground hover:text-foreground hover:bg-white/40"
-                              }`}
+                            className={platformSegmentTab(activeSideTab === "quiz") + " cursor-pointer"}
                           >
-                            <Award className="w-3.5 h-3.5" />
+                            <Award className="w-3.5 h-3.5 shrink-0" />
                             Teste
                           </button>
                           <button
                             type="button"
                             onClick={handleAnotar}
-                            className="flex items-center justify-center gap-1.5 py-2 px-3 text-xs font-bold rounded-xl transition-all text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-100/80 shrink-0"
+                            className={`cursor-pointer ${platformSegmentTab(false)} shrink-0 px-3`}
                             title="Abrir caderno de notas deste nó"
                           >
-                            <StickyNote className="w-3.5 h-3.5" />
-                            Anotar
+                            <BookMarked className="w-3.5 h-3.5 shrink-0" />
+                            Notas
                           </button>
                         </div>
                       </div>

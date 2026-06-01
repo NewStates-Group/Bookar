@@ -22,6 +22,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import {
+  platformDialog,
+  platformDialogHeaderIcon,
+  platformListItem,
+  platformListItemIcon,
+  platformPrimaryButton,
+} from "@/lib/platform-ui";
 
 interface CadernoNotasModalProps {
   open: boolean;
@@ -93,62 +100,54 @@ export function CadernoNotasModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg border-slate-200 bg-white text-slate-800 shadow-2xl rounded-2xl max-h-[85vh] flex flex-col">
-        <DialogHeader>
-          <DialogTitle className="text-xl font-bold flex items-center gap-2 text-slate-800">
-            <BookMarked className="w-5 h-5 text-amber-600" />
+      <DialogContent
+        className={`sm:max-w-lg ${platformDialog} max-h-[85vh] flex flex-col p-0 overflow-hidden rounded-lg`}
+      >
+        <DialogHeader className="px-6 pt-6 pb-4 border-b border-slate-200/60 bg-white/80 gap-1/2">
+          <DialogTitle className="text-lg font-bold text-slate-800">
             Caderno de Notas
           </DialogTitle>
-          <DialogDescription className="text-sm text-slate-500">
-            As tuas folhas de estudo. Clica numa para abrir ou cria uma nova.
-          </DialogDescription>
+          <p className="text-base text-slate-500">
+            Crie e salve as suas notas de estudo.
+          </p>
         </DialogHeader>
 
-        <Button
-          type="button"
-          onClick={handleCreate}
-          disabled={creating}
-          className="rounded-xl bg-amber-500 hover:bg-amber-600 text-white gap-2 shadow-sm"
-        >
-          {creating ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
-          ) : (
-            <Plus className="w-4 h-4" />
-          )}
-          Nova folha
-        </Button>
+        <div className="px-6 py-4 shrink-0 bg-slate-50/80">
+          <Button
+            type="button"
+            onClick={handleCreate}
+            disabled={creating}
+            className={`w-full ${platformPrimaryButton}`}
+          >
+            {creating ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Plus className="w-4 h-4" />
+            )}
+            Nova folha
+          </Button>
+        </div>
 
-        <div className="flex-1 overflow-y-auto min-h-0 -mx-1 px-1 space-y-2 mt-1">
+        <div className="flex-1 overflow-y-auto min-h-0 px-4 pb-6 space-y-2">
           {isLoading ? (
             <div className="flex justify-center py-12">
-              <Loader2 className="w-8 h-8 animate-spin text-amber-500" />
+              <Loader2 className="w-8 h-8 animate-spin text-cyan-500" />
             </div>
-          ) : !folhas?.length ? (
-            <div className="text-center py-12 px-4 rounded-2xl border border-dashed border-slate-200 bg-slate-50/50">
-              <StickyNote className="w-10 h-10 text-slate-300 mx-auto mb-2" />
-              <p className="text-sm font-semibold text-slate-600">Ainda não tens folhas</p>
-              <p className="text-xs text-slate-400 mt-1">Cria a primeira para começar a anotar.</p>
-            </div>
-          ) : (
+          ) : !folhas?.length ? null : (
             folhas.map((folha) => (
-              <button
+              <div
                 key={folha.id}
-                type="button"
-                onClick={() => onOpenFolha(folha.id)}
-                className="w-full text-left p-3.5 rounded-xl border border-slate-200/80 bg-white hover:bg-amber-50/40 hover:border-amber-200/80 transition-all group flex items-start gap-3"
+                className={platformListItem}
               >
-                <div className="w-9 h-9 rounded-lg bg-amber-100/80 flex items-center justify-center shrink-0">
-                  <StickyNote className="w-4 h-4 text-amber-700" />
-                </div>
+                
                 <div className="flex-1 min-w-0">
-                  <h4 className="font-semibold text-sm text-slate-800 truncate">{folha.title}</h4>
-                  <p className="text-xs text-slate-500 line-clamp-2 mt-0.5">
-                    {folha.content?.trim() || "Sem conteúdo ainda..."}
-                  </p>
+                  <h4 onClick={() => onOpenFolha(folha.id)} className="hover:underline hover:cursor-pointer font-semibold text-sm text-slate-800 truncate">{folha.title}</h4>
                   <div className="flex flex-wrap items-center gap-2 mt-1.5">
-                    <span className="text-[10px] text-slate-400">{formatDate(folha.updated_at)}</span>
+                    <span className="inline-flex items-center gap-1 text-[10px] text-black font-light border px-1.5 py-0.5 rounded-md">
+                      {formatDate(folha.updated_at)}
+                    </span>
                     {folha.mind_map_title && (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-medium text-cyan-600 bg-cyan-50 px-1.5 py-0.5 rounded-md">
+                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-cyan-700 bg-cyan-50 border border-cyan-100/80 px-1.5 py-0.5 rounded-md">
                         <Network className="w-3 h-3" />
                         {folha.mind_map_title}
                       </span>
@@ -159,7 +158,7 @@ export function CadernoNotasModal({
                   type="button"
                   onClick={(e) => handleDelete(e, folha.id)}
                   disabled={deletingId === folha.id}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all shrink-0"
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all shrink-0"
                   title="Apagar folha"
                 >
                   {deletingId === folha.id ? (
@@ -168,7 +167,7 @@ export function CadernoNotasModal({
                     <Trash2 className="w-4 h-4" />
                   )}
                 </button>
-              </button>
+              </div>
             ))
           )}
         </div>
