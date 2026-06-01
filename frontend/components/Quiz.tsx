@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Loader2, CheckCircle, XCircle, Trophy, RefreshCcw } from "lucide-react";
 import { useSession } from "next-auth/react";
+import { apiRequest } from "@/lib/api";
 
 interface Choice {
     id: string;
@@ -48,26 +49,15 @@ export function Quiz({ lessonId, onComplete }: QuizProps) {
 
     const fetchQuiz = async () => {
         try {
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/courses/quiz/${lessonId}`, {
-                headers: {
-                    Authorization: `Bearer ${(session as any)?.accessToken}`,
-                },
-            });
-            if (res.ok) {
-                const data = await res.json();
-                setQuiz(data);
-            } else {
-                const err = await res.json();
-                // console.error(err);
-                if (res.status === 404) {
-                    // Quiz not ready or not found
-                    // Assuming if not found, we might skip or show a specific message
-                    // For now, let's treat it as "no quiz" and maybe autocomplete?
-                    // Or just show "Waiting for quiz..."
-                }
+            const data = await apiRequest(
+                `${process.env.NEXT_PUBLIC_API_URL}/courses/quiz/${lessonId}`
+            );
+            setQuiz(data);
+        } catch (error: unknown) {
+            const status = (error as { status?: number })?.status;
+            if (status !== 404) {
+                // quiz indisponível ou erro de rede
             }
-        } catch (error) {
-            // console.error("Failed to fetch quiz", error);
         } finally {
             setLoading(false);
         }
@@ -89,28 +79,21 @@ export function Quiz({ lessonId, onComplete }: QuizProps) {
         };
 
         try {
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/courses/quiz/${quiz.id}/submit`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${(session as any)?.accessToken}`,
-                },
-                body: JSON.stringify(submission),
-            });
-
-            if (res.ok) {
-                const data = await res.json();
-                setResult(data);
-                if (data.passed) {
-                    toast.success("Parabéns! Você passou no quiz.");
-                    setTimeout(() => onComplete(), 2000); // Call onComplete after short delay
-                } else {
-                    toast.error("Você não atingiu a pontuação mínima. Tente novamente.");
+            const data = await apiRequest(
+                `${process.env.NEXT_PUBLIC_API_URL}/courses/quiz/${quiz.id}/submit`,
+                {
+                    method: "POST",
+                    body: JSON.stringify(submission),
                 }
+            );
+            setResult(data);
+            if (data.passed) {
+                toast.success("Parabéns! Você passou no quiz.");
+                setTimeout(() => onComplete(), 2000);
             } else {
-                toast.error("Erro ao enviar respostas.");
+                toast.error("Você não atingiu a pontuação mínima. Tente novamente.");
             }
-        } catch (error) {
+        } catch {
             toast.error("Erro de conexão.");
         } finally {
             setSubmitting(false);

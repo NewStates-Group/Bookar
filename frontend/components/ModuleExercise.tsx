@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { apiRequest } from "@/lib/api";
 
 interface Choice {
     id: string;
@@ -49,17 +50,9 @@ export default function ModuleExercise({ moduleId, onComplete }: ModuleExerciseP
     const fetchQuiz = async () => {
         setIsLoading(true);
         try {
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/courses/module/${moduleId}/quiz`, {
-                headers: {
-                    Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
-                },
-            });
-
-            if (!res.ok) {
-                throw new Error("Failed to fetch quiz");
-            }
-
-            const data = await res.json();
+            const data = await apiRequest(
+                `${process.env.NEXT_PUBLIC_API_URL}/courses/module/${moduleId}/quiz`
+            );
             setQuiz(data);
         } catch (error) {
             toast.error("Erro ao carregar exercícios");
@@ -83,23 +76,13 @@ export default function ModuleExercise({ moduleId, onComplete }: ModuleExerciseP
 
         setIsSubmitting(true);
         try {
-            const res = await fetch(
+            const data = await apiRequest(
                 `${process.env.NEXT_PUBLIC_API_URL}/courses/module/${moduleId}/quiz/submit`,
                 {
                     method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
-                    },
                     body: JSON.stringify({ answers: answersArray }),
                 }
             );
-
-            if (!res.ok) {
-                throw new Error("Failed to submit quiz");
-            }
-
-            const data = await res.json();
             setResult(data);
 
             if (data.passed) {

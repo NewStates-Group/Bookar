@@ -50,7 +50,8 @@ jobs:
         run: |
           IMAGE_TAG=${{ github.sha }}
           docker build -f ./backend/Dockerfile.prod -t $BACKEND_IMAGE:$IMAGE_TAG ./backend
-          docker tag $BACKEND_IMAGE:$IMAGE_TAG $BACKEND_IMAGE:latest
+          docker tag $BACKEND_IMAGE:$IMAGE_TAG 
+        # $BACKEND_IMAGE:latest
 
       - name: Push image
         run: |
