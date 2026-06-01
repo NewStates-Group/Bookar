@@ -21,7 +21,8 @@ import {
   Share2,
   Bot,
   Lock,
-  X
+  X,
+  UserPlus
 } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -1057,8 +1058,8 @@ export default function ExplicadorRoomPage() {
               onClick={handleShareRoom}
               className="hover:bg-transparent! h-8 shadow-none border-none rounded-full text-xs flex items-center"
             >
-              <Share2 className="w-3.5 h-3.5" />
-              <span className="hidden sm:block">Partilhar</span>
+              <UserPlus className="w-3.5 h-3.5" />
+              <span className="hidden sm:block">Convidar</span>
             </Button>
 
             <div className="flex items-center gap-1.5">
