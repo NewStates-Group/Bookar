@@ -11,7 +11,27 @@ export const authenticatedFetcher = async (args: [string, string]) => {
 };
 
 /**
- * Generic authenticated request helper with built-in 401 retry logic
+ * Force NextAuth to re-evaluate the JWT callback (which triggers refresh if expired).
+ * Returns the refreshed session or null.
+ */
+async function forceSessionRefresh() {
+    try {
+        // This hits the server-side session endpoint which triggers the jwt callback
+        const res = await fetch("/api/auth/session");
+        if (res.ok) {
+            const session = await res.json();
+            if (session?.accessToken && !session?.error) {
+                return session;
+            }
+        }
+    } catch (e) {
+        console.warn("[API] Force session refresh failed", e);
+    }
+    return null;
+}
+
+/**
+ * Generic authenticated request helper with built-in 401 retry + auto-refresh
  */
 export const apiRequest = async (url: string, options: RequestInit = {}) => {
     let session = await getSession();
@@ -27,26 +47,23 @@ export const apiRequest = async (url: string, options: RequestInit = {}) => {
     let res = await fetch(url, { ...options, headers });
 
     if (res.status === 401) {
-        // console.warn(`[API] 401 detected for ${url}. Attempting session refresh and retry...`);
+        // Force a real server-side token refresh
+        const refreshedSession = await forceSessionRefresh();
 
-        // Force a session refresh
-        session = await getSession();
-
-        if (session?.accessToken) {
-            // console.log(`[API] Retrying with new token...`);
+        if (refreshedSession?.accessToken) {
             res = await fetch(url, {
                 ...options,
                 headers: {
                     ...headers,
-                    Authorization: `Bearer ${session.accessToken}`,
+                    Authorization: `Bearer ${refreshedSession.accessToken}`,
                 },
             });
         }
 
+        // If still 401, the refresh token is dead — sign out
         if (res.status === 401) {
-            // console.error("[API] Persistent 401. User might need to login again.");
-            // We don't sign out automatically here to avoid aggressive loops, 
-            // but we could if we're sure the refresh token is dead.
+            await signOut({ callbackUrl: "/login" });
+            throw new Error("Sessão expirada. Por favor, faça login novamente.");
         }
     }
 

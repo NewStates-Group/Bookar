@@ -57,7 +57,7 @@ export default function MindMapsPage() {
       if (data.type === "mind_map_update") {
         mutateMindMaps();
         if (data.status === "READY") {
-          toast.success(`Mapa Mental "${data.title}" está pronto!`);
+          // toast.success(`Mapa Mental "${data.title}" está pronto!`);
         } else if (data.status === "FAILED") {
           toast.error("Ocorreu um erro ao gerar o mapa mental.");
         }
@@ -77,12 +77,12 @@ export default function MindMapsPage() {
         method: "POST",
         body: JSON.stringify({ topic, language }),
       });
-      toast.success("Geração do mapa mental iniciada no worker!");
+      // toast.success("Geração do mapa mental iniciada no worker!");
       setTopic("");
       setOpen(false);
       mutateMindMaps();
     } catch (err: any) {
-      toast.error(err.message || "Erro ao iniciar geração do mapa mental.");
+      toast.error(err.message || "Erro ao gerar o mapa");
     } finally {
       setIsCreating(false);
     }

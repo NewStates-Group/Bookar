@@ -43,7 +43,8 @@ async function refreshAccessToken(token: any) {
         return {
             ...token,
             accessToken: data.access,
-            accessTokenExpires: Date.now() + 30 * 60 * 1000,
+            refreshToken: data.refresh || token.refreshToken,
+            accessTokenExpires: Date.now() + 15 * 60 * 1000,
             error: undefined,
         };
     } catch (error) {
@@ -134,7 +135,7 @@ export const authOptions: NextAuthOptions = {
                     return {
                         accessToken: user.accessToken,
                         refreshToken: user.refreshToken,
-                        accessTokenExpires: Date.now() + 30 * 60 * 1000,
+                        accessTokenExpires: Date.now() + 15 * 60 * 1000,
 
                         user: {
                             id: profile.id,
@@ -150,7 +151,7 @@ export const authOptions: NextAuthOptions = {
                     return {
                         accessToken: user.accessToken,
                         refreshToken: user.refreshToken,
-                        accessTokenExpires: Date.now() + 30 * 60 * 1000,
+                        accessTokenExpires: Date.now() + 15 * 60 * 1000,
                         user: null,
                         error: "FetchProfileError"
                     };
@@ -177,7 +178,8 @@ export const authOptions: NextAuthOptions = {
                 }
             }
 
-            if (Date.now() < (token.accessTokenExpires as number) - 5 * 60 * 1000) {
+            // Refresh 2 minutes before the 10-min expiry window
+            if (Date.now() < (token.accessTokenExpires as number) - 2 * 60 * 1000) {
                 return token;
             }
 
