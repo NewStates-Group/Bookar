@@ -9,12 +9,10 @@ from asgiref.sync import sync_to_async
 
 from courses.providers import get_text_chain
 from .models import ExplicadorRoom
+from . import presence as room_presence
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
-
-# Server-side presence tracking: { room_uuid: { connection_id: { name, avatar, user_id, is_owner, is_mic_on, is_listening } } }
-_room_members = {}
 
 EXPLICADOR_MENTION = "@explicador"
 
@@ -66,20 +64,7 @@ class ExplicadorConsumer(AsyncWebsocketConsumer):
         self.user_avatar = avatar_url
         self.user_id = self.user.id if self.user.is_authenticated else None
 
-        # Add to room members (evict stale connections from same user on reload)
-        if self.room_uuid not in _room_members:
-            _room_members[self.room_uuid] = {}
-        
-        if self.user_id is not None:
-            stale_ids = [
-                cid for cid, info in _room_members[self.room_uuid].items()
-                if info.get("user_id") == self.user_id
-            ]
-            for cid in stale_ids:
-                _room_members[self.room_uuid].pop(cid, None)
-                logger.info(f"Evicted stale connection {cid} for user {self.user_id} in room {self.room_uuid}")
-
-        _room_members[self.room_uuid][self.connection_id] = {
+        member_payload = {
             "connection_id": self.connection_id,
             "name": self.user_name,
             "avatar": self.user_avatar,
@@ -88,13 +73,18 @@ class ExplicadorConsumer(AsyncWebsocketConsumer):
             "is_mic_on": False,
             "is_listening": True,
         }
+        members = await sync_to_async(room_presence.add_member)(
+            self.room_uuid,
+            self.connection_id,
+            member_payload,
+            self.user_id,
+        )
 
         # 2. Join room group
         await self.channel_layer.group_add(self.group_name, self.channel_name)
         await self.accept()
 
-        # 3. Send welcome payload to newly connected user
-        members = list(_room_members.get(self.room_uuid, {}).values())
+        # 3. Send welcome payload to newly connected user (roster completo da cache)
         await self.send(
             text_data=json.dumps(
                 {
@@ -108,32 +98,14 @@ class ExplicadorConsumer(AsyncWebsocketConsumer):
             )
         )
 
-        # 4. Broadcast join event to all other members
-        await self.channel_layer.group_send(
-            self.group_name,
-            {
-                "type": "broadcast_message",
-                "message": {
-                    "type": "user_joined",
-                    "connection_id": self.connection_id,
-                    "name": self.user_name,
-                    "is_owner": self.is_owner,
-                    "avatar": self.user_avatar,
-                    "user_id": self.user_id,
-                },
-            },
-        )
-
-        # Broadcast the full current membership to sync all frontends
+        # Roster completo para todos (fonte única de verdade no cliente)
         await self._broadcast_presence_sync()
 
     async def disconnect(self, close_code):
         if hasattr(self, "group_name"):
-            # Remove from presence tracking
-            if self.room_uuid in _room_members:
-                _room_members[self.room_uuid].pop(self.connection_id, None)
-                if not _room_members[self.room_uuid]:
-                    del _room_members[self.room_uuid]
+            await sync_to_async(room_presence.remove_member)(
+                self.room_uuid, self.connection_id
+            )
 
             # Check if this connection held the lock
             self.room = await self.get_room(self.room_uuid)
@@ -155,20 +127,6 @@ class ExplicadorConsumer(AsyncWebsocketConsumer):
                         },
                     )
 
-            # Broadcast leave event
-            await self.channel_layer.group_send(
-                self.group_name,
-                {
-                    "type": "broadcast_message",
-                    "message": {
-                        "type": "user_left",
-                        "connection_id": self.connection_id,
-                        "name": getattr(self, "user_name", "Visitante"),
-                    },
-                },
-            )
-
-            # Broadcast the updated presence roster
             await self._broadcast_presence_sync()
 
             await self.channel_layer.group_discard(self.group_name, self.channel_name)
@@ -199,6 +157,12 @@ class ExplicadorConsumer(AsyncWebsocketConsumer):
             await self.handle_release_lock(data)
         elif action_type == "audio_state":
             await self.handle_audio_state(data)
+        elif action_type == "ping":
+            await self.handle_ping(data)
+        elif action_type == "refresh_token":
+            await self.handle_refresh_token(data)
+        elif action_type == "request_presence":
+            await self.handle_request_presence()
 
     async def handle_grab_lock(self, data):
         """Allows a user to grab the chalk (lock) to write on the board."""
@@ -319,15 +283,22 @@ class ExplicadorConsumer(AsyncWebsocketConsumer):
             
             # Preserve the lock object in whiteboard_data and store the new blackboard summary
             current_lock = self.room.whiteboard_data.get("lock")
-            new_summary = parsed_data.get("whiteboard_summary", "")
-            
-            # If the new summary is empty (AI evaluated no need to write/update), preserve the previous summary
-            if not new_summary.strip():
-                new_summary = self.room.whiteboard_data.get("summary", "")
-                
+            new_summary = (parsed_data.get("whiteboard_summary") or "").strip()
+            open_whiteboard = bool(parsed_data.get("open_whiteboard", False))
+
+            if new_summary:
+                board_summary = new_summary
+            else:
+                board_summary = self.room.whiteboard_data.get("summary", "")
+                open_whiteboard = False
+
+            # Só abre o quadro quando a IA decidir que ajuda E houver conteúdo visual novo
+            open_whiteboard = open_whiteboard and bool(new_summary)
+
             self.room.whiteboard_data = {
-                "summary": new_summary,
-                "lock": current_lock
+                "summary": board_summary,
+                "lock": current_lock,
+                "open_whiteboard": open_whiteboard,
             }
             
             await self.save_room()
@@ -461,10 +432,11 @@ class ExplicadorConsumer(AsyncWebsocketConsumer):
         is_mic_on = data.get("is_mic_on", False)
         is_listening = data.get("is_listening", True)
 
-        # Update in-memory presence details
-        if self.room_uuid in _room_members and self.connection_id in _room_members[self.room_uuid]:
-            _room_members[self.room_uuid][self.connection_id]["is_mic_on"] = is_mic_on
-            _room_members[self.room_uuid][self.connection_id]["is_listening"] = is_listening
+        await sync_to_async(room_presence.update_member)(
+            self.room_uuid,
+            self.connection_id,
+            {"is_mic_on": is_mic_on, "is_listening": is_listening},
+        )
 
         await self.channel_layer.group_send(
             self.group_name,
@@ -479,9 +451,78 @@ class ExplicadorConsumer(AsyncWebsocketConsumer):
             },
         )
 
+    async def handle_ping(self, data):
+        token_str = data.get("token")
+        if token_str:
+            user = await self.get_user(token_str)
+            if not user.is_authenticated:
+                await self.send(
+                    text_data=json.dumps(
+                        {
+                            "type": "auth_error",
+                            "message": "Sessão expirada. Renove o token.",
+                        }
+                    )
+                )
+                return
+        await self.send(text_data=json.dumps({"type": "pong"}))
+
+    async def handle_refresh_token(self, data):
+        token_str = data.get("token", "").strip()
+        if not token_str:
+            await self.send(
+                text_data=json.dumps(
+                    {"type": "auth_error", "message": "Token em falta."}
+                )
+            )
+            return
+
+        user = await self.get_user(token_str)
+        if not user.is_authenticated:
+            await self.send(
+                text_data=json.dumps(
+                    {
+                        "type": "auth_error",
+                        "message": "Não foi possível renovar a sessão.",
+                    }
+                )
+            )
+            return
+
+        self.user = user
+        self.user_id = user.id
+        self.user_name = (
+            f"{user.first_name} {user.last_name}".strip() or user.username
+        )
+        avatar_url = None
+        if hasattr(user, "avatar") and user.avatar:
+            try:
+                avatar_url = user.avatar.url
+            except Exception:
+                pass
+        self.user_avatar = avatar_url
+
+        await sync_to_async(room_presence.update_member)(
+            self.room_uuid,
+            self.connection_id,
+            {
+                "name": self.user_name,
+                "avatar": self.user_avatar,
+                "user_id": self.user_id,
+            },
+        )
+        await self.send(text_data=json.dumps({"type": "token_refreshed"}))
+        await self._broadcast_presence_sync()
+
+    async def handle_request_presence(self):
+        members = await sync_to_async(room_presence.list_members)(self.room_uuid)
+        await self.send(
+            text_data=json.dumps({"type": "presence_sync", "members": members})
+        )
+
     async def _broadcast_presence_sync(self):
         """Broadcast the full presence roster to all members in the room."""
-        members = list(_room_members.get(self.room_uuid, {}).values())
+        members = await sync_to_async(room_presence.list_members)(self.room_uuid)
         await self.channel_layer.group_send(
             self.group_name,
             {
@@ -530,19 +571,28 @@ class ExplicadorConsumer(AsyncWebsocketConsumer):
 O utilizador deseja aprender sobre o seguinte assunto ou fez a seguinte pergunta:
 "{message_content}"
 
-Forneça sua resposta ESTRITAMENTE em formato JSON puro, contendo uma chave "chat_response" (uma explicação textual detalhada, estruturada e amigável em Markdown em português) e uma chave "whiteboard_summary" (um resumo esquemático, cálculos ou tópicos estruturados em Markdown para serem exibidos no quadro branco).
+Forneça sua resposta ESTRITAMENTE em formato JSON puro com três chaves:
+- "chat_response": explicação em Markdown em português para o chat.
+- "whiteboard_summary": resumo esquemático para o quadro (ou string vazia).
+- "open_whiteboard": boolean — true APENAS se o quadro visual deve abrir automaticamente nesta resposta.
 
 Use exatamente a seguinte estrutura JSON:
 {{
-  "chat_response": "Uma explicação em markdown detalhada e didática em português para a conversa do chat.",
-  "whiteboard_summary": "# Título do Assunto\\n\\n- **Tópico 1**: Frase curtíssima.\\n- **Tópico 2**: Frase curtíssima.\\n\\n## 🧮 Cálculo / Regra\\n- `Fórmula ou Cálculo numérico`"
+  "chat_response": "Explicação didática em markdown.",
+  "whiteboard_summary": "# Título\\n\\n- **Ponto 1**: síntese curta.",
+  "open_whiteboard": true
 }}
 
-Regras fundamentais de escrita no quadro ("whiteboard_summary"):
-1. AVALIAÇÃO DE NECESSIDADE: Avalie criteriosamente se a mensagem do utilizador realmente exige uma explicação técnica ou resumo de conteúdo no quadro. Se for uma saudação (ex: "Olá", "bom dia"), agradecimento ("obrigado"), despedida ("tchau") ou conversa informal que não traga novos conceitos didáticos, a chave "whiteboard_summary" deve retornar obrigatoriamente uma string vazia ("").
-2. CONTEÚDO ULTRA-MINIMALISTA: O quadro deve conter APENAS resumos esquemáticos, cálculos ou tópicos extremamente curtos. Evite parágrafos longos, descrições redundantes ou introduções verbosas. O utilizador deve poder bater o olho no quadro e ler a síntese em poucos segundos.
-3. Use apenas Markdown limpo (títulos, listas, negrito ou blocos de código para fórmulas).
-4. Responda estritamente apenas com o JSON bruto. Não adicione blocos markdown ou comentários adicionais fora do JSON.
+Regras para "open_whiteboard" (como ChatGPT/Claude decidem usar ferramentas):
+1. true quando conceitos, fórmulas, passos, comparações ou estrutura visual ajudam MUITO a aprender (ex.: demonstração matemática, resumo de tópicos, diagrama em tópicos).
+2. false para saudações, agradecimentos, despedidas, confirmações curtas ("ok", "entendi"), perguntas de opinião sem conteúdo técnico, ou quando a resposta no chat basta sozinha.
+3. Se open_whiteboard for false, whiteboard_summary DEVE ser "".
+4. Se open_whiteboard for true, whiteboard_summary DEVE ter conteúdo útil e minimalista.
+
+Regras para "whiteboard_summary" (quando open_whiteboard for true):
+1. APENAS resumos esquemáticos, cálculos ou tópicos curtos — legível em poucos segundos.
+2. Markdown limpo (títulos, listas, negrito, código para fórmulas).
+3. Responda estritamente apenas com o JSON bruto, sem blocos ```json.
 """
         
         # We wrap in sync_to_async since provider calls might be blocking requests
@@ -569,14 +619,17 @@ Regras fundamentais de escrita no quadro ("whiteboard_summary"):
 
         try:
             parsed = json.loads(clean_text)
-            # Ensure required keys exist
-            if "chat_response" in parsed and "whiteboard_summary" in parsed:
+            if "chat_response" in parsed:
+                parsed.setdefault("whiteboard_summary", "")
+                parsed.setdefault("open_whiteboard", False)
+                if not str(parsed.get("whiteboard_summary", "")).strip():
+                    parsed["open_whiteboard"] = False
                 return parsed
         except Exception:
             logger.warning("AI response was not valid JSON, applying raw fallback parsing")
 
-        # Fallback parsing in case the output fails or is just normal text
         return {
             "chat_response": text,
-            "whiteboard_summary": f"# Explicação do Assunto\n\n## 💡 Introdução\n- Iniciei a síntese visual do assunto.\n\n## 📝 Detalhes\n- Veja o chat ao lado para ler a explicação detalhada do explicador!"
+            "whiteboard_summary": "",
+            "open_whiteboard": False,
         }

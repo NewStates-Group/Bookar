@@ -24,8 +24,13 @@ import {
   X,
   UserPlus
 } from "lucide-react";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { ensureFreshSession } from "@/lib/auth-session";
+import {
+  mapServerMembersToParticipants,
+  type ExplicadorParticipant,
+} from "@/lib/explicador-presence";
 import ReactMarkdown from "react-markdown";
 import {
   Dialog,
@@ -43,6 +48,8 @@ interface WhiteboardData {
   summary?: string;
   lock?: LockObject | null;
   show_whiteboard?: boolean;
+  /** Sinal do backend: abrir o quadro nesta resposta (não força fechar). */
+  open_whiteboard?: boolean;
 }
 
 interface ChatMessage {
@@ -50,16 +57,7 @@ interface ChatMessage {
   content: string;
 }
 
-interface Participant {
-  connectionId: string;
-  name: string;
-  isOwner: boolean;
-  hasAudio: boolean;
-  avatar?: string | null;
-  userId?: number | null;
-  isMicOn?: boolean;
-  isListening?: boolean;
-}
+type Participant = ExplicadorParticipant;
 
 function StreamingMessage({ content, active }: { content: string; active: boolean }) {
   const [displayedText, setDisplayedText] = useState(active ? "" : content);
@@ -107,6 +105,26 @@ function ensureExplicadorMention(text: string): string {
   return trimmed ? `${EXPLICADOR_MENTION} ${trimmed}` : `${EXPLICADOR_MENTION} `;
 }
 
+function formatUserChatContent(displayName: string, text: string): string {
+  return `**[${displayName}]**: ${text}`;
+}
+
+function mergeWhiteboardFromServer(
+  prev: WhiteboardData,
+  incoming?: WhiteboardData | null
+): WhiteboardData {
+  if (!incoming) return prev;
+  const next: WhiteboardData = {
+    ...prev,
+    summary: incoming.summary ?? prev.summary,
+    lock: incoming.lock !== undefined ? incoming.lock : prev.lock,
+  };
+  if (incoming.open_whiteboard) {
+    next.show_whiteboard = true;
+  }
+  return next;
+}
+
 export default function ExplicadorRoomPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -139,7 +157,6 @@ export default function ExplicadorRoomPage() {
 
   // Input fields
   const [message, setMessage] = useState("");
-  const [isInputSubmitting, setIsInputSubmitting] = useState(false);
 
   // WebRTC Audio States
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
@@ -161,10 +178,46 @@ export default function ExplicadorRoomPage() {
   const chatEndRef = useRef<HTMLDivElement>(null);
   const chatInputRef = useRef<HTMLInputElement>(null);
 
+  const MAX_WS_RECONNECT_ATTEMPTS = 3;
+  const wsReconnectAttemptsRef = useRef(0);
+  const wsIntentionalCloseRef = useRef(false);
+  const wsConnectGenerationRef = useRef(0);
+  const wsActiveTokenRef = useRef<string | null>(null);
+  const wsMountedRef = useRef(true);
+  const wsReconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const wsPingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const wsTokenRefreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const wsTokenRefreshReconnectRef = useRef(false);
+  const refreshExplicadorSocketTokenRef = useRef<() => Promise<void>>(async () => {});
+
   useEffect(() => { localStreamRef.current = localStream; }, [localStream]);
   useEffect(() => { isMicMutedRef.current = isMicMuted; }, [isMicMuted]);
   useEffect(() => { isOwnerRef.current = isOwner; }, [isOwner]);
   useEffect(() => { participantsRef.current = participants; }, [participants]);
+
+  const clearWsTimers = useCallback(() => {
+    if (wsReconnectTimerRef.current) {
+      clearTimeout(wsReconnectTimerRef.current);
+      wsReconnectTimerRef.current = null;
+    }
+    if (wsPingTimerRef.current) {
+      clearInterval(wsPingTimerRef.current);
+      wsPingTimerRef.current = null;
+    }
+  }, []);
+
+  const startWsPingLoop = useCallback(() => {
+    if (wsPingTimerRef.current) clearInterval(wsPingTimerRef.current);
+    wsPingTimerRef.current = setInterval(() => {
+      if (socketRef.current?.readyState !== WebSocket.OPEN) return;
+      socketRef.current.send(
+        JSON.stringify({
+          type: "ping",
+          token: wsActiveTokenRef.current,
+        })
+      );
+    }, 30_000);
+  }, []);
 
   // Load Handwriting Font
   useEffect(() => {
@@ -179,41 +232,51 @@ export default function ExplicadorRoomPage() {
     };
   }, []);
 
-  // 1. Request mic permission first, then establish WebSocket
-  useEffect(() => {
-    if (status === "loading") return;
-    let cancelled = false;
+  const connectExplicadorSocketRef = useRef<
+    (opts?: { isReconnect?: boolean }) => Promise<void>
+  >(async () => {});
 
-    const init = async () => {
-      // Step 1: Request microphone permission
-      setLobbyStatus("Solicitando permissão do microfone...");
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        // Mute all tracks immediately — user starts silent
-        stream.getAudioTracks().forEach((track) => { track.enabled = false; });
-        if (!cancelled) {
-          localStreamRef.current = stream;
-          setLocalStream(stream);
-          isMicMutedRef.current = true;
-          setIsMicMuted(true);
-          setAudioApproved(true);
+  const connectExplicadorSocket = useCallback(
+    async (opts?: { isReconnect?: boolean }) => {
+      const generation = ++wsConnectGenerationRef.current;
+
+      const freshSession = await ensureFreshSession();
+      const token =
+        freshSession?.accessToken ||
+        (session as { accessToken?: string } | null)?.accessToken ||
+        "";
+      if (!token) {
+        if (!opts?.isReconnect) {
+          setLobbyStatus("Sessão inválida. Inicie sessão novamente.");
         }
-      } catch (err) {
-        console.warn("Mic permission denied or unavailable", err);
+        return;
       }
 
-      if (cancelled) return;
+      wsActiveTokenRef.current = token;
+      clearWsTimers();
 
-      // Step 2: Connect WebSocket
-      setLobbyStatus("Conectando à sala...");
-      const token = session?.accessToken || "";
+      if (socketRef.current) {
+        wsIntentionalCloseRef.current = true;
+        socketRef.current.close();
+        socketRef.current = null;
+      }
+
+      if (!opts?.isReconnect) {
+        setLobbyStatus("Conectando à sala...");
+      }
+
       const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "";
-      const wsUrl = `${apiUrl.replace(/^http/, "ws")}/ws/explicador/${roomId}/?token=${token}`;
-
+      const wsUrl = `${apiUrl.replace(/^http/, "ws")}/ws/explicador/${roomId}/?token=${encodeURIComponent(token)}`;
       const socket = new WebSocket(wsUrl);
+      socketRef.current = socket;
+      wsIntentionalCloseRef.current = false;
 
       socket.onopen = () => {
-        if (!cancelled) setIsConnected(true);
+        if (!wsMountedRef.current || generation !== wsConnectGenerationRef.current) return;
+        wsReconnectAttemptsRef.current = 0;
+        setIsConnected(true);
+        startWsPingLoop();
+        socket.send(JSON.stringify({ type: "request_presence" }));
       };
 
       socket.onmessage = (event) => {
@@ -226,27 +289,120 @@ export default function ExplicadorRoomPage() {
       };
 
       socket.onclose = () => {
-        if (!cancelled) {
-          setIsConnected(false);
-          setRoomReady(false);
-          // toast.error("Ligação perdida. Tentando reconectar...");
-          closeAllPeerConnections();
+        if (generation !== wsConnectGenerationRef.current) return;
+        clearWsTimers();
+        setIsConnected(false);
+        socketRef.current = null;
+        closeAllPeerConnections();
+
+        if (!wsMountedRef.current || wsIntentionalCloseRef.current) return;
+
+        if (wsTokenRefreshReconnectRef.current) {
+          wsTokenRefreshReconnectRef.current = false;
+          wsReconnectAttemptsRef.current = 0;
+          void connectExplicadorSocketRef.current({ isReconnect: true });
+          return;
         }
+
+        if (wsReconnectAttemptsRef.current >= MAX_WS_RECONNECT_ATTEMPTS) {
+          setRoomReady(false);
+          setLobbyStatus("Não foi possível reconectar. Recarregue a página.");
+          toast.error("Ligação perdida após 3 tentativas.");
+          return;
+        }
+
+        wsReconnectAttemptsRef.current += 1;
+        const delayMs =
+          [1000, 2000, 4000][wsReconnectAttemptsRef.current - 1] ?? 4000;
+        setLobbyStatus(
+          `Reconectando (${wsReconnectAttemptsRef.current}/${MAX_WS_RECONNECT_ATTEMPTS})...`
+        );
+        wsReconnectTimerRef.current = setTimeout(() => {
+          if (wsMountedRef.current && generation === wsConnectGenerationRef.current) {
+            void connectExplicadorSocketRef.current({ isReconnect: true });
+          }
+        }, delayMs);
       };
 
-      socketRef.current = socket;
+      socket.onerror = () => {
+        socket.close();
+      };
+    },
+    [roomId, session, clearWsTimers, startWsPingLoop]
+  );
+
+  connectExplicadorSocketRef.current = connectExplicadorSocket;
+
+  const refreshExplicadorSocketToken = useCallback(async () => {
+    const fresh = await ensureFreshSession();
+    const newToken = fresh?.accessToken;
+    if (!newToken || newToken === wsActiveTokenRef.current) return;
+    if (socketRef.current?.readyState === WebSocket.OPEN) {
+      socketRef.current.send(
+        JSON.stringify({ type: "refresh_token", token: newToken })
+      );
+      wsActiveTokenRef.current = newToken;
+      return;
+    }
+    wsTokenRefreshReconnectRef.current = true;
+    wsReconnectAttemptsRef.current = 0;
+    wsIntentionalCloseRef.current = false;
+    socketRef.current?.close();
+  }, []);
+
+  refreshExplicadorSocketTokenRef.current = refreshExplicadorSocketToken;
+
+  // 1. Request mic permission first, then establish WebSocket
+  useEffect(() => {
+    if (status === "loading") return;
+    wsMountedRef.current = true;
+    wsReconnectAttemptsRef.current = 0;
+    wsIntentionalCloseRef.current = false;
+
+    const init = async () => {
+      setLobbyStatus("Solicitando permissão do microfone...");
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        stream.getAudioTracks().forEach((track) => {
+          track.enabled = false;
+        });
+        if (wsMountedRef.current) {
+          localStreamRef.current = stream;
+          setLocalStream(stream);
+          isMicMutedRef.current = true;
+          setIsMicMuted(true);
+          setAudioApproved(true);
+        }
+      } catch (err) {
+        console.warn("Mic permission denied or unavailable", err);
+      }
+
+      if (!wsMountedRef.current) return;
+      await connectExplicadorSocket();
     };
 
     init();
 
+    wsTokenRefreshTimerRef.current = setInterval(() => {
+      void refreshExplicadorSocketToken();
+    }, 10 * 60 * 1000);
+
     return () => {
-      cancelled = true;
+      wsMountedRef.current = false;
+      wsIntentionalCloseRef.current = true;
+      wsConnectGenerationRef.current += 1;
+      clearWsTimers();
+      if (wsTokenRefreshTimerRef.current) {
+        clearInterval(wsTokenRefreshTimerRef.current);
+        wsTokenRefreshTimerRef.current = null;
+      }
       if (socketRef.current) {
         socketRef.current.close();
+        socketRef.current = null;
       }
       closeAllPeerConnections();
     };
-  }, [roomId, session?.accessToken, status]);
+  }, [roomId, status, connectExplicadorSocket, refreshExplicadorSocketToken, clearWsTimers]);
 
   const closeAllPeerConnections = () => {
     peerConnectionsRef.current.forEach((pc) => pc.close());
@@ -351,9 +507,44 @@ export default function ExplicadorRoomPage() {
     });
   };
 
+  const cleanupPeerConnection = useCallback((peerId: string) => {
+    const pc = peerConnectionsRef.current.get(peerId);
+    if (pc) {
+      pc.close();
+      peerConnectionsRef.current.delete(peerId);
+    }
+    pendingIceCandidatesRef.current.delete(peerId);
+    document.getElementById(`audio-${peerId}`)?.remove();
+    setActiveVoiceRequests((prev) => prev.filter((r) => r.connectionId !== peerId));
+  }, []);
+
+  /** Fonte única de verdade para quem está na sala (evita duplicados de join/leave). */
+  const syncPresenceFromServer = useCallback(
+    (members: unknown, selfId?: string | null) => {
+      const previousIds = new Set(participantsRef.current.map((p) => p.connectionId));
+      const list = mapServerMembersToParticipants(
+        members as Parameters<typeof mapServerMembersToParticipants>[0],
+        selfId ?? connectionIdRef.current
+      );
+      setParticipants(list);
+      participantsRef.current = list;
+      const nextIds = new Set(list.map((p) => p.connectionId));
+
+      previousIds.forEach((id) => {
+        if (!nextIds.has(id)) cleanupPeerConnection(id);
+      });
+
+      if (!isMicMutedRef.current && localStreamRef.current) {
+        list.forEach((m) => void connectToPeer(m.connectionId));
+      }
+      return list;
+    },
+    [cleanupPeerConnection]
+  );
+
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [chatHistory, isGenerating]);
+  }, [chatHistory, isGenerating, activeStreamingMessageIndex]);
 
   useEffect(() => {
     const handleStreamTick = () => {
@@ -424,32 +615,24 @@ export default function ExplicadorRoomPage() {
         // Room is now fully ready
         setRoomReady(true);
 
-        // Sync participants from welcome payload (other members already in room)
-        if (data.members) {
-          const membersList = data.members
-            .filter((m: any) => m.connection_id !== connectionIdRef.current)
-            .map((m: any) => ({
-              connectionId: m.connection_id,
-              name: m.name,
-              isOwner: m.is_owner,
-              hasAudio: m.is_mic_on || false,
-              avatar: m.avatar,
-              userId: m.user_id,
-              isMicOn: m.is_mic_on || false,
-              isListening: m.is_listening !== false,
-            }));
-          setParticipants(membersList);
-          participantsRef.current = membersList;
-        }
+        syncPresenceFromServer(data.members, data.connection_id);
 
         // Auto-submit initial prompt if present in URL query params (ChatGPT onboarding)
         if (typeof window !== "undefined") {
           const searchParams = new URLSearchParams(window.location.search);
           const promptParam = searchParams.get("prompt");
           if (promptParam && (!data.chat_history || data.chat_history.length <= 1)) {
-            // Send grab_lock first to hold the chalk
             socketRef.current?.send(JSON.stringify({ type: "grab_lock" }));
             const promptMessage = ensureExplicadorMention(promptParam);
+            const displayName =
+              (session?.user as { first_name?: string; last_name?: string })?.first_name
+                ? `${(session?.user as { first_name?: string; last_name?: string }).first_name} ${(session?.user as { last_name?: string }).last_name || ""}`.trim()
+                : session?.user?.name || "Eu";
+            setChatHistory((prev) => [
+              ...prev,
+              { role: "user", content: formatUserChatContent(displayName, promptMessage) },
+            ]);
+            setIsGenerating(true);
             socketRef.current?.send(
               JSON.stringify({
                 type: "chat_message",
@@ -463,49 +646,25 @@ export default function ExplicadorRoomPage() {
         }
         break;
 
-      case "user_joined":
-        setParticipants((prev) => {
-          if (prev.some((p) => p.connectionId === data.connection_id)) return prev;
-          if (data.connection_id === connectionIdRef.current) return prev;
-          return [
-            ...prev,
-            {
-              connectionId: data.connection_id,
-              name: data.name,
-              isOwner: data.is_owner,
-              hasAudio: false,
-              avatar: data.avatar,
-              userId: data.user_id,
-              isMicOn: false,
-              isListening: true,
-            },
-          ];
-        });
-        if (!isMicMutedRef.current && localStreamRef.current) {
-          connectToPeer(data.connection_id);
-        }
+      case "presence_sync":
+        syncPresenceFromServer(data.members);
         break;
 
-      case "presence_sync":
-        if (data.members) {
-          const membersList = data.members
-            .filter((m: any) => m.connection_id !== connectionIdRef.current)
-            .map((m: any) => ({
-              connectionId: m.connection_id,
-              name: m.name,
-              isOwner: m.is_owner,
-              hasAudio: m.is_mic_on || false,
-              avatar: m.avatar,
-              userId: m.user_id,
-              isMicOn: m.is_mic_on || false,
-              isListening: m.is_listening !== false,
-            }));
-          setParticipants(membersList);
-          participantsRef.current = membersList;
-          if (!isMicMutedRef.current && localStreamRef.current) {
-            membersList.forEach((m: Participant) => connectToPeer(m.connectionId));
-          }
-        }
+      case "user_joined":
+      case "user_left":
+        // Ignorado: roster vem só de presence_sync (evita duplicar contagem)
+        break;
+
+      case "auth_error":
+        toast.error(data.message || "Sessão expirada.");
+        void refreshExplicadorSocketTokenRef.current();
+        break;
+
+      case "token_refreshed":
+        sendWSMessage({ type: "request_presence" });
+        break;
+
+      case "pong":
         break;
 
       case "audio_state":
@@ -518,40 +677,18 @@ export default function ExplicadorRoomPage() {
         );
         break;
 
-      case "user_left":
-        setParticipants((prev) => prev.filter((p) => p.connectionId !== data.connection_id));
-        if (peerConnectionsRef.current.has(data.connection_id)) {
-          peerConnectionsRef.current.get(data.connection_id)?.close();
-          peerConnectionsRef.current.delete(data.connection_id);
-          pendingIceCandidatesRef.current.delete(data.connection_id);
-          const el = document.getElementById(`audio-${data.connection_id}`);
-          el?.remove();
-        }
-        setActiveVoiceRequests((prev) => prev.filter((r) => r.connectionId !== data.connection_id));
-        break;
-
       case "chat_update":
         if (data.chat_history) {
-          setChatHistory((prev) => {
-            const hasNewAssistantMessage =
-              data.chat_history.length > prev.length &&
-              data.chat_history[data.chat_history.length - 1].role === "assistant";
-            if (hasNewAssistantMessage) {
-              setActiveStreamingMessageIndex(data.chat_history.length - 1);
-            }
-            return data.chat_history;
-          });
+          setChatHistory(data.chat_history);
+          const last = data.chat_history[data.chat_history.length - 1];
+          if (last?.role === "assistant" && !data.is_generating) {
+            setActiveStreamingMessageIndex(null);
+          }
         }
-        setIsGenerating(data.is_generating || false);
+        setIsGenerating(Boolean(data.is_generating));
 
-        // Delay whiteboard sync if AI generation just completed to allow organic text stream first
-        if (data.is_generating === false) {
-          setTimeout(() => {
-            if (data.whiteboard_data) setWhiteboardData(data.whiteboard_data);
-          }, 1200);
-        } else {
-          // Sync immediately during loading or manual updates (e.g. lock releases)
-          if (data.whiteboard_data) setWhiteboardData(data.whiteboard_data);
+        if (data.whiteboard_data) {
+          setWhiteboardData((prev) => mergeWhiteboardFromServer(prev, data.whiteboard_data));
         }
         break;
 
@@ -739,21 +876,39 @@ export default function ExplicadorRoomPage() {
   // Keep WS handler ref fresh so socket.onmessage never uses a stale closure
   wsMessageHandlerRef.current = handleWebSocketMessage;
 
-  // 3. Message sending (restricted to lock holder)
+  const getDisplayName = () => {
+    const u = session?.user as { first_name?: string; last_name?: string; name?: string } | undefined;
+    if (u?.first_name) {
+      return `${u.first_name} ${u.last_name || ""}`.trim();
+    }
+    return u?.name || "Eu";
+  };
+
+  // 3. Message sending (restricted to lock holder) — UI otimista
   const submitChatMessage = (rawMessage: string) => {
     const trimmed = rawMessage.trim();
     if (!trimmed || isGenerating) return;
 
-    setIsInputSubmitting(true);
+    const mentionsTutor = messageMentionsExplicador(trimmed);
+
+    setChatHistory((prev) => [
+      ...prev,
+      { role: "user", content: formatUserChatContent(getDisplayName(), trimmed) },
+    ]);
+    if (mentionsTutor) {
+      setIsGenerating(true);
+      setActiveStreamingMessageIndex(null);
+    }
+
     sendWSMessage({
       type: "chat_message",
       message: trimmed,
     });
 
     setMessage("");
-    setTimeout(() => {
-      setIsInputSubmitting(false);
-    }, 450);
+    requestAnimationFrame(() => {
+      chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    });
   };
 
   const handleSendMessage = (e: React.FormEvent) => {
@@ -1023,9 +1178,14 @@ export default function ExplicadorRoomPage() {
                 </span>
               </button>
             ) : null}
-            {!isConnected  && (
-              <span className={`text-xs rounded-full ml-1 text-red-500`}>
-              (Conexão perdida)
+            {!isConnected && roomReady && (
+              <span className="text-xs rounded-full ml-1 text-amber-600 animate-pulse">
+                (A reconectar…)
+              </span>
+            )}
+            {!isConnected && !roomReady && (
+              <span className="text-xs rounded-full ml-1 text-red-500">
+                (Sem ligação)
               </span>
             )}
           </div>
@@ -1122,12 +1282,17 @@ export default function ExplicadorRoomPage() {
                     )}
                   </div>
 
-                  {msg.role === "assistant" && whiteboardData.summary && !showWhiteboard && i === chatHistory.length - 1 && (
+                  {msg.role === "assistant" &&
+                    whiteboardData.summary &&
+                    !showWhiteboard &&
+                    !isGenerating &&
+                    i === chatHistory.length - 1 && (
                     <button
+                      type="button"
                       onClick={() => setWhiteboardData((prev) => ({ ...prev, show_whiteboard: true }))}
                       className="mt-2.5 flex items-center gap-1.5 px-3 py-1.5 bg-cyan-50 hover:bg-cyan-100 text-cyan-600 text-[10px] font-bold rounded-full transition-all border border-cyan-100/50 cursor-pointer select-none"
                     >
-                      <PenTool className="w-3.5 h-3.5 animate-pulse" />
+                      <PenTool className="w-3.5 h-3.5" />
                       Ver no quadro
                     </button>
                   )}
@@ -1135,13 +1300,20 @@ export default function ExplicadorRoomPage() {
               </div>
             ))}
             {isGenerating && (
-              <div className="flex flex-col items-start max-w-[85%] mr-auto">
-                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wide mb-1 px-1">
-                  Explicador
-                </span>
-                <div className="p-3.5 rounded-2xl bg-white border border-slate-200 rounded-tl-none flex items-center gap-3 shadow-sm">
-                  <Loader2 className="w-4 h-4 animate-spin text-cyan-500" />
-                  <span className="text-xs text-slate-500 font-medium">Escrevendo e atualizando o quadro...</span>
+              <div className="flex flex-col items-start w-full message-bubble-animate">
+                <div className="flex items-center gap-1.5 mb-1 px-1">
+                  <Bot className="w-4 h-4 text-cyan-600" />
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">
+                    Explicador
+                  </span>
+                </div>
+                <div className="p-3.5 rounded-2xl bg-white border border-slate-200/80 rounded-tl-sm flex items-center gap-3 shadow-sm">
+                  <div className="flex gap-1">
+                    <span className="w-2 h-2 rounded-full bg-cyan-500 animate-bounce" style={{ animationDelay: "0ms" }} />
+                    <span className="w-2 h-2 rounded-full bg-cyan-400 animate-bounce" style={{ animationDelay: "120ms" }} />
+                    <span className="w-2 h-2 rounded-full bg-cyan-300 animate-bounce" style={{ animationDelay: "240ms" }} />
+                  </div>
+                  <span className="text-sm text-slate-600 font-medium">A pensar...</span>
                 </div>
               </div>
             )}
@@ -1152,8 +1324,7 @@ export default function ExplicadorRoomPage() {
         {/* Message Input — pill style matching the landing page */}
         <form
           onSubmit={handleSendMessage}
-          className={`p-3 overflow-hidden transition-all duration-500 cubic-bezier(0.16, 1, 0.3, 1) transform max-w-3xl mx-auto w-full ${isInputSubmitting ? "translate-y-14 opacity-0 scale-95" : "translate-y-0 opacity-100 scale-100"
-            }`}
+          className="p-3 max-w-3xl mx-auto w-full"
         >
           <div className="flex items-center gap-2 bg-white border border-slate-200 focus-within:border-cyan-400 focus-within:ring-4 focus-within:ring-cyan-500/10 rounded-full px-4 py-1.5 shadow-sm transition-all duration-300">
             <input
@@ -1243,7 +1414,7 @@ export default function ExplicadorRoomPage() {
               {isGenerating && (
                 <div className="flex items-center gap-2 bg-slate-50 border border-slate-150 px-3 py-1 rounded-full text-[10px] text-slate-500 font-bold uppercase tracking-wider">
                   <span className="w-2.5 h-2.5 rounded-full bg-cyan-500 animate-ping" />
-                  <span className="text-cyan-600">Escrevendo...</span>
+                  <span className="text-cyan-600">A pensar...</span>
                 </div>
               )}
 
