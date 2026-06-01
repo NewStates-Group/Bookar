@@ -1023,7 +1023,11 @@ export default function ExplicadorRoomPage() {
                 </span>
               </button>
             ) : null}
-            <span className={`w-2 h-2 rounded-full ml-1 ${isConnected ? "bg-emerald-500 animate-pulse" : "bg-red-500"}`} />
+            {!isConnected  && (
+              <span className={`text-xs rounded-full ml-1 text-red-500`}>
+              (Conexão perdida)
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-1">
             <div>
