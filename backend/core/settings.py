@@ -83,7 +83,12 @@ NINJA_JWT = {
     "BLACKLIST_AFTER_ROTATION": True,
 }
 
-CACHES = {"default": env.cache_url("REDIS_URL")}
+REDIS_URL = env.str("REDIS_URL")
+PROD_REDIS_URL = REDIS_URL + "/ssl_cert_reqs=CERT_NONE"
+
+CACHES = {
+    "default": env.cache_url_config(PROD_REDIS_URL if ENV == "prod" else REDIS_URL)
+}
 
 CHANNEL_LAYERS = {
     "default": {
@@ -91,11 +96,11 @@ CHANNEL_LAYERS = {
         "CONFIG": {
             "hosts": [
                 {
-                    "address": env.str("REDIS_URL"),
+                    "address": REDIS_URL,
                     "ssl_cert_reqs": None,
                 }
                 if ENV == "prod"
-                else env.str("REDIS_URL")
+                else REDIS_URL
             ],
         },
     },
@@ -146,9 +151,8 @@ CLOUDINARY_STORAGE = {
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-CELERY_REDIS_URL = env.str("REDIS_URL")
-CELERY_BROKER_URL = CELERY_REDIS_URL
-CELERY_RESULT_BACKEND = CELERY_REDIS_URL
+CELERY_BROKER_URL = REDIS_URL
+CELERY_RESULT_BACKEND = REDIS_URL
 CELERY_TIMEZONE = TIME_ZONE
 
 CORS_ALLOW_CREDENTIALS = True
