@@ -225,16 +225,13 @@ export function PlatformSidebar({
             </div>
             <div className="space-y-0.5">
               {rooms.map((room) => {
-                const isRoomActive = pathname === `/app/explicador/${room.id}`;
                 return (
                   <div key={room.id} className="group relative flex items-center">
                     <Link
                       href={`/app/explicador/${room.id}`}
                       onClick={closeMobile}
-                      className={`flex-1 min-w-0 flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium transition-all duration-200 pr-8 ${
-                        isRoomActive
-                          ? "bg-white text-slate-900 border border-slate-200/80 shadow-sm"
-                          : "text-slate-500 hover:text-slate-800 hover:bg-slate-200/40 border border-transparent"
+                      className={`flex-1 min-w-0 flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium transition-all duration-200 pr-8
+                        text-slate-500 hover:text-slate-800 hover:bg-slate-200/40 border border-transparent
                       }`}
                     >
                       <span className="truncate">{room.title}</span>
