@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 import uuid
 from channels.generic.websocket import AsyncWebsocketConsumer
 from ninja_jwt.tokens import AccessToken
@@ -14,6 +15,17 @@ User = get_user_model()
 
 # Server-side presence tracking: { room_uuid: { connection_id: { name, avatar, user_id, is_owner, is_mic_on, is_listening } } }
 _room_members = {}
+
+EXPLICADOR_MENTION = "@explicador"
+
+
+def message_mentions_explicador(text: str) -> bool:
+    return EXPLICADOR_MENTION in text.lower()
+
+
+def strip_explicador_mention(text: str) -> str:
+    cleaned = re.sub(r"@explicador\s*", "", text, flags=re.IGNORECASE).strip()
+    return cleaned
 
 
 
@@ -266,13 +278,15 @@ class ExplicadorConsumer(AsyncWebsocketConsumer):
         if not message_content:
             return
 
-        # 1. Update chat history with user message
+        mentions_tutor = message_mentions_explicador(message_content)
+        prompt_for_ai = strip_explicador_mention(message_content) if mentions_tutor else ""
+
+        # 1. Update chat history with user message (always visible in the room)
         user_name = lock.get("name", "Usuário")
         user_msg = {"role": "user", "content": f"**[{user_name}]**: {message_content}"}
         self.room.chat_history.append(user_msg)
         await self.save_room()
 
-        # Broadcast the new user message immediately
         await self.channel_layer.group_send(
             self.group_name,
             {
@@ -281,14 +295,20 @@ class ExplicadorConsumer(AsyncWebsocketConsumer):
                     "type": "chat_update",
                     "chat_history": self.room.chat_history,
                     "whiteboard_data": self.room.whiteboard_data,
-                    "is_generating": True,
+                    "is_generating": mentions_tutor,
                 },
             },
         )
 
-        # 2. Call AI to explain the subject and generate the whiteboard JSON structure
+        if not mentions_tutor:
+            return
+
+        if not prompt_for_ai:
+            prompt_for_ai = "Olá, estou disponível para ajudar. Em que posso esclarecer as tuas dúvidas?"
+
+        # 2. Call AI only when @explicador is mentioned
         try:
-            ai_response = await self.generate_ai_explanation(message_content)
+            ai_response = await self.generate_ai_explanation(prompt_for_ai)
             
             # Parse AI output
             parsed_data = self.parse_ai_output(ai_response)

@@ -6,6 +6,7 @@ from accounts.controllers import AuthController
 from courses.controllers import CourseController, LessonController
 from mind_maps.controllers import MindMapController
 from explicador.controllers import ExplicadorController
+from folhas.controllers import FolhaController
 
 api = NinjaExtraAPI(
     title="Bookar API",
@@ -20,6 +21,7 @@ api.register_controllers(
     LessonController,
     MindMapController,
     ExplicadorController,
+    FolhaController,
 )
 
 

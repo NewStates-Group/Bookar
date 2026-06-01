@@ -7,6 +7,7 @@ import { PanelLeft, Menu } from "lucide-react";
 import Image from "next/image";
 import { useSession } from "next-auth/react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { AppFloatingMenu } from "@/components/AppFloatingMenu";
 
 export default function AppLayout({
   children,
@@ -41,6 +42,7 @@ export default function AppLayout({
     return (
       <main className="min-h-screen bg-slate-50">
         {children}
+        <AppFloatingMenu />
       </main>
     );
   }
@@ -82,6 +84,8 @@ export default function AppLayout({
           {children}
         </main>
       </div>
+
+      <AppFloatingMenu />
     </div>
   );
 }

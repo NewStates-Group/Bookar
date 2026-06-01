@@ -94,6 +94,18 @@ function StreamingMessage({ content, active }: { content: string; active: boolea
   return <ReactMarkdown>{displayedText}</ReactMarkdown>;
 }
 
+const EXPLICADOR_MENTION = "@explicador";
+
+function messageMentionsExplicador(text: string): boolean {
+  return text.toLowerCase().includes(EXPLICADOR_MENTION);
+}
+
+function ensureExplicadorMention(text: string): string {
+  if (messageMentionsExplicador(text)) return text;
+  const trimmed = text.trim();
+  return trimmed ? `${EXPLICADOR_MENTION} ${trimmed}` : `${EXPLICADOR_MENTION} `;
+}
+
 export default function ExplicadorRoomPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -436,11 +448,11 @@ export default function ExplicadorRoomPage() {
           if (promptParam && (!data.chat_history || data.chat_history.length <= 1)) {
             // Send grab_lock first to hold the chalk
             socketRef.current?.send(JSON.stringify({ type: "grab_lock" }));
-            // Send the prompt message
+            const promptMessage = ensureExplicadorMention(promptParam);
             socketRef.current?.send(
               JSON.stringify({
                 type: "chat_message",
-                message: promptParam,
+                message: promptMessage,
               })
             );
             // Clean the query parameter from browser address bar
@@ -727,20 +739,33 @@ export default function ExplicadorRoomPage() {
   wsMessageHandlerRef.current = handleWebSocketMessage;
 
   // 3. Message sending (restricted to lock holder)
-  const handleSendMessage = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!message.trim() || isGenerating) return;
+  const submitChatMessage = (rawMessage: string) => {
+    const trimmed = rawMessage.trim();
+    if (!trimmed || isGenerating) return;
 
     setIsInputSubmitting(true);
     sendWSMessage({
       type: "chat_message",
-      message: message,
+      message: trimmed,
     });
 
     setMessage("");
     setTimeout(() => {
       setIsInputSubmitting(false);
-    }, 450); // Match animation duration
+    }, 450);
+  };
+
+  const handleSendMessage = (e: React.FormEvent) => {
+    e.preventDefault();
+    submitChatMessage(message);
+  };
+
+  const handleMentionExplicador = () => {
+    if (!isLockHolder || isGenerating) return;
+
+    const withMention = ensureExplicadorMention(message);
+    setMessage(withMention);
+    submitChatMessage(withMention);
   };
 
   // Draggable Splitter Pointer Events
@@ -829,6 +854,7 @@ export default function ExplicadorRoomPage() {
   const currentLock = whiteboardData.lock;
   const isLockHolder = currentLock && currentLock.connection_id === connectionId;
   const showWhiteboard = whiteboardData.show_whiteboard === true;
+  const mentionsExplicadorInInput = messageMentionsExplicador(message);
 
   const combinedRoster = [
     {
@@ -1129,7 +1155,7 @@ export default function ExplicadorRoomPage() {
               ref={chatInputRef}
               placeholder={
                 isLockHolder
-                  ? "Pergunte ao explicador..."
+                  ? "Escreve no chat... usa @explicador para o tutor responder"
                   : currentLock
                     ? `${currentLock.name} está a escrever...`
                     : "Pegue o Lápis acima para escrever..."
@@ -1149,6 +1175,20 @@ export default function ExplicadorRoomPage() {
               className="w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:text-cyan-600 hover:bg-cyan-50 disabled:opacity-40 transition-all duration-200 flex-shrink-0 cursor-pointer"
             >
               <Mic className="w-4 h-4" />
+            </button>
+
+            <button
+              type="button"
+              onClick={handleMentionExplicador}
+              disabled={!isLockHolder || isGenerating}
+              title="Mencionar @explicador e pedir resposta"
+              className={`w-8 h-8 flex items-center justify-center rounded-full transition-all duration-200 flex-shrink-0 cursor-pointer disabled:opacity-40 ${
+                mentionsExplicadorInInput
+                  ? "bg-cyan-100 text-cyan-700 ring-2 ring-cyan-300/60"
+                  : "text-slate-400 hover:text-cyan-600 hover:bg-cyan-50"
+              }`}
+            >
+              <Bot className="w-4 h-4" />
             </button>
 
             {/* Send button */}

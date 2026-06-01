@@ -23,21 +23,21 @@ import {
   Volume2,
   BookOpen,
   Award,
-  PenTool,
   CheckCircle2,
   Lock,
-  Eye,
   X,
   Share2,
   Copy,
   Check,
   Download,
   Users,
+  StickyNote,
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState, useRef } from "react";
 import useSWR from "swr";
 import { authenticatedFetcher, apiRequest } from "@/lib/api";
+import { useNotebook } from "@/context/NotebookContext";
 import { motion, AnimatePresence } from "framer-motion";
 import ReactMarkdown from "react-markdown";
 import { toast } from "sonner";
@@ -116,9 +116,8 @@ export default function MindMapDetailPage() {
     }
   );
 
-  // Active sub-tab inside selected node details (video, reading, quiz, notes)
-  const [activeSideTab, setActiveSideTab] = useState<"video" | "reading" | "quiz" | "notes">("video");
-  const [isEditingNotes, setIsEditingNotes] = useState<boolean>(false);
+  // Active sub-tab inside selected node details (video, reading, quiz)
+  const [activeSideTab, setActiveSideTab] = useState<"video" | "reading" | "quiz">("video");
 
   // States for user-dragged/resized nodes
   const [customPositions, setCustomPositions] = useState<Record<string, { x: number; y: number }>>({});
@@ -264,6 +263,7 @@ export default function MindMapDetailPage() {
 
   // Deriving isOwner safely
   const isOwner = mindMap?.is_owner !== false;
+  const { openFolhaForMindMapNode } = useNotebook();
 
   const toggleShare = async () => {
     setIsSharingLoading(true);
@@ -470,51 +470,18 @@ export default function MindMapDetailPage() {
     }
   };
 
-  // --- Debounced Personal Note Editor ---
-  const [noteText, setNoteText] = useState("");
-  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
-  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  useEffect(() => {
-    if (selectedNode?.type === 3) {
-      const existingNote = mindMap?.notes?.[selectedNode.data.id] || "";
-      setNoteText(existingNote);
-      setSaveStatus("idle");
+  const handleAnotar = () => {
+    if (!selectedNode || selectedNode.type !== 3 || !params.id) return;
+    if (!isOwner) {
+      toast.warning("Importa este mapa mental para criar anotações.");
+      return;
     }
-  }, [selectedNode?.data.id, mindMap?.notes]);
-
-  const saveNote = async (text: string, nodeId: string) => {
-    setSaveStatus("saving");
-    try {
-      await apiRequest(
-        `${process.env.NEXT_PUBLIC_API_URL}/mind-maps/${params.id}/node/${nodeId}/note`,
-        {
-          method: "POST",
-          body: JSON.stringify({ content: text }),
-        }
-      );
-      setSaveStatus("saved");
-      mutateMindMap();
-    } catch (err) {
-      setSaveStatus("idle");
-    }
-  };
-
-  const handleNoteChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const text = e.target.value;
-    setNoteText(text);
-    setSaveStatus("saving");
-
-    if (debounceTimeoutRef.current) {
-      clearTimeout(debounceTimeoutRef.current);
-    }
-
-    if (selectedNode) {
-      const nodeId = selectedNode.data.id;
-      debounceTimeoutRef.current = setTimeout(() => {
-        saveNote(text, nodeId);
-      }, 1000);
-    }
+    openFolhaForMindMapNode(
+      params.id as string,
+      selectedNode.data.id,
+      selectedNode.data.title,
+      mindMap?.notes?.[selectedNode.data.id]
+    );
   };
 
   // Automatically select the first Level 3 node on initial load
@@ -1350,14 +1317,13 @@ export default function MindMapDetailPage() {
                             Teste
                           </button>
                           <button
-                            onClick={() => setActiveSideTab("notes")}
-                            className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-bold rounded-xl transition-all ${activeSideTab === "notes"
-                              ? "bg-white text-cyan-600 shadow-sm border border-slate-200/40"
-                              : "text-muted-foreground hover:text-foreground hover:bg-white/40"
-                              }`}
+                            type="button"
+                            onClick={handleAnotar}
+                            className="flex items-center justify-center gap-1.5 py-2 px-3 text-xs font-bold rounded-xl transition-all text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-100/80 shrink-0"
+                            title="Abrir caderno de notas deste nó"
                           >
-                            <PenTool className="w-3.5 h-3.5" />
-                            Notas
+                            <StickyNote className="w-3.5 h-3.5" />
+                            Anotar
                           </button>
                         </div>
                       </div>
@@ -1709,97 +1675,6 @@ export default function MindMapDetailPage() {
                                 </Button>
                               </div>
                             )
-                          )}
-                        </div>
-                      )}
-
-                      {/* 4. AUTO-SAVING NOTES TAB */}
-                      {selectedNode.type === 3 && activeSideTab === "notes" && (
-                        <div className="">
-                          {!isOwner ? (
-                            <div className="p-6 rounded-2xl bg-stone-50 border border-stone-200/50 flex flex-col items-center justify-center text-center gap-3">
-                              <PenTool className="w-10 h-10 text-stone-400/40 animate-bounce" />
-                              <h3 className="font-bold text-stone-850 text-xs sm:text-sm">Notas Bloqueadas 🔒</h3>
-                              <p className="text-xs text-stone-450 max-w-xs leading-relaxed">
-                                Para escrever anotações de estudo personalizadas e salvá-las no seu perfil, importe este mapa mental.
-                              </p>
-                              <Button onClick={importMindMap} disabled={isImporting} className="bg-cyan-500 hover:bg-cyan-600 text-white rounded-full text-xs font-bold px-6 h-9 transition-transform active:scale-95 shadow-sm shadow-cyan-500/10">
-                                {isImporting ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : <Download className="w-3.5 h-3.5 mr-1.5" />}
-                                Importar Mapa Mental
-                              </Button>
-                            </div>
-                          ) : (
-                            /* Paper-styled Minimalist Document Card */
-                            <div className="bg-[#FAF9F6] border shadow-sm p-5 min-h-[380px] flex flex-col transition-all duration-300 hover:shadow-md relative group">
-
-                              {/* Paper Header / Control Bar */}
-                              <div className="flex items-center justify-between pb-3.5 mb-3 border-b border-stone-200/40 select-none">
-                                <div className="flex items-center gap-2">
-                                  <div className={`w-2 h-2 rounded-full transition-all ${saveStatus === "saving" ? "bg-amber-400 animate-pulse" : "bg-emerald-400"
-                                    }`} />
-                                  <span className="text-[10px] font-extrabold text-stone-400 uppercase tracking-wider">
-                                    {saveStatus === "saving" ? "Salvando Notas..." : "Notas Salvas"}
-                                  </span>
-                                </div>
-
-                                <div className="flex bg-stone-200/50 p-0.5 rounded-lg gap-0.5">
-                                  <button
-                                    type="button"
-                                    onClick={(e) => { e.stopPropagation(); setIsEditingNotes(true); }}
-                                    className={`flex items-center gap-1.5 px-3 py-1 text-[10px] font-bold rounded-md transition-all ${isEditingNotes
-                                      ? "bg-white text-stone-900 shadow-sm"
-                                      : "text-stone-500 hover:text-stone-850"
-                                      }`}
-                                  >
-                                    <PenTool className="w-3 h-3" />
-                                    Escrever
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={(e) => { e.stopPropagation(); setIsEditingNotes(false); }}
-                                    className={`flex items-center gap-1.5 px-3 py-1 text-[10px] font-bold rounded-md transition-all ${!isEditingNotes
-                                      ? "bg-white text-stone-900 shadow-sm"
-                                      : "text-stone-500 hover:text-stone-850"
-                                      }`}
-                                  >
-                                    <Eye className="w-3 h-3" />
-                                    Visualizar
-                                  </button>
-                                </div>
-                              </div>
-
-                              {/* Paper Writing Area */}
-                              <div className="flex-1 flex flex-col">
-                                {isEditingNotes ? (
-                                  <textarea
-                                    placeholder="Escreva suas anotações aqui usando Markdown... 
-  # Títulos
-  * Tópicos
-  **Negrito** ou `código`."
-                                    value={noteText}
-                                    onChange={handleNoteChange}
-                                    autoFocus
-                                    className="w-full flex-1 min-h-[300px] resize-none border-none focus:ring-0 focus:outline-none bg-transparent text-stone-800 text-xs sm:text-sm leading-relaxed font-sans placeholder-stone-300"
-                                  />
-                                ) : (
-                                  <div
-                                    onClick={() => setIsEditingNotes(true)}
-                                    className="w-full flex-1 min-h-[300px] cursor-text prose prose-stone prose-sm max-w-none text-stone-800 focus:outline-none"
-                                  >
-                                    {noteText.trim() ? (
-                                      <ReactMarkdown>{noteText}</ReactMarkdown>
-                                    ) : (
-                                      <div className="flex flex-col items-center justify-center py-20 text-stone-300 text-center gap-2 select-none">
-                                        <PenTool className="w-8 h-8 opacity-45 text-stone-400" />
-                                        <p className="text-xs font-bold text-stone-400">Folha em Branco</p>
-                                        <p className="text-[10px] max-w-[220px] text-stone-400/80">Clique em qualquer lugar do papel para começar a digitar suas anotações com suporte a Markdown...</p>
-                                      </div>
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-
-                            </div>
                           )}
                         </div>
                       )}

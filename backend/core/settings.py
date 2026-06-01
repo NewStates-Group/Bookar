@@ -38,6 +38,7 @@ INSTALLED_APPS = [
     "channels",
     "mind_maps",
     "explicador",
+    "folhas",
 ]
 
 MIDDLEWARE = [
