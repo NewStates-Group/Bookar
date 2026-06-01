@@ -305,7 +305,7 @@ export default function MindMapDetailPage() {
   // Reset side tab when node changes
   useEffect(() => {
     setActiveSideTab("video");
-    setIsEditingNotes(false);
+    // setIsEditingNotes(false);
   }, [selectedNode?.data.id]);
 
   // --- Dynamic Reading Material On-Demand Content Generation ---
