@@ -1,5 +1,7 @@
-ao que tem acontecido muito é eu sair da plataforma e qnd eu voltar ele me obrigar a fazer login dnv mesmo o access token expirou mas tem o refresh e ele precisa fazer refresh automatico para evitar login toda a hora, resolve isso no backend e no frontend
-
-
-
-escreve o agents.md e coloca as especificacoes do design do bookar e os outros necessarios para que as outras ia gerem codigo de acordo
+verificar as falhas no áudio
+ajustar responsividade no mobile
+quadro abre varias vezes, a cada mensagem, ele só pode abrir qnd o explicador estiver a escrever
+salas que já acessei devem ser guardadas
+qnd clico em uma sala e n posso entrar salva e apos o login redireciona
+verificar o processo de envio de mensagens ao explicador (ele pode estar processando duas vezes)
+adicionar botao para interroper a resposta do explicador
