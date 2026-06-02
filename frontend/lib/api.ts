@@ -1,5 +1,6 @@
 import { getSession, signOut } from "next-auth/react";
 import { ensureFreshSession } from "@/lib/auth-session";
+import { authDebug } from "@/lib/auth-debug";
 
 /**
  * Enhanced fetcher for SWR that handles intermittent 401 errors
@@ -28,9 +29,11 @@ export const apiRequest = async (url: string, options: RequestInit = {}) => {
   let res = await fetch(url, { ...options, headers });
 
   if (res.status === 401) {
+    authDebug("API 401: token expirado, refrescando…", { url });
     const refreshedSession = await ensureFreshSession();
 
     if (refreshedSession?.accessToken) {
+      authDebug("Pedido API a repetir com token renovado.", { url });
       res = await fetch(url, {
         ...options,
         headers: {
@@ -41,6 +44,7 @@ export const apiRequest = async (url: string, options: RequestInit = {}) => {
     }
 
     if (res.status === 401) {
+      authDebug("Refresh não resolveu o 401, a terminar sessão.");
       await signOut({ callbackUrl: "/login" });
       throw new Error("Sessão expirada. Por favor, faça login novamente.");
     }

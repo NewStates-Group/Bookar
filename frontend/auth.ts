@@ -1,5 +1,6 @@
 import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
+import { authDebug } from "@/lib/auth-debug";
 
 const apiUrlRaw = process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL;
 const apiUrl = apiUrlRaw?.endsWith("/") ? apiUrlRaw.slice(0, -1) : apiUrlRaw;
@@ -52,8 +53,15 @@ async function getMe(accessToken: string) {
 
 async function refreshAccessToken(token: Record<string, unknown>) {
   if (!token.refreshToken) {
+    authDebug("Refresh impossível: sem refresh token.");
     return { ...token, error: "RefreshAccessTokenError" as const };
   }
+
+  authDebug("Token expirado, refrescando…", {
+    expiraEm: token.accessTokenExpires
+      ? new Date(token.accessTokenExpires as number).toISOString()
+      : "desconhecido",
+  });
 
   try {
     const res = await backendFetch(`${apiUrl}/auth/refresh`, {
@@ -78,12 +86,18 @@ async function refreshAccessToken(token: Record<string, unknown>) {
         detail.includes("blacklist");
 
       if (isInvalidRefresh) {
+        authDebug("Refresh falhou: refresh token inválido ou expirado.", {
+          status: res.status,
+        });
         return { ...token, error: "RefreshAccessTokenError" as const };
       }
-      // Erro transitório (rede/5xx): mantém tokens para nova tentativa
+      authDebug("Refresh adiado (erro transitório), nova tentativa depois.", {
+        status: res.status,
+      });
       return token;
     }
 
+    authDebug("Refresh concluído com sucesso.");
     return {
       ...token,
       accessToken: data.access,
@@ -91,7 +105,10 @@ async function refreshAccessToken(token: Record<string, unknown>) {
       accessTokenExpires: accessExpiresAt(),
       error: undefined,
     };
-  } catch {
+  } catch (err) {
+    authDebug("Refresh falhou (rede/timeout).", {
+      erro: err instanceof Error ? err.message : String(err),
+    });
     return token;
   }
 }
@@ -215,6 +232,9 @@ export const authOptions: NextAuthOptions = {
           working.refreshToken &&
           (!working.accessToken || isAccessExpired(working.accessTokenExpires))
         ) {
+          if (isAccessExpired(working.accessTokenExpires)) {
+            authDebug("Callback JWT: access token expirado, a renovar…");
+          }
           working = await refreshAccessToken(working);
           if (working.error === "RefreshAccessTokenError") {
             return working;

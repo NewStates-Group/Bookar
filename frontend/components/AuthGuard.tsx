@@ -58,6 +58,10 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
       if (isProfileIncomplete && isAppRoute && pathname !== "/app/profile") {
         router.replace("/app/profile");
       }
+
+      if (pathname === "/") {
+        router.replace("/app/courses")
+      }
     }
   }, [status, session, pathname, router, isAppRoute, sessionCheckDone]);
 
