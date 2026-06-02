@@ -91,8 +91,6 @@ class CourseOut(ModelSchema):
     @staticmethod
     def resolve_is_owner(obj, context):
         user = context.get("request").user
-        logger.critical(f"Course owner: {obj.owner} (ID: {obj.owner_id})")
-        logger.critical(f"Request user: {user} (ID: {getattr(user, 'id', 'N/A')})")
         return obj.owner_id == getattr(user, "id", None)
 
 

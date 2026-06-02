@@ -452,7 +452,6 @@ def generate_next_module(self, user_pk: int, course_pk: int, module_pk: int = No
         return
 
     existing_modules = course.modules.all().order_by("created_at")
-    logger.critical(existing_modules)
     modules_context = "\n".join([f"- {m.name}: {m.desc}" for m in existing_modules])
     prompt = (
         "You are an expert educational content creator. "
