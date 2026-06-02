@@ -1,11 +1,8 @@
 import concurrent.futures
-import io
 import logging
-import os
 import shutil
 import subprocess
 import tempfile
-import time
 import uuid
 from io import BytesIO
 from pathlib import Path
@@ -15,17 +12,10 @@ from core.mail import send_certificate_email
 from core.utils import send_user_update
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.core.cache import cache
 from django.core.files.base import ContentFile
-from django.core.files.storage import default_storage
 from django.db import transaction
 from google.genai import types
-from PIL import Image, ImageDraw, UnidentifiedImageError
-from pypdf import PdfReader, PdfWriter
-from reportlab.lib import colors
-from reportlab.lib.pagesizes import A4, landscape
-from reportlab.lib.units import mm
-from reportlab.pdfgen import canvas
+from PIL import Image
 
 from .exceptions import LessonDoesNotExist, ThumbnailCreationError
 from .models import (
@@ -195,7 +185,9 @@ def generate_lesson_plan(self, user_id, lesson_id: int):
         return None
 
     if lesson.segments_data:
-        logger.info(f"Lesson {lesson_id} already has segments_data, jumping to media generation.")
+        logger.info(
+            f"Lesson {lesson_id} already has segments_data, jumping to media generation."
+        )
         generate_lesson_media.delay(user_id, lesson_id)
         return
 
@@ -241,19 +233,21 @@ def generate_lesson_plan(self, user_id, lesson_id: int):
 
         lesson.segments_data = segments
         lesson.save(update_fields=["segments_data"])
-        
+
         generate_lesson_media.delay(user_id, lesson_id)
         return
-        
+
     except Exception as e:
         with transaction.atomic():
             lesson.status = "ERROR"
             lesson.save(update_fields=["status"])
-            
+
             def _on_error():
                 send_user_update(
-                    user_id, {"type": "lesson_update", "id": lesson.short_id, "status": "ERROR"}
+                    user_id,
+                    {"type": "lesson_update", "id": lesson.short_id, "status": "ERROR"},
                 )
+
             transaction.on_commit(_on_error)
         raise e
 
@@ -295,7 +289,6 @@ def generate_lesson_media(self, user_id, lesson_id: int):
     temp_dir = Path(tempfile.mkdtemp())
     client = get_genai_client()
     try:
-
         # --- RESTORED LOGIC WITH INITIAL SEQUENTIAL CHECK ---
         videos = []
         context = {"working_provider": None}
@@ -977,11 +970,9 @@ def create_course_thumb(course_pk: str, prompt: str, user_id=None):
     default_retry_delay=40,
 )
 def generate_certificate_task(user_id: int, course_id: int, full_name: str):
-    import io
     import uuid
 
     from django.core.files.base import ContentFile
-    from google.genai import types
     from PIL import Image
 
     from .models import Course, CourseEnrollment

@@ -1,13 +1,14 @@
 import uuid
+
 import shortuuid
-from django.contrib.auth import get_user_model
-from django.conf import settings
-from django.db import models
 from cloudinary_storage.storage import (
-    VideoMediaCloudinaryStorage,
-    RawMediaCloudinaryStorage,
     MediaCloudinaryStorage,
+    RawMediaCloudinaryStorage,
+    VideoMediaCloudinaryStorage,
 )
+from django.conf import settings
+from django.contrib.auth import get_user_model
+from django.db import models
 
 User = get_user_model()
 
@@ -174,7 +175,9 @@ class Lesson(models.Model):
     narration = models.TextField(null=True, blank=True)
     key_points = models.CharField(max_length=150, null=True, blank=True)
     scene_suggestion = models.TextField(null=True, blank=True)
-    segments_data = models.JSONField(null=True, blank=True, help_text="Cache do guião gerado pela Task 1")
+    segments_data = models.JSONField(
+        null=True, blank=True, help_text="Cache do guião gerado pela Task 1"
+    )
     created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)
 
 

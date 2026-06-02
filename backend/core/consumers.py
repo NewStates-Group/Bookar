@@ -1,8 +1,9 @@
 import json
-from channels.generic.websocket import AsyncWebsocketConsumer
-from ninja_jwt.tokens import AccessToken
-from django.contrib.auth import get_user_model
+
 from asgiref.sync import sync_to_async
+from channels.generic.websocket import AsyncWebsocketConsumer
+from django.contrib.auth import get_user_model
+from ninja_jwt.tokens import AccessToken
 
 User = get_user_model()
 

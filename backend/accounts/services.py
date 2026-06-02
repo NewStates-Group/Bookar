@@ -7,22 +7,21 @@ import uuid
 
 import httpx
 from django.conf import settings
-from django.contrib.auth import get_user_model, authenticate
+from django.contrib.auth import authenticate, get_user_model
 from django.core.files.base import ContentFile
-from django.core.signing import TimestampSigner, BadSignature, SignatureExpired
-from django.db import transaction, IntegrityError
+from django.core.signing import BadSignature, SignatureExpired, TimestampSigner
+from django.db import transaction
 from google.auth.transport import requests
 from google.oauth2 import id_token
 from ninja.errors import HttpError
 from ninja_jwt.tokens import RefreshToken
 
+from .models import EmailVerificationCode
 from .tasks import (
+    send_password_reset_email_task,
     send_verification_email_task,
     send_welcome_email_task,
-    send_password_reset_email_task,
 )
-from .models import EmailVerificationCode
-from courses.models import Course
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
@@ -76,8 +75,9 @@ class AuthService:
         }
 
     def verify_verification_code(self, email, code):
-        from django.utils import timezone
         from datetime import timedelta
+
+        from django.utils import timezone
 
         ten_minutes_ago = timezone.now() - timedelta(minutes=10)
         return EmailVerificationCode.objects.filter(

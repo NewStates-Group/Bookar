@@ -1,9 +1,9 @@
+import logging
 from datetime import datetime
 from typing import List, Optional
 
 from ninja import ModelSchema, Schema
 from ninja.orm import create_schema
-from pydantic import Field
 
 from .models import (
     Choice,
@@ -14,11 +14,7 @@ from .models import (
     Module,
     Question,
     Quiz,
-    CourseShare,
-    CourseShareClaim,
 )
-
-import logging
 
 logger = logging.Logger(__name__)
 
@@ -327,8 +323,10 @@ class ModuleMaterialSchema(Schema):
 
 # ── Public featured / discovery schemas ──────────────────────────────────────
 
+
 class CourseFeaturedOut(Schema):
     """Lightweight card schema for the public courses carousel."""
+
     id: str
     title: Optional[str] = None
     desc: Optional[str] = None
@@ -353,6 +351,7 @@ class CoursePreviewModuleOut(Schema):
 
 class CoursePreviewOut(Schema):
     """Full detail schema for the public preview modal, no auth required."""
+
     id: str
     title: Optional[str] = None
     desc: Optional[str] = None

@@ -5,7 +5,6 @@ import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import {
   Loader2,
   Send,
@@ -14,11 +13,8 @@ import {
   Users,
   Check,
   Volume2,
-  ArrowLeft,
   Pencil,
-  Sparkles,
   PenTool,
-  Share2,
   Bot,
   Lock,
   X,
@@ -48,7 +44,6 @@ interface WhiteboardData {
   summary?: string;
   lock?: LockObject | null;
   show_whiteboard?: boolean;
-  /** Sinal do backend: abrir o quadro nesta resposta (não força fechar). */
   open_whiteboard?: boolean;
 }
 
@@ -78,14 +73,13 @@ function StreamingMessage({ content, active }: { content: string; active: boolea
         setDisplayedText(currentText);
         wordIndex++;
 
-        // Dispatch event so parent layout can auto-scroll
         if (typeof window !== "undefined") {
           window.dispatchEvent(new CustomEvent("chat-stream-tick"));
         }
       } else {
         clearInterval(interval);
       }
-    }, 45); // Snappy, readable word streaming speed
+    }, 45);
 
     return () => clearInterval(interval);
   }, [content, active]);

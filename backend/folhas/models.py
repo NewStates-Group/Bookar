@@ -1,6 +1,7 @@
 import uuid
-from django.db import models
+
 from django.conf import settings
+from django.db import models
 
 
 class Folha(models.Model):
@@ -27,7 +28,8 @@ class Folha(models.Model):
         constraints = [
             models.UniqueConstraint(
                 fields=["user", "mind_map", "node_id"],
-                condition=models.Q(mind_map__isnull=False) & models.Q(node_id__isnull=False),
+                condition=models.Q(mind_map__isnull=False)
+                & models.Q(node_id__isnull=False),
                 name="unique_folha_per_mind_map_node",
             )
         ]

@@ -1,11 +1,11 @@
 from django.db import models
 from ninja.errors import HttpError
+
 from .models import MindMap
 from .tasks import generate_mind_map_task
 
 
 class MindMapService:
-
     def list_mind_maps(self, user):
         maps = MindMap.objects.filter(user=user).order_by("-created_at")
         for m in maps:
@@ -19,8 +19,7 @@ class MindMapService:
             language=language,
             title="Gerando...",
             desc=(
-                "Seu mapa mental está sendo gerado pela nossa inteligência"
-                " artificial."
+                "Seu mapa mental está sendo gerado pela nossa inteligência artificial."
             ),
         )
 
@@ -47,7 +46,9 @@ class MindMapService:
     def delete_mind_map(self, uuid_str: str, user):
         mind_map = self.get_mind_map(uuid_str, user)
         if mind_map.user != user:
-            raise HttpError(403, "Você não tem permissão para eliminar este mapa mental.")
+            raise HttpError(
+                403, "Você não tem permissão para eliminar este mapa mental."
+            )
         mind_map.delete()
         return {"success": True, "message": "Mapa mental eliminado."}
 
@@ -65,11 +66,13 @@ class MindMapService:
         return None
 
     def get_node_content(self, uuid_str: str, node_id: str, user):
-        from courses.utils import generate_text_with_fallback, extract_json
+        from courses.utils import extract_json, generate_text_with_fallback
 
         mind_map = self.get_mind_map(uuid_str, user)
         if not mind_map.nodes:
-            raise HttpError(400, "O mapa mental ainda está sendo gerado ou não possui nós.")
+            raise HttpError(
+                400, "O mapa mental ainda está sendo gerado ou não possui nós."
+            )
 
         node = self._find_node(mind_map.nodes, node_id)
         if not node:
@@ -85,20 +88,26 @@ class MindMapService:
         # Otherwise, generate dynamically on-demand using AI
         lang = getattr(mind_map, "language", "pt")
         if lang == "en":
-            lang_instruction = "Todos os valores de texto devem ser em Inglês (English)."
+            lang_instruction = (
+                "Todos os valores de texto devem ser em Inglês (English)."
+            )
         elif lang == "es":
-            lang_instruction = "Todos os valores de texto devem ser em Espanhol (Spanish)."
+            lang_instruction = (
+                "Todos os valores de texto devem ser em Espanhol (Spanish)."
+            )
         else:
-            lang_instruction = "Todos os valores de texto devem ser em Português do Brasil."
+            lang_instruction = (
+                "Todos os valores de texto devem ser em Português do Brasil."
+            )
 
         prompt = f"""
         Você é um educador especialista e autoridade máxima no assunto: "{mind_map.topic}".
-        Sua tarefa é elaborar um MATERIAL DIDÁTICO COMPLETO, rico, extremamente aprofundado e didático em formato Markdown para a aula: "{node.get('title')}" (contexto e foco da aula: {node.get('desc')}).
+        Sua tarefa é elaborar um MATERIAL DIDÁTICO COMPLETO, rico, extremamente aprofundado e didático em formato Markdown para a aula: "{node.get("title")}" (contexto e foco da aula: {node.get("desc")}).
 
         IMPORTANTE: Não escreva apenas uma descrição curta ou resumo rápido! Este texto deve ser um verdadeiro material de leitura para a aula, completo e abrangente, ideal para um estudante aprender o conceito do zero e se aprofundar de verdade. O texto deve ter de 800 a 1500 palavras de puro conteúdo educacional de alta qualidade, sem placeholders, pontas soltas ou evasões.
 
         Estrutura sugerida e obrigatória para o material de leitura (em `text_content`):
-        1. **Título Principal**: Comece com o título da aula formatado como `# {node.get('title')}`.
+        1. **Título Principal**: Comece com o título da aula formatado como `# {node.get("title")}`.
         2. **Introdução Didática**: Uma contextualização instigante da aula, explicando por que este assunto é fundamental no contexto de "{mind_map.topic}" e quais problemas práticos ele resolve no mundo real.
         3. **Explicação Teórica Detalhada**: Explique os conceitos teóricos fundamentais de forma mastigada, usando analogias claras, definições precisas de termos técnicos e discussões aprofundadas sobre como o conceito funciona nos bastidores.
         4. **Conceitos-Chave e Terminologias**: Use tabelas Markdown, blockquotes ou listas com definições em negrito para destacar os termos mais importantes.
@@ -119,7 +128,7 @@ class MindMapService:
 
         Retorne estritamente o formato JSON a seguir, garantindo que o texto longo e completo da aula seja colocado inteiramente como string na chave `text_content` com as quebras de linha formatadas como \\n:
         {{
-            "text_content": "# {node.get('title')}\\n\\n[Escreva aqui todo o conteúdo didático extenso, detalhado, aprofundado e altamente educativo da aula, estruturado com Introdução, Teoria, Conceitos-Chave, Exemplos Práticos, Dicas de Ouro, Exercícios de Reflexão e Resumo. Mínimo de 800 a 1500 palavras de texto real e didático...]",
+            "text_content": "# {node.get("title")}\\n\\n[Escreva aqui todo o conteúdo didático extenso, detalhado, aprofundado e altamente educativo da aula, estruturado com Introdução, Teoria, Conceitos-Chave, Exemplos Práticos, Dicas de Ouro, Exercícios de Reflexão e Resumo. Mínimo de 800 a 1500 palavras de texto real e didático...]",
             "additional_resources": [
                 {{
                     "title": "Nome do Recurso / Plataforma Oficial",
@@ -130,14 +139,16 @@ class MindMapService:
         """
 
         try:
-            response = generate_text_with_fallback([{"role": "user", "content": prompt}])
+            response = generate_text_with_fallback(
+                [{"role": "user", "content": prompt}]
+            )
             data = extract_json(response)
             if not data or "text_content" not in data:
                 raise ValueError("AI response did not return valid text_content JSON.")
 
             text_content = data.get("text_content", "")
             resources = data.get("additional_resources", [])
-        except Exception as e:
+        except Exception:
             # Fallback content if AI fails
             text_content = f"# {node.get('title')}\n\n{node.get('desc')}\n\n*Nota: Não foi possível gerar o conteúdo aprofundado no momento. Por favor, tente novamente mais tarde.*"
             resources = []
@@ -172,11 +183,13 @@ class MindMapService:
         }
 
     def get_or_create_node_quiz(self, uuid_str: str, node_id: str, user):
-        from courses.utils import generate_text_with_fallback, extract_json
+        from courses.utils import extract_json, generate_text_with_fallback
 
         mind_map = self.get_mind_map(uuid_str, user)
         if not mind_map.nodes:
-            raise HttpError(400, "O mapa mental ainda está sendo gerado ou não possui nós.")
+            raise HttpError(
+                400, "O mapa mental ainda está sendo gerado ou não possui nós."
+            )
 
         node = self._find_node(mind_map.nodes, node_id)
         if not node:
@@ -190,25 +203,33 @@ class MindMapService:
             quiz_data = mind_map.quizzes[node_id]
             sanitized_questions = []
             for q in quiz_data.get("questions", []):
-                sanitized_questions.append({
-                    "id": q["id"],
-                    "type": q["type"],
-                    "question": q["question"],
-                    "options": q.get("options"),
-                })
+                sanitized_questions.append(
+                    {
+                        "id": q["id"],
+                        "type": q["type"],
+                        "question": q["question"],
+                        "options": q.get("options"),
+                    }
+                )
             return {"questions": sanitized_questions}
 
         # Generate dynamically on-demand using AI
         lang = getattr(mind_map, "language", "pt")
         if lang == "en":
-            lang_instruction = "Todos os valores de texto devem ser em Inglês (English)."
+            lang_instruction = (
+                "Todos os valores de texto devem ser em Inglês (English)."
+            )
         elif lang == "es":
-            lang_instruction = "Todos os valores de texto devem ser em Espanhol (Spanish)."
+            lang_instruction = (
+                "Todos os valores de texto devem ser em Espanhol (Spanish)."
+            )
         else:
-            lang_instruction = "Todos os valores de texto devem ser em Português do Brasil."
+            lang_instruction = (
+                "Todos os valores de texto devem ser em Português do Brasil."
+            )
 
         prompt = f"""
-        Você é um educador especialista e sua tarefa é gerar um teste de avaliação (quiz) dinâmico e interativo sobre o assunto "{node.get('title')}" (contexto do curso: "{mind_map.topic}").
+        Você é um educador especialista e sua tarefa é gerar um teste de avaliação (quiz) dinâmico e interativo sobre o assunto "{node.get("title")}" (contexto do curso: "{mind_map.topic}").
 
         Regras:
         - Retorne APENAS um JSON válido.
@@ -248,12 +269,14 @@ class MindMapService:
         """
 
         try:
-            response = generate_text_with_fallback([{"role": "user", "content": prompt}])
+            response = generate_text_with_fallback(
+                [{"role": "user", "content": prompt}]
+            )
             data = extract_json(response)
             if not data or "questions" not in data:
                 raise ValueError("AI response did not return valid questions list.")
             quiz_data = data
-        except Exception as e:
+        except Exception:
             # Fallback quiz
             quiz_data = {
                 "questions": [
@@ -261,7 +284,9 @@ class MindMapService:
                         "id": 1,
                         "type": "true_false",
                         "question": f"O tópico '{node.get('title')}' é relevante para o aprendizado de '{mind_map.topic}'?",
-                        "options": ["Verdadeiro", "Falso"] if lang == "pt" else ["True", "False"],
+                        "options": ["Verdadeiro", "Falso"]
+                        if lang == "pt"
+                        else ["True", "False"],
                         "correct_answer": "Verdadeiro" if lang == "pt" else "True",
                     }
                 ]
@@ -276,21 +301,28 @@ class MindMapService:
         # Return sanitized quiz questions (without the answers!)
         sanitized_questions = []
         for q in quiz_data.get("questions", []):
-            sanitized_questions.append({
-                "id": q["id"],
-                "type": q["type"],
-                "question": q["question"],
-                "options": q.get("options"),
-            })
+            sanitized_questions.append(
+                {
+                    "id": q["id"],
+                    "type": q["type"],
+                    "question": q["question"],
+                    "options": q.get("options"),
+                }
+            )
         return {"questions": sanitized_questions}
 
     def submit_node_quiz(self, uuid_str: str, node_id: str, answers: dict, user):
         mind_map = self.get_mind_map(uuid_str, user)
         if mind_map.user != user:
-            raise HttpError(403, "Você precisa importar este mapa mental para salvar progresso e fazer o teste.")
+            raise HttpError(
+                403,
+                "Você precisa importar este mapa mental para salvar progresso e fazer o teste.",
+            )
 
         if not mind_map.quizzes or node_id not in mind_map.quizzes:
-            raise HttpError(400, "O questionário para esta aula não existe ou ainda não foi gerado.")
+            raise HttpError(
+                400, "O questionário para esta aula não existe ou ainda não foi gerado."
+            )
 
         quiz_data = mind_map.quizzes[node_id]
         questions = quiz_data.get("questions", [])
@@ -313,7 +345,7 @@ class MindMapService:
         if passed:
             if not mind_map.completed_nodes:
                 mind_map.completed_nodes = []
-            
+
             updated_completed = list(mind_map.completed_nodes)
             if node_id not in updated_completed:
                 updated_completed.append(node_id)
@@ -331,8 +363,10 @@ class MindMapService:
     def update_node_note(self, uuid_str: str, node_id: str, content: str, user):
         mind_map = self.get_mind_map(uuid_str, user)
         if mind_map.user != user:
-            raise HttpError(403, "Você precisa importar este mapa mental para salvar anotações.")
-        
+            raise HttpError(
+                403, "Você precisa importar este mapa mental para salvar anotações."
+            )
+
         if not mind_map.notes:
             mind_map.notes = {}
 
@@ -346,8 +380,10 @@ class MindMapService:
     def toggle_share(self, uuid_str: str, user):
         mind_map = self.get_mind_map(uuid_str, user)
         if mind_map.user != user:
-            raise HttpError(403, "Apenas o proprietário pode partilhar este mapa mental.")
-        
+            raise HttpError(
+                403, "Apenas o proprietário pode partilhar este mapa mental."
+            )
+
         mind_map.is_shared = not mind_map.is_shared
         mind_map.save(update_fields=["is_shared"])
         return {"success": True, "is_shared": mind_map.is_shared}
@@ -357,14 +393,18 @@ class MindMapService:
             original = MindMap.objects.get(uuid=uuid_str)
             # Ensure they own it or it's public
             if original.user != user and not original.is_shared:
-                raise HttpError(403, "Você não tem permissão para duplicar este mapa mental.")
+                raise HttpError(
+                    403, "Você não tem permissão para duplicar este mapa mental."
+                )
         except MindMap.DoesNotExist:
             raise HttpError(404, "Mapa mental original não encontrado.")
 
         copy_mind_map = MindMap.objects.create(
             user=user,
             topic=original.topic,
-            title=f"{original.title} (Cópia)" if not original.title.endswith("(Cópia)") else original.title,
+            title=f"{original.title} (Cópia)"
+            if not original.title.endswith("(Cópia)")
+            else original.title,
             desc=original.desc,
             status=original.status,
             language=original.language,
@@ -375,7 +415,9 @@ class MindMapService:
         )
 
         # Atomically increment the import counter on the original map
-        MindMap.objects.filter(pk=original.pk).update(import_count=models.F("import_count") + 1)
+        MindMap.objects.filter(pk=original.pk).update(
+            import_count=models.F("import_count") + 1
+        )
 
         copy_mind_map.is_owner = True
         return copy_mind_map
@@ -383,7 +425,9 @@ class MindMapService:
     def skip_node(self, uuid_str: str, node_id: str, user):
         mind_map = self.get_mind_map(uuid_str, user)
         if mind_map.user != user:
-            raise HttpError(403, "Você precisa importar este mapa mental para alterar o progresso.")
+            raise HttpError(
+                403, "Você precisa importar este mapa mental para alterar o progresso."
+            )
 
         if not mind_map.completed_nodes:
             mind_map.completed_nodes = []

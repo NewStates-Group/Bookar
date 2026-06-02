@@ -2,7 +2,6 @@ import logging
 import uuid
 
 from core.utils import send_user_update
-from django.conf import settings
 from django.core.cache import cache
 from django.db.models import Prefetch
 from django.db.models.query import QuerySet
@@ -470,7 +469,6 @@ class CourseService:
         ]
 
     def get_module_material(self, user, module_id: str) -> dict:
-        from .models import ModuleMaterial
 
         try:
             module = Module.objects.get(uuid=module_id)
@@ -515,26 +513,30 @@ class CourseService:
             owner = course.owner
             owner_name = None
             if owner:
-                owner_name = f"{owner.first_name} {owner.last_name}".strip() or owner.username
+                owner_name = (
+                    f"{owner.first_name} {owner.last_name}".strip() or owner.username
+                )
 
-            result.append({
-                "id": str(course.uuid),
-                "title": course.title,
-                "desc": course.desc,
-                "level": course.level,
-                "thumb": thumb_url,
-                "module_count": course.modules.count(),
-                "owner_name": owner_name,
-            })
+            result.append(
+                {
+                    "id": str(course.uuid),
+                    "title": course.title,
+                    "desc": course.desc,
+                    "level": course.level,
+                    "thumb": thumb_url,
+                    "module_count": course.modules.count(),
+                    "owner_name": owner_name,
+                }
+            )
         return result
 
     def get_course_preview(self, course_id: str) -> dict:
         """Return full public preview details (no auth required)."""
         try:
             course = (
-                Course.objects.prefetch_related(
-                    "modules__lessons"
-                ).select_related("owner").get(uuid=course_id, status="READY")
+                Course.objects.prefetch_related("modules__lessons")
+                .select_related("owner")
+                .get(uuid=course_id, status="READY")
             )
         except Course.DoesNotExist:
             raise HttpError(404, "Curso não encontrado")
@@ -549,18 +551,22 @@ class CourseService:
         owner = course.owner
         owner_name = None
         if owner:
-            owner_name = f"{owner.first_name} {owner.last_name}".strip() or owner.username
+            owner_name = (
+                f"{owner.first_name} {owner.last_name}".strip() or owner.username
+            )
 
         modules_data = []
         for module in course.modules.order_by("created_at"):
             lessons = list(module.lessons.values("title", "desc"))
-            modules_data.append({
-                "id": str(module.uuid),
-                "name": module.name,
-                "desc": module.desc,
-                "lesson_count": len(lessons),
-                "lessons": lessons,
-            })
+            modules_data.append(
+                {
+                    "id": str(module.uuid),
+                    "name": module.name,
+                    "desc": module.desc,
+                    "lesson_count": len(lessons),
+                    "lessons": lessons,
+                }
+            )
 
         return {
             "id": str(course.uuid),

@@ -27,7 +27,6 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const intentionalCloseRef = useRef(false);
   const mountedRef = useRef(true);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const tokenRefreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const clearReconnectTimer = () => {
     if (reconnectTimerRef.current) {
@@ -103,17 +102,6 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   connectRef.current = connect;
 
-  const refreshTokenIfNeeded = async () => {
-    const fresh = await ensureFreshSession();
-    const newToken = fresh?.accessToken;
-    if (!newToken || newToken === activeTokenRef.current) return;
-    activeTokenRef.current = newToken;
-    intentionalCloseRef.current = false;
-    reconnectAttemptsRef.current = 0;
-    socketRef.current?.close();
-    await connectRef.current();
-  };
-
   useEffect(() => {
     if (status === "loading") return;
 
@@ -122,24 +110,29 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     reconnectAttemptsRef.current = 0;
     void connectRef.current();
 
-    tokenRefreshTimerRef.current = setInterval(() => {
-      void refreshTokenIfNeeded();
-    }, 10 * 60 * 1000);
-
     return () => {
       mountedRef.current = false;
       intentionalCloseRef.current = true;
       clearReconnectTimer();
-      if (tokenRefreshTimerRef.current) {
-        clearInterval(tokenRefreshTimerRef.current);
-        tokenRefreshTimerRef.current = null;
-      }
       if (socketRef.current) {
         socketRef.current.close();
         socketRef.current = null;
       }
     };
   }, [status]);
+
+  useEffect(() => {
+    if (status !== "authenticated") return;
+
+    const token = (session as { accessToken?: string } | null)?.accessToken;
+    if (!token || token === activeTokenRef.current) return;
+
+    activeTokenRef.current = token;
+    intentionalCloseRef.current = false;
+    reconnectAttemptsRef.current = 0;
+    socketRef.current?.close();
+    void connectRef.current();
+  }, [status, session]);
 
   const sendMessage = (data: any) => {
     if (socketRef.current?.readyState === WebSocket.OPEN) {

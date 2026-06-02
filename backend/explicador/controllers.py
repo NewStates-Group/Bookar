@@ -1,12 +1,13 @@
 from typing import List
+
+from django.contrib.auth import get_user_model
+from django.contrib.auth.models import AnonymousUser
 from injector import inject
 from ninja_extra import api_controller, route
 from ninja_jwt.authentication import JWTAuth
 from ninja_jwt.tokens import AccessToken
-from django.contrib.auth import get_user_model
-from django.contrib.auth.models import AnonymousUser
 
-from .schemas import ExplicadorRoomCreateIn, ExplicadorRoomOut, ExplicadorRoomDetailOut
+from .schemas import ExplicadorRoomCreateIn, ExplicadorRoomDetailOut, ExplicadorRoomOut
 from .services import ExplicadorService
 
 User = get_user_model()
@@ -14,7 +15,6 @@ User = get_user_model()
 
 @api_controller("explicador", tags=["Explicador"])
 class ExplicadorController:
-
     @inject
     def __init__(self, explicador_service: ExplicadorService):
         self.explicador_service = explicador_service
@@ -27,7 +27,14 @@ class ExplicadorController:
     @route.post("", response=ExplicadorRoomOut, auth=JWTAuth())
     def create_room(self, request, data: ExplicadorRoomCreateIn):
         """Create a new explanation room."""
-        return self.explicador_service.create_room(request.user, data.title)
+        course_context = (
+            data.course_context.model_dump(exclude_none=True)
+            if data.course_context
+            else None
+        )
+        return self.explicador_service.create_room(
+            request.user, data.title, course_context=course_context
+        )
 
     @route.get("{room_uuid}", response=ExplicadorRoomDetailOut)
     def get_room(self, request, room_uuid: str):

@@ -5,8 +5,6 @@ import { Loader2 } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { isExplicadorRoomPath, savePendingExplicadorRoom } from "@/lib/pending-explicador-room";
-import { ensureFreshSession } from "@/lib/auth-session";
-
 const PUBLIC_ROUTES = ["/", "/login", "/signup", "/forgot-password", "/reset-password"];
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
@@ -30,7 +28,6 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     (async () => {
       if (!refreshAttempted.current) {
         refreshAttempted.current = true;
-        await ensureFreshSession();
         await update();
       }
       if (!cancelled) {

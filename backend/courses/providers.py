@@ -20,17 +20,18 @@ from __future__ import annotations
 import logging
 import os
 import subprocess
-import uuid
 import urllib.parse
+import uuid
 import wave
 from abc import ABC, abstractmethod
-from io import BytesIO
-from pathlib import Path
 from typing import Any, Optional
 
 import httpx
 from django.conf import settings
 from google.genai import types
+
+from ollama import Client as OllamaClient
+from .utils import get_genai_client, safe_gemini_call
 
 logger = logging.getLogger(__name__)
 
@@ -54,30 +55,55 @@ class BaseProvider(ABC):
 
     def handle(self, **kwargs) -> Any:
         try:
-            logger.info(f"Attempting provider: {self.name}")
             result = self._execute(**kwargs)
-            logger.info(f"Provider {self.name} succeeded.")
             return result
         except Exception as e:
-            logger.warning(f"Provider {self.name} failed: {e}")
             if self._next:
                 return self._next.handle(**kwargs)
-            raise AllProvidersFailed(
-                f"All providers failed. Last error ({self.name}): {e}"
-            ) from e
+            raise AllProvidersFailed(f"All providers failed. ({self.name}): {e}") from e
+
+    def stream(self, **kwargs) -> Any:
+        try:
+            yield from self._stream(**kwargs)
+        except Exception as e:
+            if self._next:
+                yield from self._next.stream(**kwargs)
+            else:
+                raise AllProvidersFailed(
+                    f"All providers failed. ({self.name}): {e}"
+                ) from e
 
     @abstractmethod
-    def _execute(self, **kwargs) -> Any:
-        """Provider-specific logic. Must raise on failure."""
-        ...
+    def _execute(self, **kwargs) -> Any: ...
+
+    @abstractmethod
+    def _stream(self, **kwargs) -> Any: ...
 
 
 class GeminiTextProvider(BaseProvider):
+    DEFAULT_MODEL = settings.AI.get("GENAI_MODEL_TEXT", "gemini-2.5-flash-lite")
     name = "GenAI"
 
-    def _execute(self, *, messages, model=None, **_kw) -> str:
-        from .utils import safe_gemini_call, get_genai_client
+    def _stream(self, *, messages, model=None, **_kw):
+        client = get_genai_client()
+        if model is None:
+            model = self.DEFAULT_MODEL
 
+        if isinstance(messages, list) and messages and isinstance(messages[-1], dict):
+            prompt = messages[-1].get("content", "")
+        else:
+            prompt = str(messages)
+
+        stream = client.models.generate_content_stream(
+            model=model,
+            contents=prompt,
+        )
+
+        for chunk in stream:
+            if chunk.text:
+                yield chunk.text
+
+    def _execute(self, *, messages, model=None, **_kw) -> str:
         client = get_genai_client()
         if model is None:
             model = settings.AI.get("GENAI_MODEL_TEXT", "gemini-2.5-flash-lite")
@@ -97,10 +123,9 @@ class GeminiTextProvider(BaseProvider):
 
 class OllamaTextProvider(BaseProvider):
     name = "Ollama"
+    DEFAULT_MODEL = settings.AI["OLLAMA_MODEL_TEXT"]
 
-    def _execute(self, *, messages, **_kw) -> str:
-        from ollama import Client as OllamaClient
-
+    def _stream(self, *, messages, **_kw):
         client = OllamaClient(
             host="https://ollama.com",
             headers={"Authorization": "Bearer " + settings.AI["OLLAMA_KEY"]},
@@ -110,17 +135,29 @@ class OllamaTextProvider(BaseProvider):
         else:
             msgs = [{"role": "user", "content": str(messages)}]
 
-        return client.chat(settings.AI["OLLAMA_MODEL_TEXT"], messages=msgs)["message"][
-            "content"
-        ]
+        response = client.chat(model=self.DEFAULT_MODEL, messages=msgs, stream=True)
+        for chunk in response:
+            yield chunk["message"]["content"]
+
+    def _execute(self, *, messages, **_kw) -> str:
+        client = OllamaClient(
+            host="https://ollama.com",
+            headers={"Authorization": "Bearer " + settings.AI["OLLAMA_KEY"]},
+        )
+        if isinstance(messages, list):
+            msgs = messages
+        else:
+            msgs = [{"role": "user", "content": str(messages)}]
+
+        return client.chat(self.DEFAULT_MODEL, messages=msgs)["message"]["content"]
 
 
 class GeminiImageProvider(BaseProvider):
     name = "GenAI"
 
-    def _execute(self, *, prompt, output_path, client, timeout=30, **_kw) -> bool:
-        from .utils import safe_gemini_call
+    def _stream(self, **kwargs): ...
 
+    def _execute(self, *, prompt, output_path, client, timeout=30, **_kw) -> bool:
         model_name = settings.AI.get("GENAI_MODEL_IMAGE", "gemini-2.5-flash-lite")
 
         if "imagen" in model_name.lower() or "generate" in model_name.lower():
@@ -171,6 +208,8 @@ class GeminiImageProvider(BaseProvider):
 class ReplicateImageProvider(BaseProvider):
     name = "Replicate"
 
+    def _stream(self, **kwargs): ...
+
     def _execute(self, *, prompt, output_path, timeout=30, **_kw) -> bool:
         import replicate
 
@@ -193,6 +232,8 @@ class ReplicateImageProvider(BaseProvider):
 class PollinationsImageProvider(BaseProvider):
     name = "Pollinations"
 
+    def _stream(self, **kwargs): ...
+
     def _execute(self, *, prompt, output_path, timeout=30, **_kw) -> bool:
         encoded = urllib.parse.quote(prompt)
         seed = uuid.uuid4().int % 100000000
@@ -207,6 +248,8 @@ class PollinationsImageProvider(BaseProvider):
 
 class HuggingFaceImageProvider(BaseProvider):
     name = "HuggingFace"
+
+    def _stream(self, **kwargs): ...
 
     def _execute(self, *, prompt, output_path, timeout=30, **_kw) -> bool:
         token = settings.AI.get("HF_API_KEY", "")
@@ -240,6 +283,8 @@ def _save_pcm_as_wav(filename, pcm_bytes, channels=1, rate=24000, sample_width=2
 class GeminiAudioProvider(BaseProvider):
     name = "Gemini TTS"
 
+    def _stream(self, **kwargs): ...
+
     def _execute(self, *, text, output_path, client, **_kw) -> bool:
         from .utils import safe_gemini_call
 
@@ -269,6 +314,8 @@ class GeminiAudioProvider(BaseProvider):
 
 class ElevenLabsAudioProvider(BaseProvider):
     name = "ElevenLabs"
+
+    def _stream(self, **kwargs): ...
 
     def _execute(self, *, text, output_path, **_kw) -> bool:
         api_key = settings.AI.get("ELEVENLABS_KEY", "")

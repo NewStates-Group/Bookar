@@ -1,12 +1,12 @@
 from celery import shared_task
 from core.mail import (
+    send_certificate_email,
+    send_password_reset_email,
     send_verification_email,
     send_welcome_email,
-    send_password_reset_email,
-    send_certificate_email,
 )
-from django.contrib.auth import get_user_model
 from courses.models import Course
+from django.contrib.auth import get_user_model
 
 User = get_user_model()
 

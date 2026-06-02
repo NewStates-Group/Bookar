@@ -1,7 +1,13 @@
+import { getSession } from "next-auth/react";
 import type { Session } from "next-auth";
 
 /** Evita vários refresh em paralelo (race com rotação de refresh no backend). */
 let sessionRefreshPromise: Promise<Session | null> | null = null;
+
+function isSessionPayload(value: unknown): value is Session & { error?: string } {
+  if (!value || typeof value !== "object") return false;
+  return "user" in value || "accessToken" in value || "error" in value;
+}
 
 /**
  * Obtém a sessão via NextAuth, disparando o callback JWT no servidor
@@ -14,14 +20,11 @@ export async function ensureFreshSession(): Promise<Session | null> {
 
   sessionRefreshPromise = (async () => {
     try {
-      const res = await fetch("/api/auth/session", {
-        method: "GET",
-        cache: "no-store",
-        credentials: "same-origin",
-      });
-      if (!res.ok) return null;
-      const session = (await res.json()) as Session & { error?: string };
-      if (!session?.accessToken || session.error === "RefreshAccessTokenError") {
+      const session = (await getSession()) as (Session & { error?: string }) | null;
+      if (!isSessionPayload(session)) {
+        return null;
+      }
+      if (!session.accessToken || session.error === "RefreshAccessTokenError") {
         return null;
       }
       return session;

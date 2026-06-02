@@ -6,20 +6,20 @@ from ninja_jwt.authentication import JWTAuth
 
 from .schemas import (
     CourseDetailSchema,
+    CourseFeaturedOut,
     CourseIn,
     CourseOut,
-    LessonSchema,
+    CoursePreviewOut,
+    CourseShareOut,
     GetNextLessonSchema,
+    LessonSchema,
+    MessageSchema,
+    ModuleMaterialSchema,
     QuizResult,
     QuizSchema,
     QuizSubmission,
-    MessageSchema,
-    CourseShareOut,
-    ShareClaimOut,
     ShareClaimListOut,
-    ModuleMaterialSchema,
-    CourseFeaturedOut,
-    CoursePreviewOut,
+    ShareClaimOut,
 )
 from .services import CourseService, LessonService
 

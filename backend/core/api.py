@@ -1,12 +1,11 @@
-from ninja_extra import NinjaExtraAPI
-from ninja.errors import ValidationError as NinjaValidationError
-from pydantic import ValidationError as PydanticValidationError
-
 from accounts.controllers import AuthController
 from courses.controllers import CourseController, LessonController
-from mind_maps.controllers import MindMapController
 from explicador.controllers import ExplicadorController
 from folhas.controllers import FolhaController
+from mind_maps.controllers import MindMapController
+from ninja.errors import ValidationError as NinjaValidationError
+from ninja_extra import NinjaExtraAPI
+from pydantic import ValidationError as PydanticValidationError
 
 api = NinjaExtraAPI(
     title="Bookar API",

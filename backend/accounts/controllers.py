@@ -1,31 +1,28 @@
-from PIL.Image import logger
-from accounts.schemas import GoogleLoginIn
 from injector import inject
-from ninja_extra import api_controller, route
-
-from ninja_jwt.authentication import JWTAuth
-from ninja_jwt.controller import NinjaJWTDefaultController
-
-from .schemas import RegisterIn, RegisterOut
-from .services import AuthService
-from ninja.errors import HttpError
 from ninja import File
+from ninja.errors import HttpError
 from ninja.files import UploadedFile
+from ninja_extra import api_controller, route
+from ninja_jwt.authentication import JWTAuth
+from ninja_jwt.controller import NinjaJWTDefaultController, schema
+
+from accounts.schemas import GoogleLoginIn
+
 from .schemas import (
-    RegisterIn,
-    RegisterOut,
-    ProfileUpdateIn,
-    PasswordResetRequestIn,
-    PasswordResetConfirmIn,
     EmailCheckIn,
     EmailCheckOut,
+    LoginIn,
+    PasswordResetConfirmIn,
+    PasswordResetRequestIn,
+    PreWaitlistEmailIn,
+    ProfileUpdateIn,
+    RegisterIn,
+    RegisterOut,
     SendVerificationIn,
     WaitlistEmailIn,
-    PreWaitlistEmailIn,
-    LoginIn,
 )
+from .services import AuthService
 from .throttling import AnonRateThrottle, DynamicRateThrottle
-from ninja_jwt.controller import schema
 
 
 @api_controller("auth/", tags=["Auth"])

@@ -1,14 +1,15 @@
 from typing import List, Optional
+
 from injector import inject
 from ninja_extra import api_controller, route
 from ninja_jwt.authentication import JWTAuth
+
 from .schemas import FolhaCreateIn, FolhaOut, FolhaUpdateIn
 from .services import FolhaService
 
 
 @api_controller("folhas", tags=["Folhas"], auth=JWTAuth())
 class FolhaController:
-
     @inject
     def __init__(self, folha_service: FolhaService):
         self.folha_service = folha_service

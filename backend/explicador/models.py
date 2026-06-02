@@ -1,6 +1,7 @@
 import uuid
-from django.db import models
+
 from django.conf import settings
+from django.db import models
 
 
 class ExplicadorRoom(models.Model):
@@ -12,7 +13,7 @@ class ExplicadorRoom(models.Model):
     )
     title = models.CharField(max_length=255)
     is_active = models.BooleanField(default=True)
-    
+
     # Stores the whiteboard configuration, like:
     # {
     #   "nodes": [
@@ -23,14 +24,14 @@ class ExplicadorRoom(models.Model):
     #   ]
     # }
     whiteboard_data = models.JSONField(default=dict, blank=True)
-    
+
     # Stores the chat messages list, like:
     # [
     #   {"role": "user", "content": "olá!"},
     #   {"role": "assistant", "content": "Olá, sou o explicador..."}
     # ]
     chat_history = models.JSONField(default=list, blank=True)
-    
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

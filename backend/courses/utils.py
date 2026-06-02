@@ -1,18 +1,17 @@
 import logging
-import time
-import orjson
 import threading
+import time
+
+import orjson
 from django.conf import settings
 from google import genai
-from google.genai.errors import ClientError
 from tenacity import (
     retry,
+    retry_if_exception,
     stop_after_attempt,
     wait_exponential,
-    retry_if_exception,
 )
 
-from .models import Lesson
 
 logger = logging.getLogger(__name__)
 
@@ -70,6 +69,7 @@ def extract_json(response: str, isList: bool = False):
     # Remove markdown code blocks if present
     if "```" in cleaned:
         import re
+
         match = re.search(r"```(?:json)?\s*([\s\S]*?)```", cleaned)
         if match:
             cleaned = match.group(1).strip()
@@ -88,7 +88,9 @@ def extract_json(response: str, isList: bool = False):
             # Try to find first opening bracket
             first_brace = s.find("{")
             first_bracket = s.find("[")
-            if first_brace != -1 and (first_bracket == -1 or first_brace < first_bracket):
+            if first_brace != -1 and (
+                first_bracket == -1 or first_brace < first_bracket
+            ):
                 s = s[first_brace:]
             elif first_bracket != -1:
                 s = s[first_bracket:]
@@ -130,6 +132,7 @@ def extract_json(response: str, isList: bool = False):
                 return orjson.loads(json_str)
             except Exception:
                 import json
+
                 try:
                     return json.loads(json_str)
                 except Exception:
@@ -145,6 +148,7 @@ def extract_json(response: str, isList: bool = False):
             return orjson.loads(repaired)
         except Exception:
             import json
+
             try:
                 return json.loads(repaired)
             except Exception:
@@ -152,29 +156,34 @@ def extract_json(response: str, isList: bool = False):
 
     # 3. Regex Fallback: If JSON is completely mangled or truncated, extract fields manually
     if not isList:
-        import re
         import json
-        logger.warning("Attempting regex fallback to extract text_content from incomplete JSON.")
-        
+        import re
+
+        logger.warning(
+            "Attempting regex fallback to extract text_content from incomplete JSON."
+        )
+
         # Try matching complete string with escaped quotes/newlines
         text_match = re.search(r'"text_content"\s*:\s*"((?:[^"\\]|\\.)*)"', cleaned)
         if text_match:
             try:
                 text_val = json.loads('"' + text_match.group(1) + '"')
                 # Try matching resources array
-                resources_match = re.search(r'"additional_resources"\s*:\s*(\[[\s\S]*?\])', cleaned + "]}")
+                resources_match = re.search(
+                    r'"additional_resources"\s*:\s*(\[[\s\S]*?\])', cleaned + "]}"
+                )
                 resources_val = []
                 if resources_match:
-                     try:
-                         resources_val = json.loads(resources_match.group(1))
-                     except Exception:
-                         items = re.findall(r'\{\s*"title"\s*:\s*"([^"]*)"\s*,\s*"url"\s*:\s*"([^"]*)"\s*\}', cleaned)
-                         for title, url in items:
-                             resources_val.append({"title": title, "url": url})
-                return {
-                    "text_content": text_val,
-                    "additional_resources": resources_val
-                }
+                    try:
+                        resources_val = json.loads(resources_match.group(1))
+                    except Exception:
+                        items = re.findall(
+                            r'\{\s*"title"\s*:\s*"([^"]*)"\s*,\s*"url"\s*:\s*"([^"]*)"\s*\}',
+                            cleaned,
+                        )
+                        for title, url in items:
+                            resources_val.append({"title": title, "url": url})
+                return {"text_content": text_val, "additional_resources": resources_val}
             except Exception as e:
                 logger.error(f"Regex complete match extraction failed: {e}")
 
@@ -191,28 +200,31 @@ def extract_json(response: str, isList: bool = False):
                     if escape:
                         escape = False
                         continue
-                    if c == '\\':
+                    if c == "\\":
                         escape = True
                     elif c == '"':
                         quote_idx = idx
                         break
                 if quote_idx != -1:
                     raw_text = raw_text[:quote_idx]
-                
+
                 # Unescape manually
-                text_val = raw_text.replace('\\"', '"').replace('\\n', '\n').replace('\\t', '\t').strip()
+                text_val = (
+                    raw_text.replace('\\"', '"')
+                    .replace("\\n", "\n")
+                    .replace("\\t", "\t")
+                    .strip()
+                )
                 if text_val.endswith('"'):
                     text_val = text_val[:-1]
-                return {
-                    "text_content": text_val,
-                    "additional_resources": []
-                }
+                return {"text_content": text_val, "additional_resources": []}
             except Exception as e:
                 logger.error(f"Regex incomplete match extraction failed: {e}")
 
-    logger.error(f"Failed to extract JSON even with fallbacks from response: {response[:150]}...")
+    logger.error(
+        f"Failed to extract JSON even with fallbacks from response: {response[:150]}..."
+    )
     return None
-
 
 
 def get_genai_client():
@@ -234,6 +246,7 @@ def cached_genai_call(prompt: str, ttl: int = 86400) -> str:
     Cache textual responses in Redis for 24h.
     """
     import hashlib
+
     from django.core.cache import cache
 
     key = "genai:" + hashlib.md5(prompt.encode()).hexdigest()

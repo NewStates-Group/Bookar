@@ -1,6 +1,6 @@
+from cloudinary_storage.storage import MediaCloudinaryStorage
 from django.contrib.auth.models import AbstractUser
 from django.db import models
-from cloudinary_storage.storage import MediaCloudinaryStorage
 
 
 class User(AbstractUser):

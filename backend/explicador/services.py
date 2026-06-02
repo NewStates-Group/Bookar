@@ -1,28 +1,34 @@
-from ninja.errors import HttpError
 from django.contrib.auth import get_user_model
+from ninja.errors import HttpError
+
 from .models import ExplicadorRoom
 
 User = get_user_model()
 
 
 class ExplicadorService:
-
     def list_rooms(self, user):
         """List all active rooms owned by the user."""
-        queryset = ExplicadorRoom.objects.filter(owner=user, is_active=True).order_by("-created_at")
+        queryset = ExplicadorRoom.objects.filter(owner=user, is_active=True).order_by(
+            "-created_at"
+        )
         for room in queryset:
             room.is_owner = True
         return queryset
 
-    def create_room(self, user, title: str):
+    def create_room(self, user, title: str, course_context=None):
         """Create a new explicador room."""
+        whiteboard_data = {
+            "summary": "",
+            "lock": None,
+        }
+        if course_context is not None:
+            whiteboard_data["course_context"] = course_context
+
         room = ExplicadorRoom.objects.create(
             owner=user,
             title=title,
-            whiteboard_data={
-                "summary": "",
-                "lock": None,
-            },
+            whiteboard_data=whiteboard_data,
             chat_history=[],
         )
         room.is_owner = True
@@ -39,8 +45,8 @@ class ExplicadorService:
         # If user is anonymous, is_owner will be False
         is_owner = False
         if user and user.is_authenticated:
-            is_owner = (room.owner == user)
-        
+            is_owner = room.owner == user
+
         room.is_owner = is_owner
         return room
 

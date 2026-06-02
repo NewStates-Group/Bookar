@@ -9,6 +9,8 @@ const ACCESS_TOKEN_LIFETIME_MS = 15 * 60 * 1000;
 const REFRESH_SKEW_MS = 2 * 60 * 1000;
 /** Alinhado com REFRESH_TOKEN_LIFETIME no backend (7 dias). */
 const SESSION_MAX_AGE_SEC = 7 * 24 * 60 * 60;
+/** Evita que o callback JWT bloqueie /api/auth/session até o proxy devolver HTML (502). */
+const BACKEND_FETCH_TIMEOUT_MS = 12_000;
 
 function accessExpiresAt(): number {
   return Date.now() + ACCESS_TOKEN_LIFETIME_MS;
@@ -19,8 +21,21 @@ function isAccessExpired(accessTokenExpires?: number | null): boolean {
   return Date.now() >= accessTokenExpires - REFRESH_SKEW_MS;
 }
 
+async function backendFetch(
+  url: string,
+  init?: RequestInit
+): Promise<Response> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), BACKEND_FETCH_TIMEOUT_MS);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 async function getMe(accessToken: string) {
-  const res = await fetch(`${apiUrl}/auth/me`, {
+  const res = await backendFetch(`${apiUrl}/auth/me`, {
     headers: {
       Authorization: `Bearer ${accessToken}`,
       "Content-Type": "application/json",
@@ -41,7 +56,7 @@ async function refreshAccessToken(token: Record<string, unknown>) {
   }
 
   try {
-    const res = await fetch(`${apiUrl}/auth/refresh`, {
+    const res = await backendFetch(`${apiUrl}/auth/refresh`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -127,7 +142,7 @@ export const authOptions: NextAuthOptions = {
         }
         let res;
         try {
-          res = await fetch(`${apiUrl}/auth/pair`, {
+          res = await backendFetch(`${apiUrl}/auth/pair`, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -170,78 +185,89 @@ export const authOptions: NextAuthOptions = {
 
   callbacks: {
     async jwt({ token, user, trigger }: any) {
-      if (user?.accessToken) {
-        try {
-          const profile = await getMe(user.accessToken);
-          return {
-            accessToken: user.accessToken,
-            refreshToken: user.refreshToken,
-            accessTokenExpires: accessExpiresAt(),
-            user: profileFromApi(profile),
-          };
-        } catch {
-          return {
-            accessToken: user.accessToken,
-            refreshToken: user.refreshToken,
-            accessTokenExpires: accessExpiresAt(),
-            user: token.user ?? null,
-          };
+      try {
+        if (user?.accessToken) {
+          try {
+            const profile = await getMe(user.accessToken);
+            return {
+              accessToken: user.accessToken,
+              refreshToken: user.refreshToken,
+              accessTokenExpires: accessExpiresAt(),
+              user: profileFromApi(profile),
+            };
+          } catch {
+            return {
+              accessToken: user.accessToken,
+              refreshToken: user.refreshToken,
+              accessTokenExpires: accessExpiresAt(),
+              user: token.user ?? null,
+            };
+          }
         }
-      }
 
-      if (token.error === "RefreshAccessTokenError") {
-        return token;
-      }
+        if (token.error === "RefreshAccessTokenError") {
+          return token;
+        }
 
-      let working = { ...token };
+        let working = { ...token };
 
-      if (
-        working.refreshToken &&
-        (!working.accessToken || isAccessExpired(working.accessTokenExpires))
-      ) {
-        working = await refreshAccessToken(working);
-        if (working.error === "RefreshAccessTokenError") {
+        if (
+          working.refreshToken &&
+          (!working.accessToken || isAccessExpired(working.accessTokenExpires))
+        ) {
+          working = await refreshAccessToken(working);
+          if (working.error === "RefreshAccessTokenError") {
+            return working;
+          }
+          if (working.accessToken && working.user) {
+            return working;
+          }
+        }
+
+        if (trigger === "update" && working.accessToken) {
+          try {
+            const profile = await getMe(working.accessToken as string);
+            return {
+              ...working,
+              user: profileFromApi(profile),
+            };
+          } catch {
+            return working;
+          }
+        }
+
+        if (
+          working.accessToken &&
+          !isAccessExpired(working.accessTokenExpires) &&
+          working.user
+        ) {
           return working;
         }
-      }
 
-      if (trigger === "update" && working.accessToken) {
-        try {
-          const profile = await getMe(working.accessToken as string);
-          return {
-            ...working,
-            user: profileFromApi(profile),
-          };
-        } catch {
+        if (working.accessToken && working.user) {
           return working;
         }
-      }
 
-      if (
-        working.accessToken &&
-        !isAccessExpired(working.accessTokenExpires) &&
-        working.user
-      ) {
+        if (working.accessToken) {
+          try {
+            const profile = await getMe(working.accessToken as string);
+            return {
+              ...working,
+              user: profileFromApi(profile),
+            };
+          } catch {
+            return working;
+          }
+        }
+
         return working;
+      } catch (error) {
+        console.error("[NextAuth] jwt callback error:", error);
+        return {
+          ...token,
+          error: "RefreshAccessTokenError" as const,
+        };
       }
-
-      if (working.accessToken && working.user) {
-        return working;
-      }
-
-      if (working.accessToken) {
-        try {
-          const profile = await getMe(working.accessToken as string);
-          return {
-            ...working,
-            user: profileFromApi(profile),
-          };
-        } catch {
-          return working;
-        }
-      }
-
-      return working;
     },
 
     async session({ session, token }: any) {

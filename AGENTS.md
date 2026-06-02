@@ -57,8 +57,10 @@ Ficheiro `.env` na raiz (não commitar). O frontend usa tipicamente:
 - `NEXT_PUBLIC_API_URL` — base da API REST (ex.: `http://api.localhost/api`)
 - `NEXT_PUBLIC_API_BASE_URL` — origem HTTP para WebSockets (ex.: `http://api.localhost`)
 - `NEXT_PUBLIC_TURNSTILE_SITE_KEY` — Cloudflare Turnstile (signup/login)
-- `AUTH_SECRET` — NextAuth
-- `INTERNAL_API_URL` — URL da API vista de dentro do container frontend (server-side / NextAuth)
+- `AUTH_SECRET` — NextAuth (obrigatório em produção no runtime do container frontend, não só no build)
+- `NEXTAUTH_URL` — URL pública do frontend (ex.: `https://bookar.study`, sem `/api/auth`)
+- `AUTH_TRUST_HOST` — `true` em produção atrás de ALB/nginx/Cloudflare
+- `INTERNAL_API_URL` — URL da API vista de dentro do container frontend (server-side / NextAuth); deve alcançar o backend sem timeout
 
 O backend usa `django-environ` em `core/settings.py` (`DATABASE_URL`, `REDIS_URL`, `SECRET_KEY`, `CORS_ALLOWED_ORIGINS`, credenciais Cloudinary, etc.).
 

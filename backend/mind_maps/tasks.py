@@ -1,11 +1,13 @@
 import logging
 import re
 import urllib.parse
-from celery import shared_task
-from django.db import transaction
+
 import httpx
+from celery import shared_task
 from core.utils import send_user_update
-from courses.utils import generate_text_with_fallback, extract_json
+from courses.utils import extract_json, generate_text_with_fallback
+from django.db import transaction
+
 from .models import MindMap, MindMapStatus
 
 logger = logging.getLogger(__name__)
@@ -76,7 +78,9 @@ def generate_mind_map_task(self, user_id: int, mind_map_id: int):
         # Determine target language configuration
         lang = getattr(mind_map, "language", "pt")
         if lang == "en":
-            lang_instruction = "Todos os valores de texto devem ser em Inglês (English)."
+            lang_instruction = (
+                "Todos os valores de texto devem ser em Inglês (English)."
+            )
             level1_ex = "Foundations of " + mind_map.topic
             level2_ex = "Core Syntax and Setup"
             level3_ex = "What is " + mind_map.topic + " and why use it"
@@ -84,7 +88,9 @@ def generate_mind_map_task(self, user_id: int, mind_map_id: int):
             title_ex = f"Mastering {mind_map.topic}: The Complete Guide"
             search_lang = "english"
         elif lang == "es":
-            lang_instruction = "Todos os valores de texto devem ser em Espanhol (Spanish)."
+            lang_instruction = (
+                "Todos os valores de texto devem ser em Espanhol (Spanish)."
+            )
             level1_ex = "Fundamentos de " + mind_map.topic
             level2_ex = "Sintaxis y Primeros Pasos"
             level3_ex = "Qué es " + mind_map.topic + " y por qué usarlo"
@@ -92,7 +98,9 @@ def generate_mind_map_task(self, user_id: int, mind_map_id: int):
             title_ex = f"Dominando {mind_map.topic}: La Guía Completa"
             search_lang = "espanol"
         else:  # pt
-            lang_instruction = "Todos os valores de texto devem ser em Português do Brasil."
+            lang_instruction = (
+                "Todos os valores de texto devem ser em Português do Brasil."
+            )
             level1_ex = "Fundamentos de " + mind_map.topic
             level2_ex = "Primeiro contato com a Sintaxe"
             level3_ex = "O que é e por que usar " + mind_map.topic

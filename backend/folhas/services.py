@@ -1,7 +1,8 @@
-from ninja.errors import HttpError
 from django.db import IntegrityError
 from mind_maps.models import MindMap
 from mind_maps.services import MindMapService
+from ninja.errors import HttpError
+
 from .models import Folha
 
 
@@ -14,7 +15,9 @@ class FolhaService:
 
     def _get_owned_folha(self, folha_uuid: str, user):
         try:
-            return Folha.objects.select_related("mind_map").get(uuid=folha_uuid, user=user)
+            return Folha.objects.select_related("mind_map").get(
+                uuid=folha_uuid, user=user
+            )
         except Folha.DoesNotExist:
             raise HttpError(404, "Folha não encontrada.")
 
@@ -30,7 +33,9 @@ class FolhaService:
         if not self._find_node(mind_map.nodes, node_id):
             raise HttpError(404, f"Nó {node_id} não encontrado no mapa mental.")
 
-    def list_folhas(self, user, mind_map_id: str | None = None, node_id: str | None = None):
+    def list_folhas(
+        self, user, mind_map_id: str | None = None, node_id: str | None = None
+    ):
         queryset = Folha.objects.filter(user=user).select_related("mind_map")
         if mind_map_id:
             queryset = queryset.filter(mind_map__uuid=mind_map_id)
@@ -62,7 +67,9 @@ class FolhaService:
         mind_map = None
         if mind_map_id or node_id:
             if not mind_map_id or not node_id:
-                raise HttpError(400, "mind_map_id e node_id devem ser fornecidos em conjunto.")
+                raise HttpError(
+                    400, "mind_map_id e node_id devem ser fornecidos em conjunto."
+                )
             mind_map = self._resolve_mind_map(mind_map_id, user)
             self._validate_node_link(mind_map, node_id)
 
@@ -85,7 +92,13 @@ class FolhaService:
                 return Folha.objects.get(user=user, mind_map=mind_map, node_id=node_id)
             raise HttpError(400, "Não foi possível criar a folha.")
 
-    def update_folha(self, folha_uuid: str, user, title: str | None = None, content: str | None = None):
+    def update_folha(
+        self,
+        folha_uuid: str,
+        user,
+        title: str | None = None,
+        content: str | None = None,
+    ):
         folha = self._get_owned_folha(folha_uuid, user)
         if title is not None:
             folha.title = title

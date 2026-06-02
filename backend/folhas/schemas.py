@@ -1,5 +1,7 @@
 from typing import Optional
+
 from ninja import ModelSchema, Schema
+
 from .models import Folha
 
 

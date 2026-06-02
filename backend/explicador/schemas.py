@@ -1,10 +1,23 @@
-from typing import Optional, List, Any, Dict
+from typing import Any, Dict, List, Optional
+
 from ninja import ModelSchema, Schema
+
 from .models import ExplicadorRoom
+
+
+class ExplicadorCourseContextIn(Schema):
+    course_id: str
+    course_title: str
+    module_name: Optional[str] = None
+    lesson_id: Optional[str] = None
+    lesson_title: Optional[str] = None
+    lesson_description: Optional[str] = None
+    narration: Optional[str] = None
 
 
 class ExplicadorRoomCreateIn(Schema):
     title: str
+    course_context: Optional[ExplicadorCourseContextIn] = None
 
 
 class ExplicadorRoomOut(ModelSchema):

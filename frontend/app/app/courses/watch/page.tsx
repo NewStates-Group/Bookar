@@ -4,7 +4,9 @@ import { useSession } from "next-auth/react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Loader2, ArrowRight, ChevronLeft, ChevronRight, HelpCircle, X, Menu, ArrowLeft, Award, FileDown, FileText, ExternalLink, BookOpen, GripVertical } from "lucide-react";
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef, useCallback, useMemo } from "react";
+import { ExplicadorPromptDialog } from "@/components/ExplicadorPromptDialog";
+import { buildExplicadorCourseContext } from "@/lib/explicador-course-context";
 import { toast } from "sonner";
 import { CourseWatchSidebar } from "@/components/course-sidebar";
 import Link from "next/link";
@@ -79,7 +81,7 @@ export default function WatchPage() {
     const [played, setPlayed] = useState(false);
     const [ended, setEnded] = useState(false);
     const [sidebarOpen, setSidebarOpen] = useState(false);
-    const [showQuestionsModal, setShowQuestionsModal] = useState(false);
+    const [explicadorOpen, setExplicadorOpen] = useState(false);
     const [previousLesson, setPreviousLesson] = useState<Lesson | null>(null)
     const [nextLesson, setNextLesson] = useState<Lesson | null>(null)
     const [nextQuiz, setNextQuiz] = useState<{ id: string, moduleId: string } | null>(null)
@@ -256,6 +258,35 @@ export default function WatchPage() {
             }
         }
     }, [course, lesson, lessonID, quizID]);
+
+    const explicadorCourseContext = useMemo(() => {
+        if (!course || !courseID) return null;
+
+        if (lessonID === "quiz" && quizID) {
+            const moduleWithQuiz = course.modules.find((m) => m.id.toString() === quizID);
+            if (!moduleWithQuiz) return null;
+            return buildExplicadorCourseContext({
+                courseId: courseID,
+                courseTitle: course.title,
+                moduleName: moduleWithQuiz.name,
+                lessonTitle: `Quiz: ${moduleWithQuiz.name}`,
+            });
+        }
+
+        if (!lesson?.id) return null;
+        const currentModule = course.modules.find((m) =>
+            m.lessons.some((l) => l.id === lesson.id)
+        );
+        return buildExplicadorCourseContext({
+            courseId: courseID,
+            courseTitle: course.title,
+            moduleName: currentModule?.name,
+            lessonId: lesson.id,
+            lessonTitle: lesson.title,
+            lessonDescription: lesson.desc,
+            narration: lesson.narration,
+        });
+    }, [course, courseID, lesson, lessonID, quizID]);
 
     // Resizing Logic
     const startResizing = useCallback((e: React.MouseEvent) => {
@@ -435,7 +466,7 @@ export default function WatchPage() {
                         })()}
                     </button>
 
-                    <button className="flex gap-2 items-center cursor-pointer justify-center border-r hover:bg-muted transition-colors" onClick={() => setShowQuestionsModal(true)}>
+                    <button className="flex gap-2 items-center cursor-pointer justify-center border-r hover:bg-muted transition-colors" onClick={() => setExplicadorOpen(true)}>
                         <HelpCircle className="w-5 h-5" />
                         <span className="hidden md:block">
                             Dúvidas
@@ -630,37 +661,13 @@ export default function WatchPage() {
                 </div>
             )}
 
-            {showQuestionsModal && (
-                <div className="fixed inset-0 bg-black/40 backdrop-blur-[2px] flex items-center justify-center z-[110] animate-in fade-in duration-200">
-                    <div className="bg-card border border-border rounded-2xl max-w-md w-full mx-4 overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
-                        <div className="bg-primary/10 px-4 py-1.5 flex items-center justify-center gap-2 border-b border-primary/20">
-                            <span className="text-xs font-medium text-primary">Funcionalidade em Desenvolvimento</span>
-                        </div>
-
-                        <div className="p-6">
-                            <div className="relative group">
-                                {/* Blurred Overlay for content */}
-                                <div className="absolute inset-0 z-10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                                    <div className="bg-background/80 backdrop-blur-sm px-4 py-2 rounded-full border border-border shadow-sm">
-                                        <p className="text-xs font-semibold text-foreground">Disponível em breve!</p>
-                                    </div>
-                                </div>
-
-                            </div>
-
-                            <div className="mt-6 flex justify-center">
-                                <Button
-                                    onClick={() => setShowQuestionsModal(false)}
-                                    variant="ghost"
-                                    className="text-primary hover:text-primary/80 hover:bg-primary/5 text-sm font-medium"
-                                >
-                                    Entendido, voltar para a aula
-                                </Button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
+            <ExplicadorPromptDialog
+                open={explicadorOpen}
+                onOpenChange={setExplicadorOpen}
+                courseContext={explicadorCourseContext}
+                title="Dúvidas sobre a aula"
+                placeholder="O que não percebeste nesta aula?"
+            />
         </div>
     );
 }
