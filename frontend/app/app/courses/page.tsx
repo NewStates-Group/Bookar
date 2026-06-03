@@ -917,14 +917,14 @@ export default function CoursesPage() {
 
       {/* ── MODAL: PREVIEW DO CURSO DA COMUNIDADE ── */}
       <Dialog open={showPreviewModal} onOpenChange={setShowPreviewModal}>
-        <DialogContent className="sm:max-w-[520px] p-6 max-h-[85vh] overflow-y-auto border border-slate-100 rounded-3xl shadow-2xl bg-white scrollbar-thin">
+        <DialogContent className="sm:max-w-[520px] p-6 max-h-[85vh] overflow-y-auto border border-slate-100 rounded-md shadow-2xl bg-white scrollbar-thin">
           {previewLoading ? (
             <div className="flex flex-col items-center justify-center py-20 gap-4">
               <Loader2 className="w-10 h-10 animate-spin text-cyan-500" />
               <p className="text-xs font-bold text-slate-500 animate-pulse">Obtendo detalhes do curso...</p>
             </div>
           ) : previewData ? (
-            <div className="space-y-5">
+            <div className="space-y-6">
               <div className="aspect-video w-full rounded-2xl overflow-hidden relative bg-slate-50 border border-slate-100">
                 {previewData.thumb ? (
                   <img
@@ -937,11 +937,6 @@ export default function CoursesPage() {
                     <ImageOff className="w-12 h-12 text-slate-350" />
                   </div>
                 )}
-                <div className="absolute top-3 left-3 flex gap-2">
-                  <span className="inline-flex items-center rounded-full bg-cyan-500 text-white px-3 py-1 text-xs font-extrabold shadow-md">
-                    {previewData.level === 'B' ? 'Iniciante' : previewData.level === 'IT' ? 'Intermediário' : 'Avançado'}
-                  </span>
-                </div>
               </div>
 
               <div className="space-y-2">
@@ -949,11 +944,18 @@ export default function CoursesPage() {
                   {previewData.title}
                 </DialogTitle>
                 {previewData.owner_name && (
+                  <div className="flex gap-3">
                   <p className="text-xs text-slate-400 font-medium">
                     Criado por <span className="text-slate-600 font-bold">{previewData.owner_name}</span>
                   </p>
+                  <p className="text-xs text-slate-400 font-medium">
+                    Nível <span className="text-slate-600 font-bold">
+                     {previewData.level === 'B' ? 'Iniciante' : previewData.level === 'IT' ? 'Intermediário' : 'Avançado'}
+                    </span>
+                  </p>
+                  </div>
                 )}
-                <DialogDescription className="text-xs md:text-sm text-slate-500 leading-relaxed">
+                <DialogDescription className="text-sm md:text-sm text-slate-500 leading-relaxed">
                   {previewData.desc || "Sem descrição disponível para este curso."}
                 </DialogDescription>
               </div>
@@ -962,27 +964,24 @@ export default function CoursesPage() {
               <div className="space-y-3">
                 <h4 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
                   <Layers className="w-3.5 h-3.5 text-cyan-500" />
-                  Grade Curricular ({previewData.module_count} Módulos)
+                  Grade Curricular ({previewData.module_count} {previewData.module_count > 1 ? 'Módulos' : 'Módulo'})
                 </h4>
 
                 <div className="space-y-2.5 max-h-[220px] overflow-y-auto pr-1.5 scrollbar-thin">
                   {previewData.modules.map((mod, idx) => (
                     <div key={mod.id} className="p-3 rounded-2xl bg-slate-50 border border-slate-100 space-y-1.5">
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-extrabold text-slate-700 capitalize">
-                          Módulo {idx + 1}: {mod.name}
-                        </span>
-                        <span className="text-[10px] font-bold text-cyan-600 bg-cyan-50 px-2 py-0.5 rounded-full">
-                          {mod.lesson_count} Aulas
+                        <span className="text-sm font-extrabold text-slate-700 capitalize">
+                          Módulo {idx + 1}: {mod.name} ({mod.lesson_count} Aulas)
                         </span>
                       </div>
-                      {mod.desc && <p className="text-[10px] text-slate-400 line-clamp-1">{mod.desc}</p>}
+                      {mod.desc && <p className="text-sm text-slate-400 line-clamp-1">{mod.desc}</p>}
 
                       {/* Lesson title listing */}
                       {mod.lessons && mod.lessons.length > 0 && (
                         <div className="pl-3 border-l-2 border-slate-200 pt-1 space-y-1">
                           {mod.lessons.map((lesson, lIdx) => (
-                            <div key={lIdx} className="text-[10px] text-slate-500 flex items-center gap-1">
+                            <div key={lIdx} className="text-xs text-slate-500 flex items-center gap-1">
                               <span className="w-1 h-1 rounded-full bg-cyan-400 flex-shrink-0" />
                               <span className="font-semibold line-clamp-1">{lesson.title}</span>
                             </div>
@@ -999,7 +998,7 @@ export default function CoursesPage() {
                 <Button
                   onClick={() => handleCloneCourse(previewData.id)}
                   disabled={isCloning}
-                  className="flex-1 h-11 bg-cyan-500 hover:bg-cyan-600 text-white font-extrabold rounded-full gap-2 transition-all hover:scale-[1.01] active:scale-[0.99] shadow-md shadow-cyan-500/10 cursor-pointer"
+                  className="flex-1 py-2 bg-cyan-500 hover:bg-cyan-600 text-white font-extrabold rounded-lg gap-2 transition-all hover:scale-[1.01] active:scale-[0.99] shadow-md shadow-cyan-500/10 cursor-pointer"
                 >
                   {isCloning ? (
                     <>
@@ -1009,14 +1008,14 @@ export default function CoursesPage() {
                   ) : (
                     <>
                       <Plus className="w-4 h-4" />
-                      Importar para a Minha Biblioteca
+                      Importar Curso
                     </>
                   )}
                 </Button>
                 <Button
                   variant="ghost"
                   onClick={() => setShowPreviewModal(false)}
-                  className="h-11 rounded-full text-xs font-bold text-slate-450 hover:bg-slate-50 hover:text-slate-700 transition-colors"
+                  className="py-2 border rounded-lg text-xs font-bold text-slate-450 hover:bg-slate-50 hover:text-slate-700 transition-colors"
                 >
                   Fechar
                 </Button>
