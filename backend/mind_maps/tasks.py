@@ -75,6 +75,33 @@ def generate_mind_map_task(self, user_id: int, mind_map_id: int):
     )
 
     try:
+        # Validate the topic first to avoid wasting CPU / AI requests on invalid subjects
+        stripped_topic = (mind_map.topic or "").strip()
+        if not stripped_topic or len(stripped_topic) < 3:
+            raise ValueError("O assunto deve ter pelo menos 3 caracteres.")
+            
+        if len(stripped_topic) > 100:
+            raise ValueError("O assunto é demasiado longo (máximo 100 caracteres).")
+
+        validation_prompt = f"""
+        Analise se o assunto a seguir é um tema real, coerente, inteligível e educativo sobre o qual faz sentido criar um roteiro de estudos / mapa mental.
+        Se for apenas caracteres aleatórios (ex: "asdfg"), números sem contexto (ex: "12345"), lixo, spam ou insultos, marque como inválido.
+
+        Assunto: "{stripped_topic}"
+
+        Retorne estritamente o seguinte JSON:
+        {{
+            "is_valid": true ou false,
+            "reason": "Breve explicação da invalidade em Português (apenas se is_valid for false, senão string vazia)"
+        }}
+        """
+        val_res = generate_text_with_fallback([{"role": "user", "content": validation_prompt}])
+        val_data = extract_json(val_res)
+        
+        if val_data and not val_data.get("is_valid", True):
+            reason = val_data.get("reason", "Assunto inválido ou não educativo.")
+            raise ValueError(reason)
+
         # Determine target language configuration
         lang = getattr(mind_map, "language", "pt")
         if lang == "en":
@@ -235,6 +262,27 @@ def generate_mind_map_task(self, user_id: int, mind_map_id: int):
             transaction.on_commit(_on_success)
 
         return True
+
+    except ValueError as val_err:
+        logger.warning(f"Validation failed for mind map {mind_map_id}: {val_err}")
+        with transaction.atomic():
+            mind_map.status = MindMapStatus.FAILED
+            mind_map.desc = str(val_err)
+            mind_map.save(update_fields=["status", "desc"])
+
+            def _on_val_error():
+                send_user_update(
+                    user_id,
+                    {
+                        "type": "mind_map_update",
+                        "id": str(mind_map.uuid),
+                        "status": "FAILED",
+                        "error_message": str(val_err),
+                    },
+                )
+
+            transaction.on_commit(_on_val_error)
+        return False
 
     except Exception as e:
         logger.error(f"Error generating mind map: {e}")

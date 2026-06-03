@@ -266,8 +266,8 @@ export default function MindMapsPage() {
                 <h3 className="font-bold text-center text-sm text-red-500 capitalize max-w-[80%] line-clamp-1">
                   Falha: {map.topic}
                 </h3>
-                <span className="text-xs text-muted-foreground text-center">
-                  Tente criar novamente
+                <span className="text-xs text-muted-foreground text-center px-2 line-clamp-2" title={map.desc}>
+                  {map.desc || "Tente criar novamente"}
                 </span>
               </div>
             )}

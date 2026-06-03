@@ -144,6 +144,26 @@ export default function ExplicadorRoomPage() {
   const isMultiUserRoom = !isSoloRoom;
   const [showParticipantsModal, setShowParticipantsModal] = useState(false);
 
+  // Pencil request limit and cooldown states
+  const [pencilRequestsCount, setPencilRequestsCount] = useState(0);
+  const [pencilCooldownActive, setPencilCooldownActive] = useState(false);
+  const [pencilCooldownTimeLeft, setPencilCooldownTimeLeft] = useState(0);
+
+  useEffect(() => {
+    if (!pencilCooldownActive) return;
+    const interval = setInterval(() => {
+      setPencilCooldownTimeLeft((prev) => {
+        if (prev <= 1) {
+          setPencilCooldownActive(false);
+          clearInterval(interval);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [pencilCooldownActive]);
+
   // Splitter Resizing states
   const [splitPct, setSplitPct] = useState<number>(35); // Left chat starts at 35%
   const isSplitting = useRef(false);
@@ -1131,7 +1151,22 @@ export default function ExplicadorRoomPage() {
 
   // Chalk Lock action triggers
   const grabLock = () => {
+    if (pencilCooldownActive) {
+      toast.error(`Aguarde ${pencilCooldownTimeLeft}s para pedir o lápis novamente.`);
+      return;
+    }
+
     sendWSMessage({ type: "grab_lock" });
+
+    setPencilRequestsCount((prev) => {
+      const next = prev + 1;
+      if (next >= 3) {
+        setPencilCooldownActive(true);
+        setPencilCooldownTimeLeft(30);
+        return 0;
+      }
+      return next;
+    });
   };
 
   const releaseLock = () => {
@@ -1503,6 +1538,37 @@ export default function ExplicadorRoomPage() {
               <Mic className="w-4 h-4" />
             </button>
 
+            {/* Pencil grab/release toggle — only in multi-user rooms */}
+            {isMultiUserRoom && (
+              <button
+                type="button"
+                onClick={isLockHolder ? releaseLock : grabLock}
+                disabled={isGenerating || pencilCooldownActive || (!isLockHolder && Boolean(currentLock))}
+                title={
+                  isLockHolder
+                    ? "Largar o lápis"
+                    : pencilCooldownActive
+                      ? `Aguarde ${pencilCooldownTimeLeft}s`
+                      : currentLock
+                        ? `${currentLock.name} tem o lápis`
+                        : "Pegar o lápis para falar com o explicador"
+                }
+                className={`w-8 h-8 flex items-center justify-center rounded-full transition-all duration-200 flex-shrink-0 cursor-pointer disabled:opacity-40 ${
+                  isLockHolder
+                    ? "bg-amber-100 text-amber-700 ring-2 ring-amber-300/60"
+                    : pencilCooldownActive
+                      ? "bg-red-55 text-red-500 ring-2 ring-red-200/50"
+                      : "text-slate-400 hover:text-amber-600 hover:bg-amber-50"
+                }`}
+              >
+                {pencilCooldownActive ? (
+                  <span className="text-[10px] font-bold">{pencilCooldownTimeLeft}</span>
+                ) : (
+                  <Pencil className="w-4 h-4" />
+                )}
+              </button>
+            )}
+
             {isMultiUserRoom && (
               <button
                 type="button"
@@ -1556,11 +1622,11 @@ export default function ExplicadorRoomPage() {
 
       {/* RIGHT WORKSPACE: Dotted Whiteboard Summary Panel */}
       {showWhiteboard && (
-        <div className={`flex-1 h-full bg-[#fafafa] flex flex-col justify-start relative overflow-hidden select-text animate-in fade-in slide-in-from-right duration-500 ${isMobile ? "p-4 w-full absolute inset-0 z-50" : "p-6 md:p-10"
+        <div className={`flex-1 h-full bg-[#fafafa] flex flex-col justify-start relative select-text animate-in fade-in slide-in-from-right duration-500 ${isMobile ? "p-4 w-full absolute inset-0 z-50 overflow-y-auto" : "p-6 md:p-10 overflow-hidden"
           }`}>
 
           {/* Header of the Board */}
-          <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-200/60 shrink-0">
+          <div className={`flex justify-between items-center mb-6 pb-4 border-b border-slate-200/60 shrink-0 ${isMobile ? "sticky top-0 z-10 bg-[#fafafa] pt-1" : ""}`}>
             <div className="flex items-center gap-2">
               <PenTool className="w-5 h-5 text-cyan-600" />
               <h2 className="text-sm font-bold text-slate-700 tracking-wide">
@@ -1692,9 +1758,9 @@ export default function ExplicadorRoomPage() {
                   {/* Listening status */}
                   <div className="flex items-center gap-1 border-l border-slate-200 pl-2.5">
                     {member.isListening ? (
-                      <Volume2 className="w-3.5 h-3.5 text-cyan-600 animate-pulse" title="A ouvir" />
+                      <span title="A ouvir"><Volume2 className="w-3.5 h-3.5 text-cyan-600 animate-pulse" /></span>
                     ) : (
-                      <Volume2 className="w-3.5 h-3.5 text-slate-350" title="Sem áudio" />
+                      <span title="Sem áudio"><Volume2 className="w-3.5 h-3.5 text-slate-350" /></span>
                     )}
                     <span className="text-[10px] text-slate-400 font-semibold select-none">
                       {member.isListening ? "A ouvir" : "Sem áudio"}
