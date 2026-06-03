@@ -16,3 +16,5 @@ O ZOOM SÓ PODE SER DADO NO CHAT, DE MODO QUE O INPUT DE TEXTO E A BARRINHA COM 
 O MESMO ACONTECE COM O QUADRO NO MOBILE O USER PRECISA VOLTAR A SUBIR COM O TOUCH PARA CIMAP ARA VER TÍTULO: QUADRO E O BOTÃO DE FECHAR
 
 adicionar verificacao do tipo de mapa mental que se quer gerar, para evitar desperdício de cpu;
+
+adicionar um botao na barra de chat, para permitir que o user peça lapis ao explicador, e dps se ele pedir mais de 3 vezes coloca um tempo de espera de 30s
