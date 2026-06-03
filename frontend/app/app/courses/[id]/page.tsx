@@ -225,7 +225,6 @@ export default function CoursePage() {
       await apiRequest(`${process.env.NEXT_PUBLIC_API_URL}/courses/${course.id}`, {
         method: "DELETE",
       });
-      toast.success("Curso eliminado.");
       setDeleteDialogOpen(false);
       router.replace("/app/courses");
     } catch (e: unknown) {

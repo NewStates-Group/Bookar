@@ -3,7 +3,7 @@ import uuid
 
 from core.utils import send_user_update
 from django.core.cache import cache
-from django.db.models import Prefetch
+from django.db.models import Prefetch, Q
 from django.db.models.query import QuerySet
 from django.utils import timezone
 from ninja.errors import HttpError
@@ -493,42 +493,67 @@ class CourseService:
         except Exception:
             return {"status": "PROCESSING", "pdf_url": None}
 
-    def list_featured_courses(self) -> list:
-        """Return all READY courses for the public discovery carousel."""
-        courses = (
+    def _serialize_featured_course(self, course: Course) -> dict:
+        thumb_url = None
+        if course.thumb:
+            try:
+                thumb_url = course.thumb.url
+            except Exception:
+                thumb_url = str(course.thumb)
+
+        owner = course.owner
+        owner_name = None
+        if owner:
+            owner_name = (
+                f"{owner.first_name} {owner.last_name}".strip() or owner.username
+            )
+
+        return {
+            "id": str(course.uuid),
+            "title": course.title,
+            "desc": course.desc,
+            "level": course.level,
+            "thumb": thumb_url,
+            "module_count": course.modules.count(),
+            "owner_name": owner_name,
+        }
+
+    def list_featured_courses(
+        self, page: int = 1, page_size: int = 12, q: str = ""
+    ) -> dict:
+        """Return paginated READY courses for the public community listing."""
+        page = max(page, 1)
+        page_size = min(max(page_size, 1), 48)
+
+        queryset = (
             Course.objects.filter(status="READY")
             .prefetch_related("modules")
             .select_related("owner")
-            .order_by("-created_at")[:30]
+            .order_by("-created_at")
         )
-        result = []
-        for course in courses:
-            thumb_url = None
-            if course.thumb:
-                try:
-                    thumb_url = course.thumb.url
-                except Exception:
-                    thumb_url = str(course.thumb)
 
-            owner = course.owner
-            owner_name = None
-            if owner:
-                owner_name = (
-                    f"{owner.first_name} {owner.last_name}".strip() or owner.username
-                )
-
-            result.append(
-                {
-                    "id": str(course.uuid),
-                    "title": course.title,
-                    "desc": course.desc,
-                    "level": course.level,
-                    "thumb": thumb_url,
-                    "module_count": course.modules.count(),
-                    "owner_name": owner_name,
-                }
+        search = (q or "").strip()
+        if search:
+            queryset = queryset.filter(
+                Q(title__icontains=search)
+                | Q(desc__icontains=search)
+                | Q(owner__first_name__icontains=search)
+                | Q(owner__last_name__icontains=search)
+                | Q(owner__username__icontains=search)
             )
-        return result
+
+        total = queryset.count()
+        offset = (page - 1) * page_size
+        courses = queryset[offset : offset + page_size]
+        total_pages = (total + page_size - 1) // page_size if total else 0
+
+        return {
+            "items": [self._serialize_featured_course(c) for c in courses],
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+            "total_pages": total_pages,
+        }
 
     def get_course_preview(self, course_id: str) -> dict:
         """Return full public preview details (no auth required)."""

@@ -111,7 +111,6 @@ export default function MindMapsPage() {
       await apiRequest(`${process.env.NEXT_PUBLIC_API_URL}/mind-maps/${id}`, {
         method: "DELETE",
       });
-      toast.success("Mapa mental eliminado.");
       mutateMindMaps();
       setMapToDelete(null);
     } catch (err: unknown) {

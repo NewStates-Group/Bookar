@@ -4,8 +4,8 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { BookOpen, Plus, Loader2, ArrowRight, ArrowUp, ImageOff, Sparkles, GraduationCap, Award, FileDown, X, Trash2, Share2, Heart, Compass, Layers, ChevronLeft, ChevronRight } from "lucide-react";
-import { useEffect, useState, useRef } from "react";
+import { BookOpen, Plus, Loader2, ArrowRight, ArrowUp, ImageOff, Sparkles, GraduationCap, Award, FileDown, X, Trash2, Share2, Heart, Compass, Layers, Search, ChevronLeft, ChevronRight } from "lucide-react";
+import { useEffect, useState, useRef, useMemo } from "react";
 import { Label } from "@/components/ui/label";
 import {
   Dialog,
@@ -55,6 +55,16 @@ interface FeaturedCourse {
   owner_name: string | null;
 }
 
+interface FeaturedCoursesPage {
+  items: FeaturedCourse[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+}
+
+const COMMUNITY_PAGE_SIZE = 12;
+
 interface PreviewLesson {
   title: string;
   desc: string;
@@ -82,20 +92,6 @@ interface CoursePreviewDetail {
 export default function CoursesPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
-  const communityScrollRef = useRef<HTMLDivElement>(null);
-
-  const scrollCommunity = (direction: "left" | "right") => {
-    if (communityScrollRef.current) {
-      const { scrollLeft, clientWidth } = communityScrollRef.current;
-      const scrollAmount = clientWidth * 0.75;
-      const targetScroll = direction === "left" ? scrollLeft - scrollAmount : scrollLeft + scrollAmount;
-      communityScrollRef.current.scrollTo({
-        left: targetScroll,
-        behavior: "smooth",
-      });
-    }
-  };
-
   const [courses, setCourses] = useState<Course[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
@@ -118,10 +114,34 @@ export default function CoursesPage() {
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewData, setPreviewData] = useState<CoursePreviewDetail | null>(null);
   const [isCloning, setIsCloning] = useState(false);
+  const [communityPage, setCommunityPage] = useState(1);
+  const [communitySearchInput, setCommunitySearchInput] = useState("");
+  const [communitySearch, setCommunitySearch] = useState("");
 
-  // SWR to fetch all ready courses for community discovery (no auth header needed)
-  const { data: featuredCourses, mutate: mutateFeatured } = useSWR<FeaturedCourse[]>(
-    `${process.env.NEXT_PUBLIC_API_URL}/courses/featured`,
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setCommunitySearch(communitySearchInput.trim());
+      setCommunityPage(1);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [communitySearchInput]);
+
+  const communityFeaturedUrl = useMemo(() => {
+    const params = new URLSearchParams({
+      page: String(communityPage),
+      page_size: String(COMMUNITY_PAGE_SIZE),
+    });
+    if (communitySearch) {
+      params.set("q", communitySearch);
+    }
+    return `${process.env.NEXT_PUBLIC_API_URL}/courses/featured?${params.toString()}`;
+  }, [communityPage, communitySearch]);
+
+  const {
+    data: featuredPage,
+    isLoading: isLoadingCommunity,
+  } = useSWR<FeaturedCoursesPage>(
+    communityFeaturedUrl,
     async (url: string) => {
       const res = await fetch(url);
       if (!res.ok) throw new Error("Failed to fetch featured courses");
@@ -130,8 +150,11 @@ export default function CoursesPage() {
     {
       revalidateOnFocus: false,
       dedupingInterval: 30000,
+      keepPreviousData: true,
     }
   );
+
+  const featuredCourses = featuredPage?.items ?? [];
 
   const handleOpenPreview = async (courseId: string) => {
     setShowPreviewModal(true);
@@ -210,7 +233,6 @@ export default function CoursesPage() {
         method: "DELETE",
       });
       mutateCourses();
-      toast.success("Curso eliminado.");
       setCourseToDelete(null);
     } catch {
       toast.error("Erro ao eliminar curso.");
@@ -748,99 +770,150 @@ export default function CoursesPage() {
         </div>
       )}
 
-      {/* <div className="border w-full mt-5 mb-5 border-slate-200"></div> */}
-      {featuredCourses && featuredCourses.length > 0 && (
-        <div className="pt-10">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h2 className="text-xl md:text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
-                Explore Cursos da Comunidade
-                {/* <span className="px-2 py-0.5 rounded bg-cyan-50 text-cyan-600 text-[9px] font-black uppercase tracking-wider border border-cyan-100">
-                  Destaque
-                </span> */}
-              </h2>
-              <p className="text-sm text-slate-500 mt-0.5">Aprenda com cursos criados por outros estudantes e adicione-os à sua conta</p>
-            </div>
-
-            {/* Navigation Arrows (Udemy/Coursera style) */}
-            <div className="flex items-center gap-2 flex-shrink-0">
-              <button
-                onClick={() => scrollCommunity("left")}
-                className="w-8 h-8 rounded-full border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 hover:border-slate-300 active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-sm"
-                title="Anterior"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => scrollCommunity("right")}
-                className="w-8 h-8 rounded-full border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 hover:border-slate-300 active:scale-95 transition-all flex items-center justify-center cursor-pointer shadow-sm"
-                title="Próximo"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
+      <div className="pt-10 border-t border-slate-200/80 mt-10">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between mb-6">
+          <div>
+            <h2 className="text-xl md:text-2xl font-bold text-slate-900 tracking-tight">
+              Explore Cursos da Comunidade
+            </h2>
+            <p className="text-sm text-slate-500 mt-0.5">
+              Aprenda com cursos criados por outros estudantes e adicione-os à sua conta
+            </p>
+            {featuredPage && featuredPage.total > 0 && (
+              <p className="text-xs text-slate-400 mt-1">
+                {featuredPage.total}{" "}
+                {featuredPage.total === 1
+                  ? "curso disponível"
+                  : "cursos disponíveis"}
+              </p>
+            )}
           </div>
 
-          <div className="relative">
+          <div className="relative w-full sm:max-w-xs">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+            <Input
+              type="search"
+              placeholder="Pesquisar por título, descrição ou autor…"
+              value={communitySearchInput}
+              onChange={(e) => setCommunitySearchInput(e.target.value)}
+              className="pl-9 h-10 rounded-xl border-slate-200/80 bg-white"
+            />
+          </div>
+        </div>
+
+        {isLoadingCommunity && !featuredPage ? (
+          <div className="flex items-center justify-center py-16">
+            <Loader2 className="w-8 h-8 animate-spin text-cyan-500" />
+          </div>
+        ) : featuredCourses.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center rounded-2xl border border-dashed border-slate-200 bg-slate-50/50">
+            <Compass className="w-10 h-10 text-slate-300 mb-3" />
+            <p className="font-medium text-slate-600">
+              {communitySearch
+                ? "Nenhum curso encontrado para esta pesquisa."
+                : "Ainda não há cursos da comunidade."}
+            </p>
+            {communitySearch && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="mt-2 text-cyan-600"
+                onClick={() => setCommunitySearchInput("")}
+              >
+                Limpar pesquisa
+              </Button>
+            )}
+          </div>
+        ) : (
+          <>
             <div
-              ref={communityScrollRef}
-              className="flex gap-6 overflow-x-auto pb-2 scroll-smooth snap-x snap-mandatory [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+              className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 transition-opacity ${isLoadingCommunity ? "opacity-60 pointer-events-none" : ""}`}
             >
               {featuredCourses.map((fc) => (
                 <div
                   key={fc.id}
                   onClick={() => handleOpenPreview(fc.id)}
-                  className="snap-start
-        flex-shrink-0
-        w-full
-        sm:w-[calc((100%-1.5rem)/2)]
-        lg:w-[calc((100%-4.5rem)/4)]
-        bg-white
-        border
-        border-slate-200/70
-        rounded-lg
-        p-3
-        group
-        cursor-pointer
-        flex flex-col"
+                  className="bg-white border border-slate-200/70 rounded-xl p-3 group cursor-pointer flex flex-col hover:border-cyan-200/80 hover:shadow-md transition-all duration-300"
                 >
-                  <div className="aspect-[16/9] w-full rounded-sm overflow-hidden mb-3 relative bg-slate-50 border border-slate-200/60 shadow-xs">
+                  <div className="aspect-[16/9] w-full rounded-lg overflow-hidden mb-3 relative bg-slate-50 border border-slate-200/60">
                     {fc.thumb ? (
                       <img
-                        src={fc.thumb.startsWith('http') ? fc.thumb : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/media/${fc.thumb}`}
+                        src={
+                          fc.thumb.startsWith("http")
+                            ? fc.thumb
+                            : `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/media/${fc.thumb}`
+                        }
                         alt={fc.title}
                         className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                       />
                     ) : (
                       <div className="flex flex-col items-center justify-center h-full text-slate-400 bg-slate-50">
                         <ImageOff className="w-7 h-7 text-slate-300" />
-                        <span className="text-[9px] mt-1 text-slate-440">Sem Capa</span>
+                        <span className="text-[9px] mt-1 text-slate-400">Sem capa</span>
                       </div>
                     )}
                   </div>
 
-                  <h3 className="font-semibold text-base text-slate-800 line-clamp-2 group-hover:text-cyan-650 transition-colors leading-tight mb-1 capitalize">
+                  <h3 className="font-semibold text-base text-slate-800 line-clamp-2 group-hover:text-cyan-600 transition-colors leading-tight mb-1 capitalize">
                     {fc.title}
                   </h3>
 
-                  <p className="line-clamp-1 text-xs text-slate-500 line-clamp-2">
-                    {fc.owner_name}
-                  </p>
+                  <p className="text-xs text-slate-500 line-clamp-1">{fc.owner_name}</p>
 
-                  <div className="flex items-center gap-2 mt-3">
-                    <p className="text-xs text-cyan-700 font-bold bg-cyan-100 px-2 py-0.5 rounded-sm">
-                      {fc.level === 'B' ? 'Iniciante' : fc.level === 'I' ? 'Intermediário' : 'Avançado'}
-                    </p>
-                    <p className="text-xs font-light border border-slate-300 px-2 py-0.5 rounded-sm">
-                      {fc.module_count} módulo{fc.module_count !== 1 ? 's' : ''}
-                    </p>
+                  <div className="flex flex-wrap items-center gap-2 mt-3">
+                    <span className="text-xs text-cyan-700 font-bold bg-cyan-100 px-2 py-0.5 rounded-sm">
+                      {fc.level === "B"
+                        ? "Iniciante"
+                        : fc.level === "IT"
+                          ? "Intermediário"
+                          : "Avançado"}
+                    </span>
+                    <span className="text-xs font-light border border-slate-300 px-2 py-0.5 rounded-sm">
+                      {fc.module_count} módulo{fc.module_count !== 1 ? "s" : ""}
+                    </span>
                   </div>
                 </div>
               ))}
             </div>
-          </div>
-        </div>
-      )}
+
+            {featuredPage && featuredPage.total_pages > 1 && (
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-8 pt-4 border-t border-slate-100">
+                <p className="text-sm text-slate-500 order-2 sm:order-1">
+                  Página {featuredPage.page} de {featuredPage.total_pages}
+                </p>
+                <div className="flex items-center gap-2 order-1 sm:order-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="rounded-xl gap-1"
+                    disabled={communityPage <= 1 || isLoadingCommunity}
+                    onClick={() => setCommunityPage((p) => Math.max(1, p - 1))}
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                    Anterior
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="rounded-xl gap-1"
+                    disabled={
+                      communityPage >= featuredPage.total_pages || isLoadingCommunity
+                    }
+                    onClick={() =>
+                      setCommunityPage((p) =>
+                        Math.min(featuredPage.total_pages, p + 1)
+                      )
+                    }
+                  >
+                    Próxima
+                    <ChevronRight className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
 
       {/* ── MODAL: PREVIEW DO CURSO DA COMUNIDADE ── */}
       <Dialog open={showPreviewModal} onOpenChange={setShowPreviewModal}>

@@ -6,7 +6,7 @@ from ninja_jwt.authentication import JWTAuth
 
 from .schemas import (
     CourseDetailSchema,
-    CourseFeaturedOut,
+    CourseFeaturedPageOut,
     CourseIn,
     CourseOut,
     CoursePreviewOut,
@@ -40,10 +40,14 @@ class CourseController:
             request.user, data.prompt, data.level, data.num_modules
         )
 
-    @route.get("featured", response=List[CourseFeaturedOut], auth=None)
-    def list_featured_courses(self, request):
-        """Public endpoint – returns all READY courses for the discovery carousel."""
-        return self.course_service.list_featured_courses()
+    @route.get("featured", response=CourseFeaturedPageOut, auth=None)
+    def list_featured_courses(
+        self, request, page: int = 1, page_size: int = 12, q: str = ""
+    ):
+        """Public endpoint – paginated READY courses for community discovery."""
+        return self.course_service.list_featured_courses(
+            page=page, page_size=page_size, q=q
+        )
 
     @route.get("share/{token}", response=CourseShareOut, auth=None)
     def get_share_info(self, request, token: str):

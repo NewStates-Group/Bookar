@@ -325,7 +325,7 @@ class ModuleMaterialSchema(Schema):
 
 
 class CourseFeaturedOut(Schema):
-    """Lightweight card schema for the public courses carousel."""
+    """Lightweight card schema for the public community courses listing."""
 
     id: str
     title: Optional[str] = None
@@ -334,6 +334,14 @@ class CourseFeaturedOut(Schema):
     thumb: Optional[str] = None
     module_count: int = 0
     owner_name: Optional[str] = None
+
+
+class CourseFeaturedPageOut(Schema):
+    items: List[CourseFeaturedOut]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
 
 
 class CoursePreviewLessonOut(Schema):
