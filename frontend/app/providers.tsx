@@ -19,7 +19,7 @@ export function Providers({ children }: { children: ReactNode }) {
       <NotebookProvider>
         <WebSocketProvider>
           {children}
-          <PendingExplicadorRoomModal />
+          {/* <PendingExplicadorRoomModal /> */}
         </WebSocketProvider>
       </NotebookProvider>
     </SessionProvider>

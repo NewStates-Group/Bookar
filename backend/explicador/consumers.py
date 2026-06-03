@@ -27,6 +27,55 @@ def strip_explicador_mention(text: str) -> str:
     return cleaned
 
 
+def sanitize_whiteboard_data(whiteboard_data: dict | None) -> dict:
+    """Remove transient flags before persisting or broadcasting whiteboard state."""
+    data = dict(whiteboard_data or {})
+    data.pop("open_whiteboard", None)
+    return data
+
+
+def should_auto_open_whiteboard(
+    user_prompt: str, new_summary: str, previous_summary: str, ai_wants_open: bool
+) -> bool:
+    """Open board only for substantive new visual content, not social/chat-only replies."""
+    new_summary = (new_summary or "").strip()
+    previous_summary = (previous_summary or "").strip()
+    if not ai_wants_open or not new_summary:
+        return False
+    if new_summary == previous_summary:
+        return False
+
+    text = user_prompt.lower().strip()
+    if len(text) <= 60:
+        social_markers = (
+            "obrigad",
+            "agradeç",
+            "agradeço",
+            "valeu",
+            "thanks",
+            "thank you",
+            "ok",
+            "okay",
+            "entendi",
+            "perfeito",
+            "ótimo",
+            "otimo",
+            "boa",
+            "olá",
+            "ola",
+            "oi",
+            "tchau",
+            "adeus",
+            "certo",
+            "sim",
+            "não",
+            "nao",
+        )
+        if any(marker in text for marker in social_markers):
+            return False
+    return True
+
+
 class ExplicadorConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         self.room_uuid = self.scope["url_route"]["kwargs"]["room_uuid"]
@@ -95,7 +144,9 @@ class ExplicadorConsumer(AsyncWebsocketConsumer):
                     "type": "welcome",
                     "connection_id": self.connection_id,
                     "is_owner": self.is_owner,
-                    "whiteboard_data": self.room.whiteboard_data,
+                    "whiteboard_data": sanitize_whiteboard_data(
+                        self.room.whiteboard_data
+                    ),
                     "chat_history": self.room.chat_history,
                     "members": members,
                 }
@@ -125,7 +176,9 @@ class ExplicadorConsumer(AsyncWebsocketConsumer):
                             "message": {
                                 "type": "chat_update",
                                 "chat_history": self.room.chat_history,
-                                "whiteboard_data": self.room.whiteboard_data,
+                                "whiteboard_data": sanitize_whiteboard_data(
+                                    self.room.whiteboard_data
+                                ),
                             },
                         },
                     )
@@ -152,8 +205,40 @@ class ExplicadorConsumer(AsyncWebsocketConsumer):
     def get_handler(self, action_type: str):
         return getattr(self, f"handle_{action_type}", None)
 
+    async def _get_room_members(self) -> list:
+        return await sync_to_async(room_presence.list_members)(self.room_uuid)
+
+    async def _is_solo_room(self) -> bool:
+        return len(await self._get_room_members()) <= 1
+
+    async def _clear_lock_if_solo(self) -> None:
+        """Remove pencil lock when only one person remains in the room."""
+        if not await self._is_solo_room():
+            return
+        self.room = await self.get_room(self.room_uuid)
+        if not self.room or not self.room.whiteboard_data.get("lock"):
+            return
+        self.room.whiteboard_data["lock"] = None
+        await self.save_room()
+        await self.channel_layer.group_send(
+            self.group_name,
+            {
+                "type": "broadcast_message",
+                "message": {
+                    "type": "chat_update",
+                    "chat_history": self.room.chat_history,
+                    "whiteboard_data": sanitize_whiteboard_data(
+                        self.room.whiteboard_data
+                    ),
+                },
+            },
+        )
+
     async def handle_grab_lock(self, data):
         """Allows a user to grab the pencil (lock) to send messages to the explicador"""
+        if await self._is_solo_room():
+            return
+
         # Refresh room data
         self.room = await self.get_room(self.room_uuid)
         if not self.room:
@@ -180,13 +265,18 @@ class ExplicadorConsumer(AsyncWebsocketConsumer):
                     "message": {
                         "type": "chat_update",
                         "chat_history": self.room.chat_history,
-                        "whiteboard_data": self.room.whiteboard_data,
+                        "whiteboard_data": sanitize_whiteboard_data(
+                            self.room.whiteboard_data
+                        ),
                     },
                 },
             )
 
     async def handle_release_lock(self, data):
         """Allows the current lock holder to release the chalk"""
+        if await self._is_solo_room():
+            return
+
         # Refresh room data
         self.room = await self.get_room(self.room_uuid)
         if not self.room:
@@ -205,7 +295,9 @@ class ExplicadorConsumer(AsyncWebsocketConsumer):
                     "message": {
                         "type": "chat_update",
                         "chat_history": self.room.chat_history,
-                        "whiteboard_data": self.room.whiteboard_data,
+                        "whiteboard_data": sanitize_whiteboard_data(
+                            self.room.whiteboard_data
+                        ),
                     },
                 },
             )
@@ -220,27 +312,38 @@ class ExplicadorConsumer(AsyncWebsocketConsumer):
         if not message_content:
             return
 
-        mentions_tutor = message_mentions_explicador(message_content)
-        lock = self.room.whiteboard_data.get("lock")
-
-        if mentions_tutor:
-            if not lock or lock.get("connection_id") != self.connection_id:
-                await self.send(
-                    text_data=json.dumps(
-                        {
-                            "type": "error",
-                            "message": "Precisas de pegar o lápis primeiro para falar com o explicador.",
-                        }
-                    )
-                )
-                return
-            user_name = lock.get("name", "Usuário")
-        else:
-            user_name = self.user_name
-
-        prompt_for_ai = (
-            strip_explicador_mention(message_content) if mentions_tutor else ""
+        solo_room = await self._is_solo_room() or bool(
+            data.get("direct_to_explicador")
         )
+
+        if solo_room:
+            mentions_tutor = True
+            user_name = self.user_name
+            prompt_for_ai = (
+                strip_explicador_mention(message_content) or message_content
+            )
+        else:
+            mentions_tutor = message_mentions_explicador(message_content)
+            lock = self.room.whiteboard_data.get("lock")
+
+            if mentions_tutor:
+                if not lock or lock.get("connection_id") != self.connection_id:
+                    await self.send(
+                        text_data=json.dumps(
+                            {
+                                "type": "error",
+                                "message": "Precisas de pegar o lápis primeiro para falar com o explicador.",
+                            }
+                        )
+                    )
+                    return
+                user_name = lock.get("name", "Usuário")
+            else:
+                user_name = self.user_name
+
+            prompt_for_ai = (
+                strip_explicador_mention(message_content) if mentions_tutor else ""
+            )
         user_msg = {"role": "user", "content": f"**[{user_name}]**: {message_content}"}
         self.room.chat_history.append(user_msg)
         await self.save_room()
@@ -252,7 +355,9 @@ class ExplicadorConsumer(AsyncWebsocketConsumer):
                 "message": {
                     "type": "chat_update",
                     "chat_history": self.room.chat_history,
-                    "whiteboard_data": self.room.whiteboard_data,
+                    "whiteboard_data": sanitize_whiteboard_data(
+                        self.room.whiteboard_data
+                    ),
                     "is_generating": mentions_tutor,
                 },
             },
@@ -276,25 +381,23 @@ class ExplicadorConsumer(AsyncWebsocketConsumer):
             self.room.chat_history.append(ai_msg)
 
             # Preserve the lock object in whiteboard_data and store the new blackboard summary
-            current_lock = self.room.whiteboard_data.get("lock")
+            current_wb = sanitize_whiteboard_data(self.room.whiteboard_data)
+            current_lock = current_wb.get("lock")
+            previous_summary = (current_wb.get("summary") or "").strip()
             new_summary = (parsed_data.get("whiteboard_summary") or "").strip()
-            open_whiteboard = bool(parsed_data.get("open_whiteboard", False))
+            ai_wants_open = bool(parsed_data.get("open_whiteboard", False))
 
             if new_summary:
                 board_summary = new_summary
             else:
-                board_summary = self.room.whiteboard_data.get("summary", "")
-                open_whiteboard = False
+                board_summary = previous_summary
 
-            # Só abre o quadro quando a IA decidir que ajuda E houver conteúdo visual novo
-            open_whiteboard = open_whiteboard and bool(new_summary)
+            should_open = should_auto_open_whiteboard(
+                prompt_for_ai, board_summary, previous_summary, ai_wants_open
+            )
 
-            self.room.whiteboard_data = {
-                "summary": board_summary,
-                "lock": current_lock,
-                "open_whiteboard": open_whiteboard,
-            }
-
+            persisted_wb = {**current_wb, "summary": board_summary, "lock": current_lock}
+            self.room.whiteboard_data = persisted_wb
             await self.save_room()
 
             # 4. Broadcast results to group
@@ -305,7 +408,8 @@ class ExplicadorConsumer(AsyncWebsocketConsumer):
                     "message": {
                         "type": "chat_update",
                         "chat_history": self.room.chat_history,
-                        "whiteboard_data": self.room.whiteboard_data,
+                        "whiteboard_data": persisted_wb,
+                        "open_whiteboard": should_open,
                         "is_generating": False,
                     },
                 },
@@ -327,7 +431,9 @@ class ExplicadorConsumer(AsyncWebsocketConsumer):
                     "message": {
                         "type": "chat_update",
                         "chat_history": self.room.chat_history,
-                        "whiteboard_data": self.room.whiteboard_data,
+                        "whiteboard_data": sanitize_whiteboard_data(
+                            self.room.whiteboard_data
+                        ),
                         "is_generating": False,
                     },
                 },
@@ -340,11 +446,11 @@ class ExplicadorConsumer(AsyncWebsocketConsumer):
         if not self.room:
             return
 
-        lock = self.room.whiteboard_data.get("lock")
-        is_lock_holder = lock and lock.get("connection_id") == self.connection_id
-
-        if not self.is_owner and not is_lock_holder:
-            return
+        if not await self._is_solo_room():
+            lock = self.room.whiteboard_data.get("lock")
+            is_lock_holder = lock and lock.get("connection_id") == self.connection_id
+            if not self.is_owner and not is_lock_holder:
+                return
 
         node_id = data.get("node_id")
         x = data.get("x")
@@ -517,6 +623,7 @@ class ExplicadorConsumer(AsyncWebsocketConsumer):
 
     async def _broadcast_presence_sync(self):
         """Broadcast the full presence roster to all members in the room."""
+        await self._clear_lock_if_solo()
         members = await sync_to_async(room_presence.list_members)(self.room_uuid)
         await self.channel_layer.group_send(
             self.group_name,
@@ -608,10 +715,11 @@ Use exatamente a seguinte estrutura JSON:
 }}
 
 Regras para "open_whiteboard" (como ChatGPT/Claude decidem usar ferramentas):
-1. true quando conceitos, fórmulas, passos, comparações ou estrutura visual ajudam MUITO a aprender (ex.: demonstração matemática, resumo de tópicos, diagrama em tópicos).
-2. false para saudações, agradecimentos, despedidas, confirmações curtas ("ok", "entendi"), perguntas de opinião sem conteúdo técnico, ou quando a resposta no chat basta sozinha.
-3. Se open_whiteboard for false, whiteboard_summary DEVE ser "".
-4. Se open_whiteboard for true, whiteboard_summary DEVE ter conteúdo útil e minimalista.
+1. true APENAS quando há conteúdo NOVO e útil para o quadro (fórmulas, passos, tópicos, diagramas) que não estava no quadro antes.
+2. false para saudações, agradecimentos ("obrigado", "valeu"), despedidas, confirmações ("ok", "entendi", "perfeito"), ou quando a resposta no chat basta sozinha.
+3. Se open_whiteboard for false, whiteboard_summary DEVE ser "" (string vazia) — não repita o quadro anterior.
+4. Se open_whiteboard for true, whiteboard_summary DEVE ter conteúdo visual novo e diferente do que já foi mostrado.
+5. Nunca uses open_whiteboard true só para repetir o mesmo resumo.
 
 Regras para "whiteboard_summary" (quando open_whiteboard for true):
 1. APENAS resumos esquemáticos, cálculos ou tópicos curtos — legível em poucos segundos.

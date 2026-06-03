@@ -2,6 +2,7 @@ verificar as falhas no áudio
 ajustar responsividade no mobile
 quadro abre varias vezes, a cada mensagem, ele só pode abrir qnd o explicador estiver a escrever
 salas que já acessei devem ser guardadas
-qnd clico em uma sala e n posso entrar salva e apos o login redireciona
+qnd clico em uma sala e n posso entrar por estar sem login, salva e apos o login ao inves de levar para os cursos ou overview leva para aquela sala q estava salva no storage
 verificar o processo de envio de mensagens ao explicador (ele pode estar processando duas vezes)
 adicionar botao para interroper a resposta do explicador
+adicionar historico de conversas com o explicador incluindo as salas de outras pessoas adiciona um extra history no localstorage e concatena com o q vier da api

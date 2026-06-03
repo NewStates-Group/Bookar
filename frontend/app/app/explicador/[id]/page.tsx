@@ -103,20 +103,17 @@ function formatUserChatContent(displayName: string, text: string): string {
   return `**[${displayName}]**: ${text}`;
 }
 
+/** Atualiza conteúdo do quadro; nunca fecha — só o utilizador fecha. */
 function mergeWhiteboardFromServer(
   prev: WhiteboardData,
   incoming?: WhiteboardData | null
 ): WhiteboardData {
   if (!incoming) return prev;
-  const next: WhiteboardData = {
+  return {
     ...prev,
     summary: incoming.summary ?? prev.summary,
     lock: incoming.lock !== undefined ? incoming.lock : prev.lock,
   };
-  if (incoming.open_whiteboard) {
-    next.show_whiteboard = true;
-  }
-  return next;
 }
 
 export default function ExplicadorRoomPage() {
@@ -139,6 +136,10 @@ export default function ExplicadorRoomPage() {
   const [activeStreamingMessageIndex, setActiveStreamingMessageIndex] = useState<number | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [participants, setParticipants] = useState<Participant[]>([]);
+  const [roomMemberCount, setRoomMemberCount] = useState(1);
+  const roomMemberCountRef = useRef(1);
+  const isSoloRoom = roomMemberCount <= 1;
+  const isMultiUserRoom = !isSoloRoom;
   const [showParticipantsModal, setShowParticipantsModal] = useState(false);
 
   // Splitter Resizing states
@@ -183,6 +184,16 @@ export default function ExplicadorRoomPage() {
   const wsTokenRefreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const wsTokenRefreshReconnectRef = useRef(false);
   const refreshExplicadorSocketTokenRef = useRef<() => Promise<void>>(async () => {});
+  const hasReceivedWelcomeRef = useRef(false);
+  const sessionRef = useRef(session);
+
+  useEffect(() => {
+    sessionRef.current = session;
+  }, [session]);
+
+  useEffect(() => {
+    hasReceivedWelcomeRef.current = false;
+  }, [roomId]);
 
   useEffect(() => { localStreamRef.current = localStream; }, [localStream]);
   useEffect(() => { isMicMutedRef.current = isMicMuted; }, [isMicMuted]);
@@ -237,7 +248,7 @@ export default function ExplicadorRoomPage() {
       const freshSession = await ensureFreshSession();
       const token =
         freshSession?.accessToken ||
-        (session as { accessToken?: string } | null)?.accessToken ||
+        (sessionRef.current as { accessToken?: string } | null)?.accessToken ||
         "";
       if (!token) {
         if (!opts?.isReconnect) {
@@ -322,7 +333,7 @@ export default function ExplicadorRoomPage() {
         socket.close();
       };
     },
-    [roomId, session, clearWsTimers, startWsPingLoop]
+    [roomId, clearWsTimers, startWsPingLoop]
   );
 
   connectExplicadorSocketRef.current = connectExplicadorSocket;
@@ -372,13 +383,13 @@ export default function ExplicadorRoomPage() {
       }
 
       if (!wsMountedRef.current) return;
-      await connectExplicadorSocket();
+      await connectExplicadorSocketRef.current();
     };
 
     init();
 
     wsTokenRefreshTimerRef.current = setInterval(() => {
-      void refreshExplicadorSocketToken();
+      void refreshExplicadorSocketTokenRef.current();
     }, 10 * 60 * 1000);
 
     return () => {
@@ -396,7 +407,15 @@ export default function ExplicadorRoomPage() {
       }
       closeAllPeerConnections();
     };
-  }, [roomId, status, connectExplicadorSocket, refreshExplicadorSocketToken, clearWsTimers]);
+  }, [roomId, status, clearWsTimers]);
+
+  // Renova token na sessão (ex.: voltar ao separador) sem derrubar o socket se o token não mudou
+  useEffect(() => {
+    if (status !== "authenticated" || !roomReady) return;
+    const token = (session as { accessToken?: string } | null)?.accessToken;
+    if (!token || token === wsActiveTokenRef.current) return;
+    void refreshExplicadorSocketTokenRef.current();
+  }, [status, session, roomReady]);
 
   const closeAllPeerConnections = () => {
     peerConnectionsRef.current.forEach((pc) => pc.close());
@@ -515,6 +534,10 @@ export default function ExplicadorRoomPage() {
   /** Fonte única de verdade para quem está na sala (evita duplicados de join/leave). */
   const syncPresenceFromServer = useCallback(
     (members: unknown, selfId?: string | null) => {
+      const rawMembers = (members as { connection_id?: string }[] | null) || [];
+      setRoomMemberCount(rawMembers.length);
+      roomMemberCountRef.current = rawMembers.length;
+
       const previousIds = new Set(participantsRef.current.map((p) => p.connectionId));
       const list = mapServerMembersToParticipants(
         members as Parameters<typeof mapServerMembersToParticipants>[0],
@@ -589,14 +612,22 @@ export default function ExplicadorRoomPage() {
         connectionIdRef.current = data.connection_id;
         setIsOwner(data.is_owner);
         isOwnerRef.current = data.is_owner;
-        if (data.whiteboard_data) {
-          setWhiteboardData({
-            ...data.whiteboard_data,
-            show_whiteboard: false // Keep whiteboard closed on load to optimize responsiveness
-          });
-        } else {
-          setWhiteboardData({ summary: "", lock: null, show_whiteboard: false });
-        }
+        setWhiteboardData((prev) => {
+          const isReconnect = hasReceivedWelcomeRef.current;
+          hasReceivedWelcomeRef.current = true;
+
+          if (!data.whiteboard_data) {
+            return isReconnect
+              ? prev
+              : { summary: "", lock: null, show_whiteboard: false };
+          }
+
+          const merged = mergeWhiteboardFromServer(prev, data.whiteboard_data);
+          return {
+            ...merged,
+            show_whiteboard: isReconnect ? prev.show_whiteboard === true : false,
+          };
+        });
         setChatHistory(data.chat_history || []);
 
         // Broadcast initial audio state (mic already acquired in lobby)
@@ -616,8 +647,19 @@ export default function ExplicadorRoomPage() {
           const searchParams = new URLSearchParams(window.location.search);
           const promptParam = searchParams.get("prompt");
           if (promptParam && (!data.chat_history || data.chat_history.length <= 1)) {
-            socketRef.current?.send(JSON.stringify({ type: "grab_lock" }));
-            const promptMessage = ensureExplicadorMention(promptParam);
+            const welcomeMembers = (data.members as { connection_id?: string }[]) || [];
+            setRoomMemberCount(welcomeMembers.length);
+            roomMemberCountRef.current = welcomeMembers.length;
+            const soloOnWelcome = welcomeMembers.length <= 1;
+            const promptText = promptParam.trim();
+            const promptMessage = soloOnWelcome
+              ? promptText
+              : ensureExplicadorMention(promptText);
+
+            if (!soloOnWelcome) {
+              socketRef.current?.send(JSON.stringify({ type: "grab_lock" }));
+            }
+
             const displayName =
               (session?.user as { first_name?: string; last_name?: string })?.first_name
                 ? `${(session?.user as { first_name?: string; last_name?: string }).first_name} ${(session?.user as { last_name?: string }).last_name || ""}`.trim()
@@ -628,10 +670,15 @@ export default function ExplicadorRoomPage() {
             ]);
             setIsGenerating(true);
             socketRef.current?.send(
-              JSON.stringify({
-                type: "chat_message",
-                message: promptMessage,
-              })
+              JSON.stringify(
+                soloOnWelcome
+                  ? {
+                      type: "chat_message",
+                      message: promptMessage,
+                      direct_to_explicador: true,
+                    }
+                  : { type: "chat_message", message: promptMessage }
+              )
             );
             // Clean the query parameter from browser address bar
             const cleanUrl = window.location.pathname;
@@ -682,7 +729,20 @@ export default function ExplicadorRoomPage() {
         setIsGenerating(Boolean(data.is_generating));
 
         if (data.whiteboard_data) {
-          setWhiteboardData((prev) => mergeWhiteboardFromServer(prev, data.whiteboard_data));
+          setWhiteboardData((prev) => {
+            const merged = mergeWhiteboardFromServer(prev, data.whiteboard_data);
+            const incomingSummary = (data.whiteboard_data.summary ?? "").trim();
+            const prevSummary = (prev.summary ?? "").trim();
+            const shouldOpen =
+              data.open_whiteboard === true &&
+              incomingSummary.length > 0 &&
+              incomingSummary !== prevSummary;
+
+            if (shouldOpen) {
+              return { ...merged, show_whiteboard: true };
+            }
+            return merged;
+          });
         }
         break;
 
@@ -878,30 +938,48 @@ export default function ExplicadorRoomPage() {
     return u?.name || "Eu";
   };
 
-  // 3. Message sending — lock required only for @explicador (tutor) messages
+  const currentLock = isSoloRoom ? null : whiteboardData.lock;
+  const isLockHolder =
+    isMultiUserRoom &&
+    Boolean(currentLock && currentLock.connection_id === connectionId);
+
+  /** Solo: mensagem vai direto ao explicador. Multi: chat ou @explicador + lápis. */
   const submitChatMessage = (rawMessage: string) => {
     const trimmed = rawMessage.trim();
     if (!trimmed || isGenerating) return;
 
-    const mentionsTutor = messageMentionsExplicador(trimmed);
-    if (mentionsTutor && !isLockHolder) {
-      toast.error("Pega o lápis primeiro para falar com o explicador.");
-      return;
+    const solo = roomMemberCountRef.current <= 1;
+
+    if (!solo) {
+      const mentionsTutor = messageMentionsExplicador(trimmed);
+      if (mentionsTutor && !isLockHolder) {
+        toast.error("Pega o lápis primeiro para falar com o explicador.");
+        return;
+      }
     }
 
     setChatHistory((prev) => [
       ...prev,
-      { role: "user", content: formatUserChatContent(getDisplayName(), trimmed) },
+      {
+        role: "user",
+        content: formatUserChatContent(getDisplayName(), trimmed),
+      },
     ]);
-    if (mentionsTutor) {
+
+    if (solo || messageMentionsExplicador(trimmed)) {
       setIsGenerating(true);
       setActiveStreamingMessageIndex(null);
     }
 
-    sendWSMessage({
-      type: "chat_message",
-      message: trimmed,
-    });
+    sendWSMessage(
+      solo
+        ? {
+            type: "chat_message",
+            message: trimmed,
+            direct_to_explicador: true,
+          }
+        : { type: "chat_message", message: trimmed }
+    );
 
     setMessage("");
     requestAnimationFrame(() => {
@@ -915,7 +993,7 @@ export default function ExplicadorRoomPage() {
   };
 
   const handleMentionExplicador = () => {
-    if (isGenerating) return;
+    if (isGenerating || isSoloRoom) return;
     if (!isLockHolder) {
       toast.error("Pega o lápis primeiro para falar com o explicador.");
       return;
@@ -1008,11 +1086,9 @@ export default function ExplicadorRoomPage() {
     }
   };
 
-  // Derived lock state values
-  const currentLock = whiteboardData.lock;
-  const isLockHolder = currentLock && currentLock.connection_id === connectionId;
   const showWhiteboard = whiteboardData.show_whiteboard === true;
-  const mentionsExplicadorInInput = messageMentionsExplicador(message);
+  const mentionsExplicadorInInput =
+    isMultiUserRoom && messageMentionsExplicador(message);
 
   const combinedRoster = [
     {
@@ -1149,7 +1225,7 @@ export default function ExplicadorRoomPage() {
               <Bot className="w-5 h-5 text-cyan-600" />
               Explicador
             </span>
-            {combinedRoster.length >= 1 ? (
+            {isMultiUserRoom ? (
               <button
                 onClick={() => setShowParticipantsModal(true)}
                 className="flex items-center -space-x-1.5 hover:opacity-90 transition-opacity bg-slate-100 hover:bg-slate-200/80 px-2.5 py-1 rounded-full border border-slate-200/60 cursor-pointer ml-2"
@@ -1192,30 +1268,32 @@ export default function ExplicadorRoomPage() {
             )}
           </div>
           <div className="flex items-center gap-1">
-            <div>
-              {!currentLock ? (
-                <div onClick={grabLock} className="cursor-pointer gap-1 flex items-center justify-between text-xs px-1 text-slate-800">
-                  <Pencil className="w-3.5 h-3.5 text-slate-800" />
-                  <span className="hidden sm:block flex items-center gap-1.5 font-medium">
-                    Lápis (tutor)
-                  </span>
-                </div>
-              ) : isLockHolder ? (
-                <div onClick={releaseLock} className="flex items-center gap-1 justify-between text-xs px-1 text-cyan-600">
-                  <Lock className="w-3.5 h-3.5 text-cyan-600" />
-                  <span className="hidden sm:block flex items-center gap-1.5 font-semibold">
-                    Tens o lápis!
-                  </span>
-                </div>
-              ) : (
-                <div className="flex items-center justify-between gap-1 text-xs px-1 text-slate-800">
-                  <Lock className="w-3.5 h-3.5 text-slate-350" />
-                  <span className="hidden sm:block flex items-center gap-1.5 font-medium truncate pr-2">
-                    Lápiz com: <strong>{currentLock.name}</strong>
-                  </span>
-                </div>
-              )}
-            </div>
+            {isMultiUserRoom && (
+              <div>
+                {!currentLock ? (
+                  <div onClick={grabLock} className="cursor-pointer gap-1 flex items-center justify-between text-xs px-1 text-slate-800">
+                    <Pencil className="w-3.5 h-3.5 text-slate-800" />
+                    <span className="hidden sm:block flex items-center gap-1.5 font-medium">
+                      Lápis (tutor)
+                    </span>
+                  </div>
+                ) : isLockHolder ? (
+                  <div onClick={releaseLock} className="flex items-center gap-1 justify-between text-xs px-1 text-cyan-600">
+                    <Lock className="w-3.5 h-3.5 text-cyan-600" />
+                    <span className="hidden sm:block flex items-center gap-1.5 font-semibold">
+                      Tens o lápis!
+                    </span>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between gap-1 text-xs px-1 text-slate-800">
+                    <Lock className="w-3.5 h-3.5 text-slate-350" />
+                    <span className="hidden sm:block flex items-center gap-1.5 font-medium truncate pr-2">
+                      Lápiz com: <strong>{currentLock.name}</strong>
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Share room link */}
             <Button
@@ -1228,22 +1306,24 @@ export default function ExplicadorRoomPage() {
               <span className="hidden sm:block">Convidar</span>
             </Button>
 
-            <div className="flex items-center gap-1.5">
-              <Button
-                size="sm"
-                variant="secondary"
-                onClick={toggleMute}
-                className={`hover:bg-transparent! rounded-full h-8 px-3 gap-1.5 text-xs`}
-              >
-                {isMicMuted ?
-                  <MicOff className="w-3.5 h-3.5 text-red-650" />
-                  : <Mic className="w-3.5 h-3.5 text-slate-800" />}
-                <span className="hidden sm:block">
-                  {isMicMuted ? "Silenciado" : "Voz Ativa"}
-                </span>
+            {isMultiUserRoom && (
+              <div className="flex items-center gap-1.5">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={toggleMute}
+                  className={`hover:bg-transparent! rounded-full h-8 px-3 gap-1.5 text-xs`}
+                >
+                  {isMicMuted ?
+                    <MicOff className="w-3.5 h-3.5 text-red-650" />
+                    : <Mic className="w-3.5 h-3.5 text-slate-800" />}
+                  <span className="hidden sm:block">
+                    {isMicMuted ? "Silenciado" : "Voz Ativa"}
+                  </span>
 
-              </Button>
-            </div>
+                </Button>
+              </div>
+            )}
           </div>
 
         </div>
@@ -1334,9 +1414,11 @@ export default function ExplicadorRoomPage() {
               placeholder={
                 isGenerating
                   ? "A aguardar resposta do explicador..."
-                  : mentionsExplicadorInInput && !isLockHolder
-                    ? "Pega o lápis para falar com o explicador"
-                    : "Escreve no chat com os outros..."
+                  : isSoloRoom
+                    ? "Escreve a tua dúvida para o explicador..."
+                    : mentionsExplicadorInInput && !isLockHolder
+                      ? "Pega o lápis para falar com o explicador"
+                      : "Escreve no chat com os outros..."
               }
               value={message}
               onChange={(e) => setMessage(e.target.value)}
@@ -1344,30 +1426,31 @@ export default function ExplicadorRoomPage() {
               className="flex-1 h-10 bg-transparent text-slate-800 placeholder:text-slate-400 text-sm px-1 outline-none border-0 focus:ring-0 disabled:text-slate-400"
             />
 
-            {/* Mic button */}
             <button
               type="button"
               onClick={handleChatMic}
               disabled={isGenerating}
-              title="Falar"
+              title="Falar com o explicador"
               className="w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:text-cyan-600 hover:bg-cyan-50 disabled:opacity-40 transition-all duration-200 flex-shrink-0 cursor-pointer"
             >
               <Mic className="w-4 h-4" />
             </button>
 
-            <button
-              type="button"
-              onClick={handleMentionExplicador}
-              disabled={isGenerating}
-              title="Mencionar @explicador e pedir resposta (precisas do lápis)"
-              className={`w-8 h-8 flex items-center justify-center rounded-full transition-all duration-200 flex-shrink-0 cursor-pointer disabled:opacity-40 ${
-                mentionsExplicadorInInput
-                  ? "bg-cyan-100 text-cyan-700 ring-2 ring-cyan-300/60"
-                  : "text-slate-400 hover:text-cyan-600 hover:bg-cyan-50"
-              }`}
-            >
-              <Bot className="w-4 h-4" />
-            </button>
+            {isMultiUserRoom && (
+              <button
+                type="button"
+                onClick={handleMentionExplicador}
+                disabled={isGenerating}
+                title="Mencionar @explicador e pedir resposta (precisas do lápis)"
+                className={`w-8 h-8 flex items-center justify-center rounded-full transition-all duration-200 flex-shrink-0 cursor-pointer disabled:opacity-40 ${
+                  mentionsExplicadorInInput
+                    ? "bg-cyan-100 text-cyan-700 ring-2 ring-cyan-300/60"
+                    : "text-slate-400 hover:text-cyan-600 hover:bg-cyan-50"
+                }`}
+              >
+                <Bot className="w-4 h-4" />
+              </button>
+            )}
 
             {/* Send button */}
             <Button
@@ -1375,7 +1458,7 @@ export default function ExplicadorRoomPage() {
               disabled={
                 !message.trim() ||
                 isGenerating ||
-                (mentionsExplicadorInInput && !isLockHolder)
+                (isMultiUserRoom && mentionsExplicadorInInput && !isLockHolder)
               }
               className="w-8 h-8 p-0 bg-cyan-500 hover:bg-cyan-600 disabled:bg-slate-200 disabled:text-slate-400 text-white rounded-full flex items-center justify-center shadow-sm shadow-cyan-500/20 transition-all duration-200 flex-shrink-0"
             >

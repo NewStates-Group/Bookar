@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import Image from "next/image";
 import { motion } from "framer-motion";
 import { Turnstile } from "next-turnstile";
+import { getPendingExplicadorRoom } from "@/lib/pending-explicador-room";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -104,22 +105,24 @@ export default function LoginPage() {
         redirect: false,
       });
 
-      // if (typeof window !== "undefined") console.log("[Login] signIn result:", result);
-
       if (result?.error) {
         if (result.error === "AUTHENTICATION_FAILED" || result.error.includes("incorretos")) {
           setErrors({ password: ["E-mail ou palavra-passe incorretos"] });
         } else if (result.error.includes("anti-bot")) {
           toast.error("Por favor, resolva o CAPTCHA.");
         } else if (result.error.includes("Muitas tentativas") || result.status === 429) {
-          // NextAuth might not pass the status directly, but let's try to handle it
           setCooldown(180);
         } else {
           toast.error(result.error);
         }
       } else {
-        // if (typeof window !== "undefined") console.log("[Login] Login successful, redirecting to /app/courses");
-        router.push("/app/courses");
+        const pendingRoom = getPendingExplicadorRoom();
+        if (pendingRoom) {
+          router.replace(pendingRoom.path);
+          clearPendingExplicadorRoom();
+        } else {
+          router.replace("/app/courses");
+        } 
       }
     } catch (error) {
       toast.error("Ocorreu um erro ao tentar fazer login.");
@@ -173,7 +176,6 @@ export default function LoginPage() {
 
     const handleMessage = async (event: MessageEvent) => {
       if (event.data?.type === "AUTH_SUCCESS") {
-        // if (typeof window !== "undefined") console.log("[Login] Google AUTH_SUCCESS received:", event.data);
         setIsLoading(true);
         try {
           const result = await signIn("credentials", {
@@ -181,15 +183,16 @@ export default function LoginPage() {
             refreshToken: event.data.refresh,
             redirect: false,
           });
-
-          // if (typeof window !== "undefined") console.log("[Login] Google signIn result:", result);
-
           if (result?.error) {
-            // if (typeof window !== "undefined") console.error("[Login] Google signIn error:", result.error);
             toast.error(result.error);
           } else {
-            // if (typeof window !== "undefined") console.log("[Login] Google login successful, redirecting to /app/courses");
-            router.replace("/app/courses");
+            const pendingRoom = getPendingExplicadorRoom();
+        if (pendingRoom) {
+          router.push(pendingRoom.path);
+          clearPendingExplicadorRoom();
+        } else {
+          router.replace("/app/courses");
+        } 
           }
         } catch (err) {
           toast.error("Erro ao finalizar autenticação.");
