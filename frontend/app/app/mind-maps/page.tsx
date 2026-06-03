@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import useSWR from "swr";
 import { authenticatedFetcher, apiRequest } from "@/lib/api";
 import { useWebSocket } from "@/context/WebSocketContext";
+import { DeleteMindMapDialog } from "@/components/DeleteMindMapDialog";
 
 interface MindMap {
   id: string;
@@ -36,6 +37,11 @@ export default function MindMapsPage() {
   const [isCreating, setIsCreating] = useState(false);
   const [open, setOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
+  const [mapToDelete, setMapToDelete] = useState<{
+    id: string;
+    title?: string | null;
+    topic?: string;
+  } | null>(null);
 
   const { data: mindMaps, mutate: mutateMindMaps, isLoading } = useSWR<
     MindMap[]
@@ -88,19 +94,30 @@ export default function MindMapsPage() {
     }
   };
 
-  const handleDeleteMindMap = async (id: string, e: React.MouseEvent) => {
+  const openDeleteDialog = (map: MindMap, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!window.confirm("Deseja mesmo remover este mapa mental?")) return;
+    setMapToDelete({
+      id: map.id,
+      title: map.title || map.topic,
+      topic: map.topic,
+    });
+  };
 
+  const confirmDeleteMindMap = async () => {
+    if (!mapToDelete) return;
+    const id = mapToDelete.id;
     setIsDeleting(id);
     try {
       await apiRequest(`${process.env.NEXT_PUBLIC_API_URL}/mind-maps/${id}`, {
         method: "DELETE",
       });
-      // toast.success("Mapa mental removido.");
+      toast.success("Mapa mental eliminado.");
       mutateMindMaps();
-    } catch (err: any) {
-      toast.error(err.message || "Erro ao deletar mapa mental.");
+      setMapToDelete(null);
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : "Erro ao eliminar mapa mental.";
+      toast.error(message);
     } finally {
       setIsDeleting(null);
     }
@@ -218,7 +235,7 @@ export default function MindMapsPage() {
               variant="ghost"
               size="icon"
               className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-red-500 hover:bg-red-50/50 rounded-full transition-all duration-300"
-              onClick={(e) => handleDeleteMindMap(map.id, e)}
+              onClick={(e) => openDeleteDialog(map, e)}
               disabled={isDeleting === map.id}
             >
               {isDeleting === map.id ? (
@@ -285,6 +302,14 @@ export default function MindMapsPage() {
           </Card>
         ))}
       </div>
+
+      <DeleteMindMapDialog
+        open={!!mapToDelete}
+        onOpenChange={(open) => !open && !isDeleting && setMapToDelete(null)}
+        mapTitle={mapToDelete?.title}
+        isDeleting={!!mapToDelete && isDeleting === mapToDelete.id}
+        onConfirm={confirmDeleteMindMap}
+      />
     </div>
   );
 }

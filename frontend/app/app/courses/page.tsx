@@ -28,6 +28,7 @@ import {
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { useWebSocket } from "@/context/WebSocketContext";
+import { DeleteCourseDialog } from "@/components/DeleteCourseDialog";
 import useSWR from 'swr';
 import { authenticatedFetcher, apiRequest } from "@/lib/api";
 
@@ -107,6 +108,10 @@ export default function CoursesPage() {
   const [isDownloading, setIsDownloading] = useState(false);
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const [isDeletingCourse, setIsDeletingCourse] = useState<number | null>(null);
+  const [courseToDelete, setCourseToDelete] = useState<{
+    id: number;
+    title?: string | null;
+  } | null>(null);
 
   // Community discovery states
   const [showPreviewModal, setShowPreviewModal] = useState(false);
@@ -196,15 +201,17 @@ export default function CoursesPage() {
     }
   }, [swrCourses]);
 
-  const handleDeleteCourse = async (courseId: Number) => {
-    if (!window.confirm("Tem certeza que deseja eliminar este curso?")) return;
-    setIsDeletingCourse(courseId as number);
+  const confirmDeleteCourse = async () => {
+    if (!courseToDelete) return;
+    const courseId = courseToDelete.id;
+    setIsDeletingCourse(courseId);
     try {
       await apiRequest(`${process.env.NEXT_PUBLIC_API_URL}/courses/${courseId}`, {
         method: "DELETE",
       });
       mutateCourses();
       toast.success("Curso eliminado.");
+      setCourseToDelete(null);
     } catch {
       toast.error("Erro ao eliminar curso.");
     } finally {
@@ -646,7 +653,9 @@ export default function CoursesPage() {
                     variant="ghost"
                     size="icon"
                     className="absolute top-0 right-0 text-gray-400 hover:text-red-500 hover:bg-red-50"
-                    onClick={() => handleDeleteCourse(course.id)}
+                    onClick={() =>
+                      setCourseToDelete({ id: course.id, title: course.title })
+                    }
                     disabled={isDeletingCourse === course.id}
                   >
                     {isDeletingCourse === course.id ? (
@@ -671,7 +680,9 @@ export default function CoursesPage() {
                     size="sm"
                     variant="outline"
                     className="border-red-200 text-red-500 hover:bg-red-50 gap-2"
-                    onClick={() => handleDeleteCourse(course.id)}
+                    onClick={() =>
+                      setCourseToDelete({ id: course.id, title: course.title })
+                    }
                     disabled={isDeletingCourse === course.id}
                   >
                     {isDeletingCourse === course.id ? (
@@ -945,6 +956,14 @@ export default function CoursesPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      <DeleteCourseDialog
+        open={!!courseToDelete}
+        onOpenChange={(open) => !open && !isDeletingCourse && setCourseToDelete(null)}
+        courseTitle={courseToDelete?.title}
+        isDeleting={!!courseToDelete && isDeletingCourse === courseToDelete.id}
+        onConfirm={confirmDeleteCourse}
+      />
     </div>
   );
 }

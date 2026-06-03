@@ -10,6 +10,7 @@ import { useEffect, useState, useRef } from "react";
 import { toast } from "sonner";
 import { Award, FileDown, X, HelpCircle, CheckCircle2, XCircle, Lock, Share2, Users } from "lucide-react";
 import { ShareCourseModal } from "@/components/ShareCourseModal";
+import { DeleteCourseDialog } from "@/components/DeleteCourseDialog";
 import { useWebSocket } from "@/context/WebSocketContext";
 import useSWR from 'swr';
 import { authenticatedFetcher, apiRequest } from "@/lib/api";
@@ -69,6 +70,8 @@ export default function CoursePage() {
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [shareToken, setShareToken] = useState("");
   const [claims, setClaims] = useState<Claim[]>([]);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [isDeletingCourse, setIsDeletingCourse] = useState(false);
 
   const { addListener } = useWebSocket();
 
@@ -215,15 +218,21 @@ export default function CoursePage() {
     }
   }
 
-  const handleDeleteCourse = async () => {
-    if (!window.confirm("Tem certeza que deseja eliminar este curso?")) return;
+  const confirmDeleteCourse = async () => {
+    if (!course?.id) return;
+    setIsDeletingCourse(true);
     try {
-      await apiRequest(`${process.env.NEXT_PUBLIC_API_URL}/courses/${course?.id}`, {
+      await apiRequest(`${process.env.NEXT_PUBLIC_API_URL}/courses/${course.id}`, {
         method: "DELETE",
       });
-      router.replace('/app/courses')
-    } catch (e: any) {
-      toast.error(e.message || "Erro ao eliminar curso");
+      toast.success("Curso eliminado.");
+      setDeleteDialogOpen(false);
+      router.replace("/app/courses");
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "Erro ao eliminar curso";
+      toast.error(message);
+    } finally {
+      setIsDeletingCourse(false);
     }
   };
 
@@ -309,11 +318,19 @@ export default function CoursePage() {
                   </span>
                 )}
               </Button>
-              <Button variant="outline" size="lg" className="rounded-full px-8" onClick={handleDeleteCourse}>
-                <Trash className="w-4 h-4 text-red-500" />
-                <span className="text-red-500 hidden md:block">
-                  Eliminar Curso
-                </span>
+              <Button
+                variant="outline"
+                size="lg"
+                className="rounded-full px-8 border-red-100 hover:bg-red-50"
+                onClick={() => setDeleteDialogOpen(true)}
+                disabled={isDeletingCourse}
+              >
+                {isDeletingCourse ? (
+                  <Loader2 className="w-4 h-4 animate-spin text-red-500" />
+                ) : (
+                  <Trash className="w-4 h-4 text-red-500" />
+                )}
+                <span className="text-red-500 hidden md:block">Eliminar Curso</span>
               </Button>
               {(!course.max_modules || course.modules.length < course.max_modules) && (
                 <Button variant="outline" size="lg" className="rounded-full px-8" onClick={handleGenerateModule} disabled={isGeneratingModule}>
@@ -521,6 +538,14 @@ export default function CoursePage() {
         isOpen={isShareModalOpen}
         onClose={() => setIsShareModalOpen(false)}
         shareUrl={`${window.location.origin}/share/${shareToken}`}
+      />
+
+      <DeleteCourseDialog
+        open={deleteDialogOpen}
+        onOpenChange={(open) => !isDeletingCourse && setDeleteDialogOpen(open)}
+        courseTitle={course?.title}
+        isDeleting={isDeletingCourse}
+        onConfirm={confirmDeleteCourse}
       />
     </div>
   );
