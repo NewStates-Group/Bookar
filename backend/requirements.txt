@@ -110,6 +110,8 @@ django-cors-headers==4.9.0
     # via backend (pyproject.toml)
 django-environ==0.12.0
     # via backend (pyproject.toml)
+django-gmailapi-backend==0.3.3
+    # via backend (pyproject.toml)
 django-ninja==1.4.3
     # via
     #   backend (pyproject.toml)
@@ -134,12 +136,24 @@ flower==2.0.1
     # via backend (pyproject.toml)
 freetype-py==2.5.1
     # via rlpycairo
+google-api-core==2.30.3
+    # via google-api-python-client
+google-api-python-client==2.197.0
+    # via django-gmailapi-backend
 google-auth==2.43.0
     # via
     #   backend (pyproject.toml)
+    #   django-gmailapi-backend
+    #   google-api-core
+    #   google-api-python-client
+    #   google-auth-httplib2
     #   google-genai
+google-auth-httplib2==0.4.0
+    # via google-api-python-client
 google-genai==1.52.0
     # via backend (pyproject.toml)
+googleapis-common-protos==1.75.0
+    # via google-api-core
 gunicorn==25.1.0
     # via backend (pyproject.toml)
 h11==0.16.0
@@ -150,6 +164,10 @@ html5lib==1.1
     # via xhtml2pdf
 httpcore==1.0.9
     # via httpx
+httplib2==0.31.2
+    # via
+    #   google-api-python-client
+    #   google-auth-httplib2
 httptools==0.7.1
     # via uvicorn
 httpx==0.28.1
@@ -208,6 +226,13 @@ prometheus-client==0.23.1
     # via flower
 prompt-toolkit==3.0.52
     # via click-repl
+proto-plus==1.28.0
+    # via google-api-core
+protobuf==7.35.0
+    # via
+    #   google-api-core
+    #   googleapis-common-protos
+    #   proto-plus
 psycopg2-binary==2.9.11
     # via backend (pyproject.toml)
 py-ubjson==0.16.1
@@ -247,6 +272,8 @@ pyjwt==2.10.1
     # via django-ninja-jwt
 pyopenssl==25.3.0
     # via twisted
+pyparsing==3.3.2
+    # via httplib2
 pypdf==6.9.1
     # via xhtml2pdf
 python-bidi==0.6.7
@@ -278,6 +305,7 @@ requests==2.32.5
     # via
     #   django-cloudinary-storage
     #   elevenlabs
+    #   google-api-core
     #   google-genai
     #   pyhanko
     #   pyhanko-certvalidator
@@ -333,6 +361,8 @@ tzlocal==5.3.1
     #   pyhanko
 ujson==5.12.0
     # via autobahn
+uritemplate==4.2.0
+    # via google-api-python-client
 uritools==6.0.1
     # via pyhanko-certvalidator
 urllib3==2.5.0

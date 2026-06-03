@@ -37,4 +37,5 @@ dependencies = [
     "channels-redis>=4.2.1",
     "replicate>=1.0.7",
     "elevenlabs>=2.46.0",
+    "django-gmailapi-backend>=0.3.3",
 ]
