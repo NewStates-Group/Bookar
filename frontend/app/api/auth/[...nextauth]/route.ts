@@ -7,7 +7,6 @@ export const dynamic = "force-dynamic";
 
 type RouteContext = { params: Promise<{ nextauth: string[] }> };
 
-/** Garante JSON válido mesmo se o handler NextAuth falhar (evita CLIENT_FETCH_ERROR no cliente). */
 async function safeAuthHandler(
   req: Request,
   context: RouteContext,

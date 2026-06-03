@@ -13,7 +13,7 @@ import { toast } from "sonner";
 import Image from "next/image";
 import { motion } from "framer-motion";
 import { Turnstile } from "next-turnstile";
-import { getPendingExplicadorRoom } from "@/lib/pending-explicador-room";
+import { clearPendingExplicadorRoom, getPendingExplicadorRoom } from "@/lib/pending-explicador-room";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -122,7 +122,7 @@ export default function LoginPage() {
           clearPendingExplicadorRoom();
         } else {
           router.replace("/app/courses");
-        } 
+        }
       }
     } catch (error) {
       toast.error("Ocorreu um erro ao tentar fazer login.");
@@ -158,55 +158,7 @@ export default function LoginPage() {
   };
 
   const handleGoogleLogin = () => {
-    const width = 500;
-    const height = 600;
-    const left = window.screenX + (window.outerWidth - width) / 2;
-    const top = window.screenY + (window.outerHeight - height) / 2;
-
-    const popup = window.open(
-      "/auth/login/google",
-      "google-login",
-      `width=${width},height=${height},left=${left},top=${top}`
-    );
-
-    if (!popup) {
-      toast.error("Por favor, permita popups para este site.");
-      return;
-    }
-
-    const handleMessage = async (event: MessageEvent) => {
-      if (event.data?.type === "AUTH_SUCCESS") {
-        setIsLoading(true);
-        try {
-          const result = await signIn("credentials", {
-            accessToken: event.data.access,
-            refreshToken: event.data.refresh,
-            redirect: false,
-          });
-          if (result?.error) {
-            toast.error(result.error);
-          } else {
-            const pendingRoom = getPendingExplicadorRoom();
-        if (pendingRoom) {
-          router.push(pendingRoom.path);
-          clearPendingExplicadorRoom();
-        } else {
-          router.replace("/app/courses");
-        } 
-          }
-        } catch (err) {
-          toast.error("Erro ao finalizar autenticação.");
-        } finally {
-          setIsLoading(false);
-          window.removeEventListener("message", handleMessage);
-        }
-      } else if (event.data?.type === "AUTH_ERROR") {
-        toast.error(event.data.message || "Erro na autenticação com Google");
-        window.removeEventListener("message", handleMessage);
-      }
-    };
-
-    window.addEventListener("message", handleMessage);
+    window.location.href = "/auth/login/google";
   };
 
   return (
@@ -389,7 +341,7 @@ export default function LoginPage() {
                   disabled={isLoading || (step === "password" && !turnstileToken) || cooldown > 0}
                 >
                   {isLoading ? (
-                    <>
+                      <>
                       <Loader2 className="mr-2 h-5 w-5 animate-spin" />
                       {step === "email" ? "Verificando..." : "Entrando..."}
                     </>

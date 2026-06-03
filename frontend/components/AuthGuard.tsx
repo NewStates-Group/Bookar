@@ -1,91 +1,109 @@
 "use client";
 
-import { useSession } from "next-auth/react";
-import { Loader2 } from "lucide-react";
+import { useSession, signOut } from "next-auth/react";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
-import { isExplicadorRoomPath, savePendingExplicadorRoom } from "@/lib/pending-explicador-room";
-const PUBLIC_ROUTES = ["/", "/login", "/signup", "/forgot-password", "/reset-password"];
+import { useEffect, useRef } from "react";
 
-export function AuthGuard({ children }: { children: React.ReactNode }) {
+import { BookarLoader } from "./BookarLoader";
+import {
+  isExplicadorRoomPath,
+  savePendingExplicadorRoom,
+} from "@/lib/pending-explicador-room";
+
+const PUBLIC_ROUTES = [
+  "/",
+  "/login",
+  "/signup",
+  "/forgot-password",
+  "/reset-password",
+];
+
+/**
+ * Module-level flag: once the session is authenticated, we never unmount
+ * children again just because status briefly goes back to "loading" during
+ * a session update() call. This ref persists across component re-renders
+ * and even across hot-reloads in dev.
+ */
+let hasEverBeenAuthenticated = false;
+
+export function AuthGuard({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const { data: session, status, update } = useSession();
+
   const pathname = usePathname();
   const router = useRouter();
-  const [sessionCheckDone, setSessionCheckDone] = useState(false);
+
   const refreshAttempted = useRef(false);
 
   const isPublicRoute = PUBLIC_ROUTES.includes(pathname);
   const isAppRoute = pathname.startsWith("/app");
 
+  // Track when the session has been authenticated for the first time.
+  if (status === "authenticated") {
+    hasEverBeenAuthenticated = true;
+  }
+
+  /**
+   * Fetch fresh session data once when entering a protected area.
+   */
   useEffect(() => {
-    if (!isAppRoute) {
-      setSessionCheckDone(true);
+    if (!isAppRoute) return;
+    if (!refreshAttempted.current) {
+      refreshAttempted.current = true;
+      update().catch(() => { /* non-critical */ });
+    }
+  }, [isAppRoute, update]);
+
+  /**
+   * Navigation rules
+   */
+  useEffect(() => {
+    if (status === "loading") return;
+
+    if (session?.error === "RefreshAccessTokenError") {
+      if (typeof window !== "undefined" && isExplicadorRoomPath(pathname)) {
+        savePendingExplicadorRoom(pathname + window.location.search);
+      }
+      signOut({ redirect: false });
+      router.replace("/login");
       return;
     }
 
-    let cancelled = false;
-
-    (async () => {
-      if (!refreshAttempted.current) {
-        refreshAttempted.current = true;
-        await update();
+    if (isAppRoute && status === "unauthenticated") {
+      if (typeof window !== "undefined" && isExplicadorRoomPath(pathname)) {
+        savePendingExplicadorRoom(pathname + window.location.search);
       }
-      if (!cancelled) {
-        setSessionCheckDone(true);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [isAppRoute, update]);
-
-  useEffect(() => {
-    if (!sessionCheckDone || status === "loading") return;
-
-    if (status === "unauthenticated" || session?.error === "RefreshAccessTokenError") {
-      if (isAppRoute) {
-        if (typeof window !== "undefined" && isExplicadorRoomPath(pathname)) {
-          const pendingPath = pathname + window.location.search;
-          savePendingExplicadorRoom(pendingPath);
-        }
-        router.replace("/login");
-      }
-    } else if (status === "authenticated" && session?.user) {
-      const user = session.user as { first_name?: string; last_name?: string };
-      const isProfileIncomplete = !user.first_name || !user.last_name;
-
-      if (isProfileIncomplete && isAppRoute && pathname !== "/app/profile") {
-        router.replace("/app/profile");
-      }
-
-      if (pathname === "/") {
-        router.replace("/app/courses")
-      }
+      router.replace("/login");
+      return;
     }
-  }, [status, session, pathname, router, isAppRoute, sessionCheckDone]);
 
-  const showLoader =
-    isAppRoute &&
-    (!sessionCheckDone || (status === "loading" && !session?.accessToken));
+    if (isPublicRoute && status === "authenticated") {
+      router.replace("/app/courses");
+      return;
+    }
+  }, [pathname, router, session, status, isAppRoute, isPublicRoute]);
 
-  if (showLoader) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-white to-slate-50">
-        <div className="text-center space-y-4">
-          <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto" />
-          <p className="text-muted-foreground font-medium">Verificando acesso...</p>
-        </div>
-      </div>
-    );
+  /**
+   * Show loader ONLY on the very first load before the session is known.
+   * Once authenticated, never unmount children for intermediate loading states
+   * (e.g. triggered by update() calls from child pages).
+   */
+  if (status === "loading" && !hasEverBeenAuthenticated) {
+    return <BookarLoader />;
   }
 
+  /**
+   * Block render while redirecting unauthenticated users or on hard errors.
+   */
   if (
-    sessionCheckDone &&
-    (status === "unauthenticated" || session?.error === "RefreshAccessTokenError") &&
-    isAppRoute
+    (isPublicRoute && status === "authenticated") ||
+    (isAppRoute && status === "unauthenticated") ||
+    (isAppRoute && session?.error === "RefreshAccessTokenError")
   ) {
-    return null;
+    return <BookarLoader />;
   }
 
   return <>{children}</>;

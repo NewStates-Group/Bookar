@@ -771,7 +771,7 @@ export default function CoursesPage() {
       )}
 
       <div className="pt-10 border-t border-slate-200/80 mt-10">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between mb-6">
+        <div className="flex flex-col gap-4 flex-col md:flex-row items-end md:items-center justify-between mb-6">
           <div>
             <h2 className="text-xl md:text-2xl font-bold text-slate-900 tracking-tight">
               Explore Cursos da Comunidade
@@ -945,14 +945,14 @@ export default function CoursesPage() {
                 </DialogTitle>
                 {previewData.owner_name && (
                   <div className="flex gap-3">
-                  <p className="text-xs text-slate-400 font-medium">
-                    Criado por <span className="text-slate-600 font-bold">{previewData.owner_name}</span>
-                  </p>
-                  <p className="text-xs text-slate-400 font-medium">
-                    Nível <span className="text-slate-600 font-bold">
-                     {previewData.level === 'B' ? 'Iniciante' : previewData.level === 'IT' ? 'Intermediário' : 'Avançado'}
-                    </span>
-                  </p>
+                    <p className="text-xs text-slate-400 font-medium">
+                      Criado por <span className="text-slate-600 font-bold">{previewData.owner_name}</span>
+                    </p>
+                    <p className="text-xs text-slate-400 font-medium">
+                      Nível <span className="text-slate-600 font-bold">
+                        {previewData.level === 'B' ? 'Iniciante' : previewData.level === 'IT' ? 'Intermediário' : 'Avançado'}
+                      </span>
+                    </p>
                   </div>
                 )}
                 <DialogDescription className="text-sm md:text-sm text-slate-500 leading-relaxed">

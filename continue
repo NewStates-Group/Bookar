@@ -6,3 +6,13 @@ qnd clico em uma sala e n posso entrar por estar sem login, salva e apos o login
 verificar o processo de envio de mensagens ao explicador (ele pode estar processando duas vezes)
 adicionar botao para interroper a resposta do explicador
 adicionar historico de conversas com o explicador incluindo as salas de outras pessoas adiciona um extra history no localstorage e concatena com o q vier da api
+
+a barra do audio no mobile qnd o app está a escrever no explicador desce e tenho de voltar a subir para clicar no microfone entre outros, resolve essa falha na responsividade o scroll n deve ser na pagina inteira so no chat
+
+alem disso ocorre um zoom automatico no chat principal do explicador qnd clico no iphone resolve isso
+
+O ZOOM SÓ PODE SER DADO NO CHAT, DE MODO QUE O INPUT DE TEXTO E A BARRINHA COM CONVIDAR, EXPLICADOR, MICROFONE FIQUE FIXA
+
+O MESMO ACONTECE COM O QUADRO NO MOBILE O USER PRECISA VOLTAR A SUBIR COM O TOUCH PARA CIMAP ARA VER TÍTULO: QUADRO E O BOTÃO DE FECHAR
+
+adicionar verificacao do tipo de mapa mental que se quer gerar, para evitar desperdício de cpu;

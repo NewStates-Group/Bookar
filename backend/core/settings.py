@@ -80,8 +80,6 @@ AUTH_USER_MODEL = "accounts.User"
 NINJA_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=15),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
-    # Desativado: rotação + blacklist invalidava o refresh quando vários
-    # pedidos paralelos renovavam a sessão (ex.: ao voltar ao separador).
     "ROTATE_REFRESH_TOKENS": False,
     "BLACKLIST_AFTER_ROTATION": False,
 }

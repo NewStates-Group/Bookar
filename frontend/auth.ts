@@ -1,69 +1,71 @@
 import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { authDebug } from "@/lib/auth-debug";
+import { jwtDecode } from "jwt-decode";
 
-const apiUrlRaw = process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL;
-const apiUrl = apiUrlRaw?.endsWith("/") ? apiUrlRaw.slice(0, -1) : apiUrlRaw;
-const origin = process.env.NEXT_PUBLIC_API_BASE_URL || "https://api.bookar.study";
+import GoogleProvider from "next-auth/providers/google";
 
-const ACCESS_TOKEN_LIFETIME_MS = 15 * 60 * 1000;
-const REFRESH_SKEW_MS = 2 * 60 * 1000;
-/** Alinhado com REFRESH_TOKEN_LIFETIME no backend (7 dias). */
+const apiUrlRaw =
+  process.env.INTERNAL_API_URL ||
+  process.env.NEXT_PUBLIC_API_URL;
+
+const apiUrl = apiUrlRaw?.endsWith("/")
+  ? apiUrlRaw.slice(0, -1)
+  : apiUrlRaw;
+
+const origin =
+  process.env.NEXT_PUBLIC_API_BASE_URL ||
+  "https://api.bookar.study";
+
 const SESSION_MAX_AGE_SEC = 7 * 24 * 60 * 60;
-/** Evita que o callback JWT bloqueie /api/auth/session até o proxy devolver HTML (502). */
 const BACKEND_FETCH_TIMEOUT_MS = 12_000;
+const REFRESH_SKEW_MS = 60 * 1000;
 
-function accessExpiresAt(): number {
-  return Date.now() + ACCESS_TOKEN_LIFETIME_MS;
-}
+/* -------------------------- UTILS -------------------------- */
 
-function isAccessExpired(accessTokenExpires?: number | null): boolean {
-  if (!accessTokenExpires) return true;
-  return Date.now() >= accessTokenExpires - REFRESH_SKEW_MS;
-}
-
-async function backendFetch(
-  url: string,
-  init?: RequestInit
-): Promise<Response> {
+function backendFetch(url: string, init?: RequestInit) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), BACKEND_FETCH_TIMEOUT_MS);
-  try {
-    return await fetch(url, { ...init, signal: controller.signal });
-  } finally {
-    clearTimeout(timeout);
-  }
+  const timeout = setTimeout(
+    () => controller.abort(),
+    BACKEND_FETCH_TIMEOUT_MS
+  );
+
+  return fetch(url, {
+    ...init,
+    signal: controller.signal,
+  }).finally(() => clearTimeout(timeout));
 }
 
-async function getMe(accessToken: string) {
-  const res = await backendFetch(`${apiUrl}/auth/me`, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-      Origin: origin,
-    },
-  });
-
-  if (!res.ok) {
-    throw new Error("Failed to fetch /me");
-  }
-
-  return res.json();
+function getAccessTokenExpires(access: string): number {
+  const decoded = jwtDecode<{ exp: number }>(access);
+  return decoded.exp * 1000;
 }
 
-async function refreshAccessToken(token: Record<string, unknown>) {
-  if (!token.refreshToken) {
-    authDebug("Refresh impossível: sem refresh token.");
-    return { ...token, error: "RefreshAccessTokenError" as const };
-  }
+function isExpired(expires?: number | null): boolean {
+  if (!expires) return true;
+  return Date.now() >= expires - REFRESH_SKEW_MS;
+}
 
-  authDebug("Token expirado, refrescando…", {
-    expiraEm: token.accessTokenExpires
-      ? new Date(token.accessTokenExpires as number).toISOString()
-      : "desconhecido",
-  });
+function profileFromApi(profile: any) {
+  return {
+    id: profile.id,
+    email: profile.email,
+    first_name: profile.first_name || "",
+    last_name: profile.last_name || "",
+    bio: profile.bio || "",
+    avatar: profile.avatar || null,
+    stats: profile.stats || null,
+  };
+}
 
+/* -------------------------- REFRESH -------------------------- */
+
+async function refreshAccessToken(token: any) {
   try {
+    if (!token.refreshToken) {
+      return { ...token, error: "RefreshAccessTokenError" };
+    }
+
     const res = await backendFetch(`${apiUrl}/auth/refresh`, {
       method: "POST",
       headers: {
@@ -78,52 +80,51 @@ async function refreshAccessToken(token: Record<string, unknown>) {
     const data = await res.json().catch(() => ({}));
 
     if (!res.ok) {
-      const detail = String(data?.detail || data?.message || "").toLowerCase();
-      const isInvalidRefresh =
+      const msg = String(
+        data?.detail || data?.message || ""
+      ).toLowerCase();
+
+      const invalid =
         res.status === 401 ||
         res.status === 400 ||
-        detail.includes("token") ||
-        detail.includes("blacklist");
+        msg.includes("token") ||
+        msg.includes("blacklist");
 
-      if (isInvalidRefresh) {
-        authDebug("Refresh falhou: refresh token inválido ou expirado.", {
-          status: res.status,
-        });
-        return { ...token, error: "RefreshAccessTokenError" as const };
+      if (invalid) {
+        return {
+          ...token,
+          error: "RefreshAccessTokenError",
+        };
       }
-      authDebug("Refresh adiado (erro transitório), nova tentativa depois.", {
-        status: res.status,
-      });
+
       return token;
     }
 
-    authDebug("Refresh concluído com sucesso.");
+    const newAccess = data.access;
+
     return {
       ...token,
-      accessToken: data.access,
+      accessToken: newAccess,
       refreshToken: data.refresh ?? token.refreshToken,
-      accessTokenExpires: accessExpiresAt(),
+      accessTokenExpires: getAccessTokenExpires(newAccess),
       error: undefined,
     };
   } catch (err) {
-    authDebug("Refresh falhou (rede/timeout).", {
-      erro: err instanceof Error ? err.message : String(err),
+    authDebug("Refresh error", {
+      error:
+        err instanceof Error
+          ? err.message
+          : String(err),
     });
-    return token;
+
+    return {
+      ...token,
+      error: "RefreshTemporaryError",
+    };
   }
 }
 
-function profileFromApi(profile: Record<string, unknown>) {
-  return {
-    id: profile.id,
-    email: profile.email,
-    first_name: profile.first_name || "",
-    last_name: profile.last_name || "",
-    bio: profile.bio || "",
-    avatar: profile.avatar || null,
-    stats: profile.stats || null,
-  };
-}
+/* -------------------------- AUTH OPTIONS -------------------------- */
 
 export const authOptions: NextAuthOptions = {
   session: {
@@ -157,9 +158,10 @@ export const authOptions: NextAuthOptions = {
         if (!credentials?.email || !credentials?.password) {
           return null;
         }
-        let res;
-        try {
-          res = await backendFetch(`${apiUrl}/auth/pair`, {
+
+        const res = await backendFetch(
+          `${apiUrl}/auth/pair`,
+          {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -170,27 +172,16 @@ export const authOptions: NextAuthOptions = {
               password: credentials.password,
               token: credentials.token,
             }),
-          });
-        } catch (e) {
-          console.error("[NextAuth] Fetch error for /auth/pair:", e);
-        }
-
-        if (!res) {
-          console.error("[NextAuth] No response received for /auth/pair");
-          return null;
-        }
+          }
+        );
 
         if (!res.ok) {
           const text = await res.text();
-          console.error(`[NextAuth] Login failed with status ${res.status}. Body:`, text);
-          throw new Error("Login falhou. Verifique o seu e-mail e senha.");
+          console.error("[AUTH] login failed:", text);
+          throw new Error("Login inválido");
         }
 
         const data = await res.json();
-
-        if (!data.access) {
-          throw new Error("Login falhou. Resposta inválida do servidor.");
-        }
 
         return {
           accessToken: data.access,
@@ -198,102 +189,142 @@ export const authOptions: NextAuthOptions = {
         } as any;
       },
     }),
+    GoogleProvider({
+      clientId: process.env.GOOGLE_CLIENT_ID!,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      httpOptions: {
+        timeout: 15000,
+      },
+    })
   ],
 
   callbacks: {
-    async jwt({ token, user, trigger }: any) {
+    async jwt({ token, user, account, profile, trigger }: any) {
       try {
-        if (user?.accessToken) {
-          try {
-            const profile = await getMe(user.accessToken);
-            return {
-              accessToken: user.accessToken,
-              refreshToken: user.refreshToken,
-              accessTokenExpires: accessExpiresAt(),
-              user: profileFromApi(profile),
-            };
-          } catch {
-            return {
-              accessToken: user.accessToken,
-              refreshToken: user.refreshToken,
-              accessTokenExpires: accessExpiresAt(),
-              user: token.user ?? null,
-            };
-          }
+        /**
+         * =========================
+         * 1. LOGIN GOOGLE (SÓ 1x)
+         * =========================
+         */
+        if (account?.provider === "google" && account?.access_token) {
+          const res = await backendFetch(`${apiUrl}/auth/google`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              email: profile?.email,
+              name: profile?.name,
+              avatar: profile?.picture,
+              googleAccessToken: account.access_token,
+            }),
+          });
+
+          const data = await res.json();
+
+          return {
+            accessToken: data.access,
+            refreshToken: data.refresh,
+            accessTokenExpires: getAccessTokenExpires(data.access),
+            user: data.user,
+          };
         }
 
+        /**
+         * =========================
+         * 2. LOGIN CREDENTIALS
+         * =========================
+         */
+        if (user) {
+          let profileData = null;
+          try {
+            const res = await backendFetch(`${apiUrl}/auth/me`, {
+              headers: {
+                Authorization: `Bearer ${user.accessToken}`,
+                Origin: origin,
+              },
+            });
+            if (res.ok) {
+              const apiProfile = await res.json();
+              profileData = profileFromApi(apiProfile);
+            }
+          } catch (e) {
+            console.error("[AUTH] failed to fetch profile on login:", e);
+          }
+
+          return {
+            accessToken: user.accessToken,
+            refreshToken: user.refreshToken,
+            accessTokenExpires: getAccessTokenExpires(user.accessToken),
+            user: profileData || token.user || null,
+          };
+        }
+
+        /**
+         * =========================
+         * 3. ESTADO DE ERRO
+         * =========================
+         */
         if (token.error === "RefreshAccessTokenError") {
           return token;
         }
 
         let working = { ...token };
 
+        /**
+         * =========================
+         * 4. REFRESH TOKEN (SÓ SE PRECISAR)
+         * =========================
+         */
         if (
           working.refreshToken &&
-          (!working.accessToken || isAccessExpired(working.accessTokenExpires))
+          isExpired(working.accessTokenExpires)
         ) {
-          if (isAccessExpired(working.accessTokenExpires)) {
-            authDebug("Callback JWT: access token expirado, a renovar…");
-          }
+          authDebug("REFRESHING ACCESS TOKEN");
+
           working = await refreshAccessToken(working);
+
           if (working.error === "RefreshAccessTokenError") {
             return working;
           }
-          if (working.accessToken && working.user) {
-            return working;
-          }
         }
 
+        /**
+         * =========================
+         * 5. UPDATE MANUAL (profile refresh)
+         * =========================
+         */
         if (trigger === "update" && working.accessToken) {
           try {
-            const profile = await getMe(working.accessToken as string);
-            return {
-              ...working,
-              user: profileFromApi(profile),
-            };
-          } catch {
-            return working;
-          }
-        }
+            const res = await backendFetch(`${apiUrl}/auth/me`, {
+              headers: {
+                Authorization: `Bearer ${working.accessToken}`,
+                Origin: origin,
+              },
+            });
 
-        if (
-          working.accessToken &&
-          !isAccessExpired(working.accessTokenExpires) &&
-          working.user
-        ) {
-          return working;
-        }
+            if (res.ok) {
+              const profile = await res.json();
 
-        if (working.accessToken && working.user) {
-          return working;
-        }
-
-        if (working.accessToken) {
-          try {
-            const profile = await getMe(working.accessToken as string);
-            return {
-              ...working,
-              user: profileFromApi(profile),
-            };
-          } catch {
-            return working;
+              return {
+                ...working,
+                user: profileFromApi(profile),
+              };
+            }
+          } catch (meErr) {
+            console.error("[AUTH] manual update /auth/me failed:", meErr);
           }
         }
 
         return working;
-      } catch (error) {
-        console.error("[NextAuth] jwt callback error:", error);
-        return {
-          ...token,
-          error: "RefreshAccessTokenError" as const,
-        };
+      } catch (err) {
+        console.error("[AUTH JWT ERROR]", err);
+        return token;
       }
     },
 
     async session({ session, token }: any) {
-      session.accessToken = token.accessToken as string | undefined;
+      session.accessToken = token.accessToken;
       session.error = token.error;
-      session.user = token.user as any;
+      session.user = token.user;
       return session;
     },
   },

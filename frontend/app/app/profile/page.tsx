@@ -25,25 +25,31 @@ export default function ProfilePage() {
         last_name: "",
         bio: "",
     });
+    const [freshUser, setFreshUser] = useState<any>(null);
 
+    // Populate form from session when first available
     useEffect(() => {
-        if (session?.user && !formData.email) {
+        const user = freshUser || session?.user;
+        if (user && !formData.email) {
             setFormData({
-                email: session.user.email || "",
-                first_name: (session.user as any).first_name || "",
-                last_name: (session.user as any).last_name || "",
-                bio: session.user.bio || "",
+                email: (user as any).email || "",
+                first_name: (user as any).first_name || "",
+                last_name: (user as any).last_name || "",
+                bio: (user as any).bio || "",
             });
         }
-    }, [session?.user]);
+    }, [freshUser, session?.user]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    // Fresh stats fetching
+    // Fetch fresh profile data directly from API — do NOT call update() here
+    // as it would cause session churn and remount the page component in a loop.
     useEffect(() => {
-        if (session?.accessToken && !hasFetched.current) {
-            hasFetched.current = true;
-            update();
-        }
-    }, [session?.accessToken, update]);
+        if (!session?.accessToken || hasFetched.current) return;
+        hasFetched.current = true;
+
+        apiRequest(`${process.env.NEXT_PUBLIC_API_URL}/auth/me`)
+            .then((profile: any) => setFreshUser(profile))
+            .catch(() => {/* non-critical, session data still shows */ });
+    }, [session?.accessToken]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const handleUpdateProfile = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -71,13 +77,11 @@ export default function ProfilePage() {
                 body: JSON.stringify(formData),
             });
 
-            await update({
-                ...session,
-                user: {
-                    ...session?.user,
-                    ...updatedUser,
-                },
-            });
+            // Update local display state immediately
+            setFreshUser((prev: any) => ({ ...(prev || session?.user), ...updatedUser }));
+
+            // Sync to NextAuth session (no loop risk: this is an explicit user action)
+            update({ user: updatedUser }).catch(() => { /* non-critical */ });
 
             toast.success("Perfil atualizado com sucesso!");
         } catch (error: any) {
@@ -102,13 +106,11 @@ export default function ProfilePage() {
                 body: uploadData,
             });
 
-            await update({
-                ...session,
-                user: {
-                    ...session?.user,
-                    avatar: updatedUser.avatar,
-                },
-            });
+            // Update local display state immediately
+            setFreshUser((prev: any) => ({ ...(prev || session?.user), avatar: updatedUser.avatar }));
+
+            // Sync to NextAuth session
+            update({ user: { avatar: updatedUser.avatar } }).catch(() => { /* non-critical */ });
 
             toast.success("Foto de perfil atualizada!");
         } catch (error: any) {
@@ -118,21 +120,37 @@ export default function ProfilePage() {
         }
     };
 
+    // Use freshUser data when available (fetched directly from /auth/me),
+    // falling back to session data while loading.
+    const displayUser = (freshUser || session?.user) as any;
+    const displayStats = freshUser?.stats ?? session?.user?.stats;
+    const avatarSrc = displayUser?.avatar
+        ? (displayUser.avatar.startsWith('http') ? displayUser.avatar : `${process.env.NEXT_PUBLIC_API_URL}${displayUser.avatar}`)
+        : "";
+
     return (
-        <div className="container mx-auto py-10 space-y-8 max-w-5xl">
-            <div className="flex flex-col md:flex-row gap-8">
-                {/* Profile Information */}
-                <Card className="flex-1">
-                    <CardHeader>
-                        <CardTitle className="text-2xl font-bold">Resumo do Perfil</CardTitle>
-                        <CardDescription>Visualize e edite as suas informações pessoais.</CardDescription>
+        <div className="px-4 py-6 sm:px-6 md:py-10 max-w-5xl mx-auto w-full space-y-6">
+            {/* Cabeçalho */}
+            <div>
+                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">O Meu Perfil</h1>
+                <p className="text-sm text-slate-500 mt-1">Gere as tuas informações e acompanha o teu progresso de aprendizagem.</p>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+                {/* Informações de Perfil */}
+                <Card className="lg:col-span-2 shadow-sm border-slate-200">
+                    <CardHeader className="pb-4">
+                        <CardTitle className="text-xl font-bold text-slate-900">Resumo do Perfil</CardTitle>
+                        <CardDescription>Visualiza e edita as suas informações pessoais.</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-6">
-                        <div className="flex flex-col items-center space-y-4 sm:flex-row sm:space-y-0 sm:space-x-6 pb-6 border-b border-muted">
+                        <div className="flex flex-col items-center space-y-4 sm:flex-row sm:space-y-0 sm:space-x-6 pb-6 border-b border-slate-100">
                             <div className="relative">
-                                <Avatar className="h-32 w-32 border-2 border-cyan-500/20">
-                                    <AvatarImage src={session?.user?.avatar ? (session.user.avatar.startsWith('http') ? session.user.avatar : `${process.env.NEXT_PUBLIC_API_URL}${session.user.avatar}`) : ""} />
-                                    <AvatarFallback className="text-2xl">{(session?.user?.first_name || session?.user?.email || "U").slice(0, 2).toUpperCase()}</AvatarFallback>
+                                <Avatar className="h-28 w-28 sm:h-32 sm:w-32 border-2 border-cyan-500/20 shadow-sm">
+                                    <AvatarImage src={avatarSrc} />
+                                    <AvatarFallback className="text-2xl font-semibold bg-slate-100 text-slate-600">
+                                        {(displayUser?.first_name || displayUser?.email || "U").slice(0, 2).toUpperCase()}
+                                    </AvatarFallback>
                                 </Avatar>
                                 <label
                                     htmlFor="avatar-upload"
@@ -143,9 +161,13 @@ export default function ProfilePage() {
                                 </label>
                             </div>
                             <div className="text-center sm:text-left space-y-1">
-                                <h3 className="text-2xl font-bold">{(session?.user as any).first_name ? `${(session?.user as any).first_name} ${(session?.user as any).last_name}` : session?.user?.email}</h3>
-                                <p className="text-muted-foreground">{session?.user?.email}</p>
-                                {(!(session?.user as any).first_name || !(session?.user as any).last_name || !session?.user?.avatar) && (
+                                <h3 className="text-xl sm:text-2xl font-bold text-slate-900">
+                                    {displayUser?.first_name
+                                        ? `${displayUser.first_name} ${displayUser.last_name}`
+                                        : displayUser?.email}
+                                </h3>
+                                <p className="text-sm text-slate-500">{displayUser?.email}</p>
+                                {(!displayUser?.first_name || !displayUser?.last_name || !displayUser?.avatar) && (
                                     <p className="text-xs text-orange-500 font-medium animate-pulse">
                                         Por favor, complete o seu perfil (nome e foto) para continuar.
                                     </p>
@@ -154,7 +176,7 @@ export default function ProfilePage() {
                         </div>
 
                         <form onSubmit={handleUpdateProfile} className="space-y-4 mt-4">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div className="space-y-2">
                                     <Label htmlFor="first_name">Nome</Label>
                                     <Input
@@ -177,17 +199,16 @@ export default function ProfilePage() {
                                         required
                                     />
                                 </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="email">E-mail</Label>
-                                    <Input
-                                        id="email"
-                                        type="email"
-                                        value={formData.email}
-                                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                                        className="bg-muted/30 focus:border-cyan-500"
-                                        disabled
-                                    />
-                                </div>
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="email">E-mail</Label>
+                                <Input
+                                    id="email"
+                                    type="email"
+                                    value={formData.email}
+                                    className="bg-muted/10 opacity-70 cursor-not-allowed"
+                                    disabled
+                                />
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="bio">Biografia</Label>
@@ -196,10 +217,10 @@ export default function ProfilePage() {
                                     placeholder="Conte um pouco sobre você..."
                                     value={formData.bio}
                                     onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
-                                    className="min-h-[100px] bg-muted/30 focus:border-cyan-500"
+                                    className="min-h-[100px] bg-muted/30 focus:border-cyan-500 resize-none"
                                 />
                             </div>
-                            <Button type="submit" className="bg-cyan-500 hover:bg-cyan-600 text-white w-full sm:w-auto" disabled={isLoading}>
+                            <Button type="submit" className="bg-cyan-500 hover:bg-cyan-600 text-white w-full sm:w-auto px-6" disabled={isLoading}>
                                 {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                 Salvar Alterações
                             </Button>
@@ -207,44 +228,43 @@ export default function ProfilePage() {
                     </CardContent>
                 </Card>
 
-                {/* Statistics Dashboard */}
-                <div className="w-full md:w-80 space-y-6">
-                    <Card className="bg-card border-cyan-500/20 overflow-hidden relative shadow-xl shadow-cyan-500/5">
-                        <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/5 blur-3xl -mr-16 -mt-16" />
+                {/* Estatísticas */}
+                <div className="w-full space-y-6">
+                    <Card className="bg-card border-slate-200 overflow-hidden relative shadow-sm">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/5 blur-3xl -mr-16 -mt-16 pointer-events-none" />
                         <CardHeader className="pb-2">
-                            <CardTitle className="text-lg">As Suas Estatísticas</CardTitle>
+                            <CardTitle className="text-lg font-bold text-slate-900">As Suas Estatísticas</CardTitle>
                         </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border border-border/50">
+                        <CardContent className="space-y-3">
+                            <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border border-slate-100">
                                 <div className="flex items-center gap-3">
                                     <div className="p-2 bg-cyan-500/10 rounded-md">
                                         <BookOpen className="h-5 w-5 text-cyan-500" />
                                     </div>
-                                    <span className="text-sm font-medium">Em Curso</span>
+                                    <span className="text-sm font-medium text-slate-700">Em Curso</span>
                                 </div>
-                                <span className="text-xl font-bold">{session?.user?.stats?.ongoing_courses || 0}</span>
+                                <span className="text-xl font-bold text-slate-900">{displayStats?.ongoing_courses ?? 0}</span>
                             </div>
-                            <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border border-border/50">
+                            <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border border-slate-100">
                                 <div className="flex items-center gap-3">
                                     <div className="p-2 bg-green-500/10 rounded-md">
                                         <CheckCircle className="h-5 w-5 text-green-500" />
                                     </div>
-                                    <span className="text-sm font-medium">Concluídos</span>
+                                    <span className="text-sm font-medium text-slate-700">Concluídos</span>
                                 </div>
-                                <span className="text-xl font-bold">{session?.user?.stats?.finished_courses || 0}</span>
+                                <span className="text-xl font-bold text-slate-900">{displayStats?.finished_courses ?? 0}</span>
                             </div>
-                            <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border border-border/50">
+                            <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border border-slate-100">
                                 <div className="flex items-center gap-3">
                                     <div className="p-2 bg-yellow-500/10 rounded-md">
                                         <GraduationCap className="h-5 w-5 text-yellow-500" />
                                     </div>
-                                    <span className="text-sm font-medium">Certificados</span>
+                                    <span className="text-sm font-medium text-slate-700">Certificados</span>
                                 </div>
-                                <span className="text-xl font-bold">{session?.user?.stats?.certificates_issued || 0}</span>
+                                <span className="text-xl font-bold text-slate-900">{displayStats?.certificates_issued ?? 0}</span>
                             </div>
                         </CardContent>
                     </Card>
-
                 </div>
             </div>
         </div>

@@ -1,66 +1,64 @@
-import { getSession, signOut } from "next-auth/react";
+import { signOut } from "next-auth/react";
 import { ensureFreshSession } from "@/lib/auth-session";
 import { authDebug } from "@/lib/auth-debug";
 
-/**
- * Enhanced fetcher for SWR that handles intermittent 401 errors
- */
-export const authenticatedFetcher = async (args: [string, string]) => {
-  const [url, token] = args;
-  return apiRequest(url, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
+export const authenticatedFetcher = async ([url]: [string, string?]) => {
+  return apiRequest(url);
 };
 
-/**
- * Generic authenticated request helper with built-in 401 retry + auto-refresh
- */
-export const apiRequest = async (url: string, options: RequestInit = {}) => {
-  let session = await getSession();
-  const headers = {
-    "Content-Type": "application/json",
-    ...options.headers,
-  } as Record<string, string>;
 
-  if (session?.accessToken && !headers["Authorization"]) {
-    headers["Authorization"] = `Bearer ${session.accessToken}`;
+export const apiRequest = async (
+  url: string,
+  options: RequestInit = {}
+) => {
+  let session = await ensureFreshSession();
+
+  if (!session?.accessToken) {
+    authDebug("No valid session → signing out");
+    await signOut({ callbackUrl: "/login" });
+    throw new Error("Not authenticated");
   }
+
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...(options.headers as Record<string, string>),
+    Authorization: `Bearer ${session.accessToken}`,
+  };
 
   let res = await fetch(url, { ...options, headers });
 
   if (res.status === 401) {
-    authDebug("API 401: token expirado, refrescando…", { url });
-    const refreshedSession = await ensureFreshSession();
+    authDebug("401 received → forcing refresh + retry", { url });
 
-    if (refreshedSession?.accessToken) {
-      authDebug("Pedido API a repetir com token renovado.", { url });
-      res = await fetch(url, {
-        ...options,
-        headers: {
-          ...headers,
-          Authorization: `Bearer ${refreshedSession.accessToken}`,
-        },
-      });
-    }
+    const refreshed = await ensureFreshSession();
 
-    if (res.status === 401) {
-      authDebug("Refresh não resolveu o 401, a terminar sessão.");
+    if (!refreshed?.accessToken) {
+      authDebug("Refresh failed → logout");
       await signOut({ callbackUrl: "/login" });
-      throw new Error("Sessão expirada. Por favor, faça login novamente.");
+      throw new Error("Session expired");
     }
+
+    res = await fetch(url, {
+      ...options,
+      headers: {
+        ...headers,
+        Authorization: `Bearer ${refreshed.accessToken}`,
+      },
+    });
   }
 
   if (!res.ok) {
-    const error = new Error("Erro na requisição");
-    // @ts-ignore
+    const error = new Error("API Error") as Error & {
+      status?: number;
+      data?: any;
+    };
+
     error.status = res.status;
+
     try {
-      const data = await res.json();
-      // @ts-ignore
-      error.message = data.message || data.detail || error.message;
-    } catch {
-      /* ignore */
-    }
+      error.data = await res.json();
+    } catch { }
+
     throw error;
   }
 
