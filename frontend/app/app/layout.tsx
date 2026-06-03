@@ -76,11 +76,13 @@ export default function AppLayout({
 
       {/* Main Content Workspace Layout */}
       <div
-        className={`transition-all duration-300 ease-in-out min-h-screen ${
+        className={`transition-all duration-300 ease-in-out ${
+          isExplicadorRoom ? "h-[calc(100vh-56px)] md:h-screen overflow-hidden" : "min-h-screen"
+        } ${
           mounted && isSidebarOpen ? "md:pl-[260px]" : "md:pl-[68px]"
         }`}
       >
-        <main className={`w-full ${isExplicadorRoom ? "py-0" : "py-4 md:py-6"}`}>
+        <main className={`w-full ${isExplicadorRoom ? "h-full py-0" : "py-4 md:py-6"}`}>
           {children}
         </main>
       </div>

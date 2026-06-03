@@ -8,6 +8,8 @@ import { BookarLoader } from "./BookarLoader";
 import {
   isExplicadorRoomPath,
   savePendingExplicadorRoom,
+  getPendingExplicadorRoom,
+  clearPendingExplicadorRoom,
 } from "@/lib/pending-explicador-room";
 
 const PUBLIC_ROUTES = [
@@ -81,7 +83,13 @@ export function AuthGuard({
     }
 
     if (isPublicRoute && status === "authenticated") {
-      router.replace("/app/courses");
+      const pending = getPendingExplicadorRoom();
+      if (pending) {
+        clearPendingExplicadorRoom();
+        router.replace(pending.path);
+      } else {
+        router.replace("/app/courses");
+      }
       return;
     }
   }, [pathname, router, session, status, isAppRoute, isPublicRoute]);

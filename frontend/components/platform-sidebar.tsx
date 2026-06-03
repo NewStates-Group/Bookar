@@ -78,35 +78,86 @@ export function PlatformSidebar({
     session?.accessToken && isExplicadorActive
       ? [`${process.env.NEXT_PUBLIC_API_URL}/explicador`, session.accessToken]
       : null,
-    authenticatedFetcher,
+    ([url, token]) => authenticatedFetcher(url, token as string),
     { revalidateOnFocus: false, dedupingInterval: 10000 }
   );
+
+  const [localRooms, setLocalRooms] = React.useState<any[]>([]);
+
+  React.useEffect(() => {
+    if (typeof window !== "undefined") {
+      const raw = localStorage.getItem("bookar-explicador-history");
+      if (raw) {
+        try {
+          setLocalRooms(JSON.parse(raw));
+        } catch { }
+      }
+    }
+  }, [pathname]);
+
+  const displayedRooms = React.useMemo(() => {
+    const apiList = rooms || [];
+    const localList = localRooms || [];
+    const combined = [...apiList];
+    const seenIds = new Set(apiList.map((r) => r.id));
+
+    for (const lr of localList) {
+      if (!seenIds.has(lr.id)) {
+        combined.push({
+          id: lr.id,
+          title: lr.title,
+          is_active: lr.is_active,
+          created_at: lr.created_at,
+        });
+        seenIds.add(lr.id);
+      }
+    }
+    return combined;
+  }, [rooms, localRooms]);
 
   const [deletingId, setDeletingId] = React.useState<string | null>(null);
 
   const handleDeleteRoom = async (id: string, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    setDeletingId(id);
-    try {
-      await apiRequest(`${process.env.NEXT_PUBLIC_API_URL}/explicador/${id}`, {
-        method: "DELETE",
-      });
-      mutateRooms();
+
+    const isLocal = localRooms.some((r) => r.id === id);
+    const inApi = rooms?.some((r) => r.id === id);
+
+    if (isLocal) {
+      const nextLocal = localRooms.filter((r) => r.id !== id);
+      setLocalRooms(nextLocal);
+      localStorage.setItem("bookar-explicador-history", JSON.stringify(nextLocal));
+      toast.success("Sala removida do histórico local.");
+    }
+
+    if (inApi) {
+      setDeletingId(id);
+      try {
+        await apiRequest(`${process.env.NEXT_PUBLIC_API_URL}/explicador/${id}`, {
+          method: "DELETE",
+        });
+        toast.success("Sala eliminada com sucesso!");
+        mutateRooms();
+        if (pathname === `/app/explicador/${id}`) {
+          router.push("/app/explicador");
+        }
+      } catch {
+        toast.error("Não foi possível eliminar a sala do servidor.");
+      } finally {
+        setDeletingId(null);
+      }
+    } else if (isLocal) {
       if (pathname === `/app/explicador/${id}`) {
         router.push("/app/explicador");
       }
-    } catch {
-      toast.error("Erro ao remover sala.");
-    } finally {
-      setDeletingId(null);
     }
   };
 
   // Render the core sidebar content. We support both expanded and collapsed responsive states.
   const renderContent = (isExpanded: boolean) => (
     <div className="flex flex-col h-full bg-slate-50 text-slate-700 select-none overflow-hidden border-r border-slate-200/60">
-      
+
       {/* ── Header Logo & Toggle ── */}
       <div className={`flex items-center justify-between px-4 py-4 border-b border-slate-200/60 ${!isExpanded ? "flex-col gap-4" : ""}`}>
         <Link
@@ -151,18 +202,15 @@ export function PlatformSidebar({
               href={item.href}
               onClick={closeMobile}
               title={!isExpanded ? item.title : undefined}
-              className={`flex items-center rounded-xl text-sm font-medium transition-all duration-200 ${
-                isExpanded ? "px-3 py-2.5 gap-3" : "p-2.5 justify-center"
-              } ${
-                isActive
+              className={`flex items-center rounded-xl text-sm font-medium transition-all duration-200 ${isExpanded ? "px-3 py-2.5 gap-3" : "p-2.5 justify-center"
+                } ${isActive
                   ? "bg-white text-slate-900 border border-slate-200/80 shadow-sm font-semibold"
                   : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/40 border border-transparent"
-              }`}
+                }`}
             >
               <item.icon
-                className={`w-[18px] h-[18px] flex-shrink-0 transition-colors duration-200 ${
-                  isActive ? "text-cyan-600" : "text-slate-500"
-                }`}
+                className={`w-[18px] h-[18px] flex-shrink-0 transition-colors duration-200 ${isActive ? "text-cyan-600" : "text-slate-500"
+                  }`}
               />
               {isExpanded && <span className="truncate">{item.title}</span>}
             </Link>
@@ -174,9 +222,8 @@ export function PlatformSidebar({
           <DialogTrigger asChild>
             <button
               title={!isExpanded ? "Tutor (Em Breve)" : undefined}
-              className={`w-full flex items-center rounded-xl text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-200/40 border border-transparent transition-all duration-200 cursor-pointer ${
-                isExpanded ? "px-3 py-2.5 gap-3" : "p-2.5 justify-center"
-              }`}
+              className={`w-full flex items-center rounded-xl text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-200/40 border border-transparent transition-all duration-200 cursor-pointer ${isExpanded ? "px-3 py-2.5 gap-3" : "p-2.5 justify-center"
+                }`}
             >
               <GraduationCap className="w-[18px] h-[18px] flex-shrink-0 text-slate-500" />
               {isExpanded && (
@@ -208,7 +255,7 @@ export function PlatformSidebar({
         </Dialog>
 
         {/* ── Explicador Rooms History (shown only when Explicador is active) ── */}
-        {isExpanded && isExplicadorActive && rooms && rooms.length > 0 && (
+        {isExpanded && isExplicadorActive && displayedRooms && displayedRooms.length > 0 && (
           <div className="pt-3">
             <div className="flex items-center justify-between px-3 pb-1.5">
               <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">
@@ -224,7 +271,7 @@ export function PlatformSidebar({
               </Link>
             </div>
             <div className="space-y-0.5">
-              {rooms.map((room) => {
+              {displayedRooms.map((room) => {
                 return (
                   <div key={room.id} className="group relative flex items-center">
                     <Link
@@ -261,9 +308,8 @@ export function PlatformSidebar({
         <button
           onClick={toggleSidebar}
           title={isExpanded ? "Ocultar barra lateral" : "Mostrar barra lateral"}
-          className={`flex items-center rounded-xl text-sm font-medium text-slate-500 hover:text-slate-800 hover:bg-slate-200/40 border border-transparent transition-all duration-200 cursor-pointer ${
-            isExpanded ? "px-3 py-2 gap-3 w-full" : "p-2.5 justify-center"
-          }`}
+          className={`flex items-center rounded-xl text-sm font-medium text-slate-500 hover:text-slate-800 hover:bg-slate-200/40 border border-transparent transition-all duration-200 cursor-pointer ${isExpanded ? "px-3 py-2 gap-3 w-full" : "p-2.5 justify-center"
+            }`}
         >
           <PanelLeftClose className={`w-4.5 h-4.5 transition-transform duration-300 ${!isExpanded ? "rotate-180" : ""}`} />
           {isExpanded && <span>Recolher barra</span>}
@@ -276,9 +322,8 @@ export function PlatformSidebar({
           <DropdownMenuTrigger asChild>
             <button
               title={!isExpanded ? (user?.first_name || user?.email || "Minha Conta") : undefined}
-              className={`flex items-center w-full rounded-xl hover:bg-slate-200/40 border border-transparent hover:border-slate-200/40 transition-all duration-200 cursor-pointer text-left focus:outline-none group ${
-                isExpanded ? "p-2.5 gap-3" : "p-1.5 justify-center"
-              }`}
+              className={`flex items-center w-full rounded-xl hover:bg-slate-200/40 border border-transparent hover:border-slate-200/40 transition-all duration-200 cursor-pointer text-left focus:outline-none group ${isExpanded ? "p-2.5 gap-3" : "p-1.5 justify-center"
+                }`}
             >
               {/* Avatar */}
               <div className="flex-shrink-0 w-9 h-9 rounded-xl border border-slate-200 overflow-hidden bg-slate-100">
@@ -398,20 +443,18 @@ export function PlatformSidebar({
     <>
       {/* ── Desktop Sidebar (Toggles width dynamically on collapse instead of translating out) ── */}
       <aside
-        className={`fixed inset-y-0 left-0 z-40 h-full transition-all duration-300 ease-in-out hidden md:block shadow-sm ${
-          isOpen ? "w-[260px]" : "w-[68px]"
-        }`}
+        className={`fixed inset-y-0 left-0 z-40 h-full transition-all duration-300 ease-in-out hidden md:block shadow-sm ${isOpen ? "w-[260px]" : "w-[68px]"
+          }`}
       >
         {renderContent(isOpen)}
       </aside>
 
       {/* ── Mobile/Tablet Drawer (slides in from left, always renders full-expanded content) ── */}
       <div
-        className={`fixed inset-0 z-50 transition-all duration-300 md:hidden ${
-          isMobileOpen
+        className={`fixed inset-0 z-50 transition-all duration-300 md:hidden ${isMobileOpen
             ? "opacity-100 pointer-events-auto"
             : "opacity-0 pointer-events-none"
-        }`}
+          }`}
       >
         {/* Backdrop */}
         <div
@@ -421,9 +464,8 @@ export function PlatformSidebar({
 
         {/* Slide Panel */}
         <aside
-          className={`absolute inset-y-0 left-0 w-[280px] h-full shadow-2xl transition-transform duration-300 ease-in-out ${
-            isMobileOpen ? "translate-x-0" : "-translate-x-full"
-          }`}
+          className={`absolute inset-y-0 left-0 w-[280px] h-full shadow-2xl transition-transform duration-300 ease-in-out ${isMobileOpen ? "translate-x-0" : "-translate-x-full"
+            }`}
         >
           {renderContent(true)}
         </aside>

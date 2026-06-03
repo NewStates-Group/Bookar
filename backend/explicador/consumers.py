@@ -97,6 +97,7 @@ class ExplicadorConsumer(AsyncWebsocketConsumer):
         self.is_owner = self.user.is_authenticated and (
             self.room.owner_id == self.user.id
         )
+        self.is_interrupted = False
         self.group_name = f"explicador_{self.room_uuid}"
 
         # Resolve user name and avatar
@@ -302,8 +303,27 @@ class ExplicadorConsumer(AsyncWebsocketConsumer):
                 },
             )
 
+    async def handle_interrupt(self, data):
+        """Allows the client to interrupt an ongoing AI generation."""
+        self.is_interrupted = True
+        await self.channel_layer.group_send(
+            self.group_name,
+            {
+                "type": "broadcast_message",
+                "message": {
+                    "type": "chat_update",
+                    "chat_history": self.room.chat_history,
+                    "whiteboard_data": sanitize_whiteboard_data(
+                        self.room.whiteboard_data
+                    ),
+                    "is_generating": False,
+                },
+            },
+        )
+
     async def handle_chat_message(self, data):
         """Processes chat messages. Lock is required only for @explicador messages."""
+        self.is_interrupted = False
         self.room = await self.get_room(self.room_uuid)
         if not self.room:
             return
@@ -372,6 +392,11 @@ class ExplicadorConsumer(AsyncWebsocketConsumer):
         # 2. Call AI only when @explicador is mentioned
         try:
             ai_response = await self.generate_ai_explanation(prompt_for_ai)
+
+            # Check if interrupted while AI was generating
+            if self.is_interrupted:
+                self.is_interrupted = False
+                return
 
             # Parse AI output
             parsed_data = self.parse_ai_output(ai_response)

@@ -133,6 +133,8 @@ export default function ExplicadorRoomPage() {
   const [isOwner, setIsOwner] = useState(false);
   const [whiteboardData, setWhiteboardData] = useState<WhiteboardData>({ summary: "", lock: null });
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
+  const chatHistoryRef = useRef<ChatMessage[]>([]);
+  useEffect(() => { chatHistoryRef.current = chatHistory; }, [chatHistory]);
   const [activeStreamingMessageIndex, setActiveStreamingMessageIndex] = useState<number | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [participants, setParticipants] = useState<Participant[]>([]);
@@ -169,7 +171,7 @@ export default function ExplicadorRoomPage() {
   const isMicMutedRef = useRef(true);
   const isOwnerRef = useRef(false);
   const participantsRef = useRef<Participant[]>([]);
-  const wsMessageHandlerRef = useRef<(data: any) => void>(() => {});
+  const wsMessageHandlerRef = useRef<(data: any) => void>(() => { });
   const chatEndRef = useRef<HTMLDivElement>(null);
   const chatInputRef = useRef<HTMLInputElement>(null);
 
@@ -183,7 +185,7 @@ export default function ExplicadorRoomPage() {
   const wsPingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const wsTokenRefreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const wsTokenRefreshReconnectRef = useRef(false);
-  const refreshExplicadorSocketTokenRef = useRef<() => Promise<void>>(async () => {});
+  const refreshExplicadorSocketTokenRef = useRef<() => Promise<void>>(async () => { });
   const hasReceivedWelcomeRef = useRef(false);
   const sessionRef = useRef(session);
 
@@ -237,9 +239,39 @@ export default function ExplicadorRoomPage() {
     };
   }, []);
 
+  // Fetch room details to save in visited history list
+  useEffect(() => {
+    if (!roomId) return;
+    const fetchRoomDetails = async () => {
+      try {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/explicador/${roomId}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.title) {
+            const historyItem = {
+              id: roomId,
+              title: data.title,
+              created_at: data.created_at || new Date().toISOString(),
+              is_active: data.is_active !== false,
+            };
+            const raw = localStorage.getItem("bookar-explicador-history");
+            let list = raw ? JSON.parse(raw) : [];
+            list = list.filter((x: any) => x.id !== roomId);
+            list.unshift(historyItem);
+            list = list.slice(0, 20);
+            localStorage.setItem("bookar-explicador-history", JSON.stringify(list));
+          }
+        }
+      } catch (err) {
+        console.warn("Failed to fetch room title for history", err);
+      }
+    };
+    fetchRoomDetails();
+  }, [roomId]);
+
   const connectExplicadorSocketRef = useRef<
     (opts?: { isReconnect?: boolean }) => Promise<void>
-  >(async () => {});
+  >(async () => { });
 
   const connectExplicadorSocket = useCallback(
     async (opts?: { isReconnect?: boolean }) => {
@@ -470,7 +502,7 @@ export default function ExplicadorRoomPage() {
       }
 
       audioEl.srcObject = remoteStream;
-      audioEl.play().catch(() => {});
+      audioEl.play().catch(() => { });
     };
 
     peerConnectionsRef.current.set(targetId, pc);
@@ -604,6 +636,11 @@ export default function ExplicadorRoomPage() {
     }
   };
 
+  const handleInterrupt = () => {
+    setIsGenerating(false);
+    sendWSMessage({ type: "interrupt" });
+  };
+
   // 2. Handle Incoming WebSocket events
   const handleWebSocketMessage = async (data: any) => {
     switch (data.type) {
@@ -673,10 +710,10 @@ export default function ExplicadorRoomPage() {
               JSON.stringify(
                 soloOnWelcome
                   ? {
-                      type: "chat_message",
-                      message: promptMessage,
-                      direct_to_explicador: true,
-                    }
+                    type: "chat_message",
+                    message: promptMessage,
+                    direct_to_explicador: true,
+                  }
                   : { type: "chat_message", message: promptMessage }
               )
             );
@@ -716,17 +753,35 @@ export default function ExplicadorRoomPage() {
               : p
           )
         );
+        {
+          const myId = connectionIdRef.current;
+          if (
+            data.is_mic_on &&
+            myId &&
+            data.connection_id !== myId &&
+            !isMicMutedRef.current &&
+            localStreamRef.current &&
+            shouldInitiateOffer(myId, data.connection_id)
+          ) {
+            void connectToPeer(data.connection_id);
+          }
+        }
         break;
 
       case "chat_update":
         if (data.chat_history) {
+          const isNewMessage = data.chat_history.length > chatHistoryRef.current.length && chatHistoryRef.current.length > 0;
           setChatHistory(data.chat_history);
           const last = data.chat_history[data.chat_history.length - 1];
-          if (last?.role === "assistant" && !data.is_generating) {
+          if (last?.role === "assistant" && !data.is_generating && isNewMessage) {
+            setActiveStreamingMessageIndex(data.chat_history.length - 1);
+          } else if (!data.is_generating) {
             setActiveStreamingMessageIndex(null);
           }
         }
-        setIsGenerating(Boolean(data.is_generating));
+
+        const nextIsGenerating = Boolean(data.is_generating);
+        setIsGenerating(nextIsGenerating);
 
         if (data.whiteboard_data) {
           setWhiteboardData((prev) => {
@@ -734,15 +789,19 @@ export default function ExplicadorRoomPage() {
             const incomingSummary = (data.whiteboard_data.summary ?? "").trim();
             const prevSummary = (prev.summary ?? "").trim();
             const shouldOpen =
-              data.open_whiteboard === true &&
-              incomingSummary.length > 0 &&
-              incomingSummary !== prevSummary;
+              nextIsGenerating || (
+                data.open_whiteboard === true &&
+                incomingSummary.length > 0 &&
+                incomingSummary !== prevSummary
+              );
 
             if (shouldOpen) {
               return { ...merged, show_whiteboard: true };
             }
             return merged;
           });
+        } else if (nextIsGenerating) {
+          setWhiteboardData((prev) => ({ ...prev, show_whiteboard: true }));
         }
         break;
 
@@ -974,10 +1033,10 @@ export default function ExplicadorRoomPage() {
     sendWSMessage(
       solo
         ? {
-            type: "chat_message",
-            message: trimmed,
-            direct_to_explicador: true,
-          }
+          type: "chat_message",
+          message: trimmed,
+          direct_to_explicador: true,
+        }
         : { type: "chat_message", message: trimmed }
     );
 
@@ -1369,15 +1428,15 @@ export default function ExplicadorRoomPage() {
                     !showWhiteboard &&
                     !isGenerating &&
                     i === chatHistory.length - 1 && (
-                    <button
-                      type="button"
-                      onClick={() => setWhiteboardData((prev) => ({ ...prev, show_whiteboard: true }))}
-                      className="mt-2.5 flex items-center gap-1.5 px-3 py-1.5 bg-cyan-50 hover:bg-cyan-100 text-cyan-600 text-[10px] font-bold rounded-full transition-all border border-cyan-100/50 cursor-pointer select-none"
-                    >
-                      <PenTool className="w-3.5 h-3.5" />
-                      Ver no quadro
-                    </button>
-                  )}
+                      <button
+                        type="button"
+                        onClick={() => setWhiteboardData((prev) => ({ ...prev, show_whiteboard: true }))}
+                        className="mt-2.5 flex items-center gap-1.5 px-3 py-1.5 bg-cyan-50 hover:bg-cyan-100 text-cyan-600 text-[10px] font-bold rounded-full transition-all border border-cyan-100/50 cursor-pointer select-none"
+                      >
+                        <PenTool className="w-3.5 h-3.5" />
+                        Ver no quadro
+                      </button>
+                    )}
                 </div>
               </div>
             ))}
@@ -1396,6 +1455,14 @@ export default function ExplicadorRoomPage() {
                     <span className="w-2 h-2 rounded-full bg-cyan-300 animate-bounce" style={{ animationDelay: "240ms" }} />
                   </div>
                   <span className="text-sm text-slate-600 font-medium">A pensar...</span>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={handleInterrupt}
+                    className="h-7 px-2 text-xs text-red-500 hover:text-red-700 hover:bg-red-50 rounded-full ml-2 flex items-center gap-1 cursor-pointer"
+                  >
+                    <X className="w-3 h-3" /> Parar
+                  </Button>
                 </div>
               </div>
             )}
@@ -1423,7 +1490,7 @@ export default function ExplicadorRoomPage() {
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               disabled={isGenerating}
-              className="flex-1 h-10 bg-transparent text-slate-800 placeholder:text-slate-400 text-sm px-1 outline-none border-0 focus:ring-0 disabled:text-slate-400"
+              className="flex-1 h-10 bg-transparent text-slate-800 placeholder:text-slate-400 text-base md:text-sm px-1 outline-none border-0 focus:ring-0 disabled:text-slate-400"
             />
 
             <button
@@ -1442,28 +1509,32 @@ export default function ExplicadorRoomPage() {
                 onClick={handleMentionExplicador}
                 disabled={isGenerating}
                 title="Mencionar @explicador e pedir resposta (precisas do lápis)"
-                className={`w-8 h-8 flex items-center justify-center rounded-full transition-all duration-200 flex-shrink-0 cursor-pointer disabled:opacity-40 ${
-                  mentionsExplicadorInInput
+                className={`w-8 h-8 flex items-center justify-center rounded-full transition-all duration-200 flex-shrink-0 cursor-pointer disabled:opacity-40 ${mentionsExplicadorInInput
                     ? "bg-cyan-100 text-cyan-700 ring-2 ring-cyan-300/60"
                     : "text-slate-400 hover:text-cyan-600 hover:bg-cyan-50"
-                }`}
+                  }`}
               >
                 <Bot className="w-4 h-4" />
               </button>
             )}
 
-            {/* Send button */}
+            {/* Send/Interrupt button */}
             <Button
-              type="submit"
+              type={isGenerating ? "button" : "submit"}
+              onClick={isGenerating ? handleInterrupt : undefined}
               disabled={
-                !message.trim() ||
-                isGenerating ||
-                (isMultiUserRoom && mentionsExplicadorInInput && !isLockHolder)
+                !isGenerating && (
+                  !message.trim() ||
+                  (isMultiUserRoom && mentionsExplicadorInInput && !isLockHolder)
+                )
               }
-              className="w-8 h-8 p-0 bg-cyan-500 hover:bg-cyan-600 disabled:bg-slate-200 disabled:text-slate-400 text-white rounded-full flex items-center justify-center shadow-sm shadow-cyan-500/20 transition-all duration-200 flex-shrink-0"
+              className={`w-8 h-8 p-0 text-white rounded-full flex items-center justify-center shadow-sm transition-all duration-200 flex-shrink-0 cursor-pointer ${isGenerating
+                  ? "bg-red-500 hover:bg-red-650 shadow-red-500/20"
+                  : "bg-cyan-500 hover:bg-cyan-600 disabled:bg-slate-200 disabled:text-slate-400 shadow-cyan-500/20"
+                }`}
             >
               {isGenerating ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                <X className="w-3.5 h-3.5" />
               ) : (
                 <Send className="w-3.5 h-3.5" />
               )}
