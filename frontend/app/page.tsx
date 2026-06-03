@@ -148,8 +148,8 @@ export default function DefinitiveHomePage() {
               <div className="space-y-4">
                 <h4 className="font-bold">Legal</h4>
                 <ul className="text-sm text-muted-foreground space-y-2">
-                  <Link href="/policies/privacy" className="hover:text-black cursor-pointer">Privacidade</Link>
-                  <Link href="/policies/terms" className="hover:text-black cursor-pointer">Termos</Link>
+                  <Link href="https://bookar.study/policies/privacy" className="hover:text-black cursor-pointer">Privacidade</Link>
+                  <Link href="https://bookar.study/policies/terms" className="hover:text-black cursor-pointer">Termos</Link>
                 </ul>
               </div>
             </div>
