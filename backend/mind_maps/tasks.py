@@ -249,6 +249,8 @@ def generate_mind_map_task(self, user_id: int, mind_map_id: int):
             mind_map.save()
 
             def _on_success():
+                from .services import invalidate_mind_map_cache
+                invalidate_mind_map_cache(str(mind_map.uuid), user_id)
                 send_user_update(
                     user_id,
                     {
@@ -271,6 +273,8 @@ def generate_mind_map_task(self, user_id: int, mind_map_id: int):
             mind_map.save(update_fields=["status", "desc"])
 
             def _on_val_error():
+                from .services import invalidate_mind_map_cache
+                invalidate_mind_map_cache(str(mind_map.uuid), user_id)
                 send_user_update(
                     user_id,
                     {
@@ -291,6 +295,8 @@ def generate_mind_map_task(self, user_id: int, mind_map_id: int):
             mind_map.save(update_fields=["status"])
 
             def _on_error():
+                from .services import invalidate_mind_map_cache
+                invalidate_mind_map_cache(str(mind_map.uuid), user_id)
                 send_user_update(
                     user_id,
                     {

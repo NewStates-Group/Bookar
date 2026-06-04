@@ -525,6 +525,24 @@ class CourseService:
         page = max(page, 1)
         page_size = min(max(page_size, 1), 48)
 
+        from django.core.cache import cache
+        import hashlib
+
+        # 1. Get or initialize the featured courses version number
+        version = cache.get("featured_courses_version")
+        if version is None:
+            version = 1
+            cache.set("featured_courses_version", version, 86400 * 30)  # Store for 30 days
+
+        # 2. Build the unique cache key
+        q_hash = hashlib.md5((q or "").strip().encode("utf-8")).hexdigest()
+        cache_key = f"featured_courses_v{version}_{page}_{page_size}_{q_hash}"
+
+        # 3. Check cache
+        cached_result = cache.get(cache_key)
+        if cached_result is not None:
+            return cached_result
+
         queryset = (
             Course.objects.filter(status="READY")
             .prefetch_related("modules")
@@ -547,13 +565,15 @@ class CourseService:
         courses = queryset[offset : offset + page_size]
         total_pages = (total + page_size - 1) // page_size if total else 0
 
-        return {
+        result = {
             "items": [self._serialize_featured_course(c) for c in courses],
             "total": total,
             "page": page,
             "page_size": page_size,
             "total_pages": total_pages,
         }
+        cache.set(cache_key, result, 3600)  # Cache for 1 hour
+        return result
 
     def get_course_preview(self, course_id: str) -> dict:
         """Return full public preview details (no auth required)."""

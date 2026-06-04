@@ -271,9 +271,18 @@ def get_lesson_detail_cache_key(lesson_short_id):
     return f"lesson_detail_{lesson_short_id}"
 
 
+def invalidate_featured_courses_cache():
+    from django.core.cache import cache
+    try:
+        cache.incr("featured_courses_version")
+    except (ValueError, TypeError):
+        cache.set("featured_courses_version", 1, 86400 * 30)
+
+
 def invalidate_course_cache(course_uuid, user_id=None):
     from django.core.cache import cache
 
     cache.delete(get_course_detail_cache_key(course_uuid))
     if user_id:
         cache.delete(get_course_list_cache_key(user_id))
+    invalidate_featured_courses_cache()

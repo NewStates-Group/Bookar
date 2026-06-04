@@ -165,12 +165,12 @@ export function PlatformSidebar({
           onClick={closeMobile}
           className="flex items-center gap-3 group flex-shrink-0"
         >
-          <div className="relative flex items-center justify-center w-8 h-8 rounded-lg bg-white border border-slate-200 group-hover:scale-105 transition-transform duration-200">
+          <div className="relative flex items-center justify-center w-8 h-8 rounded-lg group-hover:scale-105 transition-transform duration-200">
             <Image
               src="/logo.png"
               alt="Bookar Logo"
-              width={18}
-              height={18}
+              width={30}
+              height={30}
               className="object-contain"
             />
           </div>
@@ -209,7 +209,7 @@ export function PlatformSidebar({
                 }`}
             >
               <item.icon
-                className={`w-[18px] h-[18px] flex-shrink-0 transition-colors duration-200 ${isActive ? "text-cyan-600" : "text-slate-500"
+                className={`w-[20px] h-[20px] flex-shrink-0 transition-colors duration-200 ${isActive ? "text-cyan-600" : "text-slate-500"
                   }`}
               />
               {isExpanded && <span className="truncate">{item.title}</span>}
@@ -452,8 +452,8 @@ export function PlatformSidebar({
       {/* ── Mobile/Tablet Drawer (slides in from left, always renders full-expanded content) ── */}
       <div
         className={`fixed inset-0 z-50 transition-all duration-300 md:hidden ${isMobileOpen
-            ? "opacity-100 pointer-events-auto"
-            : "opacity-0 pointer-events-none"
+          ? "opacity-100 pointer-events-auto"
+          : "opacity-0 pointer-events-none"
           }`}
       >
         {/* Backdrop */}

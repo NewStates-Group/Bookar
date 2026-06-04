@@ -5,11 +5,26 @@ from .models import MindMap
 from .tasks import generate_mind_map_task
 
 
+def invalidate_mind_map_cache(mind_map_uuid: str, user_id=None):
+    from django.core.cache import cache
+    if mind_map_uuid:
+        cache.delete(f"mind_map_detail_{mind_map_uuid}")
+    if user_id:
+        cache.delete(f"mind_maps_list_{user_id}")
+
+
 class MindMapService:
     def list_mind_maps(self, user):
-        maps = MindMap.objects.filter(user=user).order_by("-created_at")
+        from django.core.cache import cache
+        cache_key = f"mind_maps_list_{user.id}"
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return cached
+
+        maps = list(MindMap.objects.filter(user=user).order_by("-created_at"))
         for m in maps:
             m.is_owner = True
+        cache.set(cache_key, maps, 300)  # 5 minutes
         return maps
 
     def create_mind_map(self, user, topic: str, language: str = "pt"):
@@ -24,18 +39,28 @@ class MindMapService:
         )
 
         generate_mind_map_task.delay(user.pk, mind_map.pk)
+        invalidate_mind_map_cache("", user.id)
         mind_map.is_owner = True
         return mind_map
 
     def get_mind_map(self, uuid_str: str, user):
+        from django.core.cache import cache
+        cache_key = f"mind_map_detail_{uuid_str}"
+        cached = cache.get(cache_key)
+        if cached is not None:
+            cached.is_owner = (cached.user_id == user.id)
+            return cached
+
         try:
             mind_map = MindMap.objects.get(uuid=uuid_str, user=user)
             mind_map.is_owner = True
+            cache.set(cache_key, mind_map, 600)  # 10 minutes
             return mind_map
         except MindMap.DoesNotExist:
             try:
                 mind_map = MindMap.objects.get(uuid=uuid_str, is_shared=True)
                 mind_map.is_owner = False
+                cache.set(cache_key, mind_map, 600)
                 return mind_map
             except MindMap.DoesNotExist:
                 raise HttpError(
@@ -50,6 +75,7 @@ class MindMapService:
                 403, "Você não tem permissão para eliminar este mapa mental."
             )
         mind_map.delete()
+        invalidate_mind_map_cache(uuid_str, user.id)
         return {"success": True, "message": "Mapa mental eliminado."}
 
     def _find_node(self, nodes, node_id):
@@ -176,6 +202,7 @@ class MindMapService:
         if _update_node_in_list(updated_nodes):
             mind_map.nodes = updated_nodes
             mind_map.save(update_fields=["nodes"])
+            invalidate_mind_map_cache(uuid_str, user.id)
 
         return {
             "text_content": text_content,
@@ -297,6 +324,7 @@ class MindMapService:
         updated_quizzes[node_id] = quiz_data
         mind_map.quizzes = updated_quizzes
         mind_map.save(update_fields=["quizzes"])
+        invalidate_mind_map_cache(uuid_str, user.id)
 
         # Return sanitized quiz questions (without the answers!)
         sanitized_questions = []
@@ -351,6 +379,7 @@ class MindMapService:
                 updated_completed.append(node_id)
                 mind_map.completed_nodes = updated_completed
                 mind_map.save(update_fields=["completed_nodes"])
+                invalidate_mind_map_cache(uuid_str, user.id)
 
         return {
             "passed": passed,
@@ -374,6 +403,7 @@ class MindMapService:
         updated_notes[node_id] = content
         mind_map.notes = updated_notes
         mind_map.save(update_fields=["notes"])
+        invalidate_mind_map_cache(uuid_str, user.id)
 
         return {"success": True, "notes": mind_map.notes}
 
@@ -386,6 +416,7 @@ class MindMapService:
 
         mind_map.is_shared = not mind_map.is_shared
         mind_map.save(update_fields=["is_shared"])
+        invalidate_mind_map_cache(uuid_str, user.id)
         return {"success": True, "is_shared": mind_map.is_shared}
 
     def duplicate_mind_map(self, uuid_str: str, user):
@@ -419,6 +450,9 @@ class MindMapService:
             import_count=models.F("import_count") + 1
         )
 
+        invalidate_mind_map_cache(uuid_str)
+        invalidate_mind_map_cache("", user.id)
+
         copy_mind_map.is_owner = True
         return copy_mind_map
 
@@ -437,6 +471,7 @@ class MindMapService:
             updated_completed.append(node_id)
             mind_map.completed_nodes = updated_completed
             mind_map.save(update_fields=["completed_nodes"])
+            invalidate_mind_map_cache(uuid_str, user.id)
 
         return {
             "success": True,
