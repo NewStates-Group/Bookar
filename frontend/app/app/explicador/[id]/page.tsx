@@ -1305,7 +1305,7 @@ export default function ExplicadorRoomPage() {
       {/* LEFT SIDEBAR: Chat History */}
       <div
         style={{ width: isMobile ? (showWhiteboard ? "0%" : "100%") : (showWhiteboard ? `${splitPct}%` : "100%") }}
-        className={`bg-white flex flex-col shrink-0 h-full select-text transition-[width] duration-500 ease-in-out ${showWhiteboard ? (isMobile ? "hidden" : "border-r border-slate-200") : ""
+        className={`bg-white flex flex-col overflow-hidden shrink-0 h-full select-text transition-[width] duration-500 ease-in-out ${showWhiteboard ? (isMobile ? "hidden" : "border-r border-slate-200") : ""
           }`}
       >
         {/* Header section with connection status */}
