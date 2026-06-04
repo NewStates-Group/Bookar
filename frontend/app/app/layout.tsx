@@ -22,13 +22,29 @@ export default function AppLayout({
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
 
-  // Load preferences from localStorage on mount
+  // Load preferences from localStorage on mount and listen to navigation events
   useEffect(() => {
     setMounted(true);
     const saved = localStorage.getItem("bookar-sidebar-open");
     if (saved !== null) {
       setIsSidebarOpen(saved === "true");
     }
+
+    const handleOpenMobile = () => setIsMobileOpen(true);
+    const handleToggleDesktop = () => {
+      setIsSidebarOpen((prev) => {
+        const nextState = !prev;
+        localStorage.setItem("bookar-sidebar-open", String(nextState));
+        return nextState;
+      });
+    };
+
+    window.addEventListener("open-mobile-sidebar", handleOpenMobile);
+    window.addEventListener("toggle-desktop-sidebar", handleToggleDesktop);
+    return () => {
+      window.removeEventListener("open-mobile-sidebar", handleOpenMobile);
+      window.removeEventListener("toggle-desktop-sidebar", handleToggleDesktop);
+    };
   }, []);
 
   const toggleSidebar = () => {
@@ -60,24 +76,26 @@ export default function AppLayout({
       />
 
       {/* Mobile Sticky Navigation Header (Left-aligned Hamburger, Logo & Name) */}
-      <header className="md:hidden sticky top-0 z-30 flex items-center gap-3 w-full h-14 px-4 bg-white/95 backdrop-blur-sm border-b border-slate-200/60 shadow-sm select-none">
-        <button
-          onClick={() => setIsMobileOpen(true)}
-          className="p-1.5 rounded-lg text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
-        >
-          <Menu className="w-6 h-6" />
-        </button>
-        
-        <div className="flex items-center gap-2">
-          <Image src="/logo.png" alt="Logo" width={24} height={24} />
-          <span className="font-bold text-lg text-slate-800 tracking-tight">Bookar</span>
-        </div>
-      </header>
+      {!isExplicadorRoom && (
+        <header className="md:hidden sticky top-0 z-30 flex items-center gap-3 w-full h-14 px-4 bg-white/95 backdrop-blur-sm border-b border-slate-200/60 shadow-sm select-none">
+          <button
+            onClick={() => setIsMobileOpen(true)}
+            className="p-1.5 rounded-lg text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+          >
+            <Menu className="w-6 h-6" />
+          </button>
+          
+          <div className="flex items-center gap-2">
+            <Image src="/logo.png" alt="Logo" width={24} height={24} />
+            <span className="font-bold text-lg text-slate-800 tracking-tight">Bookar</span>
+          </div>
+        </header>
+      )}
 
       {/* Main Content Workspace Layout */}
       <div
         className={`transition-all duration-300 ease-in-out ${
-          isExplicadorRoom ? "h-[calc(100vh-56px)] md:h-screen overflow-hidden" : "min-h-screen"
+          isExplicadorRoom ? "h-screen overflow-hidden" : "min-h-screen"
         } ${
           mounted && isSidebarOpen ? "md:pl-[260px]" : "md:pl-[68px]"
         }`}

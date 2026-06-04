@@ -18,7 +18,8 @@ import {
   Bot,
   Lock,
   X,
-  UserPlus
+  UserPlus,
+  Menu
 } from "lucide-react";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -1236,7 +1237,7 @@ export default function ExplicadorRoomPage() {
     <div
       ref={splitContainerRef}
       onPointerMove={handleSplitterPointerMove}
-      className="flex h-[calc(100vh-56px)] md:h-screen w-full overflow-hidden bg-slate-50 text-slate-800 relative select-none"
+      className="flex h-screen w-full overflow-hidden bg-slate-50 text-slate-800 relative select-none"
     >
       <style>{`
         .font-handwriting {
@@ -1311,7 +1312,20 @@ export default function ExplicadorRoomPage() {
         {/* Header section with connection status */}
         <div className="px-4 py-3 border-b border-slate-200 flex justify-between items-center bg-white select-none shrink-0">
           <div className="flex items-center gap-2">
-            <span className="text-sm font-bold text-slate-800 flex items-center gap-2">
+            <button
+              onClick={() => {
+                if (window.innerWidth < 768) {
+                  window.dispatchEvent(new CustomEvent("open-mobile-sidebar"));
+                } else {
+                  window.dispatchEvent(new CustomEvent("toggle-desktop-sidebar"));
+                }
+              }}
+              className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition-colors cursor-pointer"
+              title="Menu principal"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+            <span className="text-sm font-bold text-slate-800 flex items-center gap-1.5 ml-1">
               <Bot className="w-5 h-5 text-cyan-600" />
               Explicador
             </span>
