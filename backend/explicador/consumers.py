@@ -774,21 +774,73 @@ Regras para "whiteboard_summary" (quando open_whiteboard for true):
 
         clean_text = clean_text.strip()
 
+        # Helper to decode a JSON string value by repairing its backslashes
+        def decode_json_string(raw_str: str) -> str:
+            # Match a backslash not preceded by another backslash, and not followed by valid JSON escapes.
+            # We only preserve \", \\, \/, \n, \r, \b, \uXXXX.
+            # \f and \t are doubled to \\f and \\t because they usually mean LaTeX \frac and \text.
+            pattern = re.compile(r"(?<!\\)\\(?![\"\\/nrb]|u[0-9a-fA-F]{4})")
+            repaired = pattern.sub(r"\\\\", raw_str)
+            try:
+                return json.loads(f"\"{repaired}\"")
+            except Exception:
+                # Fallback: manual replacements
+                return raw_str.replace("\\\"", "\"").replace("\\n", "\n").replace("\\\\", "\\")
+
+        # 1. Try parsing the whole clean_text directly with json.loads
         try:
             parsed = json.loads(clean_text)
-            if "chat_response" in parsed:
+            if isinstance(parsed, dict) and "chat_response" in parsed:
                 parsed.setdefault("whiteboard_summary", "")
                 parsed.setdefault("open_whiteboard", False)
                 if not str(parsed.get("whiteboard_summary", "")).strip():
                     parsed["open_whiteboard"] = False
                 return parsed
         except Exception:
-            logger.warning(
-                "AI response was not valid JSON, applying raw fallback parsing"
-            )
+            pass
+
+        # 2. Try to extract JSON object between first { and last } and repair it
+        first_brace = clean_text.find("{")
+        last_brace = clean_text.rfind("}")
+        if first_brace != -1 and last_brace != -1 and last_brace > first_brace:
+            candidate = clean_text[first_brace:last_brace+1]
+            pattern = re.compile(r"(?<!\\)\\(?![\"\\/nrb]|u[0-9a-fA-F]{4})")
+            repaired = pattern.sub(r"\\\\", candidate)
+            try:
+                parsed = json.loads(repaired)
+                if isinstance(parsed, dict) and "chat_response" in parsed:
+                    parsed.setdefault("whiteboard_summary", "")
+                    parsed.setdefault("open_whiteboard", False)
+                    if not str(parsed.get("whiteboard_summary", "")).strip():
+                        parsed["open_whiteboard"] = False
+                    return parsed
+            except Exception:
+                pass
+
+        # 3. Fall back to Regex extraction from the text
+        chat_resp = ""
+        whiteboard_sum = ""
+        open_wb = False
+
+        chat_match = re.search(r"\"chat_response\"\s*:\s*\"([^\"\\]*(?:\\.[^\"\\]*)*)\"", clean_text, re.DOTALL)
+        if chat_match:
+            chat_resp = decode_json_string(chat_match.group(1))
+        else:
+            chat_resp = text
+
+        wb_match = re.search(r"\"whiteboard_summary\"\s*:\s*\"([^\"\\]*(?:\\.[^\"\\]*)*)\"", clean_text, re.DOTALL)
+        if wb_match:
+            whiteboard_sum = decode_json_string(wb_match.group(1))
+
+        open_match = re.search(r"\"open_whiteboard\"\s*:\s*(true|false)", clean_text, re.IGNORECASE)
+        if open_match:
+            open_wb = open_match.group(1).lower() == "true"
+
+        if not whiteboard_sum.strip():
+            open_wb = False
 
         return {
-            "chat_response": text,
-            "whiteboard_summary": "",
-            "open_whiteboard": False,
+            "chat_response": chat_resp,
+            "whiteboard_summary": whiteboard_sum,
+            "open_whiteboard": open_wb,
         }

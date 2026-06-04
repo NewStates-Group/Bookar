@@ -809,19 +809,15 @@ export default function ExplicadorRoomPage() {
             const incomingSummary = (data.whiteboard_data.summary ?? "").trim();
             const prevSummary = (prev.summary ?? "").trim();
             const shouldOpen =
-              nextIsGenerating || (
-                data.open_whiteboard === true &&
-                incomingSummary.length > 0 &&
-                incomingSummary !== prevSummary
-              );
+              data.open_whiteboard === true &&
+              incomingSummary.length > 0 &&
+              incomingSummary !== prevSummary;
 
             if (shouldOpen) {
               return { ...merged, show_whiteboard: true };
             }
             return merged;
           });
-        } else if (nextIsGenerating) {
-          setWhiteboardData((prev) => ({ ...prev, show_whiteboard: true }));
         }
         break;
 
@@ -1553,13 +1549,12 @@ export default function ExplicadorRoomPage() {
                         ? `${currentLock.name} tem o lápis`
                         : "Pegar o lápis para falar com o explicador"
                 }
-                className={`w-8 h-8 flex items-center justify-center rounded-full transition-all duration-200 flex-shrink-0 cursor-pointer disabled:opacity-40 ${
-                  isLockHolder
+                className={`w-8 h-8 flex items-center justify-center rounded-full transition-all duration-200 flex-shrink-0 cursor-pointer disabled:opacity-40 ${isLockHolder
                     ? "bg-amber-100 text-amber-700 ring-2 ring-amber-300/60"
                     : pencilCooldownActive
                       ? "bg-red-55 text-red-500 ring-2 ring-red-200/50"
                       : "text-slate-400 hover:text-amber-600 hover:bg-amber-50"
-                }`}
+                  }`}
               >
                 {pencilCooldownActive ? (
                   <span className="text-[10px] font-bold">{pencilCooldownTimeLeft}</span>
@@ -1576,8 +1571,8 @@ export default function ExplicadorRoomPage() {
                 disabled={isGenerating}
                 title="Mencionar @explicador e pedir resposta (precisas do lápis)"
                 className={`w-8 h-8 flex items-center justify-center rounded-full transition-all duration-200 flex-shrink-0 cursor-pointer disabled:opacity-40 ${mentionsExplicadorInInput
-                    ? "bg-cyan-100 text-cyan-700 ring-2 ring-cyan-300/60"
-                    : "text-slate-400 hover:text-cyan-600 hover:bg-cyan-50"
+                  ? "bg-cyan-100 text-cyan-700 ring-2 ring-cyan-300/60"
+                  : "text-slate-400 hover:text-cyan-600 hover:bg-cyan-50"
                   }`}
               >
                 <Bot className="w-4 h-4" />
@@ -1595,8 +1590,8 @@ export default function ExplicadorRoomPage() {
                 )
               }
               className={`w-8 h-8 p-0 text-white rounded-full flex items-center justify-center shadow-sm transition-all duration-200 flex-shrink-0 cursor-pointer ${isGenerating
-                  ? "bg-red-500 hover:bg-red-650 shadow-red-500/20"
-                  : "bg-cyan-500 hover:bg-cyan-600 disabled:bg-slate-200 disabled:text-slate-400 shadow-cyan-500/20"
+                ? "bg-red-500 hover:bg-red-650 shadow-red-500/20"
+                : "bg-cyan-500 hover:bg-cyan-600 disabled:bg-slate-200 disabled:text-slate-400 shadow-cyan-500/20"
                 }`}
             >
               {isGenerating ? (
