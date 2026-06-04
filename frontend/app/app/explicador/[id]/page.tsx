@@ -1310,10 +1310,11 @@ export default function ExplicadorRoomPage() {
           }`}
       >
         {/* Header section with connection status */}
-        <div className="px-4 py-3 border-b border-slate-200 flex justify-between items-center bg-white select-none shrink-0">
+        <div className="px-4 py-4 border-b border-slate-200 flex justify-between items-center bg-white select-none shrink-0">
           <div className="flex items-center gap-2">
             <button
-              onClick={() => {
+              onClick={(e) => {
+                e.stopPropagation();
                 window.dispatchEvent(new CustomEvent("open-mobile-sidebar"));
               }}
               className="md:hidden p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition-colors cursor-pointer"
