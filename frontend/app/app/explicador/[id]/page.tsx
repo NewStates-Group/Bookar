@@ -1314,18 +1314,14 @@ export default function ExplicadorRoomPage() {
           <div className="flex items-center gap-2">
             <button
               onClick={() => {
-                if (window.innerWidth < 768) {
-                  window.dispatchEvent(new CustomEvent("open-mobile-sidebar"));
-                } else {
-                  window.dispatchEvent(new CustomEvent("toggle-desktop-sidebar"));
-                }
+                window.dispatchEvent(new CustomEvent("open-mobile-sidebar"));
               }}
-              className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition-colors cursor-pointer"
+              className="md:hidden p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition-colors cursor-pointer"
               title="Menu principal"
             >
               <Menu className="w-5 h-5" />
             </button>
-            <span className="text-sm font-bold text-slate-800 flex items-center gap-1.5 ml-1">
+            <span className="text-sm font-bold text-slate-800 flex items-center gap-1.5 ml-1 md:ml-0">
               <Bot className="w-5 h-5 text-cyan-600" />
               Explicador
             </span>
