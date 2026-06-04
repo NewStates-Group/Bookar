@@ -19,7 +19,8 @@ import {
   Lock,
   X,
   UserPlus,
-  Menu
+  Menu,
+  Square
 } from "lucide-react";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -179,6 +180,12 @@ export default function ExplicadorRoomPage() {
   // WebRTC Audio States
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [isMicMuted, setIsMicMuted] = useState(false);
+  const [isForceMuted, setIsForceMuted] = useState(false);
+  const isForceMutedRef = useRef(false);
+  const currentAudioRef = useRef<HTMLAudioElement | null>(null);
+  const [isRecordingAudio, setIsRecordingAudio] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
   const [audioApproved, setAudioApproved] = useState(false);
   const [audioRequestPending, setAudioRequestPending] = useState(false);
   const [activeVoiceRequests, setActiveVoiceRequests] = useState<{ connectionId: string; name: string }[]>([]);
@@ -220,8 +227,24 @@ export default function ExplicadorRoomPage() {
 
   useEffect(() => { localStreamRef.current = localStream; }, [localStream]);
   useEffect(() => { isMicMutedRef.current = isMicMuted; }, [isMicMuted]);
+  useEffect(() => { isForceMutedRef.current = isForceMuted; }, [isForceMuted]);
   useEffect(() => { isOwnerRef.current = isOwner; }, [isOwner]);
   useEffect(() => { participantsRef.current = participants; }, [participants]);
+
+  // Sync mic track enabled state with user mute and force system mute
+  useEffect(() => {
+    const stream = localStreamRef.current;
+    if (stream) {
+      stream.getAudioTracks().forEach((track) => {
+        track.enabled = !isMicMuted && !isForceMuted;
+      });
+      sendWSMessage({
+        type: "audio_state",
+        is_mic_on: !isMicMuted && !isForceMuted,
+        is_listening: true,
+      });
+    }
+  }, [isMicMuted, isForceMuted]);
 
   const clearWsTimers = useCallback(() => {
     if (wsReconnectTimerRef.current) {
@@ -660,6 +683,16 @@ export default function ExplicadorRoomPage() {
   const handleInterrupt = () => {
     setIsGenerating(false);
     sendWSMessage({ type: "interrupt" });
+    if (currentAudioRef.current) {
+      currentAudioRef.current.pause();
+      currentAudioRef.current = null;
+    }
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      mediaRecorderRef.current.onstop = null; // prevent sending on interrupt
+      mediaRecorderRef.current.stop();
+    }
+    setIsRecordingAudio(false);
+    setIsForceMuted(false);
   };
 
   // 2. Handle Incoming WebSocket events
@@ -789,6 +822,16 @@ export default function ExplicadorRoomPage() {
         }
         break;
 
+      case "voice_broadcast_started":
+        if (data.speaker_connection_id !== connectionIdRef.current) {
+          setIsForceMuted(true);
+        }
+        break;
+
+      case "voice_broadcast_ended":
+        setIsForceMuted(false);
+        break;
+
       case "chat_update":
         if (data.chat_history) {
           const isNewMessage = data.chat_history.length > chatHistoryRef.current.length && chatHistoryRef.current.length > 0;
@@ -803,6 +846,40 @@ export default function ExplicadorRoomPage() {
 
         const nextIsGenerating = Boolean(data.is_generating);
         setIsGenerating(nextIsGenerating);
+
+        if (data.audio) {
+          // Pause current audio playing
+          if (currentAudioRef.current) {
+            currentAudioRef.current.pause();
+            currentAudioRef.current = null;
+          }
+
+          setIsForceMuted(true);
+
+          const audio = new Audio(data.audio);
+          currentAudioRef.current = audio;
+
+          const endAudio = () => {
+            setIsForceMuted(false);
+            currentAudioRef.current = null;
+            sendWSMessage({ type: "voice_broadcast_end" });
+          };
+
+          audio.onended = endAudio;
+          audio.onerror = (err) => {
+            console.error("Audio playback error", err);
+            endAudio();
+          };
+
+          audio.play().catch((err) => {
+            console.warn("Failed to play audio", err);
+            endAudio();
+          });
+        } else if (!nextIsGenerating && data.is_voice) {
+          // If generation finished and this was a voice flow but no audio was generated (or failed), release mute
+          setIsForceMuted(false);
+          sendWSMessage({ type: "voice_broadcast_end" });
+        }
 
         if (data.whiteboard_data) {
           setWhiteboardData((prev) => {
@@ -987,18 +1064,18 @@ export default function ExplicadorRoomPage() {
 
     const nextMuted = !isMicMutedRef.current;
     stream.getAudioTracks().forEach((track) => {
-      track.enabled = !nextMuted;
+      track.enabled = !nextMuted && !isForceMutedRef.current;
     });
     isMicMutedRef.current = nextMuted;
     setIsMicMuted(nextMuted);
 
     sendWSMessage({
       type: "audio_state",
-      is_mic_on: !nextMuted,
+      is_mic_on: !nextMuted && !isForceMutedRef.current,
       is_listening: true,
     });
 
-    if (!nextMuted) {
+    if (!nextMuted && !isForceMutedRef.current) {
       connectToAllPeers();
     }
   };
@@ -1126,24 +1203,113 @@ export default function ExplicadorRoomPage() {
     }
   };
 
-  // Speech-to-text for the chat input (matching landing page)
-  const handleChatMic = () => {
-    const SpeechRecognition =
-      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      toast.error("O seu navegador não suporta reconhecimento de voz.");
+  // Captura o áudio usando MediaRecorder e envia para o backend
+  const handleChatMic = async () => {
+    if (!isLockHolder && !isSoloRoom) {
+      toast.error("Precisas de pegar o lápis primeiro para falar com o explicador por voz.");
       return;
     }
-    const recognition = new SpeechRecognition();
-    recognition.lang = "pt-PT";
-    recognition.interimResults = false;
-    recognition.onresult = (event: any) => {
-      const transcript = event.results[0][0].transcript;
-      setMessage(transcript);
-      chatInputRef.current?.focus();
+
+    if (isRecordingAudio) {
+      // Para a gravação e dispara o envio do Blob (onstop)
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+        mediaRecorderRef.current.stop();
+      }
+      setIsRecordingAudio(false);
+      return;
+    }
+
+    // Inicializa o Stream local caso não exista
+    let stream = localStreamRef.current;
+    if (!stream) {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        localStreamRef.current = stream;
+        setLocalStream(stream);
+      } catch (err) {
+        console.error("Falha ao capturar microfone", err);
+        toast.error("Não foi possível aceder ao microfone. Garanta permissão.");
+        return;
+      }
+    }
+
+    // Garante que o microfone local está desmutado para gravação
+    if (isMicMutedRef.current) {
+      isMicMutedRef.current = false;
+      setIsMicMuted(false);
+      stream.getAudioTracks().forEach((track) => {
+        track.enabled = true;
+      });
+      sendWSMessage({
+        type: "audio_state",
+        is_mic_on: true,
+        is_listening: true,
+      });
+      connectToAllPeers();
+    } else {
+      stream.getAudioTracks().forEach((track) => {
+        track.enabled = true;
+      });
+    }
+
+    // Notifica outros membros da sala para se silenciarem
+    sendWSMessage({ type: "voice_broadcast_start" });
+
+    // Inicia gravação de áudio
+    audioChunksRef.current = [];
+    let mediaRecorder: MediaRecorder;
+    const options = { mimeType: "audio/webm" };
+    try {
+      mediaRecorder = new MediaRecorder(stream, options);
+    } catch (e) {
+      // Fallback para Safari / iOS
+      mediaRecorder = new MediaRecorder(stream);
+    }
+
+    mediaRecorderRef.current = mediaRecorder;
+    mediaRecorder.ondataavailable = (event) => {
+      if (event.data.size > 0) {
+        audioChunksRef.current.push(event.data);
+      }
     };
-    recognition.onerror = () => toast.error("Erro ao capturar voz.");
-    recognition.start();
+
+    mediaRecorder.onstop = async () => {
+      const audioBlob = new Blob(audioChunksRef.current, { type: mediaRecorder.mimeType });
+      if (audioBlob.size < 1000) {
+        // Áudio muito curto ou vazio
+        sendWSMessage({ type: "voice_broadcast_end" });
+        setIsForceMuted(false);
+        return;
+      }
+
+      // Converte Blob em base64 e envia
+      const reader = new FileReader();
+      reader.readAsDataURL(audioBlob);
+      reader.onloadend = () => {
+        const base64Data = reader.result as string;
+
+        setIsGenerating(true);
+        setActiveStreamingMessageIndex(null);
+        setIsForceMuted(true);
+
+        sendWSMessage({
+          type: "chat_message_audio",
+          audio_base64: base64Data,
+          mime_type: mediaRecorder.mimeType,
+        });
+      };
+    };
+
+    try {
+      mediaRecorder.start();
+      setIsRecordingAudio(true);
+      toast.info("A gravar áudio... Clique novamente para enviar.");
+    } catch (err) {
+      console.error("Falha ao iniciar gravador de áudio", err);
+      toast.error("Erro ao iniciar gravador de áudio.");
+      sendWSMessage({ type: "voice_broadcast_end" });
+      setIsForceMuted(false);
+    }
   };
 
   // Chalk Lock action triggers
@@ -1523,15 +1689,17 @@ export default function ExplicadorRoomPage() {
               placeholder={
                 isGenerating
                   ? "A aguardar resposta do explicador..."
-                  : isSoloRoom
-                    ? "Escreve a tua dúvida para o explicador..."
-                    : mentionsExplicadorInInput && !isLockHolder
-                      ? "Pega o lápis para falar com o explicador"
-                      : "Escreve no chat com os outros..."
+                  : isRecordingAudio
+                    ? "A gravar áudio... Clique no botão vermelho para enviar."
+                    : isSoloRoom
+                      ? "Escreve a tua dúvida para o explicador..."
+                      : mentionsExplicadorInInput && !isLockHolder
+                        ? "Pega o lápis para falar com o explicador"
+                        : "Escreve no chat com os outros..."
               }
               value={message}
               onChange={(e) => setMessage(e.target.value)}
-              disabled={isGenerating}
+              disabled={isGenerating || isRecordingAudio}
               className="flex-1 h-10 bg-transparent text-slate-800 placeholder:text-slate-400 text-base md:text-sm px-1 outline-none border-0 focus:ring-0 disabled:text-slate-400"
             />
 
@@ -1539,10 +1707,14 @@ export default function ExplicadorRoomPage() {
               type="button"
               onClick={handleChatMic}
               disabled={isGenerating}
-              title="Falar com o explicador"
-              className="w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:text-cyan-600 hover:bg-cyan-50 disabled:opacity-40 transition-all duration-200 flex-shrink-0 cursor-pointer"
+              title={isRecordingAudio ? "Enviar gravação de voz" : "Falar com o explicador"}
+              className={`w-8 h-8 flex items-center justify-center rounded-full flex-shrink-0 cursor-pointer transition-all duration-200 disabled:opacity-40 ${
+                isRecordingAudio
+                  ? "text-red-500 bg-red-50 hover:bg-red-100 animate-pulse ring-2 ring-red-500/25"
+                  : "text-slate-400 hover:text-cyan-600 hover:bg-cyan-50"
+              }`}
             >
-              <Mic className="w-4 h-4" />
+              {isRecordingAudio ? <Square className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
             </button>
 
             {/* Pencil grab/release toggle — only in multi-user rooms */}

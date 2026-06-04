@@ -1,11 +1,16 @@
+import base64
 import json
 import logging
 import re
 import uuid
 
+import httpx
 from asgiref.sync import sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
 from courses.providers import get_text_chain
+from courses.utils import get_genai_client
+from django.conf import settings
+from google.genai import types
 from django.contrib.auth import get_user_model
 from ninja_jwt.tokens import AccessToken
 
@@ -13,6 +18,43 @@ from . import presence as room_presence
 from .models import ExplicadorRoom
 
 logger = logging.getLogger(__name__)
+
+
+async def generate_elevenlabs_audio(text: str) -> str:
+    api_key = settings.AI.get("ELEVENLABS_KEY", "")
+    if not api_key:
+        logger.warning("ELEVENLABS_KEY not configured, skipping audio generation.")
+        return ""
+
+    voice_id = "onyx"
+    url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
+    headers = {
+        "xi-api-key": api_key,
+        "Content-Type": "application/json",
+        "Accept": "audio/mpeg",
+    }
+    # Clean text to remove markdown markers for cleaner speech
+    clean_text = re.sub(r"\*\*.*?\*\*|#+ |`.*?`|\[.*?\]\(.*?\)", "", text)
+    clean_text = clean_text.replace("\n", " ").strip()
+
+    payload = {
+        "text": clean_text[:1000],  # Limit to 1000 chars to avoid huge costs/timeouts
+        "model_id": "eleven_multilingual_v2",
+        "voice_settings": {"stability": 0.5, "similarity_boost": 0.75},
+    }
+
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(url, headers=headers, json=payload, timeout=30.0)
+            if response.status_code == 200:
+                audio_base64 = base64.b64encode(response.content).decode("utf-8")
+                return f"data:audio/mp3;base64,{audio_base64}"
+            else:
+                logger.error(f"ElevenLabs TTS failed: {response.status_code} - {response.text}")
+    except Exception as e:
+        logger.error(f"Error calling ElevenLabs: {e}")
+
+    return ""
 User = get_user_model()
 
 EXPLICADOR_MENTION = "@explicador"
@@ -321,6 +363,31 @@ class ExplicadorConsumer(AsyncWebsocketConsumer):
             },
         )
 
+    async def handle_voice_broadcast_start(self, data):
+        """Broadcasts that a user has started a voice broadcast, so all other mics must mute."""
+        await self.channel_layer.group_send(
+            self.group_name,
+            {
+                "type": "broadcast_message",
+                "message": {
+                    "type": "voice_broadcast_started",
+                    "speaker_connection_id": self.connection_id,
+                },
+            },
+        )
+
+    async def handle_voice_broadcast_end(self, data):
+        """Broadcasts that the voice broadcast has ended, releasing the mute state for all."""
+        await self.channel_layer.group_send(
+            self.group_name,
+            {
+                "type": "broadcast_message",
+                "message": {
+                    "type": "voice_broadcast_ended",
+                },
+            },
+        )
+
     async def handle_chat_message(self, data):
         """Processes chat messages. Lock is required only for @explicador messages."""
         self.is_interrupted = False
@@ -425,7 +492,12 @@ class ExplicadorConsumer(AsyncWebsocketConsumer):
             self.room.whiteboard_data = persisted_wb
             await self.save_room()
 
-            # 4. Broadcast results to group
+            # 4. Generate audio if this is a voice interaction
+            audio_data_uri = ""
+            if data.get("is_voice"):
+                audio_data_uri = await generate_elevenlabs_audio(parsed_data["chat_response"])
+
+            # 5. Broadcast results to group
             await self.channel_layer.group_send(
                 self.group_name,
                 {
@@ -436,6 +508,8 @@ class ExplicadorConsumer(AsyncWebsocketConsumer):
                         "whiteboard_data": persisted_wb,
                         "open_whiteboard": should_open,
                         "is_generating": False,
+                        "audio": audio_data_uri,
+                        "is_voice": bool(data.get("is_voice")),
                     },
                 },
             )
@@ -460,9 +534,107 @@ class ExplicadorConsumer(AsyncWebsocketConsumer):
                             self.room.whiteboard_data
                         ),
                         "is_generating": False,
+                        "is_voice": bool(data.get("is_voice")),
                     },
                 },
             )
+
+    async def handle_chat_message_audio(self, data):
+        """Receives base64-encoded audio, transcribes via Gemini, then delegates to handle_chat_message."""
+        self.is_interrupted = False
+        self.room = await self.get_room(self.room_uuid)
+        if not self.room:
+            return
+
+        audio_base64 = data.get("audio_base64", "")
+        raw_mime = data.get("mime_type", "audio/webm")
+        if not audio_base64:
+            return
+
+        # Decode base64 audio bytes
+        try:
+            if "," in audio_base64:
+                _, base64_str = audio_base64.split(",", 1)
+            else:
+                base64_str = audio_base64
+            audio_bytes = base64.b64decode(base64_str)
+        except Exception as e:
+            logger.error(f"Failed to decode audio base64: {e}")
+            await self.channel_layer.group_send(
+                self.group_name,
+                {
+                    "type": "broadcast_message",
+                    "message": {
+                        "type": "chat_update",
+                        "chat_history": self.room.chat_history,
+                        "whiteboard_data": sanitize_whiteboard_data(
+                            self.room.whiteboard_data
+                        ),
+                        "is_generating": False,
+                        "is_voice": True,
+                    },
+                },
+            )
+            return
+
+        # Normalise MIME type (MediaRecorder sometimes appends codecs info)
+        mime_type = raw_mime.split(";")[0].strip()
+
+        # Transcribe audio via Gemini
+        try:
+            client = get_genai_client()
+            model_name = settings.AI.get("GENAI_MODEL_TEXT", "gemini-2.5-flash-lite")
+            response = await sync_to_async(client.models.generate_content)(
+                model=model_name,
+                contents=[
+                    "Transcreve apenas e exatamente o que foi dito neste áudio, mantendo o idioma original. "
+                    "Não adiciones comentários, notas ou formatação extra. Se não conseguires perceber o áudio, devolve uma string vazia.",
+                    types.Part.from_bytes(data=audio_bytes, mime_type=mime_type),
+                ],
+            )
+            transcript = (response.text or "").strip()
+        except Exception as e:
+            logger.exception("Failed to transcribe audio via Gemini")
+            err_msg = {
+                "role": "assistant",
+                "content": f"Não consegui transcrever o áudio: {str(e)}",
+            }
+            self.room.chat_history.append(err_msg)
+            await self.save_room()
+            await self.channel_layer.group_send(
+                self.group_name,
+                {
+                    "type": "broadcast_message",
+                    "message": {
+                        "type": "chat_update",
+                        "chat_history": self.room.chat_history,
+                        "whiteboard_data": sanitize_whiteboard_data(
+                            self.room.whiteboard_data
+                        ),
+                        "is_generating": False,
+                        "is_voice": True,
+                    },
+                },
+            )
+            return
+
+        if not transcript:
+            # Empty transcript — release mute and do nothing
+            await self.channel_layer.group_send(
+                self.group_name,
+                {
+                    "type": "broadcast_message",
+                    "message": {
+                        "type": "voice_broadcast_ended",
+                    },
+                },
+            )
+            return
+
+        # Delegate to the existing chat handler with the transcribed text
+        data["message"] = transcript
+        data["is_voice"] = True
+        await self.handle_chat_message(data)
 
     async def handle_node_moved(self, data):
         """Synchronizes coordinate drag positions from the owner or the lock holder."""

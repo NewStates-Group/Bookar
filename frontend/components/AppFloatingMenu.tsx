@@ -33,7 +33,7 @@ export function AppFloatingMenu() {
         {menuOpen && (
           <div className="flex flex-col items-end gap-2.5 mb-1 animate-in fade-in slide-in-from-bottom-3 duration-200">
             {/* Quick Action: Caderno de Notas */}
-            <div 
+            <div
               onClick={() => {
                 setMenuOpen(false);
                 openCaderno();
@@ -52,7 +52,7 @@ export function AppFloatingMenu() {
             </div>
 
             {/* Quick Action: Explicador */}
-            <div 
+            <div
               onClick={() => {
                 setMenuOpen(false);
                 setExplicadorOpen(true);
@@ -79,11 +79,11 @@ export function AppFloatingMenu() {
           title="Ferramentas de IA"
           aria-label="Ferramentas de IA"
           aria-expanded={menuOpen}
-          className={`w-13 h-13 rounded-2xl flex items-center justify-center shadow-lg transition-all duration-200 active:scale-95 cursor-pointer border ${
-            menuOpen
+          className={`w-13 h-13 rounded-2xl flex items-center justify-center shadow-lg transition-all duration-200 active:scale-95 cursor-pointer border 
+            ${menuOpen
               ? "bg-slate-800 border-slate-700 text-white hover:bg-slate-900"
-              : "bg-cyan-500 border-cyan-400 text-white hover:bg-cyan-600 shadow-cyan-500/20"
-          }`}
+              : "bg-cyan-500 border-cyan-400 text-white hover:bg-cyan-600 shadow-cyan-500/20"}
+          `}
         >
           {menuOpen ? (
             <Plus className="w-5 h-5 rotate-45 transition-transform duration-200" />
