@@ -1309,7 +1309,7 @@ export default function ExplicadorRoomPage() {
           }`}
       >
         {/* Header section with connection status */}
-        <div className="px-4 py-3 border-b border-slate-200 flex justify-between items-center bg-white select-none">
+        <div className="px-4 py-3 border-b border-slate-200 flex justify-between items-center bg-white select-none shrink-0">
           <div className="flex items-center gap-2">
             <span className="text-sm font-bold text-slate-800 flex items-center gap-2">
               <Bot className="w-5 h-5 text-cyan-600" />
@@ -1504,7 +1504,7 @@ export default function ExplicadorRoomPage() {
         {/* Message Input — pill style matching the landing page */}
         <form
           onSubmit={handleSendMessage}
-          className="p-3 max-w-3xl mx-auto w-full"
+          className="p-3 max-w-3xl mx-auto w-full shrink-0"
         >
           <div className="flex items-center gap-2 bg-white border border-slate-200 focus-within:border-cyan-400 focus-within:ring-4 focus-within:ring-cyan-500/10 rounded-full px-4 py-1.5 shadow-sm transition-all duration-300">
             <input
