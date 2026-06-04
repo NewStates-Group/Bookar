@@ -63,6 +63,22 @@ export default function DefinitiveHomePage() {
           </motion.div>
         </section>
 
+        <section id="about" className="py-24 px-6 bg-neutral-50">
+          <div className="max-w-4xl mx-auto text-center">
+            <h2 className="text-4xl font-bold mb-6">
+              Sobre a Bookar
+            </h2>
+
+            <p className="text-lg text-muted-foreground leading-relaxed">
+              A Bookar é uma plataforma educacional online que utiliza
+              inteligência artificial para ajudar estudantes e profissionais
+              a aprender de forma mais eficiente através de cursos,
+              explicações personalizadas, materiais educativos e
+              acompanhamento do progresso de aprendizagem.
+            </p>
+          </div>
+        </section>
+
         {/* Features Grid */}
         <section id="features" className="py-24 px-6 max-w-7xl mx-auto space-y-20">
           <div className="text-center space-y-4">
