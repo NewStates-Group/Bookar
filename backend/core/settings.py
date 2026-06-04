@@ -35,6 +35,7 @@ INSTALLED_APPS = [
     "django.contrib.contenttypes",
     "cloudinary_storage",
     "cloudinary",
+    "gmailapi_backend",
     "courses",
     "accounts",
     "channels",
@@ -185,13 +186,13 @@ AI = {
 GOOGLE_CLIENT_ID = env("GOOGLE_CLIENT_ID")
 GOOGLE_CLIENT_SECRET = env("GOOGLE_CLIENT_SECRET")
 
-EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
-EMAIL_HOST = "smtp.gmail.com"
-EMAIL_PORT = 587
-EMAIL_USE_TLS = True
+EMAIL_BACKEND = 'gmailapi_backend.mail.GmailBackend'
 EMAIL_HOST_USER = "newstates.bookar@gmail.com"
-EMAIL_HOST_PASSWORD = env("EMAIL_PASSWORD")
 DEFAULT_FROM_EMAIL = f"Bookar <{EMAIL_HOST_USER}>"
+
+GMAIL_API_CLIENT_ID = env("GMAIL_API_CLIENT_ID")
+GMAIL_API_CLIENT_SECRET = env("GMAIL_API_CLIENT_SECRET")
+GMAIL_API_REFRESH_TOKEN = env("GMAIL_API_REFRESH_TOKEN")
 
 NINJA_EXTRA = {
     "THROTTLE_RATES": {

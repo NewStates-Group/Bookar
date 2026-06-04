@@ -38,4 +38,5 @@ dependencies = [
     "replicate>=1.0.7",
     "elevenlabs>=2.46.0",
     "django-gmailapi-backend>=0.3.3",
+    "google-auth-oauthlib>=1.2.2",
 ]
