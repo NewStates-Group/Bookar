@@ -27,7 +27,9 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const intentionalCloseRef = useRef(false);
   const mountedRef = useRef(true);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
+  const accessToken = (session as { accessToken?: string } | null)?.accessToken;
+  const hasConnectedRef = useRef(false);
+  
   const clearReconnectTimer = () => {
     if (reconnectTimerRef.current) {
       clearTimeout(reconnectTimerRef.current);
@@ -39,10 +41,16 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const connect = async () => {
     if (!mountedRef.current) return;
+    if (socketRef.current) return;
 
-    const fresh = await ensureFreshSession();
-    const token = fresh?.accessToken || (session as { accessToken?: string })?.accessToken;
+    // const fresh = await ensureFreshSession();
+    // const token = fresh?.accessToken || (session as { accessToken?: string })?.accessToken;
+    const token = accessToken;
     if (!token) return;
+
+    if (hasConnectedRef.current) return;
+    hasConnectedRef.current = true;
+
 
     activeTokenRef.current = token;
     clearReconnectTimer();
@@ -56,7 +64,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
     if (!apiUrl) return;
 
-    const wsUrl = `${apiUrl.replace(/^http/, "ws")}/ws/updates/?token=${encodeURIComponent(token)}`;
+    const wsUrl = `${apiUrl.replace(/^http/, "ws")}/ws/updates/?t=${encodeURIComponent(token)}`;
     const socket = new WebSocket(wsUrl);
     socketRef.current = socket;
     intentionalCloseRef.current = false;
@@ -103,13 +111,10 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   connectRef.current = connect;
 
   useEffect(() => {
-    if (status === "loading") return;
+    if (status !== "authenticated") return;
 
-    mountedRef.current = true;
-    intentionalCloseRef.current = false;
-    reconnectAttemptsRef.current = 0;
-    void connectRef.current();
-
+    connect()
+  
     return () => {
       mountedRef.current = false;
       intentionalCloseRef.current = true;
@@ -118,21 +123,9 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         socketRef.current.close();
         socketRef.current = null;
       }
+      hasConnectedRef.current = false;
     };
   }, [status]);
-
-  useEffect(() => {
-    if (status !== "authenticated") return;
-
-    const token = (session as { accessToken?: string } | null)?.accessToken;
-    if (!token || token === activeTokenRef.current) return;
-
-    activeTokenRef.current = token;
-    intentionalCloseRef.current = false;
-    reconnectAttemptsRef.current = 0;
-    socketRef.current?.close();
-    void connectRef.current();
-  }, [status, session]);
 
   const sendMessage = (data: any) => {
     if (socketRef.current?.readyState === WebSocket.OPEN) {

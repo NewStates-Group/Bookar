@@ -11,7 +11,7 @@ export function Providers({ children }: { children: ReactNode }) {
   return (
     <SessionProvider
       refetchOnWindowFocus={false}
-      refetchInterval={SESSION_REFETCH_INTERVAL_SEC}
+      refetchInterval={0} // SESSION_REFETCH_INTERVAL_SEC
       refetchWhenOffline={false}
     >
       <NotebookProvider>

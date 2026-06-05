@@ -46,9 +46,20 @@ export default function ProfilePage() {
         hasFetched.current = true;
 
         apiRequest(`${process.env.NEXT_PUBLIC_API_URL}/auth/me?stats=1`)
-            .then((profile: any) => setFreshUser(profile as Profile))
-            .catch(() => {/* non-critical */ });
-        setIsPageLoading(false);
+            .then((profile: any) => {
+                setFreshUser(profile as Profile);
+                setFormData({
+                    email: profile.email,
+                    first_name: profile.first_name,
+                    last_name: profile.last_name,
+                });
+            })
+            .catch(() => {
+                toast.error("Erro ao carregar perfil");
+            })
+            .finally(() => {
+                setIsPageLoading(false);
+            });
     }, [session?.accessToken]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const handleUpdateProfile = async (e: React.FormEvent) => {
