@@ -18,10 +18,10 @@ import {
   Bot,
   Lock,
   X,
-  UserPlus,
   Menu,
   Square
 } from "lucide-react";
+import { ExplicadorInvitePopover } from "@/components/ExplicadorInvitePopover";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { ensureFreshSession } from "@/lib/auth-session";
@@ -156,6 +156,7 @@ export default function ExplicadorRoomPage() {
       setPencilCooldownTimeLeft((prev) => {
         if (prev <= 1) {
           setPencilCooldownActive(false);
+          setPencilRequestsCount(0);
           clearInterval(interval);
           return 0;
         }
@@ -164,6 +165,12 @@ export default function ExplicadorRoomPage() {
     }, 1000);
     return () => clearInterval(interval);
   }, [pencilCooldownActive]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setShareUrl(window.location.href);
+    }
+  }, [roomId]);
 
   // Splitter Resizing states
   const [splitPct, setSplitPct] = useState<number>(35); // Left chat starts at 35%
@@ -188,6 +195,8 @@ export default function ExplicadorRoomPage() {
   const [audioApproved, setAudioApproved] = useState(false);
   const [audioRequestPending, setAudioRequestPending] = useState(false);
   const [activeVoiceRequests, setActiveVoiceRequests] = useState<{ connectionId: string; name: string }[]>([]);
+  const [activePencilRequests, setActivePencilRequests] = useState<{ connectionId: string; name: string }[]>([]);
+  const [shareUrl, setShareUrl] = useState("");
 
   // WebSocket & WebRTC Refs (refs avoid stale closures in the WS handler)
   const socketRef = useRef<WebSocket | null>(null);
@@ -790,6 +799,22 @@ export default function ExplicadorRoomPage() {
         }
         break;
 
+      case "pencil_request":
+        if (data.target_connection_id === connectionIdRef.current) {
+          const requesterName = data.requester_name || "Alguém";
+          toast.info(`${requesterName} pediu o lápis`);
+          setActivePencilRequests((prev) => {
+            if (prev.some((r) => r.connectionId === data.requester_connection_id)) return prev;
+            return [...prev, { connectionId: data.requester_connection_id, name: requesterName }];
+          });
+          window.setTimeout(() => {
+            setActivePencilRequests((prev) =>
+              prev.filter((r) => r.connectionId !== data.requester_connection_id)
+            );
+          }, 6000);
+        }
+        break;
+
       case "voice_response":
         if (data.target_connection_id === connectionIdRef.current) {
           setAudioRequestPending(false);
@@ -1132,12 +1157,22 @@ export default function ExplicadorRoomPage() {
 
   // Chalk Lock action triggers
   const grabLock = () => {
+    sendWSMessage({ type: "grab_lock" });
+  };
+
+  const releaseLock = () => {
+    sendWSMessage({ type: "release_lock" });
+  };
+
+  const requestPencil = () => {
+    if (!currentLock || isLockHolder) return;
+
     if (pencilCooldownActive) {
       toast.error(`Aguarde ${pencilCooldownTimeLeft}s para pedir o lápis novamente.`);
       return;
     }
 
-    sendWSMessage({ type: "grab_lock" });
+    sendWSMessage({ type: "request_pencil", name: getDisplayName() });
 
     setPencilRequestsCount((prev) => {
       const next = prev + 1;
@@ -1148,17 +1183,6 @@ export default function ExplicadorRoomPage() {
       }
       return next;
     });
-  };
-
-  const releaseLock = () => {
-    sendWSMessage({ type: "release_lock" });
-  };
-
-  const handleShareRoom = () => {
-    if (typeof window !== "undefined") {
-      navigator.clipboard.writeText(window.location.href);
-      toast.success("Link copiado!");
-    }
   };
 
   const showWhiteboard = whiteboardData.show_whiteboard === true;
@@ -1245,6 +1269,30 @@ export default function ExplicadorRoomPage() {
           animation: slideUpFade 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
         }
       `}</style>
+
+      {/* Pencil request notifications for lock holder */}
+      {isLockHolder && activePencilRequests.length > 0 && (
+        <div className="absolute top-4 left-4 z-50 flex flex-col gap-2 max-w-sm w-full">
+          {activePencilRequests.map((req) => (
+            <Card
+              key={req.connectionId}
+              className="p-4 border border-amber-100 bg-white shadow-2xl animate-in slide-in-from-top duration-300 text-slate-800"
+            >
+              <div className="flex gap-2.5">
+                <div className="w-9 h-9 rounded-full bg-amber-500/10 flex items-center justify-center text-amber-600 mt-0.5">
+                  <Pencil className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="font-bold text-slate-850 text-sm">Pedido de lápis</h4>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    <strong>{req.name}</strong> pediu o lápis.
+                  </p>
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
 
       {/* Pop-up Voice Request Notification for Host */}
       {isOwner && activeVoiceRequests.length > 0 && (
@@ -1370,26 +1418,30 @@ export default function ExplicadorRoomPage() {
                     </span>
                   </div>
                 ) : (
-                  <div className="flex items-center justify-between gap-1 text-xs px-1 text-slate-800">
+                  <button
+                    type="button"
+                    onClick={requestPencil}
+                    disabled={pencilCooldownActive}
+                    title={
+                      pencilCooldownActive
+                        ? `Aguarde ${pencilCooldownTimeLeft}s`
+                        : `Pedir o lápis a ${currentLock.name}`
+                    }
+                    className="flex items-center justify-between gap-1 text-xs px-1 text-slate-800 hover:text-amber-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
                     <Lock className="w-3.5 h-3.5 text-slate-350" />
                     <span className="hidden sm:block flex items-center gap-1.5 font-medium truncate pr-2">
-                      Lápiz com: <strong>{currentLock.name}</strong>
+                      Lápis com: <strong>{currentLock.name}</strong>
+                      {pencilCooldownActive ? (
+                        <span className="text-red-500">({pencilCooldownTimeLeft}s)</span>
+                      ) : null}
                     </span>
-                  </div>
+                  </button>
                 )}
               </div>
             )}
 
-            {/* Share room link */}
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleShareRoom}
-              className="hover:bg-transparent! h-8 shadow-none border-none rounded-full text-xs flex items-center"
-            >
-              <UserPlus className="w-3.5 h-3.5" />
-              <span className="hidden sm:block">Convidar</span>
-            </Button>
+            {shareUrl ? <ExplicadorInvitePopover shareUrl={shareUrl} /> : null}
 
             {isMultiUserRoom && (
               <div className="flex items-center gap-1.5">
@@ -1539,25 +1591,30 @@ export default function ExplicadorRoomPage() {
             {isMultiUserRoom && (
               <button
                 type="button"
-                onClick={isLockHolder ? releaseLock : grabLock}
-                disabled={isGenerating || pencilCooldownActive || (!isLockHolder && Boolean(currentLock))}
+                onClick={isLockHolder ? releaseLock : currentLock ? requestPencil : grabLock}
+                disabled={
+                  isGenerating ||
+                  (Boolean(currentLock) && !isLockHolder && pencilCooldownActive)
+                }
                 title={
                   isLockHolder
                     ? "Largar o lápis"
-                    : pencilCooldownActive
-                      ? `Aguarde ${pencilCooldownTimeLeft}s`
-                      : currentLock
-                        ? `${currentLock.name} tem o lápis`
-                        : "Pegar o lápis para falar com o explicador"
+                    : currentLock
+                      ? pencilCooldownActive
+                        ? `Aguarde ${pencilCooldownTimeLeft}s`
+                        : `Pedir o lápis a ${currentLock.name}`
+                      : "Pegar o lápis para falar com o explicador"
                 }
                 className={`w-8 h-8 flex items-center justify-center rounded-full transition-all duration-200 flex-shrink-0 cursor-pointer disabled:opacity-40 ${isLockHolder
                   ? "bg-amber-100 text-amber-700 ring-2 ring-amber-300/60"
-                  : pencilCooldownActive
+                  : currentLock && pencilCooldownActive
                     ? "bg-red-55 text-red-500 ring-2 ring-red-200/50"
-                    : "text-slate-400 hover:text-amber-600 hover:bg-amber-50"
+                    : currentLock
+                      ? "text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+                      : "text-slate-400 hover:text-amber-600 hover:bg-amber-50"
                   }`}
               >
-                {pencilCooldownActive ? (
+                {currentLock && !isLockHolder && pencilCooldownActive ? (
                   <span className="text-[10px] font-bold">{pencilCooldownTimeLeft}</span>
                 ) : (
                   <Pencil className="w-4 h-4" />

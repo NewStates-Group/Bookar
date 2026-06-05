@@ -315,6 +315,65 @@ class ExplicadorConsumer(AsyncWebsocketConsumer):
                 },
             )
 
+    async def handle_request_pencil(self, data):
+        """Notifies the current lock holder that someone wants the pencil."""
+        if await self._is_solo_room():
+            return
+
+        self.room = await self.get_room(self.room_uuid)
+        if not self.room:
+            return
+
+        lock = self.room.whiteboard_data.get("lock")
+        if not lock:
+            await self.send(
+                text_data=json.dumps(
+                    {
+                        "type": "error",
+                        "message": "Ninguém tem o lápis agora.",
+                    }
+                )
+            )
+            return
+
+        lock_holder_id = lock.get("connection_id")
+        if lock_holder_id == self.connection_id:
+            return
+
+        allowed, wait_seconds = await self._check_pencil_request_rate_limit()
+        if not allowed:
+            await self.send(
+                text_data=json.dumps(
+                    {
+                        "type": "error",
+                        "message": (
+                            f"Aguarde {wait_seconds}s para pedir o lápis novamente."
+                        ),
+                    }
+                )
+            )
+            return
+
+        requester_name = data.get("name") or (
+            f"{self.user.first_name} {self.user.last_name}".strip()  # type: ignore
+            or getattr(self.user, "username", "Visitante")
+            if self.user.is_authenticated
+            else "Visitante"
+        )
+
+        await self.channel_layer.group_send(
+            self.group_name,
+            {
+                "type": "broadcast_message",
+                "message": {
+                    "type": "pencil_request",
+                    "target_connection_id": lock_holder_id,
+                    "requester_name": requester_name,
+                    "requester_connection_id": self.connection_id,
+                },
+            },
+        )
+
     async def handle_release_lock(self, data):
         """Allows the current lock holder to release the chalk"""
         if await self._is_solo_room():
@@ -836,6 +895,28 @@ class ExplicadorConsumer(AsyncWebsocketConsumer):
     async def broadcast_message(self, event):
         """Send the broadcasted group event to this specific client connection."""
         await self.send(text_data=json.dumps(event["message"]))
+
+    @sync_to_async
+    def _check_pencil_request_rate_limit(self):
+        import time
+
+        from django.core.cache import cache
+
+        key = f"pencil_request_{self.room_uuid}_{self.connection_id}"
+        now = time.time()
+        window = 30
+        limit = 3
+
+        timestamps = cache.get(key) or []
+        timestamps = [t for t in timestamps if now - t < window]
+
+        if len(timestamps) >= limit:
+            wait_seconds = max(1, int(window - (now - timestamps[0])) + 1)
+            return False, wait_seconds
+
+        timestamps.append(now)
+        cache.set(key, timestamps, window)
+        return True, 0
 
     # Async Database Helpers
     @sync_to_async
