@@ -1146,7 +1146,7 @@ export default function ExplicadorRoomPage() {
     try {
       mediaRecorder.start();
       setIsRecordingAudio(true);
-      toast.info("A gravar áudio... Clique novamente para enviar.");
+      // toast.info("A gravar áudio... Clique novamente para enviar.");
     } catch (err) {
       console.error("Falha ao iniciar gravador de áudio", err);
       toast.error("Erro ao iniciar gravador de áudio.");
@@ -1570,11 +1570,10 @@ export default function ExplicadorRoomPage() {
               onClick={handleChatMic}
               disabled={isGenerating}
               title={isRecordingAudio ? "Enviar gravação de voz" : "Falar com o explicador"}
-              className={`w-8 h-8 flex items-center justify-center rounded-full flex-shrink-0 cursor-pointer transition-all duration-200 disabled:opacity-40 ${
-                isRecordingAudio
+              className={`w-8 h-8 flex items-center justify-center rounded-full flex-shrink-0 cursor-pointer transition-all duration-200 disabled:opacity-40 ${isRecordingAudio
                   ? "text-red-500 bg-red-50 hover:bg-red-100 animate-pulse ring-2 ring-red-500/25"
                   : "text-slate-400 hover:text-cyan-600 hover:bg-cyan-50"
-              }`}
+                }`}
             >
               {isRecordingAudio ? <Square className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
             </button>

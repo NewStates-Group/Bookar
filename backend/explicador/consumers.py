@@ -13,48 +13,73 @@ from django.conf import settings
 from google.genai import types
 from django.contrib.auth import get_user_model
 from ninja_jwt.tokens import AccessToken
-
+from elevenlabs import ElevenLabs
 from . import presence as room_presence
 from .models import ExplicadorRoom
 
 logger = logging.getLogger(__name__)
 
 
-async def generate_elevenlabs_audio(text: str) -> str:
+# async def generate_elevenlabs_audio(text: str) -> str:
+#     api_key = settings.AI.get("ELEVENLABS_KEY", "")
+#     if not api_key:
+#         logger.warning("ELEVENLABS_KEY not configured, skipping audio generation.")
+#         return ""
+
+#     voice_id = "onyx"
+#     url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
+#     headers = {
+#         "xi-api-key": api_key,
+#         "Content-Type": "application/json",
+#         "Accept": "audio/mpeg",
+#     }
+#     # Clean text to remove markdown markers for cleaner speech
+#     clean_text = re.sub(r"\*\*.*?\*\*|#+ |`.*?`|\[.*?\]\(.*?\)", "", text)
+#     clean_text = clean_text.replace("\n", " ").strip()
+
+#     payload = {
+#         "text": clean_text[:1000],  # Limit to 1000 chars to avoid huge costs/timeouts
+#         "model_id": "eleven_multilingual_v2",
+#         "voice_settings": {"stability": 0.5, "similarity_boost": 0.75},
+#     }
+
+#     try:
+#         async with httpx.AsyncClient() as client:
+#             response = await client.post(url, headers=headers, json=payload, timeout=30.0)
+#             if response.status_code == 200:
+#                 audio_base64 = base64.b64encode(response.content).decode("utf-8")
+#                 return f"data:audio/mp3;base64,{audio_base64}"
+#             else:
+#                 logger.error(f"ElevenLabs TTS failed: {response.status_code} - {response.text}")
+#     except Exception as e:
+#         logger.error(f"Error calling ElevenLabs: {e}")
+
+#     return ""
+
+def generate_elevenlabs_audio(text: str) -> str:
     api_key = settings.AI.get("ELEVENLABS_KEY", "")
     if not api_key:
         logger.warning("ELEVENLABS_KEY not configured, skipping audio generation.")
         return ""
+        
+    client = ElevenLabs(
+        api_key=api_key,
+        timeout=30,
+    )
+    audio = client.text_to_speech.convert(
+        text=text[:1000],
+        voice_id="JBFqnCBsd6RMkjVDRZzb",  # replace with your voice
+        model_id="eleven_multilingual_v2",
+        output_format="mp3_44100_128",
+    )
 
-    voice_id = "onyx"
-    url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
-    headers = {
-        "xi-api-key": api_key,
-        "Content-Type": "application/json",
-        "Accept": "audio/mpeg",
-    }
-    # Clean text to remove markdown markers for cleaner speech
-    clean_text = re.sub(r"\*\*.*?\*\*|#+ |`.*?`|\[.*?\]\(.*?\)", "", text)
-    clean_text = clean_text.replace("\n", " ").strip()
+    audio_bytes = b"".join(audio)
 
-    payload = {
-        "text": clean_text[:1000],  # Limit to 1000 chars to avoid huge costs/timeouts
-        "model_id": "eleven_multilingual_v2",
-        "voice_settings": {"stability": 0.5, "similarity_boost": 0.75},
-    }
+    return (
+        "data:audio/mpeg;base64,"
+        + base64.b64encode(audio_bytes).decode()
+    )
 
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.post(url, headers=headers, json=payload, timeout=30.0)
-            if response.status_code == 200:
-                audio_base64 = base64.b64encode(response.content).decode("utf-8")
-                return f"data:audio/mp3;base64,{audio_base64}"
-            else:
-                logger.error(f"ElevenLabs TTS failed: {response.status_code} - {response.text}")
-    except Exception as e:
-        logger.error(f"Error calling ElevenLabs: {e}")
-
-    return ""
 User = get_user_model()
 
 EXPLICADOR_MENTION = "@explicador"
@@ -554,7 +579,7 @@ class ExplicadorConsumer(AsyncWebsocketConsumer):
             # 4. Generate audio if this is a voice interaction
             audio_data_uri = ""
             if data.get("is_voice"):
-                audio_data_uri = await generate_elevenlabs_audio(parsed_data["chat_response"])
+                audio_data_uri = await sync_to_async(generate_elevenlabs_audio)(parsed_data["chat_response"])
 
             # 5. Broadcast results to group
             await self.channel_layer.group_send(
