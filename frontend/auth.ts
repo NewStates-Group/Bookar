@@ -48,13 +48,10 @@ function isExpired(expires?: number | null): boolean {
 
 function profileFromApi(profile: any) {
   return {
-    id: profile.id,
     email: profile.email,
     first_name: profile.first_name || "",
     last_name: profile.last_name || "",
-    bio: profile.bio || "",
     avatar: profile.avatar || null,
-    stats: profile.stats || null,
   };
 }
 

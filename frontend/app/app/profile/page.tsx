@@ -14,11 +14,9 @@ import { Loader2, Upload, BookOpen, CheckCircle, GraduationCap } from "lucide-re
 import { apiRequest } from "@/lib/api";
 
 interface Profile {
-    id: number;
     email: string;
     first_name: string;
     last_name: string;
-    bio: string;
     avatar: string | null;
     stats: {
       ongoing_courses: number;
@@ -38,7 +36,6 @@ export default function ProfilePage() {
         email: "",
         first_name: "",
         last_name: "",
-        bio: "",
     });
     const [freshUser, setFreshUser] = useState<Profile | null>(null);
 
@@ -214,16 +211,6 @@ export default function ProfilePage() {
                                     value={formData.email}
                                     className="bg-muted/10 opacity-70 cursor-not-allowed"
                                     disabled
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="bio">Biografia</Label>
-                                <Textarea
-                                    id="bio"
-                                    placeholder="Conte um pouco sobre você..."
-                                    value={formData.bio}
-                                    onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
-                                    className="min-h-[100px] bg-muted/30 focus:border-cyan-500 resize-none"
                                 />
                             </div>
                             <Button type="submit" className="bg-cyan-500 hover:bg-cyan-600 text-white w-full sm:w-auto px-6" disabled={isLoading}>
