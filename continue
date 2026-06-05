@@ -2,3 +2,5 @@ adicionar a opcao de pedir lápis a quem com ele está no máximo 3 vezes num in
 o botao de convidar deve abrir e mostrar de ladinho uma opcao para copiar o link e scannear um codigo qr
 pq o webscoket update?token= está reconectando toda a hora apos o auth session, acho q era por causa do lifetime do token, subi para 30 minutos(era 15 minutos)
 evita reconectar o utilizador sempre q o access token muda, pois a validacao é feita so na conexao dps ela já estara estabelecida
+aplica cache no modulo folhas tmb
+notei q a aplicacao backend está um pouco lenta, onde só para pegar os cursos do utilizador leva 4000ms

@@ -8,14 +8,14 @@ on:
 env:
   BACKEND_IMAGE: ${{ secrets.DOCKER_USERNAME }}/bookar-backend
   FRONTEND_IMAGE: ${{ secrets.DOCKER_USERNAME }}/bookar-frontend
+  NEWRELIC_IMAGE: ${{ secrets.DOCKER_USERNAME }}/bookar-new-relic
 
 jobs:
   # test:
   #   runs-on: ubuntu-latest
 
   #   steps:
-  #     - name: Checkout code
-  #       uses: actions/checkout@v4
+  #     - name: Checkout codeACKEND
 
   #     - name: Setup Python
   #       uses: actions/setup-python@v5
@@ -33,7 +33,7 @@ jobs:
   #         python manage.py test || echo "Failed"
 
   build-and-push-backend:
-    # needs: test
+    # needs: build-and-push-new-relic
     runs-on: ubuntu-latest
 
     steps:

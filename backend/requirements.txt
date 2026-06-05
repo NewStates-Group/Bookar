@@ -147,9 +147,12 @@ google-auth==2.43.0
     #   google-api-core
     #   google-api-python-client
     #   google-auth-httplib2
+    #   google-auth-oauthlib
     #   google-genai
 google-auth-httplib2==0.4.0
     # via google-api-python-client
+google-auth-oauthlib==1.2.2
+    # via backend (pyproject.toml)
 google-genai==1.52.0
     # via backend (pyproject.toml)
 googleapis-common-protos==1.75.0
@@ -205,6 +208,10 @@ msgpack==1.1.2
     # via
     #   autobahn
     #   channels-redis
+newrelic==13.1.1
+    # via backend (pyproject.toml)
+oauthlib==3.3.1
+    # via requests-oauthlib
 ollama==0.6.1
     # via backend (pyproject.toml)
 orjson==3.11.3
@@ -309,6 +316,9 @@ requests==2.32.5
     #   google-genai
     #   pyhanko
     #   pyhanko-certvalidator
+    #   requests-oauthlib
+requests-oauthlib==2.0.0
+    # via google-auth-oauthlib
 rlpycairo==0.4.0
     # via svglib
 rsa==4.9.1

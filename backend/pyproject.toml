@@ -39,4 +39,5 @@ dependencies = [
     "elevenlabs>=2.46.0",
     "django-gmailapi-backend>=0.3.3",
     "google-auth-oauthlib>=1.2.2",
+    "newrelic>=13.1.1",
 ]
