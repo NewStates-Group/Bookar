@@ -1,6 +1,9 @@
 # Created by https://www.toptal.com/developers/gitignore/api/django,python,nextjs
 # Edit at https://www.toptal.com/developers/gitignore?templates=django,python,nextjs
 
+### new relic
+newrelic.ini
+
 ### Django ###
 *.log
 *.pot
