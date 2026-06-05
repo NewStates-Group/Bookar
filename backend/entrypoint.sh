@@ -15,8 +15,7 @@ fi
 echo "Starting Gunicorn (DEBUG=$DEBUG)"
 
 if [ "$DEBUG" = "True" ] || [ "$DEBUG" = "1" ]; then
-    exec newrelic-admin run-program \
-        gunicorn core.asgi:application \
+    exec gunicorn core.asgi:application \
         --workers 2 \
         --worker-class uvicorn.workers.UvicornWorker \
         --bind 0.0.0.0:8000 \
