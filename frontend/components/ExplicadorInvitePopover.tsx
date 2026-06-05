@@ -23,7 +23,7 @@ export function ExplicadorInvitePopover({ shareUrl }: ExplicadorInvitePopoverPro
     try {
       await navigator.clipboard.writeText(shareUrl);
       setCopied(true);
-      toast.success("Link copiado!");
+      // toast.success("Link copiado!");
       setTimeout(() => setCopied(false), 2000);
     } catch {
       toast.error("Erro ao copiar link.");
