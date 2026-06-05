@@ -26,7 +26,6 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { ensureFreshSession } from "@/lib/auth-session";
 import {
-  mapServerMembersToParticipants,
   type ExplicadorParticipant,
 } from "@/lib/explicador-presence";
 import ReactMarkdown from "react-markdown";
@@ -36,6 +35,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  useWebRTC,
+  useParticipants,
+  useSignaling,
+} from "@/components/explicador/webrtc";
 
 interface LockObject {
   connection_id: string;
@@ -139,11 +143,6 @@ export default function ExplicadorRoomPage() {
   useEffect(() => { chatHistoryRef.current = chatHistory; }, [chatHistory]);
   const [activeStreamingMessageIndex, setActiveStreamingMessageIndex] = useState<number | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [participants, setParticipants] = useState<Participant[]>([]);
-  const [roomMemberCount, setRoomMemberCount] = useState(1);
-  const roomMemberCountRef = useRef(1);
-  const isSoloRoom = roomMemberCount <= 1;
-  const isMultiUserRoom = !isSoloRoom;
   const [showParticipantsModal, setShowParticipantsModal] = useState(false);
 
   // Pencil request limit and cooldown states
@@ -193,13 +192,7 @@ export default function ExplicadorRoomPage() {
   // WebSocket & WebRTC Refs (refs avoid stale closures in the WS handler)
   const socketRef = useRef<WebSocket | null>(null);
   const connectionIdRef = useRef<string | null>(null);
-  const peerConnectionsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
-  const pendingIceCandidatesRef = useRef<Map<string, RTCIceCandidateInit[]>>(new Map());
-  const localStreamRef = useRef<MediaStream | null>(null);
-  const isMicMutedRef = useRef(true);
   const isOwnerRef = useRef(false);
-  const participantsRef = useRef<Participant[]>([]);
-  const wsMessageHandlerRef = useRef<(data: any) => void>(() => { });
   const chatEndRef = useRef<HTMLDivElement>(null);
   const chatInputRef = useRef<HTMLInputElement>(null);
 
@@ -217,6 +210,65 @@ export default function ExplicadorRoomPage() {
   const hasReceivedWelcomeRef = useRef(false);
   const sessionRef = useRef(session);
 
+  const sendWSMessage = useCallback((payload: Record<string, unknown>) => {
+    if (socketRef.current?.readyState === WebSocket.OPEN) {
+      socketRef.current.send(JSON.stringify(payload));
+    }
+  }, []);
+
+  const isMicMutedRef = useRef(true);
+
+  const {
+    localStreamRef,
+    peerManagerRef,
+    acquireLocalStream,
+    handleWebRTCSignal,
+    connectToAllPeers,
+    syncPeersWithParticipants,
+    cleanupPeer,
+    closeAllPeers,
+    debugRoomState,
+    onRemoteMicOn,
+  } = useWebRTC(localStream, setLocalStream, isMicMuted, setIsMicMuted, {
+    sendWSMessage,
+    connectionIdRef,
+    isMicMutedRef,
+    isForceMutedRef,
+  });
+
+  const onParticipantsChanged = useCallback(
+    async (list: Participant[]) => {
+      await syncPeersWithParticipants(list.map((p) => p.connectionId));
+    },
+    [syncPeersWithParticipants]
+  );
+
+  const handleParticipantLeft = useCallback(
+    (peerId: string) => {
+      cleanupPeer(peerId);
+      setActiveVoiceRequests((prev) => prev.filter((r) => r.connectionId !== peerId));
+    },
+    [cleanupPeer]
+  );
+
+  const {
+    participants,
+    participantsRef,
+    roomMemberCount,
+    roomMemberCountRef,
+    isSoloRoom,
+    isMultiUserRoom,
+    syncPresenceFromServer,
+    setRoomMemberCount,
+    updateParticipantAudioState,
+  } = useParticipants({
+    connectionIdRef,
+    onParticipantsChanged,
+    onParticipantLeft: handleParticipantLeft,
+  });
+
+  const { wsMessageHandlerRef, registerHandler } = useSignaling();
+
   useEffect(() => {
     sessionRef.current = session;
   }, [session]);
@@ -225,26 +277,8 @@ export default function ExplicadorRoomPage() {
     hasReceivedWelcomeRef.current = false;
   }, [roomId]);
 
-  useEffect(() => { localStreamRef.current = localStream; }, [localStream]);
-  useEffect(() => { isMicMutedRef.current = isMicMuted; }, [isMicMuted]);
   useEffect(() => { isForceMutedRef.current = isForceMuted; }, [isForceMuted]);
   useEffect(() => { isOwnerRef.current = isOwner; }, [isOwner]);
-  useEffect(() => { participantsRef.current = participants; }, [participants]);
-
-  // Sync mic track enabled state with user mute and force system mute
-  useEffect(() => {
-    const stream = localStreamRef.current;
-    if (stream) {
-      stream.getAudioTracks().forEach((track) => {
-        track.enabled = !isMicMuted && !isForceMuted;
-      });
-      sendWSMessage({
-        type: "audio_state",
-        is_mic_on: !isMicMuted && !isForceMuted,
-        is_listening: true,
-      });
-    }
-  }, [isMicMuted, isForceMuted]);
 
   const clearWsTimers = useCallback(() => {
     if (wsReconnectTimerRef.current) {
@@ -374,7 +408,7 @@ export default function ExplicadorRoomPage() {
         clearWsTimers();
         setIsConnected(false);
         socketRef.current = null;
-        closeAllPeerConnections();
+        closeAllPeers();
 
         if (!wsMountedRef.current || wsIntentionalCloseRef.current) return;
 
@@ -481,9 +515,15 @@ export default function ExplicadorRoomPage() {
         socketRef.current.close();
         socketRef.current = null;
       }
-      closeAllPeerConnections();
+      closeAllPeers();
+      const stream = localStreamRef.current;
+      if (stream) {
+        stream.getTracks().forEach((track) => track.stop());
+        localStreamRef.current = null;
+        setLocalStream(null);
+      }
     };
-  }, [roomId, status, clearWsTimers]);
+  }, [roomId, status, clearWsTimers, closeAllPeers, setLocalStream]);
 
   // Renova token na sessão (ex.: voltar ao separador) sem derrubar o socket se o token não mudou
   useEffect(() => {
@@ -492,148 +532,6 @@ export default function ExplicadorRoomPage() {
     if (!token || token === wsActiveTokenRef.current) return;
     void refreshExplicadorSocketTokenRef.current();
   }, [status, session, roomReady]);
-
-  const closeAllPeerConnections = () => {
-    peerConnectionsRef.current.forEach((pc) => pc.close());
-    peerConnectionsRef.current.clear();
-    pendingIceCandidatesRef.current.clear();
-    const stream = localStreamRef.current;
-    if (stream) {
-      stream.getTracks().forEach((track) => track.stop());
-      localStreamRef.current = null;
-    }
-  };
-
-  // Deterministic offerer to avoid WebRTC glare when both peers unmute at once
-  const shouldInitiateOffer = (myId: string, peerId: string) => myId > peerId;
-
-  const flushPendingIceCandidates = async (peerId: string, pc: RTCPeerConnection) => {
-    const pending = pendingIceCandidatesRef.current.get(peerId) || [];
-    pendingIceCandidatesRef.current.delete(peerId);
-    for (const candidate of pending) {
-      try {
-        await pc.addIceCandidate(new RTCIceCandidate(candidate));
-      } catch (e) {
-        console.error("Error flushing ICE candidate", e);
-      }
-    }
-  };
-
-  const createPeerConnection = (targetId: string): RTCPeerConnection => {
-    const pc = new RTCPeerConnection({
-      iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
-    });
-
-    pc.onicecandidate = (event) => {
-      if (event.candidate) {
-        sendWSMessage({
-          type: "webrtc_signal",
-          target_connection_id: targetId,
-          signal: { type: "candidate", candidate: event.candidate },
-        });
-      }
-    };
-
-    pc.ontrack = (event) => {
-      const remoteStream = event.streams[0];
-      let audioEl = document.getElementById(`audio-${targetId}`) as HTMLAudioElement;
-
-      if (!audioEl) {
-        audioEl = document.createElement("audio");
-        audioEl.id = `audio-${targetId}`;
-        audioEl.autoplay = true;
-        document.body.appendChild(audioEl);
-      }
-
-      audioEl.srcObject = remoteStream;
-      audioEl.play().catch(() => { });
-    };
-
-    peerConnectionsRef.current.set(targetId, pc);
-    return pc;
-  };
-
-  const connectToPeer = async (peerId: string) => {
-    const myId = connectionIdRef.current;
-    if (!myId || peerId === myId) return;
-
-    const stream = localStreamRef.current;
-    if (!stream || isMicMutedRef.current) return;
-    if (!shouldInitiateOffer(myId, peerId)) return;
-
-    const existing = peerConnectionsRef.current.get(peerId);
-    if (existing && (existing.connectionState === "connected" || existing.connectionState === "connecting")) {
-      return;
-    }
-    if (existing && existing.signalingState !== "stable") {
-      existing.close();
-      peerConnectionsRef.current.delete(peerId);
-    }
-
-    try {
-      const pc = createPeerConnection(peerId);
-      stream.getTracks().forEach((track) => {
-        if (!pc.getSenders().some((s) => s.track === track)) {
-          pc.addTrack(track, stream);
-        }
-      });
-
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
-      sendWSMessage({
-        type: "webrtc_signal",
-        target_connection_id: peerId,
-        signal: { type: "offer", sdp: offer.sdp },
-      });
-    } catch (err) {
-      console.error(`Failed to connect to peer ${peerId}`, err);
-    }
-  };
-
-  const connectToAllPeers = () => {
-    participantsRef.current.forEach((p) => {
-      connectToPeer(p.connectionId);
-    });
-  };
-
-  const cleanupPeerConnection = useCallback((peerId: string) => {
-    const pc = peerConnectionsRef.current.get(peerId);
-    if (pc) {
-      pc.close();
-      peerConnectionsRef.current.delete(peerId);
-    }
-    pendingIceCandidatesRef.current.delete(peerId);
-    document.getElementById(`audio-${peerId}`)?.remove();
-    setActiveVoiceRequests((prev) => prev.filter((r) => r.connectionId !== peerId));
-  }, []);
-
-  /** Fonte única de verdade para quem está na sala (evita duplicados de join/leave). */
-  const syncPresenceFromServer = useCallback(
-    (members: unknown, selfId?: string | null) => {
-      const rawMembers = (members as { connection_id?: string }[] | null) || [];
-      setRoomMemberCount(rawMembers.length);
-      roomMemberCountRef.current = rawMembers.length;
-
-      const previousIds = new Set(participantsRef.current.map((p) => p.connectionId));
-      const list = mapServerMembersToParticipants(
-        members as Parameters<typeof mapServerMembersToParticipants>[0],
-        selfId ?? connectionIdRef.current
-      );
-      setParticipants(list);
-      participantsRef.current = list;
-      const nextIds = new Set(list.map((p) => p.connectionId));
-
-      previousIds.forEach((id) => {
-        if (!nextIds.has(id)) cleanupPeerConnection(id);
-      });
-
-      if (!isMicMutedRef.current && localStreamRef.current) {
-        list.forEach((m) => void connectToPeer(m.connectionId));
-      }
-      return list;
-    },
-    [cleanupPeerConnection]
-  );
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -674,12 +572,6 @@ export default function ExplicadorRoomPage() {
     return () => clearInterval(interval);
   }, [whiteboardData.summary]);
 
-  const sendWSMessage = (payload: any) => {
-    if (socketRef.current?.readyState === WebSocket.OPEN) {
-      socketRef.current.send(JSON.stringify(payload));
-    }
-  };
-
   const handleInterrupt = () => {
     setIsGenerating(false);
     sendWSMessage({ type: "interrupt" });
@@ -701,6 +593,7 @@ export default function ExplicadorRoomPage() {
       case "welcome":
         setConnectionId(data.connection_id);
         connectionIdRef.current = data.connection_id;
+        peerManagerRef.current?.setMyId(data.connection_id);
         setIsOwner(data.is_owner);
         isOwnerRef.current = data.is_owner;
         setWhiteboardData((prev) => {
@@ -800,25 +693,13 @@ export default function ExplicadorRoomPage() {
         break;
 
       case "audio_state":
-        setParticipants((prev) =>
-          prev.map((p) =>
-            p.connectionId === data.connection_id
-              ? { ...p, isMicOn: data.is_mic_on, isListening: data.is_listening }
-              : p
-          )
+        updateParticipantAudioState(
+          data.connection_id,
+          Boolean(data.is_mic_on),
+          data.is_listening !== false
         );
-        {
-          const myId = connectionIdRef.current;
-          if (
-            data.is_mic_on &&
-            myId &&
-            data.connection_id !== myId &&
-            !isMicMutedRef.current &&
-            localStreamRef.current &&
-            shouldInitiateOffer(myId, data.connection_id)
-          ) {
-            void connectToPeer(data.connection_id);
-          }
+        if (data.is_mic_on && data.connection_id !== connectionIdRef.current) {
+          onRemoteMicOn(data.connection_id);
         }
         break;
 
@@ -934,86 +815,15 @@ export default function ExplicadorRoomPage() {
     }
   };
 
-  // WebRTC signal handling
-  const handleWebRTCSignal = async (senderId: string, signal: any) => {
-    let pc = peerConnectionsRef.current.get(senderId);
-
-    if (signal.type === "offer") {
-      const myId = connectionIdRef.current;
-      if (myId && shouldInitiateOffer(myId, senderId) && pc?.signalingState === "have-local-offer") {
-        return;
-      }
-
-      if (!pc) {
-        pc = createPeerConnection(senderId);
-      } else if (pc.signalingState === "have-local-offer") {
-        await pc.setLocalDescription({ type: "rollback" } as RTCSessionDescriptionInit);
-      }
-
-      await pc.setRemoteDescription(new RTCSessionDescription(signal));
-
-      let stream = localStreamRef.current;
-      if (!stream) {
-        try {
-          stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-          stream.getAudioTracks().forEach((track) => {
-            track.enabled = !isMicMutedRef.current;
-          });
-          localStreamRef.current = stream;
-          setLocalStream(stream);
-        } catch (err) {
-          console.warn("Failed to capture microphone on offer", err);
-        }
-      }
-
-      if (stream) {
-        stream.getTracks().forEach((track) => {
-          if (!pc!.getSenders().some((s) => s.track === track)) {
-            pc!.addTrack(track, stream!);
-          }
-        });
-      }
-
-      const answer = await pc.createAnswer();
-      await pc.setLocalDescription(answer);
-      sendWSMessage({
-        type: "webrtc_signal",
-        target_connection_id: senderId,
-        signal: { type: "answer", sdp: answer.sdp },
-      });
-
-      await flushPendingIceCandidates(senderId, pc);
-    } else if (signal.type === "answer") {
-      if (!pc) return;
-      await pc.setRemoteDescription(new RTCSessionDescription(signal));
-      await flushPendingIceCandidates(senderId, pc);
-    } else if (signal.type === "candidate") {
-      if (!pc) {
-        pc = createPeerConnection(senderId);
-      }
-      if (pc.remoteDescription) {
-        try {
-          await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
-        } catch (e) {
-          console.error("Error adding received ice candidate", e);
-        }
-      } else {
-        const pending = pendingIceCandidatesRef.current.get(senderId) || [];
-        pending.push(signal.candidate);
-        pendingIceCandidatesRef.current.set(senderId, pending);
-      }
-    }
-  };
+  // WebRTC signal handling lives in PeerManager via useWebRTC hook
 
   const startLocalAudio = async () => {
     try {
-      let stream = localStreamRef.current;
+      const stream = await acquireLocalStream({ enabled: true });
       if (!stream) {
-        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        localStreamRef.current = stream;
-        setLocalStream(stream);
+        toast.error("Não foi possível aceder ao microfone.");
+        return;
       }
-      stream.getAudioTracks().forEach((track) => { track.enabled = true; });
       isMicMutedRef.current = false;
       setIsMicMuted(false);
 
@@ -1023,7 +833,7 @@ export default function ExplicadorRoomPage() {
         is_listening: true,
       });
 
-      connectToAllPeers();
+      await connectToAllPeers(participantsRef.current.map((p) => p.connectionId));
       toast.success("Microfone ativado!");
     } catch (err) {
       console.error("Error accessing microphone", err);
@@ -1033,13 +843,11 @@ export default function ExplicadorRoomPage() {
 
   const startHostAudio = async () => {
     try {
-      let stream = localStreamRef.current;
+      const stream = await acquireLocalStream({ enabled: true });
       if (!stream) {
-        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        localStreamRef.current = stream;
-        setLocalStream(stream);
+        toast.error("Não foi possível aceder ao microfone.");
+        return;
       }
-      stream.getAudioTracks().forEach((track) => { track.enabled = true; });
       isMicMutedRef.current = false;
       setIsMicMuted(false);
       setAudioApproved(true);
@@ -1050,7 +858,7 @@ export default function ExplicadorRoomPage() {
         is_listening: true,
       });
 
-      connectToAllPeers();
+      await connectToAllPeers(participantsRef.current.map((p) => p.connectionId));
       toast.success("Canal de voz ativado!");
     } catch (err) {
       console.error("Error accessing microphone", err);
@@ -1058,7 +866,7 @@ export default function ExplicadorRoomPage() {
     }
   };
 
-  const toggleMute = () => {
+  const toggleMute = async () => {
     const stream = localStreamRef.current;
     if (!stream) return;
 
@@ -1076,12 +884,22 @@ export default function ExplicadorRoomPage() {
     });
 
     if (!nextMuted && !isForceMutedRef.current) {
-      connectToAllPeers();
+      await connectToAllPeers(participantsRef.current.map((p) => p.connectionId));
     }
   };
 
   // Keep WS handler ref fresh so socket.onmessage never uses a stale closure
-  wsMessageHandlerRef.current = handleWebSocketMessage;
+  registerHandler(handleWebSocketMessage);
+
+  useEffect(() => {
+    if (process.env.NODE_ENV !== "development") return;
+    (window as unknown as { debugRoomState?: () => void }).debugRoomState = () => {
+      debugRoomState(participantsRef.current.map((p) => p.connectionId));
+    };
+    return () => {
+      delete (window as unknown as { debugRoomState?: () => void }).debugRoomState;
+    };
+  }, [debugRoomState]);
 
   const getDisplayName = () => {
     const u = session?.user as { first_name?: string; last_name?: string; name?: string } | undefined;
@@ -1245,7 +1063,7 @@ export default function ExplicadorRoomPage() {
         is_mic_on: true,
         is_listening: true,
       });
-      connectToAllPeers();
+      await connectToAllPeers(participantsRef.current.map((p) => p.connectionId));
     } else {
       stream.getAudioTracks().forEach((track) => {
         track.enabled = true;
