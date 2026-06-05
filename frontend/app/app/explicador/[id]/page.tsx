@@ -1533,14 +1533,6 @@ export default function ExplicadorRoomPage() {
                     <span className="w-2 h-2 rounded-full bg-cyan-300 animate-bounce" style={{ animationDelay: "240ms" }} />
                   </div>
                   <span className="text-sm text-slate-600 font-medium">A pensar...</span>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={handleInterrupt}
-                    className="h-7 px-2 text-xs text-red-500 hover:text-red-700 hover:bg-red-50 rounded-full ml-2 flex items-center gap-1 cursor-pointer"
-                  >
-                    <X className="w-3 h-3" /> Parar
-                  </Button>
                 </div>
               </div>
             )}
