@@ -201,11 +201,6 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async jwt({ token, user, account, profile, trigger }: any) {
       try {
-        /**
-         * =========================
-         * 1. LOGIN GOOGLE (SÓ 1x)
-         * =========================
-         */
         if (account?.provider === "google" && account?.access_token) {
           const res = await backendFetch(`${apiUrl}/auth/google`, {
             method: "POST",
@@ -228,11 +223,6 @@ export const authOptions: NextAuthOptions = {
           };
         }
 
-        /**
-         * =========================
-         * 2. LOGIN CREDENTIALS
-         * =========================
-         */
         if (user) {
           let profileData = null;
           try {
@@ -258,22 +248,12 @@ export const authOptions: NextAuthOptions = {
           };
         }
 
-        /**
-         * =========================
-         * 3. ESTADO DE ERRO
-         * =========================
-         */
         if (token.error === "RefreshAccessTokenError") {
           return token;
         }
 
         let working = { ...token };
 
-        /**
-         * =========================
-         * 4. REFRESH TOKEN (SÓ SE PRECISAR)
-         * =========================
-         */
         if (
           working.refreshToken &&
           isExpired(working.accessTokenExpires)
@@ -287,11 +267,6 @@ export const authOptions: NextAuthOptions = {
           }
         }
 
-        /**
-         * =========================
-         * 5. UPDATE MANUAL (profile refresh)
-         * =========================
-         */
         if (trigger === "update" && working.accessToken) {
           try {
             const res = await backendFetch(`${apiUrl}/auth/me`, {

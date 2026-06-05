@@ -13,9 +13,24 @@ import { toast } from "sonner";
 import { Loader2, Upload, BookOpen, CheckCircle, GraduationCap } from "lucide-react";
 import { apiRequest } from "@/lib/api";
 
+interface Profile {
+    id: number;
+    email: string;
+    first_name: string;
+    last_name: string;
+    bio: string;
+    avatar: string | null;
+    stats: {
+      ongoing_courses: number;
+      finished_courses: number;
+      certificates_issued: number;
+    } | null;
+  }
+
 export default function ProfilePage() {
     const { data: session, update } = useSession();
     const [isLoading, setIsLoading] = useState(false);
+    const [isPageLoading, setIsPageLoading] = useState<Boolean>(true);
     const [isUploading, setIsUploading] = useState(false);
     const hasFetched = useRef(false);
 
@@ -25,20 +40,7 @@ export default function ProfilePage() {
         last_name: "",
         bio: "",
     });
-    const [freshUser, setFreshUser] = useState<any>(null);
-
-    // Populate form from session when first available
-    useEffect(() => {
-        const user = freshUser || session?.user;
-        if (user && !formData.email) {
-            setFormData({
-                email: (user as any).email || "",
-                first_name: (user as any).first_name || "",
-                last_name: (user as any).last_name || "",
-                bio: (user as any).bio || "",
-            });
-        }
-    }, [freshUser, session?.user]); // eslint-disable-line react-hooks/exhaustive-deps
+    const [freshUser, setFreshUser] = useState<Profile | null>(null);
 
     // Fetch fresh profile data directly from API — do NOT call update() here
     // as it would cause session churn and remount the page component in a loop.
@@ -46,9 +48,10 @@ export default function ProfilePage() {
         if (!session?.accessToken || hasFetched.current) return;
         hasFetched.current = true;
 
-        apiRequest(`${process.env.NEXT_PUBLIC_API_URL}/auth/me`)
-            .then((profile: any) => setFreshUser(profile))
-            .catch(() => {/* non-critical, session data still shows */ });
+        apiRequest(`${process.env.NEXT_PUBLIC_API_URL}/auth/me?stats=1`)
+            .then((profile: any) => setFreshUser(profile as Profile))
+            .catch(() => {/* non-critical */ });
+        setIsPageLoading(false);
     }, [session?.accessToken]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const handleUpdateProfile = async (e: React.FormEvent) => {
@@ -82,8 +85,6 @@ export default function ProfilePage() {
 
             // Sync to NextAuth session (no loop risk: this is an explicit user action)
             update({ user: updatedUser }).catch(() => { /* non-critical */ });
-
-            toast.success("Perfil atualizado com sucesso!");
         } catch (error: any) {
             toast.error(error.message || "Erro ao atualizar perfil");
         } finally {
@@ -120,13 +121,18 @@ export default function ProfilePage() {
         }
     };
 
-    // Use freshUser data when available (fetched directly from /auth/me),
-    // falling back to session data while loading.
-    const displayUser = (freshUser || session?.user) as any;
-    const displayStats = freshUser?.stats ?? session?.user?.stats;
-    const avatarSrc = displayUser?.avatar
-        ? (displayUser.avatar.startsWith('http') ? displayUser.avatar : `${process.env.NEXT_PUBLIC_API_URL}${displayUser.avatar}`)
+    const avatarSrc = freshUser?.avatar
+        ? (freshUser.avatar.startsWith('http') ? freshUser.avatar : `${process.env.NEXT_PUBLIC_API_URL}${freshUser.avatar}`)
         : "";
+
+    if (isPageLoading) return (
+        <div className="flex items-center justify-center py-20">
+          <div className="text-center space-y-4">
+            <Loader2 className="w-10 h-10 animate-spin text-primary mx-auto" />
+            <p className="text-muted-foreground">Carregando seus dados...</p>
+          </div>
+        </div>
+    );
 
     return (
         <div className="px-4 py-6 sm:px-6 md:py-10 max-w-5xl mx-auto w-full space-y-6">
@@ -149,7 +155,7 @@ export default function ProfilePage() {
                                 <Avatar className="h-28 w-28 sm:h-32 sm:w-32 border-2 border-cyan-500/20 shadow-sm">
                                     <AvatarImage src={avatarSrc} />
                                     <AvatarFallback className="text-2xl font-semibold bg-slate-100 text-slate-600">
-                                        {(displayUser?.first_name || displayUser?.email || "U").slice(0, 2).toUpperCase()}
+                                        {(freshUser?.first_name || freshUser?.email || "U").slice(0, 2).toUpperCase()}
                                     </AvatarFallback>
                                 </Avatar>
                                 <label
@@ -162,12 +168,12 @@ export default function ProfilePage() {
                             </div>
                             <div className="text-center sm:text-left space-y-1">
                                 <h3 className="text-xl sm:text-2xl font-bold text-slate-900">
-                                    {displayUser?.first_name
-                                        ? `${displayUser.first_name} ${displayUser.last_name}`
-                                        : displayUser?.email}
+                                    {freshUser?.first_name
+                                        ? `${freshUser.first_name} ${freshUser.last_name}`
+                                        : freshUser?.email}
                                 </h3>
-                                <p className="text-sm text-slate-500">{displayUser?.email}</p>
-                                {(!displayUser?.first_name || !displayUser?.last_name || !displayUser?.avatar) && (
+                                <p className="text-sm text-slate-500">{freshUser?.email}</p>
+                                {(!freshUser?.first_name || !freshUser?.last_name || !freshUser?.avatar) && (
                                     <p className="text-xs text-orange-500 font-medium animate-pulse">
                                         Por favor, complete o seu perfil (nome e foto) para continuar.
                                     </p>
@@ -243,7 +249,7 @@ export default function ProfilePage() {
                                     </div>
                                     <span className="text-sm font-medium text-slate-700">Em Curso</span>
                                 </div>
-                                <span className="text-xl font-bold text-slate-900">{displayStats?.ongoing_courses ?? 0}</span>
+                                <span className="text-xl font-bold text-slate-900">{freshUser?.stats?.ongoing_courses ?? 0}</span>
                             </div>
                             <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border border-slate-100">
                                 <div className="flex items-center gap-3">
@@ -252,7 +258,7 @@ export default function ProfilePage() {
                                     </div>
                                     <span className="text-sm font-medium text-slate-700">Concluídos</span>
                                 </div>
-                                <span className="text-xl font-bold text-slate-900">{displayStats?.finished_courses ?? 0}</span>
+                                <span className="text-xl font-bold text-slate-900">{freshUser?.stats?.finished_courses ?? 0}</span>
                             </div>
                             <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border border-slate-100">
                                 <div className="flex items-center gap-3">
@@ -261,7 +267,7 @@ export default function ProfilePage() {
                                     </div>
                                     <span className="text-sm font-medium text-slate-700">Certificados</span>
                                 </div>
-                                <span className="text-xl font-bold text-slate-900">{displayStats?.certificates_issued ?? 0}</span>
+                                <span className="text-xl font-bold text-slate-900">{freshUser?.stats?.certificates_issued ?? 0}</span>
                             </div>
                         </CardContent>
                     </Card>

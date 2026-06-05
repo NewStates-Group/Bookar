@@ -71,9 +71,10 @@ class AuthController(NinjaJWTDefaultController):
         return {"exists": exists}
 
     @route.get("me", response=RegisterOut, auth=JWTAuth())
-    def me(self, request):
+    def me(self, request, stats: bool = False):
         user = request.user
-        user.stats = self.auth_service.get_user_stats(user)
+        if stats:
+            user.stats = self.auth_service.get_user_stats(user)
         return user
 
     @route.put("profile", response=RegisterOut, auth=JWTAuth())
