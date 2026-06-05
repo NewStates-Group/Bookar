@@ -19,7 +19,9 @@ import {
   Lock,
   X,
   Menu,
-  Square
+  Square,
+  Paperclip,
+  FileText
 } from "lucide-react";
 import { ExplicadorInvitePopover } from "@/components/ExplicadorInvitePopover";
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -56,6 +58,11 @@ interface WhiteboardData {
 interface ChatMessage {
   role: "user" | "assistant";
   content: string;
+  attachment?: {
+    name: string;
+    mime_type: string;
+    url: string;
+  };
 }
 
 type Participant = ExplicadorParticipant;
@@ -177,11 +184,54 @@ export default function ExplicadorRoomPage() {
   const isSplitting = useRef(false);
   const splitContainerRef = useRef<HTMLDivElement>(null);
 
+  // Dynamic viewport height for Safari/iOS keyboard handling
+  const [viewportHeight, setViewportHeight] = useState<string>("100dvh");
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const vv = window.visualViewport;
+
+    const updateHeight = () => {
+      const h = vv ? vv.height : window.innerHeight;
+      setViewportHeight(`${h}px`);
+    };
+
+    const preventScroll = () => {
+      // Reset any Safari offset when the keyboard pushes the viewport
+      if (vv && vv.offsetTop > 0) {
+        window.scrollTo(0, 0);
+      }
+    };
+
+    if (vv) {
+      vv.addEventListener("resize", updateHeight);
+      vv.addEventListener("scroll", preventScroll);
+    }
+    window.addEventListener("resize", updateHeight);
+
+    updateHeight();
+
+    return () => {
+      if (vv) {
+        vv.removeEventListener("resize", updateHeight);
+        vv.removeEventListener("scroll", preventScroll);
+      }
+      window.removeEventListener("resize", updateHeight);
+    };
+  }, []);
+
   // Real-time Handwriting Streaming state
   const [displayedBoardText, setDisplayedBoardText] = useState("");
 
   // Input fields
   const [message, setMessage] = useState("");
+  const [selectedFile, setSelectedFile] = useState<{
+    name: string;
+    mime_type: string;
+    base64: string;
+    size: number;
+  } | null>(null);
 
   // WebRTC Audio States
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
@@ -939,30 +989,64 @@ export default function ExplicadorRoomPage() {
     isMultiUserRoom &&
     Boolean(currentLock && currentLock.connection_id === connectionId);
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("O ficheiro deve ter no máximo 5 MB.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setSelectedFile({
+        name: file.name,
+        mime_type: file.type,
+        base64: reader.result as string,
+        size: file.size,
+      });
+      toast.success(`Ficheiro "${file.name}" anexado.`);
+    };
+    reader.onerror = () => {
+      toast.error("Erro ao ler o ficheiro.");
+    };
+    reader.readAsDataURL(file);
+  };
+
   /** Solo: mensagem vai direto ao explicador. Multi: chat ou @explicador + lápis. */
   const submitChatMessage = (rawMessage: string) => {
     const trimmed = rawMessage.trim();
-    if (!trimmed || isGenerating) return;
+    if ((!trimmed && !selectedFile) || isGenerating) return;
 
     const solo = roomMemberCountRef.current <= 1;
+    const mentionsTutor = solo || messageMentionsExplicador(trimmed) || selectedFile !== null;
 
     if (!solo) {
-      const mentionsTutor = messageMentionsExplicador(trimmed);
       if (mentionsTutor && !isLockHolder) {
         toast.error("Pega o lápis primeiro para falar com o explicador.");
         return;
       }
     }
 
+    const fileToUpload = selectedFile;
+
     setChatHistory((prev) => [
       ...prev,
       {
         role: "user",
-        content: formatUserChatContent(getDisplayName(), trimmed),
+        content: formatUserChatContent(getDisplayName(), trimmed || `Enviou um anexo: ${fileToUpload?.name}`),
+        attachment: fileToUpload
+          ? {
+            name: fileToUpload.name,
+            mime_type: fileToUpload.mime_type,
+            url: fileToUpload.base64,
+          }
+          : undefined,
       },
     ]);
 
-    if (solo || messageMentionsExplicador(trimmed)) {
+    if (mentionsTutor) {
       setIsGenerating(true);
       setActiveStreamingMessageIndex(null);
     }
@@ -973,11 +1057,31 @@ export default function ExplicadorRoomPage() {
           type: "chat_message",
           message: trimmed,
           direct_to_explicador: true,
+          attachment: fileToUpload
+            ? {
+              base64: fileToUpload.base64,
+              name: fileToUpload.name,
+              mime_type: fileToUpload.mime_type,
+              size: fileToUpload.size,
+            }
+            : undefined,
         }
-        : { type: "chat_message", message: trimmed }
+        : {
+          type: "chat_message",
+          message: trimmed,
+          attachment: fileToUpload
+            ? {
+              base64: fileToUpload.base64,
+              name: fileToUpload.name,
+              mime_type: fileToUpload.mime_type,
+              size: fileToUpload.size,
+            }
+            : undefined,
+        }
     );
 
     setMessage("");
+    setSelectedFile(null);
     requestAnimationFrame(() => {
       chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
     });
@@ -1245,7 +1349,8 @@ export default function ExplicadorRoomPage() {
     <div
       ref={splitContainerRef}
       onPointerMove={handleSplitterPointerMove}
-      className="flex h-screen w-full overflow-hidden bg-slate-50 text-slate-800 relative select-none"
+      style={{ height: viewportHeight }}
+      className="flex w-full overflow-hidden bg-slate-50 text-slate-800 fixed inset-0 select-none"
     >
       <style>{`
         .font-handwriting {
@@ -1267,6 +1372,14 @@ export default function ExplicadorRoomPage() {
         }
         .message-bubble-animate {
           animation: slideUpFade 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        /* Prevent iOS Safari rubber-band bounce on the page body */
+        html, body {
+          overscroll-behavior: none;
+          overflow: hidden;
+          position: fixed;
+          width: 100%;
+          height: 100%;
         }
       `}</style>
 
@@ -1354,7 +1467,7 @@ export default function ExplicadorRoomPage() {
             >
               <Menu className="w-5 h-5" />
             </button>
-            <span className="text-sm font-bold text-slate-800 flex items-center gap-1.5 ml-1 md:ml-0">
+            <span className="block md:hidden text-sm font-bold text-slate-800 flex items-center gap-1.5 ml-1 md:ml-0">
               <Bot className="w-5 h-5 text-cyan-600" />
               Explicador
             </span>
@@ -1466,7 +1579,7 @@ export default function ExplicadorRoomPage() {
         </div>
 
         {/* Messages List Area */}
-        <div className="flex-1 overflow-y-auto p-4 min-h-0 bg-slate-50/30 scrollbar-thin">
+        <div className="flex-1 overflow-y-auto p-4 min-h-0 bg-slate-50/30 scrollbar-thin" style={{ overscrollBehaviorY: "contain", WebkitOverflowScrolling: "touch" }}>
           <div className="max-w-3xl mx-auto w-full space-y-4">
             {chatHistory.map((msg, i) => (
               <div
@@ -1486,18 +1599,48 @@ export default function ExplicadorRoomPage() {
                 </span> */}
                 <div
                   className={`p-3.5 rounded-2xl text-base leading-relaxed ${msg.role === "user"
-                    ? "bg-cyan-500 text-white rounded-tr-none shadow-sm shadow-cyan-500/10"
+                    ? "bg-cyan-500 text-white rounded-tr-none shadow-sm shadow-cyan-500/10 px-4 py-1"
                     : "text-slate-700"
                     }`}
                 >
-                  <div className="prose prose-slate max-w-none text-xs leading-relaxed">
+                  <div className="prose prose-slate max-w-none text-sm leading-relaxed">
                     {msg.role === "assistant" ? (
                       <StreamingMessage
                         content={msg.content}
                         active={activeStreamingMessageIndex === i}
                       />
                     ) : (
-                      <ReactMarkdown>{msg.content}</ReactMarkdown>
+                      <div className="space-y-2">
+                        <ReactMarkdown>{msg.content}</ReactMarkdown>
+                        {msg.attachment && (
+                          <div className="mt-2 pt-2 border-t border-white/20">
+                            {msg.attachment.mime_type.startsWith("image/") ? (
+                              <div className="relative rounded-lg overflow-hidden border border-white/10 max-w-xs bg-black/5">
+                                <img
+                                  src={msg.attachment.url}
+                                  alt={msg.attachment.name}
+                                  className="max-h-48 object-contain w-full hover:scale-105 transition-transform duration-300"
+                                />
+                                <div className="absolute bottom-0 inset-x-0 bg-black/60 px-2 py-1 text-[10px] text-white/95 truncate font-medium">
+                                  {msg.attachment.name}
+                                </div>
+                              </div>
+                            ) : (
+                              <a
+                                href={msg.attachment.url}
+                                download={msg.attachment.name}
+                                className="flex items-center gap-2 bg-white/10 hover:bg-white/20 border border-white/20 rounded-lg p-2.5 transition-colors text-white font-medium select-none cursor-pointer"
+                              >
+                                <FileText className="w-5 h-5 shrink-0" />
+                                <div className="min-w-0 flex-1">
+                                  <p className="truncate text-xs font-bold">{msg.attachment.name}</p>
+                                  <p className="text-[9px] text-white/70 uppercase font-semibold">Descarregar documento</p>
+                                </div>
+                              </a>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     )}
                   </div>
 
@@ -1540,12 +1683,27 @@ export default function ExplicadorRoomPage() {
           <div ref={chatEndRef} />
         </div>
 
-        {/* Message Input — pill style matching the landing page */}
+        {/* Message Input — glassmorphic pill, floats above chat scroll */}
         <form
           onSubmit={handleSendMessage}
-          className="p-3 max-w-3xl mx-auto w-full shrink-0"
+          className="px-3 pb-3 pt-2 max-w-3xl mx-auto w-full shrink-0 bg-gradient-to-t from-white via-white/95 to-white/0"
         >
-          <div className="flex items-center gap-2 bg-white border border-slate-200 focus-within:border-cyan-400 focus-within:ring-4 focus-within:ring-cyan-500/10 rounded-full px-4 py-1.5 shadow-sm transition-all duration-300">
+          <div className="flex items-center gap-2 bg-white/80 backdrop-blur-xl border border-slate-200/60 focus-within:border-cyan-400 focus-within:ring-4 focus-within:ring-cyan-500/10 rounded-full px-4 py-1.5 shadow-lg shadow-slate-200/40 transition-all duration-300">
+            {/* Selected File Preview Badge */}
+            {selectedFile && (
+              <div className="flex items-center gap-1.5 bg-slate-100 border border-slate-200 rounded-full pl-3 pr-1 py-1 text-xs text-slate-700 animate-in fade-in zoom-in duration-200 shrink-0">
+                <FileText className="w-3.5 h-3.5 text-cyan-600 shrink-0" />
+                <span className="max-w-[120px] truncate font-medium">{selectedFile.name}</span>
+                <button
+                  type="button"
+                  onClick={() => setSelectedFile(null)}
+                  className="w-5 h-5 rounded-full flex items-center justify-center hover:bg-slate-200 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            )}
+
             <input
               ref={chatInputRef}
               placeholder={
@@ -1565,14 +1723,32 @@ export default function ExplicadorRoomPage() {
               className="flex-1 h-10 bg-transparent text-slate-800 placeholder:text-slate-400 text-base md:text-sm px-1 outline-none border-0 focus:ring-0 disabled:text-slate-400"
             />
 
+            <input
+              type="file"
+              id="explicador-file-upload"
+              className="hidden"
+              onChange={handleFileChange}
+              accept="image/*,application/pdf,text/*"
+              disabled={isGenerating}
+            />
+            <button
+              type="button"
+              onClick={() => document.getElementById("explicador-file-upload")?.click()}
+              disabled={isGenerating || isRecordingAudio}
+              title="Anexar imagem ou documento (máx 5MB)"
+              className="w-8 h-8 flex items-center justify-center rounded-full flex-shrink-0 cursor-pointer transition-all duration-200 text-slate-400 hover:text-cyan-600 hover:bg-cyan-50 disabled:opacity-40"
+            >
+              <Paperclip className="w-4 h-4" />
+            </button>
+
             <button
               type="button"
               onClick={handleChatMic}
               disabled={isGenerating}
               title={isRecordingAudio ? "Enviar gravação de voz" : "Falar com o explicador"}
               className={`w-8 h-8 flex items-center justify-center rounded-full flex-shrink-0 cursor-pointer transition-all duration-200 disabled:opacity-40 ${isRecordingAudio
-                  ? "text-red-500 bg-red-50 hover:bg-red-100 animate-pulse ring-2 ring-red-500/25"
-                  : "text-slate-400 hover:text-cyan-600 hover:bg-cyan-50"
+                ? "text-red-500 bg-red-50 hover:bg-red-105 animate-pulse ring-2 ring-red-500/25"
+                : "text-slate-400 hover:text-cyan-600 hover:bg-cyan-50"
                 }`}
             >
               {isRecordingAudio ? <Square className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
@@ -1633,18 +1809,26 @@ export default function ExplicadorRoomPage() {
               type={isGenerating ? "button" : "submit"}
               onClick={isGenerating ? handleInterrupt : undefined}
               disabled={
-                !isGenerating && (
-                  !message.trim() ||
-                  (isMultiUserRoom && mentionsExplicadorInInput && !isLockHolder)
-                )
+                isGenerating
+                  ? (isMultiUserRoom && !isLockHolder)
+                  : (
+                    (!message.trim() && !selectedFile) ||
+                    (isMultiUserRoom && mentionsExplicadorInInput && !isLockHolder)
+                  )
               }
               className={`w-8 h-8 p-0 text-white rounded-full flex items-center justify-center shadow-sm transition-all duration-200 flex-shrink-0 cursor-pointer ${isGenerating
-                ? "bg-red-500 hover:bg-red-650 shadow-red-500/20"
+                ? (isMultiUserRoom && !isLockHolder
+                  ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                  : "bg-red-500 hover:bg-red-650 shadow-red-500/20")
                 : "bg-cyan-500 hover:bg-cyan-600 disabled:bg-slate-200 disabled:text-slate-400 shadow-cyan-500/20"
                 }`}
             >
               {isGenerating ? (
-                <X className="w-3.5 h-3.5" />
+                isMultiUserRoom && !isLockHolder ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <X className="w-3.5 h-3.5" />
+                )
               ) : (
                 <Send className="w-3.5 h-3.5" />
               )}

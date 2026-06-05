@@ -430,7 +430,23 @@ class ExplicadorConsumer(AsyncWebsocketConsumer):
             )
 
     async def handle_interrupt(self, data):
-        """Allows the client to interrupt an ongoing AI generation."""
+        """Allows the client to interrupt an ongoing AI generation.
+        In multi-user rooms, only the pencil (lock) holder can interrupt."""
+        if not await self._is_solo_room():
+            self.room = await self.get_room(self.room_uuid)
+            if self.room:
+                lock = self.room.whiteboard_data.get("lock")
+                if not lock or lock.get("connection_id") != self.connection_id:
+                    await self.send(
+                        text_data=json.dumps(
+                            {
+                                "type": "error",
+                                "message": "Só quem tem o lápis pode interromper o explicador.",
+                            }
+                        )
+                    )
+                    return
+
         self.is_interrupted = True
         await self.channel_layer.group_send(
             self.group_name,
@@ -480,21 +496,62 @@ class ExplicadorConsumer(AsyncWebsocketConsumer):
             return
 
         message_content = data.get("message", "").strip()
-        if not message_content:
+        attachment_data = data.get("attachment")
+
+        if not message_content and not attachment_data:
             return
 
         solo_room = await self._is_solo_room() or bool(
             data.get("direct_to_explicador")
         )
 
-        if solo_room:
+        attachment_obj = None
+        if attachment_data and isinstance(attachment_data, dict):
+            size = attachment_data.get("size", 0)
+            if size > 5 * 1024 * 1024:
+                await self.send(
+                    text_data=json.dumps(
+                        {
+                            "type": "error",
+                            "message": "O ficheiro excede o limite de 5 MB.",
+                        }
+                    )
+                )
+                return
+
+            base64_str = attachment_data.get("base64", "")
+            if base64_str:
+                try:
+                    if "," in base64_str:
+                        _, base64_data = base64_str.split(",", 1)
+                    else:
+                        base64_data = base64_str
+                    file_bytes = base64.b64decode(base64_data)
+                    attachment_obj = {
+                        "data": file_bytes,
+                        "mime_type": attachment_data.get("mime_type", "application/octet-stream"),
+                        "name": attachment_data.get("name", "ficheiro"),
+                        "url": base64_str
+                    }
+                except Exception as e:
+                    logger.error(f"Failed to decode attachment: {e}")
+
+        # An attachment automatically triggers the tutor/AI explanation
+        if attachment_obj:
             mentions_tutor = True
+        else:
+            mentions_tutor = False
+
+        if solo_room:
+            if not attachment_obj:
+                mentions_tutor = True
             user_name = self.user_name
             prompt_for_ai = (
                 strip_explicador_mention(message_content) or message_content
             )
         else:
-            mentions_tutor = message_mentions_explicador(message_content)
+            if not attachment_obj:
+                mentions_tutor = message_mentions_explicador(message_content)
             lock = self.room.whiteboard_data.get("lock")
 
             if mentions_tutor:
@@ -515,7 +572,19 @@ class ExplicadorConsumer(AsyncWebsocketConsumer):
             prompt_for_ai = (
                 strip_explicador_mention(message_content) if mentions_tutor else ""
             )
-        user_msg = {"role": "user", "content": f"**[{user_name}]**: {message_content}"}
+
+        display_content = message_content
+        if not display_content and attachment_obj:
+            display_content = f"Enviou um anexo: {attachment_obj['name']}"
+
+        user_msg = {"role": "user", "content": f"**[{user_name}]**: {display_content}"}
+        if attachment_obj:
+            user_msg["attachment"] = {
+                "name": attachment_obj["name"],
+                "mime_type": attachment_obj["mime_type"],
+                "url": attachment_obj["url"]
+            }
+
         self.room.chat_history.append(user_msg)
         await self.save_room()
 
@@ -538,11 +607,14 @@ class ExplicadorConsumer(AsyncWebsocketConsumer):
             return
 
         if not prompt_for_ai:
-            prompt_for_ai = "Olá, estou disponível para ajudar. Em que posso esclarecer as tuas dúvidas?"
+            if attachment_obj:
+                prompt_for_ai = f"Analise o ficheiro em anexo: {attachment_obj['name']}"
+            else:
+                prompt_for_ai = "Olá, estou disponível para ajudar. Em que posso esclarecer as tuas dúvidas?"
 
-        # 2. Call AI only when @explicador is mentioned
+        # 2. Call AI only when @explicador is mentioned or attachment is present
         try:
-            ai_response = await self.generate_ai_explanation(prompt_for_ai)
+            ai_response = await self.generate_ai_explanation(prompt_for_ai, attachment_obj)
 
             # Check if interrupted while AI was generating
             if self.is_interrupted:
@@ -998,7 +1070,7 @@ class ExplicadorConsumer(AsyncWebsocketConsumer):
         )
         return "\n".join(lines) + "\n\n"
 
-    async def generate_ai_explanation(self, message_content: str) -> str:
+    async def generate_ai_explanation(self, message_content: str, attachment: dict | None = None) -> str:
         """Call get_text_chain() to prompt AI to explain and generate a beautifully structured classroom whiteboard summary."""
         context_block = self._format_course_context_block()
         prompt = f"""Você é um explicador didático especialista e professor particular premium.
@@ -1033,7 +1105,13 @@ Regras para "whiteboard_summary" (quando open_whiteboard for true):
         # We wrap in sync_to_async since provider calls might be blocking requests
         def run_chain():
             chain = get_text_chain()
-            return chain.handle(messages=[{"role": "user", "content": prompt}])
+            msg = {"role": "user", "content": prompt}
+            if attachment:
+                msg["attachment"] = {
+                    "data": attachment["data"],
+                    "mime_type": attachment["mime_type"]
+                }
+            return chain.handle(messages=[msg])
 
         return await sync_to_async(run_chain)()
 

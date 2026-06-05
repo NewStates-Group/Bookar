@@ -89,14 +89,25 @@ class GeminiTextProvider(BaseProvider):
         if model is None:
             model = self.DEFAULT_MODEL
 
+        attachment = None
         if isinstance(messages, list) and messages and isinstance(messages[-1], dict):
             prompt = messages[-1].get("content", "")
+            attachment = messages[-1].get("attachment")
         else:
             prompt = str(messages)
 
+        contents = [prompt]
+        if attachment and isinstance(attachment, dict) and attachment.get("data"):
+            contents.append(
+                types.Part.from_bytes(
+                    data=attachment["data"],
+                    mime_type=attachment.get("mime_type", "application/octet-stream")
+                )
+            )
+
         stream = client.models.generate_content_stream(
             model=model,
-            contents=prompt,
+            contents=contents,
         )
 
         for chunk in stream:
@@ -108,15 +119,26 @@ class GeminiTextProvider(BaseProvider):
         if model is None:
             model = settings.AI.get("GENAI_MODEL_TEXT", "gemini-2.5-flash-lite")
 
+        attachment = None
         if isinstance(messages, list) and messages and isinstance(messages[-1], dict):
             prompt = messages[-1].get("content", "")
+            attachment = messages[-1].get("attachment")
         else:
             prompt = str(messages)
+
+        contents = [prompt]
+        if attachment and isinstance(attachment, dict) and attachment.get("data"):
+            contents.append(
+                types.Part.from_bytes(
+                    data=attachment["data"],
+                    mime_type=attachment.get("mime_type", "application/octet-stream")
+                )
+            )
 
         response = safe_gemini_call(
             client.models.generate_content,
             model=model,
-            contents=prompt,
+            contents=contents,
         )
         return response.text
 
@@ -131,7 +153,11 @@ class OllamaTextProvider(BaseProvider):
             headers={"Authorization": "Bearer " + settings.AI["OLLAMA_KEY"]},
         )
         if isinstance(messages, list):
-            msgs = messages
+            msgs = []
+            for m in messages:
+                m_copy = dict(m)
+                m_copy.pop("attachment", None)
+                msgs.append(m_copy)
         else:
             msgs = [{"role": "user", "content": str(messages)}]
 
@@ -145,7 +171,11 @@ class OllamaTextProvider(BaseProvider):
             headers={"Authorization": "Bearer " + settings.AI["OLLAMA_KEY"]},
         )
         if isinstance(messages, list):
-            msgs = messages
+            msgs = []
+            for m in messages:
+                m_copy = dict(m)
+                m_copy.pop("attachment", None)
+                msgs.append(m_copy)
         else:
             msgs = [{"role": "user", "content": str(messages)}]
 
