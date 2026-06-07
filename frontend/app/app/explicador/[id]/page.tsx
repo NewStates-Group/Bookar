@@ -2,103 +2,24 @@
 
 import { useSession } from "next-auth/react";
 import { useParams, useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { Card } from "@/components/ui/card";
-import {
-  Loader2,
-  Send,
-  Mic,
-  MicOff,
-  Users,
-  Check,
-  Volume2,
-  Pencil,
-  PenTool,
-  Bot,
-  Lock,
-  X,
-  Menu,
-  Square,
-  Paperclip,
-  FileText
-} from "lucide-react";
-import { ExplicadorInvitePopover } from "@/components/ExplicadorInvitePopover";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { ensureFreshSession } from "@/lib/auth-session";
-import {
-  type ExplicadorParticipant,
-} from "@/lib/explicador-presence";
-import ReactMarkdown from "react-markdown";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import {
   useWebRTC,
   useParticipants,
   useSignaling,
 } from "@/components/explicador/webrtc";
-
-interface LockObject {
-  connection_id: string;
-  name: string;
-}
-
-interface WhiteboardData {
-  summary?: string;
-  lock?: LockObject | null;
-  show_whiteboard?: boolean;
-  open_whiteboard?: boolean;
-}
-
-interface ChatMessage {
-  role: "user" | "assistant";
-  content: string;
-  attachment?: {
-    name: string;
-    mime_type: string;
-    url: string;
-  };
-}
-
-type Participant = ExplicadorParticipant;
-
-function StreamingMessage({ content, active }: { content: string; active: boolean }) {
-  const [displayedText, setDisplayedText] = useState(active ? "" : content);
-
-  useEffect(() => {
-    if (!active) {
-      setDisplayedText(content);
-      return;
-    }
-
-    const words = content.split(" ");
-    let currentText = "";
-    let wordIndex = 0;
-
-    const interval = setInterval(() => {
-      if (wordIndex < words.length) {
-        currentText += (wordIndex === 0 ? "" : " ") + words[wordIndex];
-        setDisplayedText(currentText);
-        wordIndex++;
-
-        if (typeof window !== "undefined") {
-          window.dispatchEvent(new CustomEvent("chat-stream-tick"));
-        }
-      } else {
-        clearInterval(interval);
-      }
-    }, 45);
-
-    return () => clearInterval(interval);
-  }, [content, active]);
-
-  return <ReactMarkdown>{displayedText}</ReactMarkdown>;
-}
+import LoadingRoom from "@/components/explicador/LoadingRoom";
+import Header from "@/components/explicador/Header";
+import MessageList from "@/components/explicador/MessageList";
+import { ChatMessage, Participant, WhiteboardData } from "@/components/explicador/webrtc/types/general";
+import MessageInput from "@/components/explicador/MessageInput";
+import Participants from "@/components/explicador/Participants";
+import Whiteboard from "@/components/explicador/Whiteboard";
+import VoiceRequest from "@/components/explicador/VoiceRequest";
+import PencilRequests from "@/components/explicador/PencilRequests";
 
 const EXPLICADOR_MENTION = "@explicador";
 
@@ -1104,7 +1025,6 @@ export default function ExplicadorRoomPage() {
     submitChatMessage(withMention);
   };
 
-  // Draggable Splitter Pointer Events
   const handleSplitterPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     isSplitting.current = true;
@@ -1126,7 +1046,6 @@ export default function ExplicadorRoomPage() {
     isSplitting.current = false;
   };
 
-  // Voice permission helpers
   const requestVoice = () => {
     if (audioRequestPending) return;
     setAudioRequestPending(true);
@@ -1150,7 +1069,6 @@ export default function ExplicadorRoomPage() {
     }
   };
 
-  // Captura o áudio usando MediaRecorder e envia para o backend
   const handleChatMic = async () => {
     if (!isLockHolder && !isSoloRoom) {
       toast.error("Precisas de pegar o lápis primeiro para falar com o explicador por voz.");
@@ -1259,7 +1177,6 @@ export default function ExplicadorRoomPage() {
     }
   };
 
-  // Chalk Lock action triggers
   const grabLock = () => {
     sendWSMessage({ type: "grab_lock" });
   };
@@ -1318,31 +1235,8 @@ export default function ExplicadorRoomPage() {
       })),
   ];
 
-  // ── Loading / Lobby Screen ──
   if (!roomReady) {
-    return (
-      <div className="flex flex-col items-center justify-center h-[calc(100vh-56px)] md:h-screen w-full bg-white">
-        <div className="flex flex-col items-center gap-6 animate-in fade-in duration-500">
-          <div className="relative">
-            <div className="w-16 h-16 rounded-2xl bg-cyan-500/10 flex items-center justify-center">
-              <Bot className="w-8 h-8 text-cyan-600" />
-            </div>
-            <span className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-cyan-500 border-2 border-white flex items-center justify-center">
-              <Loader2 className="w-3 h-3 animate-spin text-white" />
-            </span>
-          </div>
-          <div className="text-center space-y-2">
-            <h2 className="text-lg font-bold text-slate-800">Explicador</h2>
-            <p className="text-sm text-slate-500 font-medium">{lobbyStatus}</p>
-          </div>
-          <div className="flex gap-1.5 mt-2">
-            <span className="w-2 h-2 rounded-full bg-cyan-500 animate-bounce" style={{ animationDelay: "0ms" }} />
-            <span className="w-2 h-2 rounded-full bg-cyan-400 animate-bounce" style={{ animationDelay: "150ms" }} />
-            <span className="w-2 h-2 rounded-full bg-cyan-300 animate-bounce" style={{ animationDelay: "300ms" }} />
-          </div>
-        </div>
-      </div>
-    );
+    return <LoadingRoom lobbyStatus={lobbyStatus} />
   }
 
   return (
@@ -1350,7 +1244,7 @@ export default function ExplicadorRoomPage() {
       ref={splitContainerRef}
       onPointerMove={handleSplitterPointerMove}
       style={{ height: viewportHeight }}
-      className="flex w-full overflow-hidden bg-slate-50 text-slate-800 fixed inset-0 select-none"
+      className="flex w-full overflow-hidden bg-slate-50 text-slate-800 select-none"
     >
       <style>{`
         .font-handwriting {
@@ -1383,461 +1277,80 @@ export default function ExplicadorRoomPage() {
         }
       `}</style>
 
-      {/* Pencil request notifications for lock holder */}
       {isLockHolder && activePencilRequests.length > 0 && (
-        <div className="absolute top-4 left-4 z-50 flex flex-col gap-2 max-w-sm w-full">
-          {activePencilRequests.map((req) => (
-            <Card
-              key={req.connectionId}
-              className="p-4 border border-amber-100 bg-white shadow-2xl animate-in slide-in-from-top duration-300 text-slate-800"
-            >
-              <div className="flex gap-2.5">
-                <div className="w-9 h-9 rounded-full bg-amber-500/10 flex items-center justify-center text-amber-600 mt-0.5">
-                  <Pencil className="w-5 h-5" />
-                </div>
-                <div>
-                  <h4 className="font-bold text-slate-850 text-sm">Pedido de lápis</h4>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    <strong>{req.name}</strong> pediu o lápis.
-                  </p>
-                </div>
-              </div>
-            </Card>
-          ))}
-        </div>
+        <PencilRequests
+          activePencilRequests={activePencilRequests}
+        />
       )}
 
-      {/* Pop-up Voice Request Notification for Host */}
       {isOwner && activeVoiceRequests.length > 0 && (
-        <div className="absolute top-4 right-4 z-50 flex flex-col gap-2 max-w-sm w-full">
-          {activeVoiceRequests.map((req) => (
-            <Card key={req.connectionId} className="p-4 border border-cyan-100 bg-white shadow-2xl animate-in slide-in-from-top duration-300 text-slate-800">
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex gap-2.5">
-                  <div className="w-9 h-9 rounded-full bg-cyan-500/10 flex items-center justify-center text-cyan-600 mt-0.5">
-                    <Volume2 className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-slate-850 text-sm">Acesso por Voz</h4>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      <strong>{req.name}</strong> quer entrar na chamada de voz.
-                    </p>
-                  </div>
-                </div>
-              </div>
-              <div className="flex justify-end gap-2 mt-4">
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => handleVoiceDecision(req.connectionId, false)}
-                  className="h-8 rounded-full text-slate-500 hover:text-slate-800 hover:bg-slate-100"
-                >
-                  Recusar
-                </Button>
-                <Button
-                  size="sm"
-                  onClick={() => handleVoiceDecision(req.connectionId, true)}
-                  className="h-8 rounded-full bg-cyan-500 hover:bg-cyan-600 text-white flex items-center gap-1 shadow-sm"
-                >
-                  <Check className="w-3.5 h-3.5" />
-                  Permitir
-                </Button>
-              </div>
-            </Card>
-          ))}
-        </div>
+        <VoiceRequest
+          activeVoiceRequests={activeVoiceRequests}
+          handleVoiceDecision={handleVoiceDecision}
+        />
       )}
 
-      {/* LEFT SIDEBAR: Chat History */}
       <div
         style={{ width: isMobile ? (showWhiteboard ? "0%" : "100%") : (showWhiteboard ? `${splitPct}%` : "100%") }}
         className={`bg-white flex flex-col overflow-hidden shrink-0 h-full select-text transition-[width] duration-500 ease-in-out ${showWhiteboard ? (isMobile ? "hidden" : "border-r border-slate-200") : ""
           }`}
       >
-        {/* Header section with connection status */}
-        <div className="px-4 py-4 border-b border-slate-200 flex justify-between items-center bg-white select-none shrink-0">
-          <div className="flex items-center gap-2">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                window.dispatchEvent(new CustomEvent("open-mobile-sidebar"));
-              }}
-              className="md:hidden p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition-colors cursor-pointer"
-              title="Menu principal"
-            >
-              <Menu className="w-5 h-5" />
-            </button>
-            <span className="block md:hidden text-sm font-bold text-slate-800 flex items-center gap-1.5 ml-1 md:ml-0">
-              <Bot className="w-5 h-5 text-cyan-600" />
-              Explicador
-            </span>
-            {isMultiUserRoom ? (
-              <button
-                onClick={() => setShowParticipantsModal(true)}
-                className="flex items-center -space-x-1.5 hover:opacity-90 transition-opacity bg-slate-100 hover:bg-slate-200/80 px-2.5 py-1 rounded-full border border-slate-200/60 cursor-pointer ml-2"
-                title="Ver participantes"
-              >
-                <div className="flex -space-x-2 mr-2">
-                  {combinedRoster.slice(0, 3).map((member) => (
-                    <div
-                      key={member.connectionId}
-                      className="w-5 h-5 rounded-full border-2 border-white overflow-hidden bg-slate-200 flex-shrink-0 flex items-center justify-center shadow-sm"
-                    >
-                      {member.avatar ? (
-                        <img
-                          src={member.avatar.startsWith("http") ? member.avatar : `${process.env.NEXT_PUBLIC_API_URL}${member.avatar}`}
-                          alt={member.name}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <span className="text-[8px] font-bold text-slate-500 uppercase select-none">
-                          {member.name[0]}
-                        </span>
-                      )}
-                    </div>
-                  ))}
-                </div>
-                <span className="text-[10px] font-bold text-slate-500 select-none">
-                  {combinedRoster.length}
-                </span>
-              </button>
-            ) : null}
-            {!isConnected && roomReady && (
-              <span className="text-xs rounded-full ml-1 text-amber-600 animate-pulse">
-                (A reconectar…)
-              </span>
-            )}
-            {!isConnected && !roomReady && (
-              <span className="text-xs rounded-full ml-1 text-red-500">
-                (Sem ligação)
-              </span>
-            )}
-          </div>
-          <div className="flex items-center gap-1">
-            {isMultiUserRoom && (
-              <div>
-                {!currentLock ? (
-                  <div onClick={grabLock} className="cursor-pointer gap-1 flex items-center justify-between text-xs px-1 text-slate-800">
-                    <Pencil className="w-3.5 h-3.5 text-slate-800" />
-                    <span className="hidden sm:block flex items-center gap-1.5 font-medium">
-                      Lápis (tutor)
-                    </span>
-                  </div>
-                ) : isLockHolder ? (
-                  <div onClick={releaseLock} className="flex items-center gap-1 justify-between text-xs px-1 text-cyan-600">
-                    <Lock className="w-3.5 h-3.5 text-cyan-600" />
-                    <span className="hidden sm:block flex items-center gap-1.5 font-semibold">
-                      Tens o lápis!
-                    </span>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={requestPencil}
-                    disabled={pencilCooldownActive}
-                    title={
-                      pencilCooldownActive
-                        ? `Aguarde ${pencilCooldownTimeLeft}s`
-                        : `Pedir o lápis a ${currentLock.name}`
-                    }
-                    className="flex items-center justify-between gap-1 text-xs px-1 text-slate-800 hover:text-amber-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <Lock className="w-3.5 h-3.5 text-slate-350" />
-                    <span className="hidden sm:block flex items-center gap-1.5 font-medium truncate pr-2">
-                      Lápis com: <strong>{currentLock.name}</strong>
-                      {pencilCooldownActive ? (
-                        <span className="text-red-500">({pencilCooldownTimeLeft}s)</span>
-                      ) : null}
-                    </span>
-                  </button>
-                )}
-              </div>
-            )}
+        <Header
+          isMultiUserRoom={isMultiUserRoom}
+          combinedRoster={combinedRoster}
+          currentLock={whiteboardData.lock}
+          grabLock={grabLock}
+          releaseLock={releaseLock}
+          requestPencil={requestPencil}
+          pencilCooldownActive={pencilCooldownActive}
+          pencilCooldownTimeLeft={pencilCooldownTimeLeft}
+          shareUrl={shareUrl}
+          isMicMuted={isMicMuted}
+          toggleMute={toggleMute}
+          roomReady={roomReady}
+          isConnected={isConnected}
+          isLockHolder={isLockHolder}
+          setShowParticipantsModal={setShowParticipantsModal}
+        />
 
-            {shareUrl ? <ExplicadorInvitePopover shareUrl={shareUrl} /> : null}
 
-            {isMultiUserRoom && (
-              <div className="flex items-center gap-1.5">
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={toggleMute}
-                  className={`hover:bg-transparent! rounded-full h-8 px-3 gap-1.5 text-xs`}
-                >
-                  {isMicMuted ?
-                    <MicOff className="w-3.5 h-3.5 text-red-650" />
-                    : <Mic className="w-3.5 h-3.5 text-slate-800" />}
-                  <span className="hidden sm:block">
-                    {isMicMuted ? "Silenciado" : "Voz Ativa"}
-                  </span>
+        <MessageList
+          chatHistory={chatHistory}
+          activeStreamingMessageIndex={activeStreamingMessageIndex}
+          isGenerating={isGenerating}
+          whiteboardData={whiteboardData}
+          showWhiteboard={showWhiteboard}
+          setWhiteboardData={setWhiteboardData}
+          chatEndRef={chatEndRef}
+        />
 
-                </Button>
-              </div>
-            )}
-          </div>
 
-        </div>
-
-        {/* Messages List Area */}
-        <div className="flex-1 overflow-y-auto p-4 min-h-0 bg-slate-50/30 scrollbar-thin" style={{ overscrollBehaviorY: "contain", WebkitOverflowScrolling: "touch" }}>
-          <div className="max-w-3xl mx-auto w-full space-y-4">
-            {chatHistory.map((msg, i) => (
-              <div
-                key={i}
-                className={`flex flex-col message-bubble-animate ${msg.role === "user"
-                  ? "max-w-[85%] ml-auto items-end"
-                  : "w-full"
-                  }`}
-              >
-                {/* <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wide mb-1 px-1">
-                  {msg.role !== "user" && (
-                    <div className="flex items-center justify-start gap-1.5">
-                      <Bot className="w-4 h-4 text-slate-600" />
-                      Explicador
-                    </div>
-                  )}
-                </span> */}
-                <div
-                  className={`p-3.5 rounded-2xl text-base leading-relaxed ${msg.role === "user"
-                    ? "bg-cyan-500 text-white rounded-tr-none shadow-sm shadow-cyan-500/10 px-4 py-1"
-                    : "text-slate-700"
-                    }`}
-                >
-                  <div className="prose prose-slate max-w-none text-sm leading-relaxed">
-                    {msg.role === "assistant" ? (
-                      <StreamingMessage
-                        content={msg.content}
-                        active={activeStreamingMessageIndex === i}
-                      />
-                    ) : (
-                      <div className="space-y-2">
-                        <ReactMarkdown>{msg.content}</ReactMarkdown>
-                        {msg.attachment && (
-                          <div className="mt-2 pt-2 border-t border-white/20">
-                            {msg.attachment.mime_type.startsWith("image/") ? (
-                              <div className="relative rounded-lg overflow-hidden border border-white/10 max-w-xs bg-black/5">
-                                <img
-                                  src={msg.attachment.url}
-                                  alt={msg.attachment.name}
-                                  className="max-h-48 object-contain w-full hover:scale-105 transition-transform duration-300"
-                                />
-                                <div className="absolute bottom-0 inset-x-0 bg-black/60 px-2 py-1 text-[10px] text-white/95 truncate font-medium">
-                                  {msg.attachment.name}
-                                </div>
-                              </div>
-                            ) : (
-                              <a
-                                href={msg.attachment.url}
-                                download={msg.attachment.name}
-                                className="flex items-center gap-2 bg-white/10 hover:bg-white/20 border border-white/20 rounded-lg p-2.5 transition-colors text-white font-medium select-none cursor-pointer"
-                              >
-                                <FileText className="w-5 h-5 shrink-0" />
-                                <div className="min-w-0 flex-1">
-                                  <p className="truncate text-xs font-bold">{msg.attachment.name}</p>
-                                  <p className="text-[9px] text-white/70 uppercase font-semibold">Descarregar documento</p>
-                                </div>
-                              </a>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  {msg.role === "assistant" &&
-                    whiteboardData.summary &&
-                    !showWhiteboard &&
-                    !isGenerating &&
-                    i === chatHistory.length - 1 && (
-                      <button
-                        type="button"
-                        onClick={() => setWhiteboardData((prev) => ({ ...prev, show_whiteboard: true }))}
-                        className="mt-2.5 flex items-center gap-1.5 px-3 py-1.5 bg-cyan-50 hover:bg-cyan-100 text-cyan-600 text-[10px] font-bold rounded-full transition-all border border-cyan-100/50 cursor-pointer select-none"
-                      >
-                        <PenTool className="w-3.5 h-3.5" />
-                        Ver no quadro
-                      </button>
-                    )}
-                </div>
-              </div>
-            ))}
-            {isGenerating && (
-              <div className="flex flex-col items-start w-full message-bubble-animate">
-                <div className="flex items-center gap-1.5 mb-1 px-1">
-                  <Bot className="w-4 h-4 text-cyan-600" />
-                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">
-                    Explicador
-                  </span>
-                </div>
-                <div className="p-3.5 rounded-2xl bg-white border border-slate-200/80 rounded-tl-sm flex items-center gap-3 shadow-sm">
-                  <div className="flex gap-1">
-                    <span className="w-2 h-2 rounded-full bg-cyan-500 animate-bounce" style={{ animationDelay: "0ms" }} />
-                    <span className="w-2 h-2 rounded-full bg-cyan-400 animate-bounce" style={{ animationDelay: "120ms" }} />
-                    <span className="w-2 h-2 rounded-full bg-cyan-300 animate-bounce" style={{ animationDelay: "240ms" }} />
-                  </div>
-                  <span className="text-sm text-slate-600 font-medium">A pensar...</span>
-                </div>
-              </div>
-            )}
-          </div>
-          <div ref={chatEndRef} />
-        </div>
-
-        {/* Message Input — glassmorphic pill, floats above chat scroll */}
-        <form
-          onSubmit={handleSendMessage}
-          className="px-3 pb-3 pt-2 max-w-3xl mx-auto w-full shrink-0 bg-gradient-to-t from-white via-white/95 to-white/0"
-        >
-          <div className="flex items-center gap-2 bg-white/80 backdrop-blur-xl border border-slate-200/60 focus-within:border-cyan-400 focus-within:ring-4 focus-within:ring-cyan-500/10 rounded-full px-4 py-1.5 shadow-lg shadow-slate-200/40 transition-all duration-300">
-            {/* Selected File Preview Badge */}
-            {selectedFile && (
-              <div className="flex items-center gap-1.5 bg-slate-100 border border-slate-200 rounded-full pl-3 pr-1 py-1 text-xs text-slate-700 animate-in fade-in zoom-in duration-200 shrink-0">
-                <FileText className="w-3.5 h-3.5 text-cyan-600 shrink-0" />
-                <span className="max-w-[120px] truncate font-medium">{selectedFile.name}</span>
-                <button
-                  type="button"
-                  onClick={() => setSelectedFile(null)}
-                  className="w-5 h-5 rounded-full flex items-center justify-center hover:bg-slate-200 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
-                >
-                  <X className="w-3 h-3" />
-                </button>
-              </div>
-            )}
-
-            <input
-              ref={chatInputRef}
-              placeholder={
-                isGenerating
-                  ? "A aguardar resposta do explicador..."
-                  : isRecordingAudio
-                    ? "A gravar áudio... Clique no botão vermelho para enviar."
-                    : isSoloRoom
-                      ? "Escreve a tua dúvida para o explicador..."
-                      : mentionsExplicadorInInput && !isLockHolder
-                        ? "Pega o lápis para falar com o explicador"
-                        : "Escreve no chat com os outros..."
-              }
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              disabled={isGenerating || isRecordingAudio}
-              className="flex-1 h-10 bg-transparent text-slate-800 placeholder:text-slate-400 text-base md:text-sm px-1 outline-none border-0 focus:ring-0 disabled:text-slate-400"
-            />
-
-            <input
-              type="file"
-              id="explicador-file-upload"
-              className="hidden"
-              onChange={handleFileChange}
-              accept="image/*,application/pdf,text/*"
-              disabled={isGenerating}
-            />
-            <button
-              type="button"
-              onClick={() => document.getElementById("explicador-file-upload")?.click()}
-              disabled={isGenerating || isRecordingAudio}
-              title="Anexar imagem ou documento (máx 5MB)"
-              className="w-8 h-8 flex items-center justify-center rounded-full flex-shrink-0 cursor-pointer transition-all duration-200 text-slate-400 hover:text-cyan-600 hover:bg-cyan-50 disabled:opacity-40"
-            >
-              <Paperclip className="w-4 h-4" />
-            </button>
-
-            <button
-              type="button"
-              onClick={handleChatMic}
-              disabled={isGenerating}
-              title={isRecordingAudio ? "Enviar gravação de voz" : "Falar com o explicador"}
-              className={`w-8 h-8 flex items-center justify-center rounded-full flex-shrink-0 cursor-pointer transition-all duration-200 disabled:opacity-40 ${isRecordingAudio
-                ? "text-red-500 bg-red-50 hover:bg-red-105 animate-pulse ring-2 ring-red-500/25"
-                : "text-slate-400 hover:text-cyan-600 hover:bg-cyan-50"
-                }`}
-            >
-              {isRecordingAudio ? <Square className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-            </button>
-
-            {/* Pencil grab/release toggle — only in multi-user rooms */}
-            {isMultiUserRoom && (
-              <button
-                type="button"
-                onClick={isLockHolder ? releaseLock : currentLock ? requestPencil : grabLock}
-                disabled={
-                  isGenerating ||
-                  (Boolean(currentLock) && !isLockHolder && pencilCooldownActive)
-                }
-                title={
-                  isLockHolder
-                    ? "Largar o lápis"
-                    : currentLock
-                      ? pencilCooldownActive
-                        ? `Aguarde ${pencilCooldownTimeLeft}s`
-                        : `Pedir o lápis a ${currentLock.name}`
-                      : "Pegar o lápis para falar com o explicador"
-                }
-                className={`w-8 h-8 flex items-center justify-center rounded-full transition-all duration-200 flex-shrink-0 cursor-pointer disabled:opacity-40 ${isLockHolder
-                  ? "bg-amber-100 text-amber-700 ring-2 ring-amber-300/60"
-                  : currentLock && pencilCooldownActive
-                    ? "bg-red-55 text-red-500 ring-2 ring-red-200/50"
-                    : currentLock
-                      ? "text-amber-600 hover:text-amber-700 hover:bg-amber-50"
-                      : "text-slate-400 hover:text-amber-600 hover:bg-amber-50"
-                  }`}
-              >
-                {currentLock && !isLockHolder && pencilCooldownActive ? (
-                  <span className="text-[10px] font-bold">{pencilCooldownTimeLeft}</span>
-                ) : (
-                  <Pencil className="w-4 h-4" />
-                )}
-              </button>
-            )}
-
-            {isMultiUserRoom && (
-              <button
-                type="button"
-                onClick={handleMentionExplicador}
-                disabled={isGenerating}
-                title="Mencionar @explicador e pedir resposta (precisas do lápis)"
-                className={`w-8 h-8 flex items-center justify-center rounded-full transition-all duration-200 flex-shrink-0 cursor-pointer disabled:opacity-40 ${mentionsExplicadorInInput
-                  ? "bg-cyan-100 text-cyan-700 ring-2 ring-cyan-300/60"
-                  : "text-slate-400 hover:text-cyan-600 hover:bg-cyan-50"
-                  }`}
-              >
-                <Bot className="w-4 h-4" />
-              </button>
-            )}
-
-            {/* Send/Interrupt button */}
-            <Button
-              type={isGenerating ? "button" : "submit"}
-              onClick={isGenerating ? handleInterrupt : undefined}
-              disabled={
-                isGenerating
-                  ? (isMultiUserRoom && !isLockHolder)
-                  : (
-                    (!message.trim() && !selectedFile) ||
-                    (isMultiUserRoom && mentionsExplicadorInInput && !isLockHolder)
-                  )
-              }
-              className={`w-8 h-8 p-0 text-white rounded-full flex items-center justify-center shadow-sm transition-all duration-200 flex-shrink-0 cursor-pointer ${isGenerating
-                ? (isMultiUserRoom && !isLockHolder
-                  ? "bg-slate-200 text-slate-400 cursor-not-allowed"
-                  : "bg-red-500 hover:bg-red-650 shadow-red-500/20")
-                : "bg-cyan-500 hover:bg-cyan-600 disabled:bg-slate-200 disabled:text-slate-400 shadow-cyan-500/20"
-                }`}
-            >
-              {isGenerating ? (
-                isMultiUserRoom && !isLockHolder ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <X className="w-3.5 h-3.5" />
-                )
-              ) : (
-                <Send className="w-3.5 h-3.5" />
-              )}
-            </Button>
-          </div>
-        </form>
+        <MessageInput
+          message={message}
+          setMessage={setMessage}
+          isGenerating={isGenerating}
+          isRecordingAudio={isRecordingAudio}
+          isSoloRoom={isSoloRoom}
+          mentionsExplicadorInInput={mentionsExplicadorInInput}
+          isLockHolder={isLockHolder}
+          handleSendMessage={handleSendMessage}
+          handleFileChange={handleFileChange}
+          handleChatMic={handleChatMic}
+          handleMentionExplicador={handleMentionExplicador}
+          handleInterrupt={handleInterrupt}
+          requestPencil={requestPencil}
+          grabLock={grabLock}
+          releaseLock={releaseLock}
+          currentLock={whiteboardData.lock}
+          isMultiUserRoom={isMultiUserRoom}
+          chatInputRef={chatInputRef}
+          selectedFile={selectedFile}
+          setSelectedFile={setSelectedFile}
+          pencilCooldownActive={pencilCooldownActive}
+          pencilCooldownTimeLeft={pencilCooldownTimeLeft}
+        />
       </div>
 
-      {/* Draggable Vertical Splitter */}
       {showWhiteboard && !isMobile && (
         <div
           onPointerDown={handleSplitterPointerDown}
@@ -1848,158 +1361,21 @@ export default function ExplicadorRoomPage() {
         </div>
       )}
 
-      {/* RIGHT WORKSPACE: Dotted Whiteboard Summary Panel */}
       {showWhiteboard && (
-        <div className={`flex-1 h-full bg-[#fafafa] flex flex-col justify-start relative select-text animate-in fade-in slide-in-from-right duration-500 ${isMobile ? "p-4 w-full absolute inset-0 z-50 overflow-y-auto" : "p-6 md:p-10 overflow-hidden"
-          }`}>
-
-          {/* Header of the Board */}
-          <div className={`flex justify-between items-center mb-6 pb-4 border-b border-slate-200/60 shrink-0 ${isMobile ? "sticky top-0 z-10 bg-[#fafafa] pt-1" : ""}`}>
-            <div className="flex items-center gap-2">
-              <PenTool className="w-5 h-5 text-cyan-600" />
-              <h2 className="text-sm font-bold text-slate-700 tracking-wide">
-                Quadro
-              </h2>
-            </div>
-
-            <div className="flex items-center gap-3">
-
-              {/* Active Streaming Indicator */}
-              {isGenerating && (
-                <div className="flex items-center gap-2 bg-slate-50 border border-slate-150 px-3 py-1 rounded-full text-[10px] text-slate-500 font-bold uppercase tracking-wider">
-                  <span className="w-2.5 h-2.5 rounded-full bg-cyan-500 animate-ping" />
-                  <span className="text-cyan-600">A pensar...</span>
-                </div>
-              )}
-
-              {/* Close whiteboard panel */}
-              <Button
-                size="icon"
-                variant="ghost"
-                onClick={() => setWhiteboardData((prev) => ({ ...prev, show_whiteboard: false }))}
-                className="w-8 h-8 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 cursor-pointer"
-                title="Fechar Quadro"
-              >
-                <X className="w-4 h-4" />
-              </Button>
-            </div>
-          </div>
-
-          {/* Dotted blackboard writing sheet */}
-          <div className="flex-1 blackboard-grid overflow-y-auto font-handwriting text-slate-700 relative leading-relaxed scrollbar-thin">
-            {displayedBoardText ? (
-              <article className="prose max-w-none prose-slate font-handwriting prose-headings:font-handwriting prose-strong:font-handwriting text-slate-700 text-lg md:text-2xl leading-loose">
-                <ReactMarkdown
-                  components={{
-                    h1: ({ node, ...props }: any) => <h1 className="text-cyan-600 font-bold text-2xl md:text-4xl border-b-2 border-cyan-100/50 pb-2 mb-6" {...props} />,
-                    h2: ({ node, ...props }: any) => <h2 className="text-slate-850 font-bold text-xl md:text-3xl mt-6 mb-3" {...props} />,
-                    h3: ({ node, ...props }: any) => <h3 className="text-slate-750 font-semibold text-lg md:text-2xl mt-4 mb-2" {...props} />,
-                    li: ({ node, ...props }: any) => <li className="text-slate-650 my-1 md:my-2 list-disc pl-1 text-base md:text-xl" {...props} />,
-                    p: ({ node, ...props }: any) => <p className="text-slate-650 mb-4 text-base md:text-xl" {...props} />,
-                    strong: ({ node, ...props }: any) => <strong className="text-slate-900 font-bold text-base md:text-xl" {...props} />,
-                  }}
-                >
-                  {displayedBoardText}
-                </ReactMarkdown>
-              </article>
-            ) : (
-              <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6 space-y-4">
-                <Pencil className="w-10 h-10 text-slate-350 stroke-[1.5] animate-bounce" />
-                <div>
-                  <h3 className="text-slate-400 font-bold text-lg">Quadro em Branco</h3>
-                  <p className="text-slate-400 text-xs mt-1 max-w-xs mx-auto">
-                    O resumo das ideias e cálculos será escrito aqui dinamicamente sempre que fizer uma pergunta ao explicador no chat lateral.
-                  </p>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Local voice stream indicators
-          {localStream && (
-            <div className="absolute top-12 left-12 z-20 bg-white border border-emerald-300 px-3.5 py-2 rounded-full shadow-md flex items-center gap-2 text-slate-700 font-medium text-xs">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span>
-                {isMicMuted ? "Modo Ouvinte (Silenciado)" : "Chamada Ativa (Fala)"}
-              </span>
-            </div>
-          )} */}
-        </div>
+        <Whiteboard
+          showWhiteboard={showWhiteboard}
+          setWhiteboardData={setWhiteboardData}
+          displayedBoardText={displayedBoardText}
+          isGenerating={isGenerating}
+          isMobile={isMobile}
+        />
       )}
-      {/* Roster / Participants Modal */}
-      <Dialog open={showParticipantsModal} onOpenChange={setShowParticipantsModal}>
-        <DialogContent className="sm:max-w-md border-slate-200 bg-white text-slate-800 shadow-2xl rounded-2xl p-6">
-          <DialogHeader>
-            <DialogTitle className="text-xl font-bold flex items-center gap-2 text-slate-800">
-              <Users className="w-5 h-5 text-cyan-600" />
-              Pessoas na Sala
-            </DialogTitle>
-          </DialogHeader>
 
-          <div className="space-y-3.5 mt-4">
-            {combinedRoster.map((member) => (
-              <div key={member.connectionId} className="flex items-center justify-between p-2 rounded-xl hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-100">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-full border border-slate-200 overflow-hidden bg-slate-100 flex items-center justify-center relative shadow-sm">
-                    {member.avatar ? (
-                      <img
-                        src={member.avatar.startsWith("http") ? member.avatar : `${process.env.NEXT_PUBLIC_API_URL}${member.avatar}`}
-                        alt={member.name}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <span className="text-sm font-bold text-slate-500 uppercase">
-                        {member.name[0]}
-                      </span>
-                    )}
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-sm text-slate-750 flex items-center gap-1.5">
-                      {member.name}
-                      {member.isSelf && (
-                        <span className="text-[9px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-md border border-slate-200/60 font-medium">
-                          Tu
-                        </span>
-                      )}
-                      {member.isOwner && (
-                        <span className="text-[9px] bg-cyan-50 text-cyan-600 px-1.5 py-0.5 rounded-md border border-cyan-100 font-bold">
-                          Anfitrião
-                        </span>
-                      )}
-                    </h4>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2.5">
-                  {/* Mic status */}
-                  <div className="flex items-center gap-1">
-                    {member.isMicOn ? (
-                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" title="Microfone ativo" />
-                    ) : (
-                      <span className="w-2 h-2 rounded-full bg-slate-350" title="Microfone desligado" />
-                    )}
-                    <span className="text-[10px] text-slate-400 font-semibold select-none">
-                      {member.isMicOn ? "A falar" : "Mudo"}
-                    </span>
-                  </div>
-
-                  {/* Listening status */}
-                  <div className="flex items-center gap-1 border-l border-slate-200 pl-2.5">
-                    {member.isListening ? (
-                      <span title="A ouvir"><Volume2 className="w-3.5 h-3.5 text-cyan-600 animate-pulse" /></span>
-                    ) : (
-                      <span title="Sem áudio"><Volume2 className="w-3.5 h-3.5 text-slate-350" /></span>
-                    )}
-                    <span className="text-[10px] text-slate-400 font-semibold select-none">
-                      {member.isListening ? "A ouvir" : "Sem áudio"}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </DialogContent>
-      </Dialog>
+      <Participants
+        showParticipantsModal={showParticipantsModal}
+        setShowParticipantsModal={setShowParticipantsModal}
+        combinedRoster={combinedRoster}
+      />
     </div>
   );
 }

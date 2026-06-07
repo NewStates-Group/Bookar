@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -8,7 +8,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Check, Copy, UserPlus } from "lucide-react";
+import { Check, Copy, Loader, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 
 interface ExplicadorInvitePopoverProps {
@@ -18,6 +18,7 @@ interface ExplicadorInvitePopoverProps {
 export function ExplicadorInvitePopover({ shareUrl }: ExplicadorInvitePopoverProps) {
   const [copied, setCopied] = useState(false);
   const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   const handleCopy = async () => {
     try {
@@ -53,13 +54,18 @@ export function ExplicadorInvitePopover({ shareUrl }: ExplicadorInvitePopoverPro
             </p>
           </div>
 
-          <div className="flex justify-center rounded-lg border border-slate-100 bg-white p-3">
+          <div className="flex items-center text-center justify-center rounded-lg border border-slate-100 bg-white p-3">
+            {loading && (
+              <Loader className="animate-spin w-8 h-8 text-black" />
+            )}
+
             <img
               src={qrSrc}
               alt="Código QR da sala"
               width={160}
               height={160}
-              className="rounded-md"
+              className={loading ? "hidden" : "block"}
+              onLoad={() => setLoading(false)}
             />
           </div>
 
