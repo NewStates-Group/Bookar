@@ -20,6 +20,7 @@ import Participants from "@/components/explicador/Participants";
 import Whiteboard from "@/components/explicador/Whiteboard";
 import VoiceRequest from "@/components/explicador/VoiceRequest";
 import PencilRequests from "@/components/explicador/PencilRequests";
+import MessageInput2 from "@/components/explicador/MessageInput2";
 
 const EXPLICADOR_MENTION = "@explicador";
 
@@ -927,7 +928,6 @@ export default function ExplicadorRoomPage() {
         base64: reader.result as string,
         size: file.size,
       });
-      toast.success(`Ficheiro "${file.name}" anexado.`);
     };
     reader.onerror = () => {
       toast.error("Erro ao ler o ficheiro.");
@@ -1244,7 +1244,7 @@ export default function ExplicadorRoomPage() {
       ref={splitContainerRef}
       onPointerMove={handleSplitterPointerMove}
       style={{ height: viewportHeight }}
-      className="flex w-full overflow-hidden bg-slate-50 text-slate-800 select-none"
+      className="flex w-full overflow-hidden bg-transparent text-slate-800 select-none"
     >
       <style>{`
         .font-handwriting {
@@ -1292,7 +1292,7 @@ export default function ExplicadorRoomPage() {
 
       <div
         style={{ width: isMobile ? (showWhiteboard ? "0%" : "100%") : (showWhiteboard ? `${splitPct}%` : "100%") }}
-        className={`bg-white flex flex-col overflow-hidden shrink-0 h-full select-text transition-[width] duration-500 ease-in-out ${showWhiteboard ? (isMobile ? "hidden" : "border-r border-slate-200") : ""
+        className={`bg-transparent flex flex-col overflow-hidden shrink-0 h-full select-text transition-[width] duration-500 ease-in-out ${showWhiteboard ? (isMobile ? "hidden" : "border-r border-slate-200") : ""
           }`}
       >
         <Header
