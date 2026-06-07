@@ -49,14 +49,14 @@ function AuthCallbackContent() {
                         }
                         router.replace(path);
                     } else {
-                        router.push(`/login?error=${result?.error}`);
+                        router.replace(`/login?error=${result?.error}`);
                     }
                 } catch (error: any) {
                     toast.error(error.message || "Erro ao processar login com Google");
-                    router.push("/login?error=GoogleAuthFailed");
+                    router.replace("/login?error=GoogleAuthFailed");
                 }
             } else {
-                router.push("/login?error=MissingParams");
+                router.replace("/login?error=MissingParams");
             }
         };
 
