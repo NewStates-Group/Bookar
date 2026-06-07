@@ -5,6 +5,7 @@ import { signIn } from "next-auth/react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { clearPendingExplicadorRoom, getPendingExplicadorRoom } from "@/lib/pending-explicador-room";
 
 function AuthCallbackContent() {
     const searchParams = useSearchParams();
@@ -13,8 +14,6 @@ function AuthCallbackContent() {
 
     useEffect(() => {
         const code = searchParams.get("code");
-        const access = searchParams.get("access");
-        const refresh = searchParams.get("refresh");
 
         if (called.current) return;
 
@@ -35,42 +34,29 @@ function AuthCallbackContent() {
 
                     const tokens = await res.json();
 
-                    if (window.opener) {
-                        window.opener.postMessage({
-                            type: "AUTH_SUCCESS",
-                            access: tokens.access,
-                            refresh: tokens.refresh
-                        }, window.location.origin);
-                        window.close();
+                    const pendingRoom = getPendingExplicadorRoom();
+                    const path = pendingRoom?.path || "/app/courses";
+
+                    const result = await signIn("credentials", {
+                        accessToken: tokens.access,
+                        refreshToken: tokens.refresh,
+                        redirect: false,
+                    });
+
+                    if (result?.ok) {
+                        if (pendingRoom) {
+                            clearPendingExplicadorRoom();
+                        }
+                        router.replace(path);
                     } else {
-                        await signIn("credentials", {
-                            accessToken: tokens.access,
-                            refreshToken: tokens.refresh,
-                            callbackUrl: "/app/courses",
-                        });
+                        router.push(`/login?error=${result?.error}`);
                     }
                 } catch (error: any) {
-                    if (window.opener) {
-                        window.opener.postMessage({
-                            type: "AUTH_ERROR",
-                            message: error.message
-                        }, window.location.origin);
-                        window.close();
-                    } else {
-                        toast.error(error.message || "Erro ao processar login com Google");
-                        router.push("/login?error=GoogleAuthFailed");
-                    }
+                    toast.error(error.message || "Erro ao processar login com Google");
+                    router.push("/login?error=GoogleAuthFailed");
                 }
             } else {
-                if (window.opener) {
-                    window.opener.postMessage({
-                        type: "AUTH_ERROR",
-                        message: "Código de autenticação ausente"
-                    }, window.location.origin);
-                    window.close();
-                } else {
-                    router.push("/login?error=MissingParams");
-                }
+                router.push("/login?error=MissingParams");
             }
         };
 

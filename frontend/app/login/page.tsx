@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card } from "@/components/ui/card";
 import { User, Lock, Loader2, ArrowRight, AlertCircle, ChevronLeft, MailCheck } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -117,6 +116,7 @@ export default function LoginPage() {
         }
       } else {
         const pendingRoom = getPendingExplicadorRoom();
+        console.log(pendingRoom)
         if (pendingRoom) {
           router.replace(pendingRoom.path);
           clearPendingExplicadorRoom();
@@ -341,7 +341,7 @@ export default function LoginPage() {
                   disabled={isLoading || (step === "password" && !turnstileToken) || cooldown > 0}
                 >
                   {isLoading ? (
-                      <>
+                    <>
                       <Loader2 className="mr-2 h-5 w-5 animate-spin" />
                       {step === "email" ? "Verificando..." : "Entrando..."}
                     </>
