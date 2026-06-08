@@ -21,7 +21,12 @@ class MindMapService:
         if cached is not None:
             return cached
 
-        maps = list(MindMap.objects.filter(user=user).order_by("-created_at"))
+        maps = list(
+            MindMap.objects
+            .filter(user=user)
+            .order_by("-created_at")
+            .only("uuid", "topic", "title", "status", "is_shared", "created_at")[:50]
+        )
         for m in maps:
             m.is_owner = True
         cache.set(cache_key, maps, 300)  # 5 minutes
