@@ -55,24 +55,32 @@ class CourseOut(ModelSchema):
 
     @staticmethod
     def resolve_is_fully_completed(obj, context):
+        if hasattr(obj, "_precomputed_is_fully_completed"):
+            return obj._precomputed_is_fully_completed
         user = context.get("request").user
         return obj.is_fully_completed(user)
 
     @staticmethod
     def resolve_is_completed(obj, context):
+        if hasattr(obj, "_precomputed_is_completed"):
+            return obj._precomputed_is_completed
         user = context.get("request").user
         return obj.is_completed(user)
 
     @staticmethod
     def resolve_certificate_status(obj, context):
+        if hasattr(obj, "_precomputed_certificate_status"):
+            return obj._precomputed_certificate_status
         user = context.get("request").user
-        enrollment = obj.enrollments.filter(user=user).first()
+        enrollment = obj.enrollments.filter(user=user).only("certificate_status").first()
         return enrollment.certificate_status if enrollment else "NOT_GENERATED"
 
     @staticmethod
     def resolve_certificate_url(obj, context):
+        if hasattr(obj, "_precomputed_certificate_url"):
+            return obj._precomputed_certificate_url
         user = context.get("request").user
-        enrollment = obj.enrollments.filter(user=user).first()
+        enrollment = obj.enrollments.filter(user=user).only("certificate_status", "certificate_file").first()
         if (
             enrollment
             and enrollment.certificate_status == "READY"
