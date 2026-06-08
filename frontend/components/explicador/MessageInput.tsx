@@ -10,6 +10,11 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuSubContent,
 } from "@/components/ui/dropdown-menu";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import {
@@ -19,15 +24,15 @@ import {
   FileText,
   LayoutTemplate,
   Loader2,
+  Lock,
   Mic,
   Paperclip,
   Pencil,
   Plus,
   Square,
-  Link,
+  Unlock,
   X,
 } from "lucide-react";
-import PencilModal from "./PencilModal";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -89,7 +94,6 @@ export default function MessageInput(
     pencilCooldownTimeLeft,
   }: MessageInputProps) {
 
-  const [pencilModalOpen, setPencilModalOpen] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -101,51 +105,6 @@ export default function MessageInput(
     const maxHeight = 24 * 4;
     e.target.style.height =
       Math.min(e.target.scrollHeight, maxHeight) + "px";
-  };
-
-  const handleImportUrl = () => {
-    const url = window.prompt("Insere o URL que queres analisar:");
-    if (url?.trim()) {
-      const texto = `@explicador analisa este URL: ${url.trim()}`;
-      setMessage(message ? `${message}\n\n${texto}` : texto);
-    }
-  };
-
-  const handlePasteFromClipboard = async () => {
-    try {
-      const items = await navigator.clipboard.read();
-      for (const item of items) {
-        for (const type of item.types) {
-          if (type.startsWith("image/")) {
-            const blob = await item.getType(type);
-            const ext = type.split("/")[1] || "png";
-            const file = new File([blob], `clipboard-image.${ext}`, { type });
-            const reader = new FileReader();
-            reader.onload = () => {
-              setSelectedFile({
-                name: file.name,
-                mime_type: file.type,
-                base64: reader.result as string,
-                size: file.size,
-              });
-            };
-            reader.onerror = () => toast.error("Erro ao ler a imagem da área de transferência.");
-            reader.readAsDataURL(file);
-            return;
-          }
-        }
-      }
-      const text = await navigator.clipboard.readText();
-      if (text) {
-        setMessage(message ? `${message}\n${text}` : text);
-      }
-    } catch {
-      toast.error("Não foi possível aceder à área de transferência.");
-    }
-  };
-
-  const handleTemplateSelect = (templateText: string) => {
-    setMessage(message ? `${message}\n\n${templateText} ` : `${templateText} `);
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -184,20 +143,16 @@ export default function MessageInput(
     ? selectedFile.base64
     : null;
 
+  const [grabbingLock, setGrabbingLock] = useState(false);
+
+  const handleGrabLock = () => {
+    setGrabbingLock(true);
+    grabLock();
+    setTimeout(() => setGrabbingLock(false), 800);
+  };
+
   return (
     <>
-      <PencilModal
-        open={pencilModalOpen}
-        onOpenChange={setPencilModalOpen}
-        currentLock={currentLock}
-        isLockHolder={isLockHolder}
-        pencilCooldownActive={pencilCooldownActive}
-        pencilCooldownTimeLeft={pencilCooldownTimeLeft}
-        grabLock={grabLock}
-        releaseLock={releaseLock}
-        requestPencil={requestPencil}
-      />
-
       <form
         onSubmit={handleSendMessage}
         onDragOver={handleDragOver}
@@ -238,7 +193,7 @@ export default function MessageInput(
         )}
 
         {/* ── Container principal ── */}
-        <div className="relative rounded-xl border border-slate-200/60 bg-white shadow-sm transition-all duration-200 focus-within:border-ring focus-within:ring-4 focus-within:ring-cyan-500/10 max-w-3xl mx-auto w-full p-3">
+        <div className="relative rounded-xl border border-slate-200/60 bg-white shadow-sm transition-all duration-200 focus-within:ring-0 max-w-3xl mx-auto w-full p-3">
           <Textarea
             ref={chatInputRef}
             placeholder={
@@ -256,11 +211,11 @@ export default function MessageInput(
             rows={1}
             onChange={handleTextareaChange}
             disabled={isGenerating || isRecordingAudio}
-            className="max-h-50 min-h-12 resize-none border-none bg-transparent p-0 text-sm shadow-none focus-visible:ring-0 leading-6"
+            className="max-h-50 min-h-12 resize-none border-none bg-transparent p-0 text-sm shadow-none focus:ring-0 outline-none focus-visible:ring-0 leading-6"
           />
 
           {/* ── Toolbar inferior ── */}
-          <div className="flex items-center gap-1 mt-2">
+          <div className="flex items-center gap-1 mt-1">
             {/* ESQUERDA: + (dropdown) */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -287,32 +242,74 @@ export default function MessageInput(
               </DropdownMenuContent>
             </DropdownMenu>
 
-            {/* ESPAÇADOR */}
             <div className="flex-1" />
 
-            {/* DIREITA: [✏️][🎤][🤖][🚀] */}
             <div className="flex items-center gap-0.5 sm:gap-1">
-              {/* ✏️ Lápis (multi-user only) */}
               {isMultiUserRoom && (
-                <Button
-                  size="icon-sm"
-                  variant="ghost"
-                  onClick={() => setPencilModalOpen(true)}
-                  disabled={isGenerating || isRecordingAudio}
-                  className={cn(
-                    "rounded-md",
-                    isLockHolder && "text-amber-600 hover:text-amber-700 hover:bg-amber-50"
-                  )}
-                  title={
-                    isLockHolder
-                      ? "Tens o lápis"
-                      : currentLock
-                        ? `Lápis com ${currentLock.name}`
-                        : "Pegar o lápis"
-                  }
-                >
-                  <Pencil size={16} />
-                </Button>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      size="icon-sm"
+                      variant="ghost"
+                      disabled={isGenerating || isRecordingAudio}
+                      className={cn(
+                        "rounded-md",
+                        isLockHolder && "text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+                      )}
+                    >
+                      <Pencil size={16} />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    className="w-64 p-3"
+                    align="end"
+                    side="top"
+                  >
+                    <div className="text-sm text-slate-600 mb-3 leading-relaxed">
+                      {isLockHolder ? (
+                        "Tens o lápis! Podes falar diretamente com o explicador."
+                      ) : currentLock ? (
+                        <>O lápis está com <strong className="text-slate-800">{currentLock.name}</strong></>
+                      ) : (
+                        "O lápis está disponível. Pega-o para falar com o explicador."
+                      )}
+                    </div>
+                    {isLockHolder ? (
+                      <Button
+                        onClick={releaseLock}
+                        variant="outline"
+                        className="w-full gap-2 text-xs h-8 border-red-200 text-red-600 hover:bg-red-50"
+                      >
+                        <Unlock size={14} />
+                        Largar o lápis
+                      </Button>
+                    ) : currentLock ? (
+                      <Button
+                        onClick={requestPencil}
+                        disabled={pencilCooldownActive}
+                        className="w-full gap-2 text-xs h-8 bg-amber-500 hover:bg-amber-600 text-white disabled:opacity-50"
+                      >
+                        {pencilCooldownActive ? (
+                          <><Lock size={14} /> Aguarda {pencilCooldownTimeLeft}s</>
+                        ) : (
+                          <><Lock size={14} /> Pedir o lápis</>
+                        )}
+                      </Button>
+                    ) : (
+                      <Button
+                        onClick={handleGrabLock}
+                        disabled={grabbingLock}
+                        className="w-full gap-2 text-xs h-8 bg-amber-500 hover:bg-amber-600 text-white"
+                      >
+                        {grabbingLock ? (
+                          <><Loader2 size={14} className="animate-spin" /> A pegar...</>
+                        ) : (
+                          <><Lock size={14} /> Pegar o lápis</>
+                        )}
+                      </Button>
+                    )}
+                  </PopoverContent>
+                </Popover>
               )}
 
               {/* 🎤 Microfone */}
@@ -330,7 +327,6 @@ export default function MessageInput(
                 {isRecordingAudio ? <Square size={16} /> : <Mic size={16} />}
               </Button>
 
-              {/* 🤖 @Explicador (multi-user only) */}
               {isMultiUserRoom && (
                 <Button
                   size="icon-sm"
@@ -344,7 +340,6 @@ export default function MessageInput(
                 </Button>
               )}
 
-              {/* 🚀 Enviar / Parar */}
               <Button
                 size="icon-sm"
                 type={isGenerating ? "button" : "submit"}
