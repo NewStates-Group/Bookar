@@ -59,6 +59,8 @@ interface MessageInputProps {
   setSelectedFile: (file: any) => void;
   pencilCooldownActive: boolean;
   pencilCooldownTimeLeft: number;
+  isAudioPlaying: boolean;
+  onStopAudio: () => void;
 }
 
 const TEMPLATES = [
@@ -92,6 +94,8 @@ export default function MessageInput(
     handleInterrupt,
     pencilCooldownActive,
     pencilCooldownTimeLeft,
+    isAudioPlaying,
+    onStopAudio,
   }: MessageInputProps) {
 
   const [isDragOver, setIsDragOver] = useState(false);
@@ -361,6 +365,18 @@ export default function MessageInput(
                   title="Enviar ao explicador"
                 >
                   <Bot size={16} />
+                </Button>
+              )}
+
+              {isAudioPlaying && (
+                <Button
+                  size="icon-sm"
+                  type="button"
+                  onClick={onStopAudio}
+                  className="rounded-md bg-red-500 hover:bg-red-600 text-white animate-pulse"
+                  title="Parar áudio"
+                >
+                  <Square size={16} />
                 </Button>
               )}
 

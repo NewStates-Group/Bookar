@@ -428,7 +428,7 @@ class NvidiaAudioProvider(BaseProvider):
         resp = service.synthesize(
             text=text[:2000],
             voice_name="Chatterbox-Multilingual.en-US.Male",
-            language_code="en-US",
+            language_code="pt-BR",
             sample_rate_hz=24000,
             encoding=AudioEncoding.LINEAR_PCM,
         )

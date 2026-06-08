@@ -43,7 +43,7 @@ function StreamingMessage({ content, active }: { content: string; active: boolea
         return () => clearInterval(interval);
     }, [content, active]);
 
-    return <ReactMarkdown>{displayedText}</ReactMarkdown>;
+    return <div className="break-words"><ReactMarkdown>{displayedText}</ReactMarkdown></div>;
 }
 
 export default function MessageList(
@@ -73,7 +73,7 @@ export default function MessageList(
                                 : "text-slate-700"
                                 }`}
                         >
-                            <div className="prose prose-slate max-w-none text-sm leading-relaxed">
+                            <div className="prose prose-slate max-w-none text-sm leading-relaxed break-words">
                                 {msg.role === "assistant" ? (
                                     <StreamingMessage
                                         content={msg.content}
@@ -91,7 +91,7 @@ export default function MessageList(
                                                             alt={msg.attachment.name}
                                                             className="max-h-48 object-contain w-full hover:scale-105 transition-transform duration-300"
                                                         />
-                                                        <div className="absolute bottom-0 inset-x-0 bg-black/60 px-2 py-1 text-[10px] text-white/95 truncate font-medium">
+                                                        <div className="absolute bottom-0 inset-x-0 bg-black/60 px-2 py-1 text-[10px] text-white/95 break-words leading-tight max-h-10 overflow-y-auto font-medium">
                                                             {msg.attachment.name}
                                                         </div>
                                                     </div>
@@ -103,7 +103,7 @@ export default function MessageList(
                                                     >
                                                         <FileText className="w-5 h-5 shrink-0" />
                                                         <div className="min-w-0 flex-1">
-                                                            <p className="truncate text-xs font-bold">{msg.attachment.name}</p>
+                                                            <p className="break-words text-xs font-bold">{msg.attachment.name}</p>
                                                             <p className="text-[9px] text-white/70 uppercase font-semibold">Descarregar documento</p>
                                                         </div>
                                                     </a>

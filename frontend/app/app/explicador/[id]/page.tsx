@@ -71,6 +71,7 @@ export default function ExplicadorRoomPage() {
   useEffect(() => { chatHistoryRef.current = chatHistory; }, [chatHistory]);
   const [activeStreamingMessageIndex, setActiveStreamingMessageIndex] = useState<number | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isAudioPlaying, setIsAudioPlaying] = useState(false);
   const [showParticipantsModal, setShowParticipantsModal] = useState(false);
 
   // Pencil request limit and cooldown states
@@ -563,6 +564,16 @@ export default function ExplicadorRoomPage() {
     return () => clearInterval(interval);
   }, [whiteboardData.summary]);
 
+  const stopAudio = useCallback(() => {
+    if (currentAudioRef.current) {
+      currentAudioRef.current.pause();
+      currentAudioRef.current = null;
+    }
+    setIsAudioPlaying(false);
+    setIsForceMuted(false);
+    sendWSMessage({ type: "voice_broadcast_end" });
+  }, [sendWSMessage]);
+
   const handleInterrupt = () => {
     setIsGenerating(false);
     sendWSMessage({ type: "interrupt" });
@@ -728,11 +739,14 @@ export default function ExplicadorRoomPage() {
 
           setIsForceMuted(true);
 
+          setIsAudioPlaying(true);
+
           const audio = new Audio(data.audio);
           currentAudioRef.current = audio;
 
           const endAudio = () => {
             setIsForceMuted(false);
+            setIsAudioPlaying(false);
             currentAudioRef.current = null;
             sendWSMessage({ type: "voice_broadcast_end" });
           };
@@ -1347,6 +1361,8 @@ export default function ExplicadorRoomPage() {
           setSelectedFile={setSelectedFile}
           pencilCooldownActive={pencilCooldownActive}
           pencilCooldownTimeLeft={pencilCooldownTimeLeft}
+          isAudioPlaying={isAudioPlaying}
+          onStopAudio={stopAudio}
         />
       </div>
 

@@ -19,6 +19,8 @@ from elevenlabs import ElevenLabs
 from . import presence as room_presence
 from .models import ExplicadorRoom
 
+from courses.providers import NvidiaAudioProvider
+
 logger = logging.getLogger(__name__)
 
 
@@ -66,23 +68,23 @@ def generate_elevenlabs_audio(text: str) -> str:
     text = text[:1000]
 
     # 1. Try ElevenLabs directly
-    api_key = settings.AI.get("ELEVENLABS_KEY", "")
-    if api_key:
-        try:
-            client = ElevenLabs(api_key=api_key, timeout=30)
-            audio = client.text_to_speech.convert(
-                text=text,
-                voice_id="JBFqnCBsd6RMkjVDRZzb",
-                model_id="eleven_multilingual_v2",
-                output_format="mp3_44100_128",
-            )
-            return _audio_to_data_uri(b"".join(audio), "audio/mpeg")
-        except Exception as e:
-            logger.warning("ElevenLabs TTS failed, trying fallback: %s", e)
+    # api_key = settings.AI.get("ELEVENLABS_KEY", "")
+    # if api_key:
+    #     try:
+    #         client = ElevenLabs(api_key=api_key, timeout=30)
+    #         audio = client.text_to_speech.convert(
+    #             text=text,
+    #             voice_id="JBFqnCBsd6RMkjVDRZzb",
+    #             model_id="eleven_multilingual_v2",
+    #             output_format="mp3_44100_128",
+    #         )
+    #         return _audio_to_data_uri(b"".join(audio), "audio/mpeg")
+    #     except Exception as e:
+    #         logger.warning("ElevenLabs TTS failed, trying fallback: %s", e)
 
     # 2. Fallback to audio chain (Gemini TTS → NVIDIA Riva)
-    if not settings.AI.get("GENAI_KEY") and not settings.AI.get("NVIDIA_API_KEY"):
-        logger.warning("No fallback TTS configured (GENAI_KEY / NVIDIA_API_KEY).")
+    if not settings.AI.get("GENAI_KEY") and not settings.AI.get("NVIDIA_AUDIO_API_KEY"):
+        logger.warning("No fallback TTS configured")
         return ""
 
     try:
