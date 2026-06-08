@@ -73,7 +73,11 @@ ASGI_APPLICATION = "core.asgi.application"
 SITE_URL = env("SITE_URL")
 
 DATABASES = {
-    "default": env.db(),
+    "default": {
+        **env.db(),
+        "CONN_MAX_AGE": 600,
+        "CONN_HEALTH_CHECKS": True,
+    }
 }
 
 AUTH_USER_MODEL = "accounts.User"
@@ -187,7 +191,7 @@ AI = {
 GOOGLE_CLIENT_ID = env("GOOGLE_CLIENT_ID")
 GOOGLE_CLIENT_SECRET = env("GOOGLE_CLIENT_SECRET")
 
-EMAIL_BACKEND = 'gmailapi_backend.mail.GmailBackend'
+EMAIL_BACKEND = "gmailapi_backend.mail.GmailBackend"
 EMAIL_HOST_USER = "newstates.bookar@gmail.com"
 DEFAULT_FROM_EMAIL = f"Bookar <{EMAIL_HOST_USER}>"
 
