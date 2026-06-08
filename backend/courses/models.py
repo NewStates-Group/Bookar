@@ -6,6 +6,7 @@ from cloudinary_storage.storage import (
     RawMediaCloudinaryStorage,
     VideoMediaCloudinaryStorage,
 )
+from django.contrib.postgres.indexes import GinIndex
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db import models
@@ -60,7 +61,7 @@ def generate_short_id():
 
 
 class Course(models.Model):
-    title = models.CharField(max_length=80, null=True, blank=True, db_index=True)
+    title = models.CharField(max_length=80, null=True, blank=True)
     desc = models.TextField(null=True, blank=True)
     level = models.CharField(
         max_length=2, choices=CourseLevel.choices, null=True, blank=True
@@ -69,7 +70,6 @@ class Course(models.Model):
         max_length=20,
         choices=CourseStatus.choices,
         default=CourseStatus.PROCESSING,
-        db_index=True,
     )
     uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
     thumb = models.ImageField(
@@ -91,7 +91,9 @@ class Course(models.Model):
     class Meta:
         indexes = [
             models.Index(fields=["status"], name="idx_course_status"),
-            models.Index(fields=["title"], name="idx_course_title"),
+            GinIndex(
+                fields=["title"], name="course_title_trgm", opclasses=["gin_trgm_ops"]
+            ),
         ]
 
     @property
@@ -120,9 +122,9 @@ class Course(models.Model):
         if not quiz_ids:
             return True
         passed = set(
-            QuizAttempt.objects
-            .filter(quiz_id__in=quiz_ids, user=user, passed=True)
-            .values_list("quiz_id", flat=True)
+            QuizAttempt.objects.filter(
+                quiz_id__in=quiz_ids, user=user, passed=True
+            ).values_list("quiz_id", flat=True)
         )
         return len(passed) == len(quiz_ids)
 
@@ -152,9 +154,9 @@ class Course(models.Model):
         )
         if quiz_ids:
             passed_quiz_ids = set(
-                QuizAttempt.objects
-                .filter(quiz_id__in=quiz_ids, user=user, passed=True)
-                .values_list("quiz_id", flat=True)
+                QuizAttempt.objects.filter(
+                    quiz_id__in=quiz_ids, user=user, passed=True
+                ).values_list("quiz_id", flat=True)
             )
             if len(passed_quiz_ids) < len(quiz_ids):
                 return False
@@ -176,7 +178,9 @@ class Module(models.Model):
 
     class Meta:
         indexes = [
-            models.Index(fields=["course", "created_at"], name="idx_module_course_created"),
+            models.Index(
+                fields=["course", "created_at"], name="idx_module_course_created"
+            ),
         ]
 
 
@@ -279,8 +283,12 @@ class QuizAttempt(models.Model):
 
     class Meta:
         indexes = [
-            models.Index(fields=["quiz", "user", "passed"], name="idx_quizattempt_quiz_user_pass"),
-            models.Index(fields=["quiz", "-completed_at"], name="idx_quizattempt_quiz_completed"),
+            models.Index(
+                fields=["quiz", "user", "passed"], name="idx_quizattempt_quiz_user_pass"
+            ),
+            models.Index(
+                fields=["quiz", "-completed_at"], name="idx_quizattempt_quiz_completed"
+            ),
         ]
 
 
@@ -325,8 +333,13 @@ class CourseEnrollment(models.Model):
     class Meta:
         unique_together = ("course", "user")
         indexes = [
-            models.Index(fields=["user", "deleted"], name="idx_enrollment_user_deleted"),
-            models.Index(fields=["course", "user", "deleted"], name="idx_enrollment_course_user_del"),
+            models.Index(
+                fields=["user", "deleted"], name="idx_enrollment_user_deleted"
+            ),
+            models.Index(
+                fields=["course", "user", "deleted"],
+                name="idx_enrollment_course_user_del",
+            ),
         ]
 
     def __str__(self):
@@ -343,7 +356,9 @@ class CourseShare(models.Model):
 
     class Meta:
         indexes = [
-            models.Index(fields=["course", "sharer"], name="idx_courseshare_course_sharer"),
+            models.Index(
+                fields=["course", "sharer"], name="idx_courseshare_course_sharer"
+            ),
         ]
 
     def __str__(self):

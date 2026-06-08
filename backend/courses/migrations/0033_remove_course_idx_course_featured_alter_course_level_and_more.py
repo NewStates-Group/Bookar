@@ -5,28 +5,32 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('courses', '0032_add_course_indexes'),
+        ("courses", "0032_add_course_indexes"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
     operations = [
         migrations.RemoveIndex(
-            model_name='course',
-            name='idx_course_featured',
+            model_name="course",
+            name="idx_course_featured",
         ),
         migrations.AlterField(
-            model_name='course',
-            name='level',
-            field=models.CharField(blank=True, choices=[('B', 'Beginner'), ('IT', 'Intermediate'), ('A', 'Advance')], max_length=2, null=True),
+            model_name="course",
+            name="level",
+            field=models.CharField(
+                blank=True,
+                choices=[("B", "Beginner"), ("IT", "Intermediate"), ("A", "Advance")],
+                max_length=2,
+                null=True,
+            ),
         ),
         migrations.AddIndex(
-            model_name='course',
-            index=models.Index(fields=['status'], name='idx_course_status'),
+            model_name="course",
+            index=models.Index(fields=["status"], name="idx_course_status"),
         ),
         migrations.AddIndex(
-            model_name='course',
-            index=models.Index(fields=['title'], name='idx_course_title'),
+            model_name="course",
+            index=models.Index(fields=["title"], name="idx_course_title"),
         ),
     ]
