@@ -38,7 +38,7 @@ class MindMap(models.Model):
     #   }
     # ]
     language = models.CharField(max_length=10, default="pt")
-    is_shared = models.BooleanField(default=False)
+    is_shared = models.BooleanField(default=False, db_index=True)
     import_count = models.PositiveIntegerField(default=0)
     nodes = models.JSONField(null=True, blank=True)
     completed_nodes = models.JSONField(default=list, blank=True)
@@ -46,6 +46,11 @@ class MindMap(models.Model):
     quizzes = models.JSONField(default=dict, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["user", "-created_at"], name="idx_mindmap_user_created"),
+        ]
 
     def __str__(self):
         return f"MindMap: {self.title or self.topic} ({self.status})"

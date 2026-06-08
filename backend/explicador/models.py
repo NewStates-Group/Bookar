@@ -12,7 +12,12 @@ class ExplicadorRoom(models.Model):
         related_name="explainer_rooms",
     )
     title = models.CharField(max_length=255)
-    is_active = models.BooleanField(default=True)
+    is_active = models.BooleanField(default=True, db_index=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["owner", "is_active", "-created_at"], name="idx_explic_owner_active"),
+        ]
 
     # Stores the whiteboard configuration, like:
     # {

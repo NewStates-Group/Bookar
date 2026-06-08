@@ -15,7 +15,7 @@ class User(AbstractUser):
 
 
 class EmailVerificationCode(models.Model):
-    email = models.EmailField()
+    email = models.EmailField(db_index=True)
     code = models.CharField(max_length=6)
     updated_at = models.DateTimeField(auto_now=True)
 

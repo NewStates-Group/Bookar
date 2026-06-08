@@ -63,12 +63,13 @@ class Course(models.Model):
     title = models.CharField(max_length=80, null=True, blank=True)
     desc = models.TextField(null=True, blank=True)
     level = models.CharField(
-        max_length=2, choices=CourseLevel.choices, null=True, blank=True
+        max_length=2, choices=CourseLevel.choices, null=True, blank=True, db_index=True
     )
     status = models.CharField(
         max_length=20,
         choices=CourseStatus.choices,
         default=CourseStatus.PROCESSING,
+        db_index=True,
     )
     uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
     thumb = models.ImageField(
@@ -107,11 +108,17 @@ class Course(models.Model):
         return self._check_completion(user)
 
     def _check_completion(self, user):
-        for module in self.modules.all():
-            if hasattr(module, "quiz"):
-                if not module.quiz.attempts.filter(user=user, passed=True).exists():
-                    return False
-        return True
+        quiz_ids = list(
+            Quiz.objects.filter(module__course=self).values_list("id", flat=True)
+        )
+        if not quiz_ids:
+            return True
+        passed = set(
+            QuizAttempt.objects
+            .filter(quiz_id__in=quiz_ids, user=user, passed=True)
+            .values_list("quiz_id", flat=True)
+        )
+        return len(passed) == len(quiz_ids)
 
     def is_fully_completed(self, user):
         """
@@ -133,10 +140,18 @@ class Course(models.Model):
         if watched_lessons < total_lessons:
             return False
 
-        for module in self.modules.all():
-            if hasattr(module, "quiz"):
-                if not module.quiz.attempts.filter(user=user, passed=True).exists():
-                    return False
+        # Single query: check if all quizzes have a passed attempt
+        quiz_ids = list(
+            Quiz.objects.filter(module__course=self).values_list("id", flat=True)
+        )
+        if quiz_ids:
+            passed_quiz_ids = set(
+                QuizAttempt.objects
+                .filter(quiz_id__in=quiz_ids, user=user, passed=True)
+                .values_list("quiz_id", flat=True)
+            )
+            if len(passed_quiz_ids) < len(quiz_ids):
+                return False
 
         return True
 
@@ -153,17 +168,23 @@ class Module(models.Model):
     uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
     created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)
 
+    class Meta:
+        indexes = [
+            models.Index(fields=["course", "created_at"], name="idx_module_course_created"),
+        ]
+
 
 class Lesson(models.Model):
     module = models.ForeignKey(Module, on_delete=models.CASCADE, related_name="lessons")
     title = models.CharField(max_length=150)
     desc = models.TextField()
     duration = models.PositiveIntegerField(default=0)
-    delivered = models.BooleanField(default=False, null=True, blank=True)
+    delivered = models.BooleanField(default=False, null=True, blank=True, db_index=True)
     status = models.CharField(
         max_length=20,
         choices=LessonStatus.choices,
         default=LessonStatus.PENDING,
+        db_index=True,
     )
     short_id = models.CharField(max_length=12, default=generate_short_id, unique=True)
     lesson_file = models.FileField(
@@ -237,7 +258,7 @@ class Choice(models.Model):
         Question, on_delete=models.CASCADE, related_name="choices"
     )
     text = models.CharField(max_length=200)
-    is_correct = models.BooleanField(default=False)
+    is_correct = models.BooleanField(default=False, db_index=True)
     uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
 
 
@@ -247,8 +268,14 @@ class QuizAttempt(models.Model):
     )
     quiz = models.ForeignKey(Quiz, on_delete=models.CASCADE, related_name="attempts")
     score = models.FloatField()
-    passed = models.BooleanField(default=False)
+    passed = models.BooleanField(default=False, db_index=True)
     completed_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["quiz", "user", "passed"], name="idx_quizattempt_quiz_user_pass"),
+            models.Index(fields=["quiz", "-completed_at"], name="idx_quizattempt_quiz_completed"),
+        ]
 
 
 class EnrollmentStatus(models.TextChoices):
@@ -272,7 +299,7 @@ class CourseEnrollment(models.Model):
         choices=EnrollmentStatus.choices,
         default=EnrollmentStatus.ACTIVE,
     )
-    deleted = models.BooleanField(default=False)
+    deleted = models.BooleanField(default=False, db_index=True)
     certificate_file = models.FileField(
         upload_to="courses/certificates/",
         null=True,
@@ -291,6 +318,10 @@ class CourseEnrollment(models.Model):
 
     class Meta:
         unique_together = ("course", "user")
+        indexes = [
+            models.Index(fields=["user", "deleted"], name="idx_enrollment_user_deleted"),
+            models.Index(fields=["course", "user", "deleted"], name="idx_enrollment_course_user_del"),
+        ]
 
     def __str__(self):
         return f"Enrollment: {self.user} → {self.course}"
@@ -303,6 +334,11 @@ class CourseShare(models.Model):
     )
     token = models.CharField(max_length=100, unique=True)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["course", "sharer"], name="idx_courseshare_course_sharer"),
+        ]
 
     def __str__(self):
         return f"Share: {self.sharer} → {self.course} ({self.token})"
