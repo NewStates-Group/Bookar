@@ -33,7 +33,7 @@ import {
   Unlock,
   X,
 } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 interface MessageInputProps {
@@ -144,11 +144,29 @@ export default function MessageInput(
     : null;
 
   const [grabbingLock, setGrabbingLock] = useState(false);
+  const [releasingLock, setReleasingLock] = useState(false);
+  const [requestingLock, setRequestingLock] = useState(false);
+
+  useEffect(() => {
+    if (grabbingLock && isLockHolder) setGrabbingLock(false);
+  }, [isLockHolder, grabbingLock]);
+
+  useEffect(() => {
+    if (releasingLock && !isLockHolder) setReleasingLock(false);
+  }, [isLockHolder, releasingLock]);
+
+  useEffect(() => {
+    if (requestingLock && isLockHolder) setRequestingLock(false);
+  }, [isLockHolder, requestingLock]);
 
   const handleGrabLock = () => {
     setGrabbingLock(true);
     grabLock();
-    setTimeout(() => setGrabbingLock(false), 800);
+  };
+
+  const handleReleaseLock = () => {
+    setReleasingLock(true);
+    releaseLock();
   };
 
   return (
@@ -276,20 +294,26 @@ export default function MessageInput(
                     </div>
                     {isLockHolder ? (
                       <Button
-                        onClick={releaseLock}
+                        onClick={handleReleaseLock}
+                        disabled={releasingLock}
                         variant="outline"
                         className="w-full gap-2 text-xs h-8 border-red-200 text-red-600 hover:bg-red-50"
                       >
-                        <Unlock size={14} />
-                        Largar o lápis
+                        {releasingLock ? (
+                          <><Loader2 size={14} className="animate-spin" /> A largar...</>
+                        ) : (
+                          <><Unlock size={14} /> Largar o lápis</>
+                        )}
                       </Button>
                     ) : currentLock ? (
                       <Button
-                        onClick={requestPencil}
-                        disabled={pencilCooldownActive}
+                        onClick={() => { setRequestingLock(true); requestPencil(); }}
+                        disabled={pencilCooldownActive || requestingLock}
                         className="w-full gap-2 text-xs h-8 bg-amber-500 hover:bg-amber-600 text-white disabled:opacity-50"
                       >
-                        {pencilCooldownActive ? (
+                        {requestingLock ? (
+                          <><Loader2 size={14} className="animate-spin" /> A pedir...</>
+                        ) : pencilCooldownActive ? (
                           <><Lock size={14} /> Aguarda {pencilCooldownTimeLeft}s</>
                         ) : (
                           <><Lock size={14} /> Pedir o lápis</>

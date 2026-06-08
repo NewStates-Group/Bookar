@@ -105,17 +105,28 @@ export default function ExplicadorRoomPage() {
   const isSplitting = useRef(false);
   const splitContainerRef = useRef<HTMLDivElement>(null);
 
-  // Dynamic viewport height for Safari/iOS keyboard handling
-  const [viewportHeight, setViewportHeight] = useState<string>("100dvh");
+  // Dynamic viewport height — only uses visualViewport.height when the keyboard is open
+  // (large drop >150px). Prevents layout jumps when the mobile address bar hides/shows.
+  const [viewportHeight, setViewportHeight] = useState<string>("100svh");
 
   useEffect(() => {
     if (typeof window === "undefined") return;
 
     const vv = window.visualViewport;
+    let previousHeight = window.innerHeight;
 
     const updateHeight = () => {
-      const h = vv ? vv.height : window.innerHeight;
-      setViewportHeight(`${h}px`);
+      if (!vv) return;
+      const svh = window.innerHeight;
+      const diff = svh - vv.height;
+      if (diff > 150) {
+        // Keyboard is open — use visual viewport height
+        setViewportHeight(`${vv.height}px`);
+      } else {
+        // Keyboard is closed — use stable svh
+        setViewportHeight("100svh");
+      }
+      previousHeight = svh;
     };
 
     const preventScroll = () => {
