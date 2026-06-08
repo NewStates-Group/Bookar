@@ -7,14 +7,31 @@ User = get_user_model()
 
 
 class ExplicadorService:
-    def list_rooms(self, user):
-        """List all active rooms owned by the user."""
-        queryset = ExplicadorRoom.objects.filter(owner=user, is_active=True).order_by(
-            "-created_at"
+    def list_rooms(self, user, q: str = ""):
+        """List all active rooms owned by the user, optionally filtered by title."""
+        from django.core.cache import cache
+
+        cache_key = f"explicador_rooms_{user.id}_{(q or '').strip()}"
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return cached
+
+        qs = (
+            ExplicadorRoom.objects
+            .filter(owner=user, is_active=True)
+            .order_by("-created_at")
+            .only("uuid", "title", "is_active", "created_at")
         )
-        for room in queryset:
+
+        search = (q or "").strip()
+        if search:
+            qs = qs.filter(title__icontains=search)
+
+        result = list(qs[:50])
+        for room in result:
             room.is_owner = True
-        return queryset
+        cache.set(cache_key, result, 60)
+        return result
 
     def create_room(self, user, title: str, course_context=None):
         """Create a new explicador room."""
@@ -37,15 +54,18 @@ class ExplicadorService:
     def get_room(self, room_uuid: str, user):
         """Retrieve details of a room by public UUID. Works for owner and guests."""
         try:
-            room = ExplicadorRoom.objects.get(uuid=room_uuid)
+            room = (
+                ExplicadorRoom.objects
+                .select_related("owner")
+                .only("uuid", "title", "is_active", "created_at", "whiteboard_data", "chat_history", "owner_id")
+                .get(uuid=room_uuid)
+            )
         except (ExplicadorRoom.DoesNotExist, ValueError):
             raise HttpError(404, "Sala de explicação não encontrada.")
 
-        # Determine if current user is owner
-        # If user is anonymous, is_owner will be False
         is_owner = False
         if user and user.is_authenticated:
-            is_owner = room.owner == user
+            is_owner = room.owner_id == user.id
 
         room.is_owner = is_owner
         return room
@@ -53,11 +73,15 @@ class ExplicadorService:
     def delete_room(self, room_uuid: str, user):
         """Deactivate or delete a room (restricted to owner)."""
         try:
-            room = ExplicadorRoom.objects.get(uuid=room_uuid)
+            room = (
+                ExplicadorRoom.objects
+                .only("uuid", "owner_id")
+                .get(uuid=room_uuid)
+            )
         except (ExplicadorRoom.DoesNotExist, ValueError):
             raise HttpError(404, "Sala de explicação não encontrada.")
 
-        if room.owner != user:
+        if room.owner_id != user.id:
             raise HttpError(403, "Apenas o proprietário pode excluir esta sala.")
 
         room.delete()

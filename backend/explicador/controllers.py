@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser
@@ -6,6 +6,7 @@ from injector import inject
 from ninja_extra import api_controller, route
 from ninja_jwt.authentication import JWTAuth
 from ninja_jwt.tokens import AccessToken
+from ninja import Query
 
 from .schemas import ExplicadorRoomCreateIn, ExplicadorRoomDetailOut, ExplicadorRoomOut
 from .services import ExplicadorService
@@ -20,9 +21,9 @@ class ExplicadorController:
         self.explicador_service = explicador_service
 
     @route.get("", response=List[ExplicadorRoomOut], auth=JWTAuth())
-    def list_rooms(self, request):
-        """List explanation rooms owned by the logged-in user."""
-        return self.explicador_service.list_rooms(request.user)
+    def list_rooms(self, request, q: Optional[str] = Query(None)):
+        """List explanation rooms owned by the logged-in user. Optionally filter by title."""
+        return self.explicador_service.list_rooms(request.user, q=q or "")
 
     @route.post("", response=ExplicadorRoomOut, auth=JWTAuth())
     def create_room(self, request, data: ExplicadorRoomCreateIn):
