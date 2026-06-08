@@ -43,11 +43,9 @@ INSTALLED_APPS = [
     "mind_maps",
     "explicador",
     "folhas",
-    "silk",
 ]
 
 MIDDLEWARE = [
-    "silk.middleware.SilkyMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -76,11 +74,7 @@ ASGI_APPLICATION = "core.asgi.application"
 SITE_URL = env("SITE_URL")
 
 DATABASES = {
-    "default": {
-        **env.db(),
-        "CONN_MAX_AGE": 600,
-        "CONN_HEALTH_CHECKS": True,
-    }
+    "default": env.db(),
 }
 
 AUTH_USER_MODEL = "accounts.User"

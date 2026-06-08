@@ -21,7 +21,7 @@ class MindMapController:
     def __init__(self, mind_map_service: MindMapService):
         self.mind_map_service = mind_map_service
 
-    @route.get("", response=List[MindMapOut])
+    @route.get("", response=List[dict])
     def list_mind_maps(self, request):
         return self.mind_map_service.list_mind_maps(request.user)
 

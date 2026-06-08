@@ -21,7 +21,7 @@ import { useWebSocket } from "@/context/WebSocketContext";
 import { DeleteMindMapDialog } from "@/components/DeleteMindMapDialog";
 
 interface MindMap {
-  id: string;
+  uuid: string;
   topic: string;
   title?: string;
   desc?: string;
@@ -97,7 +97,7 @@ export default function MindMapsPage() {
   const openDeleteDialog = (map: MindMap, e: React.MouseEvent) => {
     e.stopPropagation();
     setMapToDelete({
-      id: map.id,
+      id: map.uuid,
       title: map.title || map.topic,
       topic: map.topic,
     });
@@ -223,7 +223,7 @@ export default function MindMapsPage() {
         {/* Existing Mind Maps */}
         {mindMaps?.map((map) => (
           <Card
-            key={map.id}
+            key={map.uuid}
             className={`group relative flex flex-col justify-between px-6 pt-6 border border-border bg-card rounded-2xl transition-all duration-300 min-h-[220px] ${map.status === "READY"
               ? "hover:border-cyan-500/30 hover:shadow-lg hover:shadow-cyan-500/[0.05]"
               : ""
@@ -235,9 +235,9 @@ export default function MindMapsPage() {
               size="icon"
               className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-red-500 hover:bg-red-50/50 rounded-full transition-all duration-300"
               onClick={(e) => openDeleteDialog(map, e)}
-              disabled={isDeleting === map.id}
+              disabled={isDeleting === map.uuid}
             >
-              {isDeleting === map.id ? (
+              {isDeleting === map.uuid ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
                 <Trash2 className="w-4 h-4" />
@@ -279,7 +279,7 @@ export default function MindMapsPage() {
                   <h3
                     onClick={() => {
                       if (map.status === "READY") {
-                        router.push(`/app/mind-maps/${map.id}`);
+                        router.push(`/app/mind-maps/${map.uuid}`);
                       }
                     }}
                     className="font-medium hover:underline cursor-pointer text-gray-800 text-lg capitalize line-clamp-2 leading-snug hover:text-cyan-500 transition-colors">

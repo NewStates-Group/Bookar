@@ -1,3 +1,4 @@
+from django.core.cache import cache
 from django.db import models
 from ninja.errors import HttpError
 
@@ -6,7 +7,6 @@ from .tasks import generate_mind_map_task
 
 
 def invalidate_mind_map_cache(mind_map_uuid: str, user_id=None):
-    from django.core.cache import cache
     if mind_map_uuid:
         cache.delete(f"mind_map_detail_{mind_map_uuid}")
     if user_id:
@@ -15,20 +15,16 @@ def invalidate_mind_map_cache(mind_map_uuid: str, user_id=None):
 
 class MindMapService:
     def list_mind_maps(self, user):
-        from django.core.cache import cache
         cache_key = f"mind_maps_list_{user.id}"
         cached = cache.get(cache_key)
         if cached is not None:
             return cached
 
         maps = list(
-            MindMap.objects
-            .filter(user=user)
-            .order_by("-created_at")
-            .only("uuid", "topic", "title", "status", "is_shared", "created_at")[:50]
+            MindMap.objects.filter(user_id=user.id).values(
+                "uuid", "desc", "topic", "title", "status", "is_shared", "created_at"
+            )[:50]
         )
-        for m in maps:
-            m.is_owner = True
         cache.set(cache_key, maps, 300)  # 5 minutes
         return maps
 
@@ -49,11 +45,10 @@ class MindMapService:
         return mind_map
 
     def get_mind_map(self, uuid_str: str, user):
-        from django.core.cache import cache
         cache_key = f"mind_map_detail_{uuid_str}"
         cached = cache.get(cache_key)
         if cached is not None:
-            cached.is_owner = (cached.user_id == user.id)
+            cached.is_owner = cached.user_id == user.id
             return cached
 
         try:

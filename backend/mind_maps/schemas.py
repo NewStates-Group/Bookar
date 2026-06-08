@@ -48,6 +48,7 @@ class MindMapOut(ModelSchema):
     class Meta:
         model = MindMap
         fields = [
+            "uuid",
             "topic",
             "title",
             "desc",
