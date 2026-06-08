@@ -704,48 +704,13 @@ class CourseService:
         except Exception:
             return {"status": "PROCESSING", "pdf_url": None}
 
-    # def list_featured_courses(self, q: str = ""):
-    #     """Return the first 12 READY courses for the public community listing."""
-    #     queryset = (
-    #         Course.objects.filter(status="READY")
-    #         .select_related("owner")
-    #         .order_by("-created_at")
-    #     )
-
-    #     if q:
-    #         queryset = queryset.filter(title__icontains=q.strip())
-
-    #     queryset = queryset[:12]
-
-    #     result = []
-    #     for c in queryset:
-    #         thumb_url = None
-
-    #         if c.thumb:
-    #             try:
-    #                 thumb_url = c.thumb.url
-    #             except Exception:
-    #                 thumb_url = None
-
-    #         owner = c.owner
-    #         owner_name = None
-    #         if owner:
-    #             owner_name = f"{owner.first_name} {owner.last_name}".strip()
-
-    #         result.append(
-    #             {
-    #                 "id": str(c.uuid),
-    #                 "title": c.title,
-    #                 "level": c.level,
-    #                 "thumb": thumb_url,
-    #                 "owner_name": owner_name,
-    #             }
-    #         )
-
-    #     return result
-
 
     def list_featured_courses(self, q: str = ""):
+        result = cache.get("featured_courses")
+
+        if result and not q:
+            return result
+
         queryset = (
             Course.objects.filter(status="READY")
             .only("uuid", "level", "thumb", "title", "desc")
@@ -755,15 +720,7 @@ class CourseService:
             queryset = queryset.filter(title__icontains=q.strip())
 
         queryset = queryset[:12]
-
-        sql = str(queryset.query)
-        logger.critical(f"🧾 SQL QUERY:\n{sql}")
-
-        db_start = perf_counter()
         courses = list(queryset)
-        logger.critical(f"🗄️ DB FETCH TIME: {perf_counter() - db_start:.4f}s")
-
-        logger.critical(f"📊 DB QUERIES EXECUTED: {len(connection.queries)}")
 
         result = []
         for c in courses:
@@ -783,7 +740,8 @@ class CourseService:
                     "desc": c.desc,
                 }
             )
-
+        if not q:
+            cache.set("featured_courses", result)
         return result
 
     def get_course_preview(self, course_id: str) -> dict:
