@@ -60,10 +60,10 @@ def generate_short_id():
 
 
 class Course(models.Model):
-    title = models.CharField(max_length=80, null=True, blank=True)
+    title = models.CharField(max_length=80, null=True, blank=True, db_index=True)
     desc = models.TextField(null=True, blank=True)
     level = models.CharField(
-        max_length=2, choices=CourseLevel.choices, null=True, blank=True, db_index=True
+        max_length=2, choices=CourseLevel.choices, null=True, blank=True
     )
     status = models.CharField(
         max_length=20,
@@ -87,6 +87,12 @@ class Course(models.Model):
         related_name="owned_courses",
     )
     created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["status"], name="idx_course_status"),
+            models.Index(fields=["title"], name="idx_course_title"),
+        ]
 
     @property
     def creator(self):

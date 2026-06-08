@@ -42,4 +42,5 @@ dependencies = [
     "newrelic>=13.1.1",
     "grpcio>=1.70.0",
     "nvidia-riva-client>=2.19.0",
+    "watchdog[watchmedo]>=6.0.0",
 ]

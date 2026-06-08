@@ -308,6 +308,7 @@ pyyaml==6.0.3
     # via
     #   pyhanko
     #   uvicorn
+    #   watchdog
 redis==7.1.0
     # via
     #   backend (pyproject.toml)
@@ -402,6 +403,8 @@ vine==5.1.0
     #   amqp
     #   celery
     #   kombu
+watchdog==6.0.0
+    # via backend (pyproject.toml)
 watchfiles==1.1.1
     # via uvicorn
 wcwidth==0.2.14

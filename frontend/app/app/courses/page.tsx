@@ -4,7 +4,7 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { BookOpen, Plus, Loader2, ArrowRight, ArrowUp, ImageOff, Sparkles, GraduationCap, Award, FileDown, X, Trash2, Share2, Heart, Compass, Layers, Search, ChevronLeft, ChevronRight } from "lucide-react";
+import { BookOpen, Plus, Loader2, ArrowRight, ArrowUp, ImageOff, Sparkles, GraduationCap, Award, FileDown, X, Trash2, Share2, Heart, Compass, Layers, Search } from "lucide-react";
 import { useEffect, useState, useRef, useMemo } from "react";
 import { Label } from "@/components/ui/label";
 import {
@@ -48,22 +48,10 @@ interface Course {
 interface FeaturedCourse {
   id: string;
   title: string;
-  desc: string;
   level: string;
   thumb: string | null;
-  module_count: number;
-  owner_name: string | null;
+  desc: string | null;
 }
-
-interface FeaturedCoursesPage {
-  items: FeaturedCourse[];
-  total: number;
-  page: number;
-  page_size: number;
-  total_pages: number;
-}
-
-const COMMUNITY_PAGE_SIZE = 12;
 
 interface PreviewLesson {
   title: string;
@@ -114,33 +102,28 @@ export default function CoursesPage() {
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewData, setPreviewData] = useState<CoursePreviewDetail | null>(null);
   const [isCloning, setIsCloning] = useState(false);
-  const [communityPage, setCommunityPage] = useState(1);
   const [communitySearchInput, setCommunitySearchInput] = useState("");
   const [communitySearch, setCommunitySearch] = useState("");
 
   useEffect(() => {
     const timer = setTimeout(() => {
       setCommunitySearch(communitySearchInput.trim());
-      setCommunityPage(1);
     }, 400);
     return () => clearTimeout(timer);
   }, [communitySearchInput]);
 
   const communityFeaturedUrl = useMemo(() => {
-    const params = new URLSearchParams({
-      page: String(communityPage),
-      page_size: String(COMMUNITY_PAGE_SIZE),
-    });
+    const params = new URLSearchParams();
     if (communitySearch) {
       params.set("q", communitySearch);
     }
     return `${process.env.NEXT_PUBLIC_API_URL}/courses/featured?${params.toString()}`;
-  }, [communityPage, communitySearch]);
+  }, [communitySearch]);
 
   const {
-    data: featuredPage,
+    data: featuredCourses,
     isLoading: isLoadingCommunity,
-  } = useSWR<FeaturedCoursesPage>(
+  } = useSWR<FeaturedCourse[]>(
     communityFeaturedUrl,
     async (url: string) => {
       const res = await fetch(url);
@@ -150,11 +133,8 @@ export default function CoursesPage() {
     {
       revalidateOnFocus: false,
       dedupingInterval: 30000,
-      keepPreviousData: true,
     }
   );
-
-  const featuredCourses = featuredPage?.items ?? [];
 
   const handleOpenPreview = async (courseId: string) => {
     setShowPreviewModal(true);
@@ -779,21 +759,13 @@ export default function CoursesPage() {
             <p className="text-sm text-slate-500 mt-0.5">
               Aprenda com cursos criados por outros estudantes e adicione-os à sua conta
             </p>
-            {featuredPage && featuredPage.total > 0 && (
-              <p className="text-xs text-slate-400 mt-1">
-                {featuredPage.total}{" "}
-                {featuredPage.total === 1
-                  ? "curso disponível"
-                  : "cursos disponíveis"}
-              </p>
-            )}
           </div>
 
           <div className="relative w-full sm:max-w-xs">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
             <Input
               type="search"
-              placeholder="Pesquisar por título, descrição ou autor…"
+              placeholder="Pesquisar por curso…"
               value={communitySearchInput}
               onChange={(e) => setCommunitySearchInput(e.target.value)}
               className="pl-9 h-10 rounded-xl border-slate-200/80 bg-white"
@@ -801,7 +773,7 @@ export default function CoursesPage() {
           </div>
         </div>
 
-        {isLoadingCommunity && !featuredPage ? (
+        {isLoadingCommunity && !featuredCourses ? (
           <div className="flex items-center justify-center py-16">
             <Loader2 className="w-8 h-8 animate-spin text-cyan-500" />
           </div>
@@ -858,7 +830,7 @@ export default function CoursesPage() {
                     {fc.title}
                   </h3>
 
-                  <p className="text-xs text-slate-500 line-clamp-1">{fc.owner_name}</p>
+                  <p className="text-sm text-slate-500 line-clamp-2">{fc.desc}</p>
 
                   <div className="flex flex-wrap items-center gap-2 mt-3">
                     <span className="text-xs text-cyan-700 font-bold bg-cyan-100 px-2 py-0.5 rounded-sm">
@@ -868,49 +840,12 @@ export default function CoursesPage() {
                           ? "Intermediário"
                           : "Avançado"}
                     </span>
-                    <span className="text-xs font-light border border-slate-300 px-2 py-0.5 rounded-sm">
-                      {fc.module_count} módulo{fc.module_count !== 1 ? "s" : ""}
-                    </span>
                   </div>
                 </div>
               ))}
             </div>
 
-            {featuredPage && featuredPage.total_pages > 1 && (
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-8 pt-4 border-t border-slate-100">
-                <p className="text-sm text-slate-500 order-2 sm:order-1">
-                  Página {featuredPage.page} de {featuredPage.total_pages}
-                </p>
-                <div className="flex items-center gap-2 order-1 sm:order-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="rounded-xl gap-1"
-                    disabled={communityPage <= 1 || isLoadingCommunity}
-                    onClick={() => setCommunityPage((p) => Math.max(1, p - 1))}
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                    Anterior
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="rounded-xl gap-1"
-                    disabled={
-                      communityPage >= featuredPage.total_pages || isLoadingCommunity
-                    }
-                    onClick={() =>
-                      setCommunityPage((p) =>
-                        Math.min(featuredPage.total_pages, p + 1)
-                      )
-                    }
-                  >
-                    Próxima
-                    <ChevronRight className="w-4 h-4" />
-                  </Button>
-                </div>
-              </div>
-            )}
+
           </>
         )}
       </div>

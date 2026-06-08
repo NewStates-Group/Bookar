@@ -1,10 +1,12 @@
 import logging
+from time import perf_counter
 import uuid
 
 from core.utils import send_user_update
 from django.core.cache import cache
-from django.db.models import Prefetch, Q
-from django.db.models.query import QuerySet
+from django.db.models import Prefetch
+
+from django.db import connection
 from django.utils import timezone
 from ninja.errors import HttpError
 
@@ -38,7 +40,9 @@ logger = logging.getLogger(__name__)
 
 
 class CourseService:
-    def _batch_compute_completions(self, user, course_ids: list[int]) -> dict[int, dict]:
+    def _batch_compute_completions(
+        self, user, course_ids: list[int]
+    ) -> dict[int, dict]:
         """Compute is_completed and is_fully_completed for many courses in ~7 queries total."""
         from collections import defaultdict
         from django.db.models import Count
@@ -65,9 +69,7 @@ class CourseService:
 
         # 3. READY lesson counts per course (for is_fully_completed)
         ready_lesson_counts = dict(
-            Lesson.objects.filter(
-                module__course_id__in=course_ids, status="READY"
-            )
+            Lesson.objects.filter(module__course_id__in=course_ids, status="READY")
             .values("module__course_id")
             .annotate(count=Count("id"))
             .values_list("module__course_id", "count")
@@ -96,16 +98,14 @@ class CourseService:
 
         # 6. Max modules per course
         max_mod_map = dict(
-            Course.objects.filter(id__in=course_ids)
-            .values_list("id", "max_modules")
+            Course.objects.filter(id__in=course_ids).values_list("id", "max_modules")
         )
 
         # 7. Quiz IDs grouped by course
         course_quiz_map: dict[int, list[int]] = defaultdict(list)
-        for qid, cid in (
-            Quiz.objects.filter(module__course_id__in=course_ids)
-            .values_list("id", "module__course_id")
-        ):
+        for qid, cid in Quiz.objects.filter(
+            module__course_id__in=course_ids
+        ).values_list("id", "module__course_id"):
             course_quiz_map[cid].append(qid)
 
         # 8. Passed quiz attempts across all relevant quizzes
@@ -157,14 +157,20 @@ class CourseService:
             return cached
 
         enrollments = list(
-            CourseEnrollment.objects
-            .filter(user=user, deleted=False)
+            CourseEnrollment.objects.filter(user=user, deleted=False)
             .select_related("course")
             .only(
-                "course__uuid", "course__title", "course__desc",
-                "course__thumb", "course__level", "course__status",
-                "course__max_modules", "course__created_at", "course__owner_id",
-                "certificate_status", "certificate_file",
+                "course__uuid",
+                "course__title",
+                "course__desc",
+                "course__thumb",
+                "course__level",
+                "course__status",
+                "course__max_modules",
+                "course__created_at",
+                "course__owner_id",
+                "certificate_status",
+                "certificate_file",
             )
             .order_by("-course__created_at")
         )
@@ -201,18 +207,27 @@ class CourseService:
         if not course:
             try:
                 course = (
-                    Course.objects
-                    .select_related("owner")
+                    Course.objects.select_related("owner")
                     .only(
-                        "uuid", "title", "desc", "level", "status",
-                        "max_modules", "created_at", "owner",
+                        "uuid",
+                        "title",
+                        "desc",
+                        "level",
+                        "status",
+                        "max_modules",
+                        "created_at",
+                        "owner",
                         "thumb",
                     )
                     .prefetch_related(
                         Prefetch(
                             "modules",
-                            queryset=Module.objects.order_by("created_at").prefetch_related(
-                                Prefetch("lessons", queryset=Lesson.objects.order_by("id")),
+                            queryset=Module.objects.order_by(
+                                "created_at"
+                            ).prefetch_related(
+                                Prefetch(
+                                    "lessons", queryset=Lesson.objects.order_by("id")
+                                ),
                                 Prefetch(
                                     "quiz",
                                     queryset=Quiz.objects.prefetch_related(
@@ -240,13 +255,15 @@ class CourseService:
             # Batch-fetch all quiz attempts for this user across all course modules
             module_ids = [m.id for m in course.modules.all()]
             quiz_ids = list(
-                Quiz.objects.filter(module_id__in=module_ids).values_list("id", flat=True)
+                Quiz.objects.filter(module_id__in=module_ids).values_list(
+                    "id", flat=True
+                )
             )
             if quiz_ids:
                 attempts = list(
-                    QuizAttempt.objects
-                    .filter(quiz_id__in=quiz_ids, user=user)
-                    .order_by("quiz_id", "-completed_at")
+                    QuizAttempt.objects.filter(
+                        quiz_id__in=quiz_ids, user=user
+                    ).order_by("quiz_id", "-completed_at")
                 )
                 # Map first (latest) attempt per quiz
                 best: dict[int, QuizAttempt] = {}
@@ -392,8 +409,7 @@ class CourseService:
 
         # Get all lessons for the course with a single progress lookup
         lessons = list(
-            Lesson.objects
-            .filter(module__course__uuid=course_id)
+            Lesson.objects.filter(module__course__uuid=course_id)
             .order_by("module__created_at", "module__id", "id")
             .only("id", "module", "status", "short_id", "title")
         )
@@ -402,9 +418,9 @@ class CourseService:
 
         # Single query to get all watched lesson IDs for this user
         watched_ids = set(
-            LessonProgress.objects
-            .filter(user=user, lesson__in=lessons, watched=True)
-            .values_list("lesson_id", flat=True)
+            LessonProgress.objects.filter(
+                user=user, lesson__in=lessons, watched=True
+            ).values_list("lesson_id", flat=True)
         )
 
         for lesson in lessons:
@@ -688,91 +704,86 @@ class CourseService:
         except Exception:
             return {"status": "PROCESSING", "pdf_url": None}
 
-    def _serialize_featured_course(self, course: Course) -> dict:
-        thumb_url = None
-        if course.thumb:
-            try:
-                thumb_url = course.thumb.url
-            except Exception:
-                thumb_url = str(course.thumb)
+    # def list_featured_courses(self, q: str = ""):
+    #     """Return the first 12 READY courses for the public community listing."""
+    #     queryset = (
+    #         Course.objects.filter(status="READY")
+    #         .select_related("owner")
+    #         .order_by("-created_at")
+    #     )
 
-        owner = course.owner
-        owner_name = None
-        if owner:
-            owner_name = (
-                f"{owner.first_name} {owner.last_name}".strip() or owner.username
-            )
+    #     if q:
+    #         queryset = queryset.filter(title__icontains=q.strip())
 
-        return {
-            "id": str(course.uuid),
-            "title": course.title,
-            "desc": course.desc,
-            "level": course.level,
-            "thumb": thumb_url,
-            "module_count": len(course.modules.all()),
-            "owner_name": owner_name,
-        }
+    #     queryset = queryset[:12]
 
-    def list_featured_courses(
-        self, page: int = 1, page_size: int = 12, q: str = ""
-    ) -> dict:
-        """Return paginated READY courses for the public community listing."""
-        page = max(page, 1)
-        page_size = min(max(page_size, 1), 48)
+    #     result = []
+    #     for c in queryset:
+    #         thumb_url = None
 
-        from django.core.cache import cache
-        import hashlib
+    #         if c.thumb:
+    #             try:
+    #                 thumb_url = c.thumb.url
+    #             except Exception:
+    #                 thumb_url = None
 
-        # 1. Get or initialize the featured courses version number
-        version = cache.get("featured_courses_version")
-        if version is None:
-            version = 1
-            cache.set("featured_courses_version", version, 86400 * 30)  # Store for 30 days
+    #         owner = c.owner
+    #         owner_name = None
+    #         if owner:
+    #             owner_name = f"{owner.first_name} {owner.last_name}".strip()
 
-        # 2. Build the unique cache key
-        q_hash = hashlib.md5((q or "").strip().encode("utf-8")).hexdigest()
-        cache_key = f"featured_courses_v{version}_{page}_{page_size}_{q_hash}"
+    #         result.append(
+    #             {
+    #                 "id": str(c.uuid),
+    #                 "title": c.title,
+    #                 "level": c.level,
+    #                 "thumb": thumb_url,
+    #                 "owner_name": owner_name,
+    #             }
+    #         )
 
-        # 3. Check cache
-        cached_result = cache.get(cache_key)
-        if cached_result is not None:
-            return cached_result
+    #     return result
 
+
+    def list_featured_courses(self, q: str = ""):
         queryset = (
             Course.objects.filter(status="READY")
-            .prefetch_related("modules")
-            .select_related("owner")
-            .only(
-                "uuid", "title", "desc", "level", "thumb",
-                "owner", "owner__first_name", "owner__last_name",
-                "owner__username", "created_at",
-            )
-            .order_by("-created_at")
+            .only("uuid", "level", "thumb", "title", "desc")
         )
 
-        search = (q or "").strip()
-        if search:
-            queryset = queryset.filter(
-                Q(title__icontains=search)
-                | Q(desc__icontains=search)
-                | Q(owner__first_name__icontains=search)
-                | Q(owner__last_name__icontains=search)
-                | Q(owner__username__icontains=search)
+        if q:
+            queryset = queryset.filter(title__icontains=q.strip())
+
+        queryset = queryset[:12]
+
+        sql = str(queryset.query)
+        logger.critical(f"🧾 SQL QUERY:\n{sql}")
+
+        db_start = perf_counter()
+        courses = list(queryset)
+        logger.critical(f"🗄️ DB FETCH TIME: {perf_counter() - db_start:.4f}s")
+
+        logger.critical(f"📊 DB QUERIES EXECUTED: {len(connection.queries)}")
+
+        result = []
+        for c in courses:
+            thumb_url = None
+            if c.thumb:
+                try:
+                    thumb_url = c.thumb.url
+                except Exception:
+                    thumb_url = None
+
+            result.append(
+                {
+                    "id": str(c.uuid),
+                    "title": c.title,
+                    "level": c.level,
+                    "thumb": thumb_url,
+                    "desc": c.desc,
+                }
             )
 
-        total = queryset.count()
-        offset = (page - 1) * page_size
-        courses = queryset[offset : offset + page_size]
-        total_pages = (total + page_size - 1) // page_size if total else 0
-
-        result = {
-            "items": [self._serialize_featured_course(c) for c in courses],
-            "total": total,
-            "page": page,
-            "page_size": page_size,
-            "total_pages": total_pages,
-        }
-        cache.set(cache_key, result, 3600)  # Cache for 1 hour
         return result
 
     def get_course_preview(self, course_id: str) -> dict:

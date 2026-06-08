@@ -337,19 +337,11 @@ class CourseFeaturedOut(Schema):
 
     id: str
     title: Optional[str] = None
-    desc: Optional[str] = None
     level: Optional[str] = None
     thumb: Optional[str] = None
-    module_count: int = 0
-    owner_name: Optional[str] = None
+    desc: Optional[str] = None
 
 
-class CourseFeaturedPageOut(Schema):
-    items: List[CourseFeaturedOut]
-    total: int
-    page: int
-    page_size: int
-    total_pages: int
 
 
 class CoursePreviewLessonOut(Schema):
