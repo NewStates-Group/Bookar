@@ -38,18 +38,160 @@ logger = logging.getLogger(__name__)
 
 
 class CourseService:
-    def list_courses(self, user) -> QuerySet[Course]:
-        cache_key = get_course_list_cache_key(user.id)
-        cached_result = cache.get(cache_key)
-        if cached_result:
-            return cached_result
+    def _batch_compute_completions(self, user, course_ids: list[int]) -> dict[int, dict]:
+        """Compute is_completed and is_fully_completed for many courses in ~7 queries total."""
+        from collections import defaultdict
+        from django.db.models import Count
 
-        # Return courses user is enrolled in and HAS NOT DELETED
-        enrolled_ids = CourseEnrollment.objects.filter(
-            user=user, deleted=False
-        ).values_list("course_id", flat=True)
-        courses = Course.objects.filter(id__in=enrolled_ids).order_by("-created_at")
-        cache.set(cache_key, list(courses), 300)  # Cache for 5 minutes
+        course_ids = [cid for cid in course_ids if cid]
+
+        # 1. Total lessons per course
+        lesson_counts = dict(
+            Lesson.objects.filter(module__course_id__in=course_ids)
+            .values("module__course_id")
+            .annotate(count=Count("id"))
+            .values_list("module__course_id", "count")
+        )
+
+        # 2. Watched lessons per course (no status filter — for is_completed)
+        watched_counts = dict(
+            LessonProgress.objects.filter(
+                user=user, lesson__module__course_id__in=course_ids, watched=True
+            )
+            .values("lesson__module__course_id")
+            .annotate(count=Count("id"))
+            .values_list("lesson__module__course_id", "count")
+        )
+
+        # 3. READY lesson counts per course (for is_fully_completed)
+        ready_lesson_counts = dict(
+            Lesson.objects.filter(
+                module__course_id__in=course_ids, status="READY"
+            )
+            .values("module__course_id")
+            .annotate(count=Count("id"))
+            .values_list("module__course_id", "count")
+        )
+
+        # 4. Watched READY lessons per course (for is_fully_completed)
+        watched_ready = dict(
+            LessonProgress.objects.filter(
+                user=user,
+                lesson__module__course_id__in=course_ids,
+                lesson__status="READY",
+                watched=True,
+            )
+            .values("lesson__module__course_id")
+            .annotate(count=Count("id"))
+            .values_list("lesson__module__course_id", "count")
+        )
+
+        # 5. Module counts per course
+        module_counts = dict(
+            Module.objects.filter(course_id__in=course_ids)
+            .values("course_id")
+            .annotate(count=Count("id"))
+            .values_list("course_id", "count")
+        )
+
+        # 6. Max modules per course
+        max_mod_map = dict(
+            Course.objects.filter(id__in=course_ids)
+            .values_list("id", "max_modules")
+        )
+
+        # 7. Quiz IDs grouped by course
+        course_quiz_map: dict[int, list[int]] = defaultdict(list)
+        for qid, cid in (
+            Quiz.objects.filter(module__course_id__in=course_ids)
+            .values_list("id", "module__course_id")
+        ):
+            course_quiz_map[cid].append(qid)
+
+        # 8. Passed quiz attempts across all relevant quizzes
+        all_quiz_ids = [qid for ids in course_quiz_map.values() for qid in ids]
+        passed_set: set[int] = set()
+        if all_quiz_ids:
+            passed_set = set(
+                QuizAttempt.objects.filter(
+                    quiz_id__in=all_quiz_ids, user=user, passed=True
+                ).values_list("quiz_id", flat=True)
+            )
+
+        result = {}
+        for cid in course_ids:
+            total_lessons = lesson_counts.get(cid, 0)
+            watched = watched_counts.get(cid, 0)
+            ready_total = ready_lesson_counts.get(cid, 0)
+            watched_ready_count = watched_ready.get(cid, 0)
+            total_modules = module_counts.get(cid, 0)
+            max_mod = max_mod_map.get(cid, 0)
+            quiz_ids = course_quiz_map.get(cid, [])
+            passed_quizzes = sum(1 for qid in quiz_ids if qid in passed_set)
+
+            quizzes_ok = len(quiz_ids) == passed_quizzes
+
+            # is_completed: all lessons watched (any status), all quizzes passed
+            lessons_ok = total_lessons > 0 and watched >= total_lessons
+            is_completed = lessons_ok and quizzes_ok
+
+            # is_fully_completed: max_modules reached, all READY lessons watched, all quizzes passed
+            ready_ok = (
+                (not max_mod or total_modules >= max_mod)
+                and ready_total > 0
+                and watched_ready_count >= ready_total
+            )
+            is_fully_completed = ready_ok and quizzes_ok
+
+            result[cid] = {
+                "is_completed": is_completed,
+                "is_fully_completed": is_fully_completed,
+            }
+
+        return result
+
+    def list_courses(self, user) -> list:
+        cache_key = get_course_list_cache_key(user.id)
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return cached
+
+        enrollments = list(
+            CourseEnrollment.objects
+            .filter(user=user, deleted=False)
+            .select_related("course")
+            .only(
+                "course__uuid", "course__title", "course__desc",
+                "course__thumb", "course__level", "course__status",
+                "course__max_modules", "course__created_at", "course__owner_id",
+                "certificate_status", "certificate_file",
+            )
+            .order_by("-course__created_at")
+        )
+
+        if not enrollments:
+            return []
+
+        course_ids = [e.course_id for e in enrollments]
+        completion_data = self._batch_compute_completions(user, course_ids)
+
+        for e in enrollments:
+            c = e.course
+            data = completion_data.get(c.id, {})
+            c._precomputed_is_completed = data.get("is_completed", False)
+            c._precomputed_is_fully_completed = data.get("is_fully_completed", False)
+            c._precomputed_certificate_status = e.certificate_status
+            try:
+                c._precomputed_certificate_url = (
+                    e.certificate_file.url
+                    if e.certificate_status == "READY" and e.certificate_file
+                    else None
+                )
+            except Exception:
+                c._precomputed_certificate_url = None
+
+        courses = [e.course for e in enrollments]
+        cache.set(cache_key, courses, 300)
         return courses
 
     def get_course(self, id: str, user=None) -> Course:
@@ -58,34 +200,66 @@ class CourseService:
 
         if not course:
             try:
-                course = Course.objects.prefetch_related(
-                    Prefetch(
-                        "modules",
-                        queryset=Module.objects.order_by("created_at").prefetch_related(
-                            Prefetch("lessons", queryset=Lesson.objects.order_by("id"))
+                course = (
+                    Course.objects
+                    .select_related("owner")
+                    .only(
+                        "uuid", "title", "desc", "level", "status",
+                        "max_modules", "created_at", "owner",
+                        "thumb",
+                    )
+                    .prefetch_related(
+                        Prefetch(
+                            "modules",
+                            queryset=Module.objects.order_by("created_at").prefetch_related(
+                                Prefetch("lessons", queryset=Lesson.objects.order_by("id")),
+                                Prefetch(
+                                    "quiz",
+                                    queryset=Quiz.objects.prefetch_related(
+                                        Prefetch(
+                                            "attempts",
+                                            queryset=QuizAttempt.objects.none(),
+                                            to_attr="_prefetched_attempts",
+                                        )
+                                    ),
+                                ),
+                            ),
                         ),
                     )
-                ).get(uuid=id)
-                cache.set(cache_key, course, 600)  # 10 minutes
+                    .get(uuid=id)
+                )
+                cache.set(cache_key, course, 600)
             except Course.DoesNotExist:
                 raise HttpError(404, "Curso não encontrado")
 
         if user:
-            # Update last_accessed_at on enrollment
             CourseEnrollment.objects.filter(course=course, user=user).update(
                 last_accessed_at=timezone.now()
             )
 
-            for module in course.modules.all():
-                if hasattr(module, "quiz"):
-                    last_attempt = (
-                        module.quiz.attempts.filter(user=user)
-                        .order_by("-completed_at")
-                        .first()
-                    )
-                    if last_attempt:
-                        module._last_quiz_score = last_attempt.score
-                        module._last_quiz_passed = last_attempt.passed
+            # Batch-fetch all quiz attempts for this user across all course modules
+            module_ids = [m.id for m in course.modules.all()]
+            quiz_ids = list(
+                Quiz.objects.filter(module_id__in=module_ids).values_list("id", flat=True)
+            )
+            if quiz_ids:
+                attempts = list(
+                    QuizAttempt.objects
+                    .filter(quiz_id__in=quiz_ids, user=user)
+                    .order_by("quiz_id", "-completed_at")
+                )
+                # Map first (latest) attempt per quiz
+                best: dict[int, QuizAttempt] = {}
+                for a in attempts:
+                    if a.quiz_id not in best:
+                        best[a.quiz_id] = a
+
+                for module in course.modules.all():
+                    if hasattr(module, "quiz") and module.quiz:
+                        attempt = best.get(module.quiz.id)
+                        if attempt:
+                            module._last_quiz_score = attempt.score
+                            module._last_quiz_passed = attempt.passed
 
         return course
 
@@ -216,16 +390,25 @@ class CourseService:
                 .first()
             )
 
-        # Get all lessons for the course
-        all_lessons = Lesson.objects.filter(module__course__uuid=course_id).order_by(
-            "module__created_at", "module__id", "id"
+        # Get all lessons for the course with a single progress lookup
+        lessons = list(
+            Lesson.objects
+            .filter(module__course__uuid=course_id)
+            .order_by("module__created_at", "module__id", "id")
+            .only("id", "module", "status", "short_id", "title")
+        )
+        if not lessons:
+            return None
+
+        # Single query to get all watched lesson IDs for this user
+        watched_ids = set(
+            LessonProgress.objects
+            .filter(user=user, lesson__in=lessons, watched=True)
+            .values_list("lesson_id", flat=True)
         )
 
-        # Find the first one not watched by the user
-        for lesson in all_lessons:
-            if not LessonProgress.objects.filter(
-                user=user, lesson=lesson, watched=True
-            ).exists():
+        for lesson in lessons:
+            if lesson.id not in watched_ids:
                 return lesson
 
         return None
@@ -267,26 +450,38 @@ class CourseService:
         if total_questions == 0:
             return {"score": 100, "passed": True, "correct_answers": []}
 
-        correct_count = 0
+        # Prefetch all questions + choices once
+        questions = list(quiz.questions.prefetch_related("choices").all())
+        question_map = {str(q.uuid): q for q in questions}
         correct_choice_ids = []
+        correct_count = 0
+
+        # Build lookup of all correct choice UUIDs per question
+        all_correct_map: dict[str, str] = {}
+        for q in questions:
+            for c in q.choices.all():
+                if c.is_correct:
+                    all_correct_map[str(q.uuid)] = str(c.uuid)
+                    break
 
         for ans in answers:
-            try:
-                question = Question.objects.get(uuid=ans.question_id, quiz=quiz)
-                choice = Choice.objects.get(uuid=ans.choice_id, question=question)
-                if choice.is_correct:
-                    correct_count += 1
-                    correct_choice_ids.append(choice.id)
-                else:
-                    correct_choice = question.choices.filter(is_correct=True).first()
-                    if correct_choice:
-                        correct_choice_ids.append(correct_choice.id)
-            except (Question.DoesNotExist, Choice.DoesNotExist):
+            q_uuid = ans.question_id
+            c_uuid = ans.choice_id
+            question = question_map.get(q_uuid)
+            if not question:
                 continue
+            choice_ids = [str(c.uuid) for c in question.choices.all()]
+            if c_uuid not in choice_ids:
+                continue
+            if c_uuid == all_correct_map.get(q_uuid):
+                correct_count += 1
+                correct_choice_ids.append(c_uuid)
+            else:
+                correct_uuid = all_correct_map.get(q_uuid)
+                if correct_uuid:
+                    correct_choice_ids.append(correct_uuid)
 
-        all_correct = Choice.objects.filter(
-            question__quiz=quiz, is_correct=True
-        ).values_list("uuid", flat=True)
+        all_correct = list(all_correct_map.values())
 
         score = (correct_count / total_questions) * 10.0
         passed = score >= 7.0
@@ -514,7 +709,7 @@ class CourseService:
             "desc": course.desc,
             "level": course.level,
             "thumb": thumb_url,
-            "module_count": course.modules.count(),
+            "module_count": len(course.modules.all()),
             "owner_name": owner_name,
         }
 
@@ -547,6 +742,11 @@ class CourseService:
             Course.objects.filter(status="READY")
             .prefetch_related("modules")
             .select_related("owner")
+            .only(
+                "uuid", "title", "desc", "level", "thumb",
+                "owner", "owner__first_name", "owner__last_name",
+                "owner__username", "created_at",
+            )
             .order_by("-created_at")
         )
 
@@ -602,7 +802,7 @@ class CourseService:
 
         modules_data = []
         for module in course.modules.order_by("created_at"):
-            lessons = list(module.lessons.values("title", "desc"))
+            lessons = [{"title": l.title, "desc": l.desc} for l in module.lessons.all()]
             modules_data.append(
                 {
                     "id": str(module.uuid),
