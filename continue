@@ -1,9 +1,0 @@
-no desktop a barra do explicador ficou em baixo da sidebar e o texto ficou para o centro da página inteira, resolve q modo q ele acompanhe e fique de lado da sidebar centralizado nela e o mesmo para a navbar do explicar, resolve isso
-adiciona um botão de + no lado esquerdo do input e no lado direito fica o microfone para falar com a IA e o botão de enviar mensagem normal
-dentro do botao de mais vai ficar o botão para enviar arquivo(documentos, fotos), botão para pedir ou pegar o lápis, botão de enviar mensagem para o explicador 
-resolve todos os problemas de layout e interface do usuário do explicador de modo que fique responsivo em desktpsp e celulares
-tira o lápis que fica perto do botao convidar, o lapis do botao de mais vai ter todas as informacoes qnd vc clicar ele pode abrir um modal e dizer o lapis esta com [NAME], desaja pedir, se o utilizador pedir 3 vezes consecutivas ele precisa espera 30 segundos para pedir dnv, se o lápis estiver solto qnd ele clicar no botao que esta no botao de mais vai processar com o loader do ladinho e dps pegar o lápis
-verificar o microfone ao falar com a IA, garantir que o microfone da chamada está off e que todos houvem a voz da IA
-
-
-otimiza as queries SQL da plataforma usa as técnicas mais modernas e eficientes para aumentar o desempenho da plataforma ela está lenta
