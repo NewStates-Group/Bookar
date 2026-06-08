@@ -395,6 +395,47 @@ class ElevenLabsAudioProvider(BaseProvider):
         return True
 
 
+class NvidiaAudioProvider(BaseProvider):
+    """Text-to-speech via NVIDIA Riva gRPC API.
+
+    Falls back when ElevenLabs / Gemini TTS are unavailable.
+    Requires ``NVIDIA_API_KEY`` in settings.AI and the ``nvidia-riva-client`` package.
+    """
+
+    name = "NVIDIA Riva TTS"
+
+    def _stream(self, **kwargs): ...
+
+    def _execute(self, *, text, output_path, **_kw) -> bool:
+        api_key = settings.AI.get("NVIDIA_AUDIO_API_KEY", "")
+        if not api_key:
+            raise ValueError("NVIDIA_AUDIO_API_KEY not configured")
+
+        import riva.client
+        from riva.client.proto.riva_audio_pb2 import AudioEncoding
+
+        auth = riva.client.Auth(
+            uri="grpc.nvcf.nvidia.com:443",
+            use_ssl=True,
+            options=[("grpc.max_receive_message_length", -1)],
+            metadata_args=[
+                ("function-id", "ddacc747-1269-4fab-bfd9-8f593dead106"),
+                ("authorization", f"Bearer {api_key}"),
+            ],
+        )
+        service = riva.client.SpeechSynthesisService(auth)
+
+        resp = service.synthesize(
+            text=text[:2000],
+            voice_name="Chatterbox-Multilingual.en-US.Male",
+            language_code="en-US",
+            sample_rate_hz=24000,
+            encoding=AudioEncoding.LINEAR_PCM,
+        )
+
+        return _save_pcm_as_wav(output_path, resp.audio)
+
+
 def _build_chain(providers: list[BaseProvider]) -> BaseProvider:
     """Link a list of providers into a chain and return the head."""
     for i in range(len(providers) - 1):
@@ -434,4 +475,6 @@ def get_image_chain() -> BaseProvider:
 
 def get_audio_chain() -> BaseProvider:
     """Build the audio generation chain (same for all environments)."""
-    return _build_chain([GeminiAudioProvider(), ElevenLabsAudioProvider()])
+    return _build_chain(
+        [GeminiAudioProvider(), ElevenLabsAudioProvider(), NvidiaAudioProvider()]
+    )

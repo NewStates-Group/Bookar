@@ -2,12 +2,14 @@ import base64
 import json
 import logging
 import re
+import tempfile
 import uuid
+from pathlib import Path
 
 import httpx
 from asgiref.sync import sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
-from courses.providers import get_text_chain
+from courses.providers import AllProvidersFailed, get_audio_chain, get_text_chain
 from courses.utils import get_genai_client
 from django.conf import settings
 from google.genai import types
@@ -56,29 +58,44 @@ logger = logging.getLogger(__name__)
 
 #     return ""
 
+def _audio_to_data_uri(audio_bytes: bytes, mime: str = "audio/mpeg") -> str:
+    return f"data:{mime};base64," + base64.b64encode(audio_bytes).decode()
+
+
 def generate_elevenlabs_audio(text: str) -> str:
+    text = text[:1000]
+
+    # 1. Try ElevenLabs directly
     api_key = settings.AI.get("ELEVENLABS_KEY", "")
-    if not api_key:
-        logger.warning("ELEVENLABS_KEY not configured, skipping audio generation.")
+    if api_key:
+        try:
+            client = ElevenLabs(api_key=api_key, timeout=30)
+            audio = client.text_to_speech.convert(
+                text=text,
+                voice_id="JBFqnCBsd6RMkjVDRZzb",
+                model_id="eleven_multilingual_v2",
+                output_format="mp3_44100_128",
+            )
+            return _audio_to_data_uri(b"".join(audio), "audio/mpeg")
+        except Exception as e:
+            logger.warning("ElevenLabs TTS failed, trying fallback: %s", e)
+
+    # 2. Fallback to audio chain (Gemini TTS → NVIDIA Riva)
+    if not settings.AI.get("GENAI_KEY") and not settings.AI.get("NVIDIA_API_KEY"):
+        logger.warning("No fallback TTS configured (GENAI_KEY / NVIDIA_API_KEY).")
         return ""
-        
-    client = ElevenLabs(
-        api_key=api_key,
-        timeout=30,
-    )
-    audio = client.text_to_speech.convert(
-        text=text[:1000],
-        voice_id="JBFqnCBsd6RMkjVDRZzb",  # replace with your voice
-        model_id="eleven_multilingual_v2",
-        output_format="mp3_44100_128",
-    )
 
-    audio_bytes = b"".join(audio)
-
-    return (
-        "data:audio/mpeg;base64,"
-        + base64.b64encode(audio_bytes).decode()
-    )
+    try:
+        chain = get_audio_chain()
+        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
+            tmp_path = Path(tmp.name)
+        chain.handle(text=text, output_path=tmp_path)
+        wav_bytes = tmp_path.read_bytes()
+        tmp_path.unlink(missing_ok=True)
+        return _audio_to_data_uri(wav_bytes, "audio/wav")
+    except AllProvidersFailed as e:
+        logger.error("All TTS providers failed: %s", e)
+        return ""
 
 User = get_user_model()
 

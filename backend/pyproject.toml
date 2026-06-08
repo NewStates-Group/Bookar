@@ -40,4 +40,6 @@ dependencies = [
     "django-gmailapi-backend>=0.3.3",
     "google-auth-oauthlib>=1.2.2",
     "newrelic>=13.1.1",
+    "grpcio>=1.70.0",
+    "nvidia-riva-client>=2.19.0",
 ]

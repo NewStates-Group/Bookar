@@ -181,6 +181,7 @@ AI = {
     "REPLICATE_API_TOKEN": env("REPLICATE_API_TOKEN", default=""),
     "HF_API_KEY": env("HF_API_KEY", default=""),
     "ELEVENLABS_KEY": env("ELEVENLABS_KEY", default=""),
+    "NVIDIA_AUDIO_API_KEY": env("NVIDIA_AUDIO_API_KEY", default=""),
 }
 
 GOOGLE_CLIENT_ID = env("GOOGLE_CLIENT_ID")
