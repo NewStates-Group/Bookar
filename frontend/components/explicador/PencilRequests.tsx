@@ -3,7 +3,7 @@ import { Card } from "../ui/card";
 
 export default function PencilRequests({ activePencilRequests }: { activePencilRequests: any[] }) {
     return (
-        <div className="absolute top-4 left-4 z-50 flex flex-col gap-2 max-w-sm w-full">
+        <div className="absolute top-4 right-8 z-50 flex flex-col gap-2 max-w-sm w-full">
             {activePencilRequests.map((req) => (
                 <Card
                     key={req.connectionId}

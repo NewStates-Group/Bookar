@@ -1072,9 +1072,16 @@ class ExplicadorConsumer(AsyncWebsocketConsumer):
     async def generate_ai_explanation(self, message_content: str, attachment: dict | None = None) -> str:
         """Call get_text_chain() to prompt AI to explain and generate a beautifully structured classroom whiteboard summary."""
         context_block = self._format_course_context_block()
+        if attachment:
+            file_ref = f"O utilizador enviou um ficheiro ({attachment['name']})"
+            if message_content:
+                file_ref += f" e fez a seguinte pergunta sobre ele:\n\"{message_content}\""
+            else:
+                file_ref += " para analisar."
+        else:
+            file_ref = f"O utilizador deseja aprender sobre o seguinte assunto ou fez a seguinte pergunta:\n\"{message_content}\""
         prompt = f"""Você é um explicador didático especialista e professor particular premium.
-{context_block}O utilizador deseja aprender sobre o seguinte assunto ou fez a seguinte pergunta:
-"{message_content}"
+{context_block}{file_ref}
 
 Forneça sua resposta ESTRITAMENTE em formato JSON puro com três chaves:
 - "chat_response": explicação em Markdown em português para o chat.
