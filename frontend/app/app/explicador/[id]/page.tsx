@@ -773,7 +773,7 @@ export default function ExplicadorRoomPage() {
       case "pencil_request":
         if (data.target_connection_id === connectionIdRef.current) {
           const requesterName = data.requester_name || "Alguém";
-          toast.info(`${requesterName} pediu o lápis`);
+          // toast.info(`${requesterName} pediu o lápis`);
           setActivePencilRequests((prev) => {
             if (prev.some((r) => r.connectionId === data.requester_connection_id)) return prev;
             return [...prev, { connectionId: data.requester_connection_id, name: requesterName }];

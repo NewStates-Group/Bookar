@@ -203,7 +203,7 @@ export default function MessageInput(
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
-        className="px-3 pb-2 pt-2 w-full chat-input-safe-area !pb-2 relative"
+        className="px-3 pb-2 pt-2 w-full chat-input-safe-area !pb-3 relative"
       >
         {/* ── File badges ── */}
         {selectedFile && (
@@ -283,43 +283,6 @@ export default function MessageInput(
                     <Paperclip size={16} className="mr-2 text-muted-foreground" />
                     <span>Anexar ficheiro</span>
                   </DropdownMenuItem>
-
-                  <DropdownMenuItem
-                    className="rounded-md text-xs"
-                    onClick={handleImportUrl}
-                  >
-                    <Link size={16} className="mr-2 text-muted-foreground" />
-                    <span>Importar URL</span>
-                  </DropdownMenuItem>
-
-                  <DropdownMenuItem
-                    className="rounded-md text-xs"
-                    onClick={handlePasteFromClipboard}
-                  >
-                    <Clipboard size={16} className="mr-2 text-muted-foreground" />
-                    <span>Colar área</span>
-                  </DropdownMenuItem>
-
-                  {/* Template submenu */}
-                  <DropdownMenuSub>
-                    <DropdownMenuSubTrigger className="rounded-md text-xs">
-                      <LayoutTemplate size={16} className="mr-2 text-muted-foreground" />
-                      <span>Usar Template</span>
-                    </DropdownMenuSubTrigger>
-                    <DropdownMenuSubContent className="w-52 rounded-xl p-1.5">
-                      <DropdownMenuGroup className="space-y-0.5">
-                        {TEMPLATES.map((t) => (
-                          <DropdownMenuItem
-                            key={t.id}
-                            className="rounded-md text-xs"
-                            onClick={() => handleTemplateSelect(t.text)}
-                          >
-                            {t.label}
-                          </DropdownMenuItem>
-                        ))}
-                      </DropdownMenuGroup>
-                    </DropdownMenuSubContent>
-                  </DropdownMenuSub>
                 </DropdownMenuGroup>
               </DropdownMenuContent>
             </DropdownMenu>
