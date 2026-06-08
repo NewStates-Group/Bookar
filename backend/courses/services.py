@@ -741,7 +741,7 @@ class CourseService:
                 }
             )
         if not q:
-            cache.set("featured_courses", result)
+            cache.set("featured_courses", result, 3600)
         return result
 
     def get_course_preview(self, course_id: str) -> dict:
