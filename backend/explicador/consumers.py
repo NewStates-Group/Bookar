@@ -671,10 +671,9 @@ class ExplicadorConsumer(AsyncWebsocketConsumer):
             )
         except Exception as e:
             logger.exception("Error in AI explanation generation")
-            # Append error in history so user knows what went wrong
             err_msg = {
                 "role": "assistant",
-                "content": f"Ocorreu um erro ao gerar a explicação: {str(e)}",
+                "content": "Ocorreu um erro ao gerar a explicação. Houve um erro, tenta novamente.",
             }
             self.room.chat_history.append(err_msg)
             await self.save_room()
@@ -753,7 +752,7 @@ class ExplicadorConsumer(AsyncWebsocketConsumer):
             logger.exception("Failed to transcribe audio via Gemini")
             err_msg = {
                 "role": "assistant",
-                "content": f"Não consegui transcrever o áudio: {str(e)}",
+                "content": "Não consegui transcrever o áudio. Houve um erro, tenta novamente.",
             }
             self.room.chat_history.append(err_msg)
             await self.save_room()
