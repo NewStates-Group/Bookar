@@ -15,14 +15,13 @@ fi
 echo "Starting Gunicorn (DEBUG=$DEBUG)"
 
 if [ "$DEBUG" = "True" ] || [ "$DEBUG" = "1" ]; then
-    exec watchmedo auto-restart --directory=. --pattern="*.py" --recursive -- gunicorn core.asgi:application \
-    --worker-class uvicorn.workers.UvicornWorker \
-    --bind 0.0.0.0:8000 \
-    --reload
+    exec watchmedo auto-restart --directory=. --pattern="*.py" --recursive -- uvicorn core.asgi:application \
+        --host 0.0.0.0 \
+        --port 8000
 else
     exec newrelic-admin run-program \
-         gunicorn core.asgi:application \
-        --workers 4 \
-        --worker-class uvicorn.workers.UvicornWorker \
-        --bind 0.0.0.0:8000
+        uvicorn core.asgi:application \
+        --host 0.0.0.0 \
+        --port 8000 \
+        --workers 4
 fi
