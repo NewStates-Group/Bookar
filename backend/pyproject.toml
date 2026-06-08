@@ -43,4 +43,5 @@ dependencies = [
     "grpcio>=1.70.0",
     "nvidia-riva-client>=2.19.0",
     "watchdog[watchmedo]>=6.0.0",
+    "django-silk>=5.5.0",
 ]

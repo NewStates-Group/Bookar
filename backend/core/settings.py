@@ -33,6 +33,7 @@ INSTALLED_APPS = [
     "corsheaders",
     "django.contrib.auth",
     "django.contrib.contenttypes",
+    "django.contrib.staticfiles",
     "cloudinary_storage",
     "cloudinary",
     "gmailapi_backend",
@@ -42,9 +43,11 @@ INSTALLED_APPS = [
     "mind_maps",
     "explicador",
     "folhas",
+    "silk",
 ]
 
 MIDDLEWARE = [
+    "silk.middleware.SilkyMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -93,6 +96,9 @@ REDIS_URL = env.str("REDIS_URL")
 PROD_REDIS_URL = REDIS_URL + env.str(
     "REDIS_URL_PARAMS", default="/?ssl_cert_reqs=CERT_NONE"
 )
+
+STATIC_URL = "/static/"
+STATIC_ROOT = BASE_DIR.joinpath("staticfiles")
 
 CACHES = {
     # "default": env.cache_url_config(PROD_REDIS_URL if ENV == "prod" else REDIS_URL)
