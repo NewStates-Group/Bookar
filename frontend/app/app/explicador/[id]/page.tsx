@@ -20,7 +20,6 @@ import Participants from "@/components/explicador/Participants";
 import Whiteboard from "@/components/explicador/Whiteboard";
 import VoiceRequest from "@/components/explicador/VoiceRequest";
 import PencilRequests from "@/components/explicador/PencilRequests";
-import MessageInput2 from "@/components/explicador/MessageInput2";
 
 const EXPLICADOR_MENTION = "@explicador";
 
@@ -1076,7 +1075,6 @@ export default function ExplicadorRoomPage() {
     }
 
     if (isRecordingAudio) {
-      // Para a gravação e dispara o envio do Blob (onstop)
       if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
         mediaRecorderRef.current.stop();
       }
@@ -1084,70 +1082,62 @@ export default function ExplicadorRoomPage() {
       return;
     }
 
-    // Inicializa o Stream local caso não exista
-    let stream = localStreamRef.current;
-    if (!stream) {
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        localStreamRef.current = stream;
-        setLocalStream(stream);
-      } catch (err) {
-        console.error("Falha ao capturar microfone", err);
-        toast.error("Não foi possível aceder ao microfone. Garanta permissão.");
-        return;
-      }
+    // Usa um stream DEDICADO para gravação — não mexe no stream do WebRTC
+    let recordStream: MediaStream;
+    try {
+      recordStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (err) {
+      console.error("Falha ao capturar microfone para gravação", err);
+      toast.error("Não foi possível aceder ao microfone. Garanta permissão.");
+      return;
     }
 
-    // Garante que o microfone local está desmutado para gravação
-    if (isMicMutedRef.current) {
-      isMicMutedRef.current = false;
-      setIsMicMuted(false);
-      stream.getAudioTracks().forEach((track) => {
-        track.enabled = true;
-      });
-      sendWSMessage({
-        type: "audio_state",
-        is_mic_on: true,
-        is_listening: true,
-      });
-      await connectToAllPeers(participantsRef.current.map((p) => p.connectionId));
-    } else {
-      stream.getAudioTracks().forEach((track) => {
-        track.enabled = true;
+    // Garante que o microfone do WebRTC fica OFF durante a gravação
+    if (localStreamRef.current) {
+      localStreamRef.current.getAudioTracks().forEach((track) => {
+        track.enabled = false;
       });
     }
+    isMicMutedRef.current = true;
+    setIsMicMuted(true);
+    sendWSMessage({
+      type: "audio_state",
+      is_mic_on: false,
+      is_listening: true,
+    });
 
     // Notifica outros membros da sala para se silenciarem
     sendWSMessage({ type: "voice_broadcast_start" });
 
-    // Inicia gravação de áudio
+    // Inicia gravação de áudio com stream DEDICADO
     audioChunksRef.current = [];
     let mediaRecorder: MediaRecorder;
     const options = { mimeType: "audio/webm" };
     try {
-      mediaRecorder = new MediaRecorder(stream, options);
+      mediaRecorder = new MediaRecorder(recordStream, options);
     } catch (e) {
-      // Fallback para Safari / iOS
-      mediaRecorder = new MediaRecorder(stream);
+      mediaRecorder = new MediaRecorder(recordStream);
     }
 
-    mediaRecorderRef.current = mediaRecorder;
-    mediaRecorder.ondataavailable = (event) => {
+    const recordingRecorder = mediaRecorder;
+    mediaRecorderRef.current = recordingRecorder;
+    recordingRecorder.ondataavailable = (event) => {
       if (event.data.size > 0) {
         audioChunksRef.current.push(event.data);
       }
     };
 
-    mediaRecorder.onstop = async () => {
-      const audioBlob = new Blob(audioChunksRef.current, { type: mediaRecorder.mimeType });
+    recordingRecorder.onstop = async () => {
+      // Liberta o stream de gravação dedicado
+      recordStream.getTracks().forEach((t) => t.stop());
+
+      const audioBlob = new Blob(audioChunksRef.current, { type: recordingRecorder.mimeType });
       if (audioBlob.size < 1000) {
-        // Áudio muito curto ou vazio
         sendWSMessage({ type: "voice_broadcast_end" });
         setIsForceMuted(false);
         return;
       }
 
-      // Converte Blob em base64 e envia
       const reader = new FileReader();
       reader.readAsDataURL(audioBlob);
       reader.onloadend = () => {
@@ -1160,18 +1150,18 @@ export default function ExplicadorRoomPage() {
         sendWSMessage({
           type: "chat_message_audio",
           audio_base64: base64Data,
-          mime_type: mediaRecorder.mimeType,
+          mime_type: recordingRecorder.mimeType,
         });
       };
     };
 
     try {
-      mediaRecorder.start();
+      recordingRecorder.start();
       setIsRecordingAudio(true);
-      // toast.info("A gravar áudio... Clique novamente para enviar.");
     } catch (err) {
       console.error("Falha ao iniciar gravador de áudio", err);
       toast.error("Erro ao iniciar gravador de áudio.");
+      recordStream.getTracks().forEach((t) => t.stop());
       sendWSMessage({ type: "voice_broadcast_end" });
       setIsForceMuted(false);
     }
@@ -1244,7 +1234,7 @@ export default function ExplicadorRoomPage() {
       ref={splitContainerRef}
       onPointerMove={handleSplitterPointerMove}
       style={{ height: viewportHeight }}
-      className="flex w-full overflow-hidden bg-transparent text-slate-800 select-none"
+      className="explicador-room-container flex w-full overflow-hidden bg-transparent text-slate-800 select-none"
     >
       <style>{`
         .font-handwriting {
@@ -1267,13 +1257,18 @@ export default function ExplicadorRoomPage() {
         .message-bubble-animate {
           animation: slideUpFade 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
         }
-        /* Prevent iOS Safari rubber-band bounce on the page body */
-        html, body {
+        .explicador-room-container {
           overscroll-behavior: none;
           overflow: hidden;
-          position: fixed;
-          width: 100%;
-          height: 100%;
+          touch-action: none;
+        }
+        .message-list-scroll {
+          overscroll-behavior-y: contain;
+          -webkit-overflow-scrolling: touch;
+          scroll-anchor: auto;
+        }
+        .chat-input-safe-area {
+          padding-bottom: env(safe-area-inset-bottom, 0px);
         }
       `}</style>
 
@@ -1298,18 +1293,11 @@ export default function ExplicadorRoomPage() {
         <Header
           isMultiUserRoom={isMultiUserRoom}
           combinedRoster={combinedRoster}
-          currentLock={whiteboardData.lock}
-          grabLock={grabLock}
-          releaseLock={releaseLock}
-          requestPencil={requestPencil}
-          pencilCooldownActive={pencilCooldownActive}
-          pencilCooldownTimeLeft={pencilCooldownTimeLeft}
           shareUrl={shareUrl}
           isMicMuted={isMicMuted}
           toggleMute={toggleMute}
           roomReady={roomReady}
           isConnected={isConnected}
-          isLockHolder={isLockHolder}
           setShowParticipantsModal={setShowParticipantsModal}
         />
 

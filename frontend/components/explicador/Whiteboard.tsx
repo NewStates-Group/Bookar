@@ -52,7 +52,7 @@ export default function Whiteboard({
             </div>
 
             {/* Dotted blackboard writing sheet */}
-            <div className="flex-1 blackboard-grid overflow-y-auto font-handwriting text-slate-700 relative leading-relaxed scrollbar-thin">
+            <div className="flex-1 blackboard-grid overflow-y-auto font-handwriting text-slate-700 relative leading-relaxed scrollbar-thin message-list-scroll">
                 {displayedBoardText ? (
                     <article className="prose max-w-none prose-slate font-handwriting prose-headings:font-handwriting prose-strong:font-handwriting text-slate-700 text-lg md:text-2xl leading-loose">
                         <ReactMarkdown

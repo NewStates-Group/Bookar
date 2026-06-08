@@ -57,7 +57,7 @@ export default function MessageList(
         chatEndRef
     }: MessageListProps) {
     return (
-        <div className="flex-1 overflow-y-auto p-4 min-h-0 bg-slate-50/30 scrollbar-thin" style={{ overscrollBehaviorY: "contain", WebkitOverflowScrolling: "touch" }}>
+        <div className="flex-1 overflow-y-auto p-4 min-h-0 bg-slate-50/30 scrollbar-thin message-list-scroll">
             <div className="max-w-3xl mx-auto w-full space-y-4">
                 {chatHistory.map((msg, i) => (
                     <div

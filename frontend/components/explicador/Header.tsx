@@ -1,4 +1,4 @@
-import { Bot, Lock, Menu, Mic, MicOff, Pencil } from "lucide-react";
+import { Bot, Menu, Mic, MicOff } from "lucide-react";
 import { ExplicadorInvitePopover } from "../ExplicadorInvitePopover";
 import { Button } from "../ui/button";
 
@@ -7,13 +7,6 @@ export default function Header({
     isConnected,
     roomReady,
     combinedRoster,
-    currentLock,
-    isLockHolder,
-    grabLock,
-    releaseLock,
-    requestPencil,
-    pencilCooldownActive,
-    pencilCooldownTimeLeft,
     shareUrl,
     isMicMuted,
     toggleMute,
@@ -21,15 +14,8 @@ export default function Header({
 }: {
     isMultiUserRoom: boolean;
     combinedRoster: any[];
-    currentLock: any;
     isConnected: boolean;
     roomReady: boolean;
-    isLockHolder: boolean;
-    grabLock: () => void;
-    releaseLock: () => void;
-    requestPencil: () => void;
-    pencilCooldownActive: boolean;
-    pencilCooldownTimeLeft: number;
     shareUrl: string;
     isMicMuted: boolean;
     toggleMute: () => void;
@@ -95,46 +81,6 @@ export default function Header({
                 )}
             </div>
             <div className="flex items-center gap-1">
-                {isMultiUserRoom && (
-                    <div>
-                        {!currentLock ? (
-                            <div onClick={grabLock} className="cursor-pointer gap-1 flex items-center justify-between text-xs px-1 text-slate-800">
-                                <Pencil className="w-3.5 h-3.5 text-slate-800" />
-                                <span className="hidden sm:block flex items-center gap-1.5 font-medium">
-                                    Lápis (tutor)
-                                </span>
-                            </div>
-                        ) : isLockHolder ? (
-                            <div onClick={releaseLock} className="flex items-center gap-1 justify-between text-xs px-1 text-cyan-600">
-                                <Lock className="w-3.5 h-3.5 text-cyan-600" />
-                                <span className="hidden sm:block flex items-center gap-1.5 font-semibold">
-                                    Tens o lápis!
-                                </span>
-                            </div>
-                        ) : (
-                            <button
-                                type="button"
-                                onClick={requestPencil}
-                                disabled={pencilCooldownActive}
-                                title={
-                                    pencilCooldownActive
-                                        ? `Aguarde ${pencilCooldownTimeLeft}s`
-                                        : `Pedir o lápis a ${currentLock.name}`
-                                }
-                                className="flex items-center justify-between gap-1 text-xs px-1 text-slate-800 hover:text-amber-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                <Lock className="w-3.5 h-3.5 text-slate-350" />
-                                <span className="hidden sm:block flex items-center gap-1.5 font-medium truncate pr-2">
-                                    Lápis com: <strong>{currentLock.name}</strong>
-                                    {pencilCooldownActive ? (
-                                        <span className="text-red-500">({pencilCooldownTimeLeft}s)</span>
-                                    ) : null}
-                                </span>
-                            </button>
-                        )}
-                    </div>
-                )}
-
                 {shareUrl ? <ExplicadorInvitePopover shareUrl={shareUrl} /> : null}
 
                 {isMultiUserRoom && (
