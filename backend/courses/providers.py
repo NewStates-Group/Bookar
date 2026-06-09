@@ -408,6 +408,7 @@ class NvidiaAudioProvider(BaseProvider):
 
     def _execute(self, *, text, output_path, **_kw) -> bool:
         api_key = settings.AI.get("NVIDIA_AUDIO_API_KEY", "")
+        
         if not api_key:
             raise ValueError("NVIDIA_AUDIO_API_KEY not configured")
 
@@ -419,8 +420,8 @@ class NvidiaAudioProvider(BaseProvider):
             use_ssl=True,
             options=[("grpc.max_receive_message_length", -1)],
             metadata_args=[
-                ("function-id", "ddacc747-1269-4fab-bfd9-8f593dead106"),
-                ("authorization", f"Bearer {api_key}"),
+                ["function-id", "ddacc747-1269-4fab-bfd9-8f593dead106"],
+                ["authorization", f"Bearer {api_key}"],
             ],
         )
         service = riva.client.SpeechSynthesisService(auth)
