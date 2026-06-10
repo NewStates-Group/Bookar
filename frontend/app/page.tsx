@@ -83,7 +83,7 @@ export default function DefinitiveHomePage() {
                 className="flex flex-col items-center md:items-start text-center md:text-left"
               >
                 <div className="flex items-center gap-4 mb-6">
-                  <Image src="/logo-white.png" alt="Bookar" width={48} height={48} className="shrink-0 md:w-[56px] md:h-[56px]" priority />
+                  <Image src={dark ? "/logo-white.png" : "/logo.png"} alt="Bookar" width={48} height={48} className="shrink-0 md:w-[56px] md:h-[56px]" priority />
                   <span className="text-4xl md:text-6xl font-black tracking-tight">
                     <span className="bg-clip-text text-transparent bg-gradient-to-r from-neutral-900 via-neutral-700 to-neutral-900 dark:from-white dark:via-neutral-300 dark:to-white">
                       Bookar
