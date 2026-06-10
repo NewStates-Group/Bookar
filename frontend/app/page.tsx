@@ -44,44 +44,80 @@ export default function DefinitiveHomePage() {
         {/* Hero Section */}
         <section className="relative min-h-screen flex flex-col items-center justify-center px-6 overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-b from-white via-white to-neutral-50 -z-10" />
-          <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-[600px] h-[400px] bg-cyan-200/20 blur-[140px] -z-10 rounded-full" />
 
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, ease: "easeOut" }}
-            className="flex flex-col items-center text-center space-y-8"
-          >
-            <div className="flex items-center gap-5">
-              <Image
-                src="/logo.png"
-                alt="Bookar"
-                width={72}
-                height={72}
-                className="shrink-0 drop-shadow-sm"
-                priority
+          <div className="absolute inset-0 -z-10 overflow-hidden">
+            <div className="absolute inset-0 bg-[radial-gradient(#d4d4d4_0.5px,transparent_0.5px)] [background-size:32px_32px] opacity-30" />
+            <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-cyan-200/15 blur-[160px] rounded-full animate-pulse-slow" />
+            <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-blue-200/15 blur-[160px] rounded-full animate-pulse-slower" />
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[500px] bg-cyan-100/20 blur-[160px] rounded-full" />
+          </div>
+
+          <div className="relative flex flex-col items-center text-center">
+            <motion.div
+              initial={{ opacity: 0, y: 40, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+              className="flex items-center gap-5 mb-6"
+            >
+              <motion.div
+                animate={{ y: [0, -6, 0] }}
+                transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+              >
+                <Image
+                  src="/logo.png"
+                  alt="Bookar"
+                  width={80}
+                  height={80}
+                  className="shrink-0"
+                  priority
+                />
+              </motion.div>
+              <motion.span
+                animate={{ y: [0, -6, 0] }}
+                transition={{ duration: 4, repeat: Infinity, ease: "easeInOut", delay: 0.2 }}
+                className="text-7xl md:text-8xl font-black tracking-tight"
+              >
+                <span className="bg-clip-text text-transparent bg-gradient-to-r from-neutral-900 via-neutral-700 to-neutral-900">
+                  Bookar
+                </span>
+              </motion.span>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, scaleX: 0 }}
+              animate={{ opacity: 1, scaleX: 1 }}
+              transition={{ duration: 0.8, delay: 0.4, ease: [0.16, 1, 0.3, 1] }}
+              className="h-px w-72 bg-gradient-to-r from-transparent via-cyan-300 to-transparent overflow-hidden relative"
+            >
+              <motion.div
+                animate={{ x: ["-100%", "100%"] }}
+                transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
+                className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white to-transparent"
               />
-              <span className="text-7xl md:text-8xl font-black tracking-tight text-neutral-900">
-                Bookar
-              </span>
-            </div>
+            </motion.div>
 
-            <div className="h-px w-64 bg-gradient-to-r from-transparent via-neutral-300 to-transparent overflow-hidden relative">
-              <div className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white to-transparent animate-shimmer" />
-            </div>
-
-            <p className="text-lg md:text-xl text-neutral-500 font-medium tracking-wide">
+            <motion.p
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.6, ease: [0.16, 1, 0.3, 1] }}
+              className="text-lg md:text-xl text-neutral-500 font-medium tracking-wide mt-6"
+            >
               Plataforma de aprendizado com IA
-            </p>
+            </motion.p>
 
-            <div className="pt-4">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.8, ease: [0.16, 1, 0.3, 1] }}
+              className="pt-6"
+            >
               <Link href="/signup">
                 <Button className="h-14 px-10 rounded-2xl bg-neutral-900 hover:bg-neutral-800 text-white font-bold text-lg shadow-xl transition-all hover:-translate-y-1 hover:shadow-neutral-900/20">
                   Começar Agora
                 </Button>
               </Link>
-            </div>
-          </motion.div>
+            </motion.div>
+          </div>
         </section>
 
         <section id="about" className="py-24 px-6 bg-neutral-50">

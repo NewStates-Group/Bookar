@@ -116,11 +116,23 @@
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
   --animate-shimmer: shimmer 2.5s ease-in-out infinite;
+  --animate-pulse-slow: pulse-slow 6s ease-in-out infinite;
+  --animate-pulse-slower: pulse-slower 8s ease-in-out infinite;
 }
 
 @keyframes shimmer {
   0% { transform: translateX(-100%); }
   100% { transform: translateX(100%); }
+}
+
+@keyframes pulse-slow {
+  0%, 100% { opacity: 0.15; transform: scale(1); }
+  50% { opacity: 0.3; transform: scale(1.1); }
+}
+
+@keyframes pulse-slower {
+  0%, 100% { opacity: 0.1; transform: scale(1); }
+  50% { opacity: 0.25; transform: scale(1.15); }
 }
 
 @layer base {
