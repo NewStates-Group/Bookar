@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import Image from "next/image";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { Sparkles, Zap, Smartphone, MessageSquare } from "lucide-react";
+import { MessageSquare } from "lucide-react";
 import { FeedbackForm } from "@/components/FeedbackForm";
 
 
@@ -120,19 +120,43 @@ export default function DefinitiveHomePage() {
           </div>
         </section>
 
-        <section id="about" className="py-24 px-6 bg-neutral-50">
-          <div className="max-w-4xl mx-auto text-center">
-            <h2 className="text-4xl font-bold mb-6">
-              Sobre a Bookar
-            </h2>
-
-            <p className="text-lg text-muted-foreground leading-relaxed">
-              A Bookar é uma plataforma educacional online que utiliza
-              inteligência artificial para ajudar estudantes e profissionais
-              a aprender de forma mais eficiente através de cursos,
-              explicações personalizadas, materiais educativos e
-              acompanhamento do progresso de aprendizagem.
-            </p>
+        <section id="about" className="py-32 px-6">
+          <div className="max-w-6xl mx-auto grid md:grid-cols-2 gap-16 md:gap-24 items-center">
+            <div className="space-y-6">
+              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-neutral-100 border border-neutral-200 text-xs font-semibold text-neutral-600 tracking-wide uppercase">
+                Sobre Nós
+              </div>
+              <h2 className="text-4xl md:text-5xl font-bold tracking-tight text-balance leading-[1.1]">
+                O futuro da educação<br />
+                <span className="text-cyan-500">ao teu alcance</span>
+              </h2>
+              <div className="w-12 h-1 bg-cyan-300 rounded-full" />
+              <p className="text-base md:text-lg text-neutral-500 leading-relaxed max-w-lg">
+                A Bookar combina inteligência artificial com educação para criar
+                uma experiência de aprendizagem personalizada, eficiente e
+                acessível para todos.
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              {[
+                { value: "3+", label: "Áreas de Ensino" },
+                { value: "100+", label: "Aulas Geradas" },
+                { value: "IA", label: "Modelos Próprios" },
+                { value: "24/7", label: "Disponível" },
+              ].map((stat, i) => (
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: i * 0.1, duration: 0.5 }}
+                  className="bg-neutral-50 rounded-2xl p-6 border border-neutral-100 space-y-1"
+                >
+                  <p className="text-3xl md:text-4xl font-black text-neutral-900">{stat.value}</p>
+                  <p className="text-sm text-neutral-500 font-medium">{stat.label}</p>
+                </motion.div>
+              ))}
+            </div>
           </div>
         </section>
 
@@ -143,20 +167,53 @@ export default function DefinitiveHomePage() {
             <p className="text-muted-foreground max-w-xl mx-auto">Tecnologia de ponta ao serviço do teu crescimento profissional.</p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-8">
+          <div className="grid md:grid-cols-3 gap-6">
             {[
-              { title: "Tutor IA", desc: "Dúvidas resolvidas instantaneamente com contexto direto das tuas aulas.", icon: <Zap className="w-6 h-6" /> },
-              { title: "Cursos Personalizados", desc: "Avança ao teu ritmo com percursos adaptativos baseados no teu progresso.", icon: <Smartphone className="w-6 h-6" /> },
-              { title: "Certificados com IA", desc: "Certificados profissionais gerados dinamicamente com validação Gemini.", icon: <Sparkles className="w-6 h-6" /> }
+              {
+                title: "Cursos com IA",
+                desc: "Gera cursos completos com inteligência artificial sobre qualquer tema. Conteúdo estruturado em módulos com vídeo, áudio e materiais de apoio.",
+                icon: (
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4.26 10.147a60.438 60.438 0 0 0-.491 6.347A48.62 48.62 0 0 1 12 20.904a48.62 48.62 0 0 1 8.232-4.41 60.46 60.46 0 0 0-.491-6.347m-15.482 0a50.636 50.636 0 0 0-2.658-.813A59.906 59.906 0 0 1 12 3.493a59.903 59.903 0 0 1 10.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.717 50.717 0 0 1 12 13.489a50.702 50.702 0 0 1 7.74-3.342" />
+                  </svg>
+                ),
+              },
+              {
+                title: "Mapas Mentais",
+                desc: "Transforma qualquer conteúdo em mapas mentais interativos. Visualiza conexões entre conceitos e acelera a tua compreensão.",
+                icon: (
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25" />
+                  </svg>
+                ),
+              },
+              {
+                title: "Explicador IA",
+                desc: "Tutor virtual por voz que responde às tuas dúvidas em tempo real. Explicações claras e contextuais baseadas no teu progresso.",
+                icon: (
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 0 0 6-6v-1.5m-6 7.5a6 6 0 0 1-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 0 1-3-3V4.5a3 3 0 1 1 6 0v8.25a3 3 0 0 1-3 3Z" />
+                  </svg>
+                ),
+              },
             ].map((feature, idx) => (
               <motion.div
                 key={idx}
-                whileHover={{ y: -10 }}
-                className="bg-white p-10 rounded-[32px] border border-black/[0.05] shadow-sm hover:shadow-xl transition-all duration-300"
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: idx * 0.15, duration: 0.5 }}
+                whileHover={{ y: -8 }}
+                className="group relative bg-white p-8 rounded-3xl border border-neutral-100 shadow-sm hover:shadow-lg transition-all duration-300"
               >
-                <div className="p-3 bg-neutral-50 w-fit rounded-xl mb-6 text-cyan-600">{feature.icon}</div>
-                <h3 className="text-2xl font-bold mb-4">{feature.title}</h3>
-                <p className="text-muted-foreground leading-relaxed">{feature.desc}</p>
+                <div className="absolute inset-0 rounded-3xl bg-gradient-to-b from-cyan-50/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                <div className="relative z-10">
+                  <div className="p-3 bg-neutral-50 w-fit rounded-xl mb-5 text-cyan-500 group-hover:bg-cyan-50 group-hover:text-cyan-600 transition-colors duration-300">
+                    {feature.icon}
+                  </div>
+                  <h3 className="text-xl font-bold mb-3 text-neutral-900">{feature.title}</h3>
+                  <p className="text-sm text-neutral-500 leading-relaxed">{feature.desc}</p>
+                </div>
               </motion.div>
             ))}
           </div>
