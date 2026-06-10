@@ -82,36 +82,22 @@ export default function DefinitiveHomePage() {
                 transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
                 className="flex flex-col items-center md:items-start text-center md:text-left"
               >
-                <div className="flex items-center gap-5 mb-5">
-                  <Image src="/logo-white.png" alt="Bookar" width={52} height={52} className="shrink-0 md:w-[60px] md:h-[60px]" priority />
-                  <span className="text-5xl md:text-7xl font-black tracking-tight">
+                <div className="flex items-center gap-4 mb-6">
+                  <Image src="/logo-white.png" alt="Bookar" width={48} height={48} className="shrink-0 md:w-[56px] md:h-[56px]" priority />
+                  <span className="text-4xl md:text-6xl font-black tracking-tight">
                     <span className="bg-clip-text text-transparent bg-gradient-to-r from-neutral-900 via-neutral-700 to-neutral-900 dark:from-white dark:via-neutral-300 dark:to-white">
                       Bookar
                     </span>
                   </span>
                 </div>
 
-                <motion.div
-                  initial={{ opacity: 0, scaleX: 0 }}
-                  animate={{ opacity: 1, scaleX: 1 }}
-                  transition={{ duration: 0.8, delay: 0.3, ease: [0.16, 1, 0.3, 1] }}
-                  className="h-px w-48 md:w-64 bg-gradient-to-r from-transparent via-cyan-300 to-transparent overflow-hidden relative mb-5"
-                >
-                  <motion.div
-                    animate={{ x: ["-100%", "100%"] }}
-                    transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
-                    className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white dark:via-cyan-200 to-transparent"
-                  />
-                </motion.div>
+                <h2 className="text-3xl md:text-5xl font-bold text-cyan-500 mb-4 leading-tight">
+                  Aprende mais rápido com IA
+                </h2>
 
-                <motion.p
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.6, delay: 0.5, ease: [0.16, 1, 0.3, 1] }}
-                  className="text-base md:text-lg text-neutral-500 dark:text-neutral-400 font-medium tracking-wide mb-8"
-                >
-                  Plataforma de aprendizado com IA
-                </motion.p>
+                <p className="text-base md:text-lg text-neutral-500 dark:text-neutral-400 leading-relaxed max-w-lg mb-8">
+                  O Bookar é o teu parceiro de aprendizagem inteligente. Cria mapas mentais dinâmicos, gera cursos personalizados com IA e tira todas as tuas dúvidas em tempo real.
+                </p>
 
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
