@@ -31,7 +31,7 @@ export default function DefinitiveHomePage() {
           <nav className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] w-[calc(100%-2rem)] max-w-5xl">
             <div className="flex items-center justify-between px-6 h-16 rounded-2xl bg-white/80 dark:bg-neutral-950/80 backdrop-blur-xl border border-black/[0.06] dark:border-white/[0.08] shadow-sm dark:shadow-neutral-900/50">
               <Link href="/" className="flex items-center gap-2.5">
-                <Image src="/logo.png" alt="Bookar" width={32} height={32} className="shrink-0" />
+                <Image src={dark ? "/logo-white.png" : "/logo.png"} alt="Bookar" width={32} height={32} className="shrink-0" />
                 <span className="text-xl font-bold tracking-tight">Bookar</span>
               </Link>
 
@@ -82,15 +82,16 @@ export default function DefinitiveHomePage() {
                 transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
                 className="flex flex-col items-center md:items-start text-center md:text-left"
               >
-                <div className="flex items-center gap-4 mb-4">
+                <div className="flex items-center gap-5 mb-5">
                   <motion.div
-                    animate={{ y: [0, -6, 0] }}
+                    animate={{ y: [0, -8, 0] }}
                     transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+                    className="p-3 rounded-2xl bg-neutral-900 dark:bg-neutral-100"
                   >
-                    <Image src="/logo.png" alt="Bookar" width={56} height={56} className="shrink-0 md:w-[72px] md:h-[72px]" priority />
+                    <Image src="/logo-white.png" alt="Bookar" width={44} height={44} className="shrink-0 md:w-[52px] md:h-[52px]" priority />
                   </motion.div>
                   <motion.span
-                    animate={{ y: [0, -6, 0] }}
+                    animate={{ y: [0, -8, 0] }}
                     transition={{ duration: 4, repeat: Infinity, ease: "easeInOut", delay: 0.2 }}
                     className="text-5xl md:text-7xl font-black tracking-tight"
                   >
@@ -104,7 +105,7 @@ export default function DefinitiveHomePage() {
                   initial={{ opacity: 0, scaleX: 0 }}
                   animate={{ opacity: 1, scaleX: 1 }}
                   transition={{ duration: 0.8, delay: 0.3, ease: [0.16, 1, 0.3, 1] }}
-                  className="h-px w-48 md:w-64 bg-gradient-to-r from-transparent via-cyan-300 to-transparent overflow-hidden relative mb-4"
+                  className="h-px w-48 md:w-64 bg-gradient-to-r from-transparent via-cyan-300 to-transparent overflow-hidden relative mb-5"
                 >
                   <motion.div
                     animate={{ x: ["-100%", "100%"] }}
@@ -135,76 +136,84 @@ export default function DefinitiveHomePage() {
                 </motion.div>
               </motion.div>
 
-              {/* Card Deck */}
+              {/* Phone Mockup */}
               <motion.div
-                initial={{ opacity: 0, x: 30 }}
-                animate={{ opacity: 1, x: 0 }}
+                initial={{ opacity: 0, x: 30, y: 20 }}
+                animate={{ opacity: 1, x: 0, y: 0 }}
                 transition={{ duration: 0.8, delay: 0.3, ease: [0.16, 1, 0.3, 1] }}
-                className="relative h-[400px] md:h-[500px] w-full max-w-[280px] md:max-w-[320px] mx-auto"
+                className="flex flex-col items-center"
               >
-                {screens.map((s, i) => {
-                  const offset = (i - activeIdx + screens.length) % screens.length;
-                  const isActive = i === activeIdx;
+                <motion.div
+                  animate={{ y: [0, -10, 0] }}
+                  transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
+                  className="relative w-[240px] md:w-[280px]"
+                >
+                  {/* Phone Frame */}
+                  <div className="relative aspect-[9/19] rounded-[36px] bg-neutral-200 dark:bg-neutral-800 p-2 shadow-2xl dark:shadow-neutral-900/50">
+                    <div className="relative w-full h-full rounded-[28px] overflow-hidden bg-neutral-100 dark:bg-neutral-900">
+                      <AnimatePresence mode="wait">
+                        <motion.div
+                          key={activeIdx}
+                          initial={{ opacity: 0, scale: 0.95 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          exit={{ opacity: 0, scale: 1.05 }}
+                          transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+                          className="absolute inset-0"
+                        >
+                          <Image
+                            src={screens[activeIdx].src}
+                            alt={screens[activeIdx].label}
+                            fill
+                            className="object-cover"
+                            sizes="240px"
+                          />
+                        </motion.div>
+                      </AnimatePresence>
+                    </div>
+                    {/* Notch */}
+                    <div className="absolute top-2 left-1/2 -translate-x-1/2 w-1/3 h-6 bg-neutral-900 dark:bg-neutral-950 rounded-b-xl" />
+                  </div>
+                </motion.div>
 
-                  return (
-                    <motion.div
-                      key={i}
-                      layout
-                      initial={false}
-                      animate={{
-                        scale: isActive ? 1 : 1 - offset * 0.04,
-                        rotate: isActive ? 0 : (i < activeIdx ? -2 - offset * 2 : 2 + offset * 2),
-                        y: isActive ? 0 : offset * 8,
-                        zIndex: screens.length - offset,
-                        opacity: isActive ? 1 : 1 - offset * 0.15,
-                      }}
-                      transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-                      className="absolute inset-0"
-                      style={{ filter: isActive ? "none" : "grayscale(0.3)" }}
+                <div className="mt-6 text-center space-y-1">
+                  <AnimatePresence mode="wait">
+                    <motion.p
+                      key={activeIdx}
+                      initial={{ opacity: 0, y: 6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -6 }}
+                      transition={{ duration: 0.35 }}
+                      className="text-lg font-bold text-neutral-900 dark:text-neutral-100"
                     >
-                      <div className="relative w-full aspect-[9/19] mx-auto rounded-[24px] overflow-hidden border-4 border-neutral-200 dark:border-neutral-800 shadow-xl dark:shadow-neutral-900/50">
-                        <Image
-                          src={s.src}
-                          alt={s.label}
-                          fill
-                          className="object-cover"
-                          sizes="(max-width: 768px) 280px, 320px"
-                        />
-                      </div>
-                    </motion.div>
-                  );
-                })}
+                      {screens[activeIdx].label}
+                    </motion.p>
+                  </AnimatePresence>
+                  <AnimatePresence mode="wait">
+                    <motion.p
+                      key={`desc-${activeIdx}`}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.35 }}
+                      className="text-sm text-neutral-500 dark:text-neutral-400"
+                    >
+                      {screens[activeIdx].desc}
+                    </motion.p>
+                  </AnimatePresence>
 
-                {/* Feature Label */}
-                <AnimatePresence mode="wait">
-                  <motion.div
-                    key={activeIdx}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
-                    transition={{ duration: 0.4 }}
-                    className="absolute -bottom-12 left-1/2 -translate-x-1/2 text-center w-full"
-                  >
-                    <p className="text-lg font-bold text-neutral-900 dark:text-neutral-100">{screens[activeIdx].label}</p>
-                    <p className="text-sm text-neutral-500 dark:text-neutral-400">{screens[activeIdx].desc}</p>
-                  </motion.div>
-                </AnimatePresence>
+                  <div className="flex justify-center gap-2 pt-3">
+                    {screens.map((_, i) => (
+                      <button
+                        key={i}
+                        onClick={() => setActiveIdx(i)}
+                        className={`rounded-full transition-all duration-300 ${
+                          i === activeIdx ? "w-6 h-2 bg-cyan-300" : "w-2 h-2 bg-neutral-300 dark:bg-neutral-700"
+                        }`}
+                      />
+                    ))}
+                  </div>
+                </div>
               </motion.div>
-            </div>
-
-            {/* Dots */}
-            <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex gap-2">
-              {screens.map((_, i) => (
-                <button
-                  key={i}
-                  onClick={() => setActiveIdx(i)}
-                  className={`w-2 h-2 rounded-full transition-all duration-300 ${
-                    i === activeIdx
-                      ? "bg-cyan-300 w-6"
-                      : "bg-neutral-300 dark:bg-neutral-700"
-                  }`}
-                />
-              ))}
             </div>
           </section>
 
@@ -328,7 +337,7 @@ export default function DefinitiveHomePage() {
             <div className="max-w-5xl mx-auto flex flex-col md:flex-row justify-between items-start gap-12">
               <div className="space-y-4 max-w-xs">
                 <div className="flex items-center gap-2">
-                  <Image src="/logo.png" alt="Logo" width={28} height={28} />
+                  <Image src={dark ? "/logo-white.png" : "/logo.png"} alt="Logo" width={28} height={28} />
                   <span className="text-lg font-bold tracking-tight">Bookar</span>
                 </div>
                 <p className="text-sm text-neutral-400">O futuro da educação é agora.</p>
