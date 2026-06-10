@@ -16,9 +16,19 @@ const screens = [
 ];
 
 export default function DefinitiveHomePage() {
-  const [dark, setDark] = useState(false);
+  const [dark, setDark] = useState(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("bookar-theme");
+      return saved === "dark";
+    }
+    return false;
+  });
   const [activeIdx, setActiveIdx] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
+
+  useEffect(() => {
+    localStorage.setItem("bookar-theme", dark ? "dark" : "light");
+  }, [dark]);
 
   useEffect(() => {
     const t = setInterval(() => setActiveIdx((i) => (i + 1) % screens.length), 4500);
