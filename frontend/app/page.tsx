@@ -27,14 +27,13 @@ export default function DefinitiveHomePage() {
             </div>
 
             <div className="flex items-center gap-3">
-              <Link
-                href="/login"
-                className="text-sm font-medium text-neutral-700 hover:text-neutral-900 transition-colors"
-              >
-                Entrar
+              <Link href="/login">
+                <Button variant="outline" className="h-9 rounded-full border-neutral-300 text-neutral-800 text-sm font-semibold px-5 shadow-sm transition-all hover:-translate-y-0.5 hover:bg-cyan-50 hover:border-cyan-300">
+                  Entrar
+                </Button>
               </Link>
               <Link href="/signup">
-                <Button className="h-9 rounded-full bg-neutral-900 hover:bg-neutral-800 text-white text-sm font-semibold px-5 shadow-sm transition-all hover:-translate-y-0.5">
+                <Button className="h-9 rounded-full bg-cyan-300 hover:bg-cyan-400 text-black text-sm font-semibold px-5 shadow-sm transition-all hover:-translate-y-0.5">
                   Cadastrar-se
                 </Button>
               </Link>
