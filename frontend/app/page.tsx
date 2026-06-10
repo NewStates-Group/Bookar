@@ -236,49 +236,39 @@ export default function DefinitiveHomePage() {
         </section>
 
         {/* Footer */}
-        <footer className="py-20 px-6 border-t border-black/[0.05]">
-          <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-start gap-12">
+        <footer className="py-16 px-6 border-t border-black/[0.05]">
+          <div className="max-w-5xl mx-auto flex flex-col md:flex-row justify-between items-start gap-12">
             <div className="space-y-4 max-w-xs">
               <div className="flex items-center gap-2">
-                <Image src="/logo.png" alt="Logo" width={30} height={30} />
-                <span className="text-xl font-bold tracking-tight">Bookar</span>
+                <Image src="/logo.png" alt="Logo" width={28} height={28} />
+                <span className="text-lg font-bold tracking-tight">Bookar</span>
               </div>
-              <p className="text-sm text-muted-foreground">O futuro da educação é agora. Aprende com a ajuda da inteligência artificial.</p>
+              <p className="text-sm text-neutral-400">O futuro da educação é agora.</p>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-16">
+            <div className="flex items-start gap-16">
               <div className="space-y-4">
-                <h4 className="font-bold">Plataforma</h4>
-                <ul className="text-sm text-muted-foreground space-y-2">
-                  <li className="hover:text-black cursor-pointer">Cursos</li>
-                  <li className="hover:text-black cursor-pointer">AI Tutor</li>
-                  <li className="hover:text-black cursor-pointer">Certificados</li>
+                <h4 className="text-xs font-semibold text-neutral-400 uppercase tracking-widest">Legal</h4>
+                <ul className="text-sm text-neutral-500 space-y-2.5">
+                  <li>
+                    <Link href="https://bookar.study/policies/privacy" className="hover:text-neutral-900 transition-colors">Privacidade</Link>
+                  </li>
+                  <li>
+                    <Link href="https://bookar.study/policies/terms" className="hover:text-neutral-900 transition-colors">Termos</Link>
+                  </li>
                 </ul>
               </div>
               <div className="space-y-4">
-                <h4 className="font-bold">Empresa</h4>
-                <ul className="text-sm text-muted-foreground space-y-2">
-                  <li className="hover:text-black cursor-pointer">Sobre nós</li>
-                  <li className="hover:text-black cursor-pointer">Blog</li>
-                  <li className="hover:text-black cursor-pointer">Carreiras</li>
-                </ul>
-              </div>
-              <div className="space-y-4">
-                <h4 className="font-bold">Legal</h4>
-                <ul className="text-sm text-muted-foreground space-y-2">
-                  <Link href="https://bookar.study/policies/privacy" className="hover:text-black cursor-pointer">Privacidade</Link>
-                  <Link href="https://bookar.study/policies/terms" className="hover:text-black cursor-pointer">Termos</Link>
+                <h4 className="text-xs font-semibold text-neutral-400 uppercase tracking-widest">Redes</h4>
+                <ul className="text-sm text-neutral-500 space-y-2.5">
+                  <li className="hover:text-neutral-900 cursor-pointer transition-colors">Instagram</li>
+                  <li className="hover:text-neutral-900 cursor-pointer transition-colors">Facebook</li>
                 </ul>
               </div>
             </div>
           </div>
-          <div className="max-w-7xl mx-auto mt-20 pt-8 border-t border-black/[0.05] flex justify-between items-center text-xs text-neutral-400 font-medium">
-            <p>&copy; 2026 Bookar. Todos os direitos reservados.</p>
-            <div className="flex gap-6">
-              <span className="hover:text-black cursor-pointer">Twitter</span>
-              <span className="hover:text-black cursor-pointer">LinkedIn</span>
-              <span className="hover:text-black cursor-pointer">Instagram</span>
-            </div>
+          <div className="max-w-5xl mx-auto mt-12 pt-6 border-t border-black/[0.05] flex justify-between items-center text-xs text-neutral-400">
+            <p>&copy; {new Date().getFullYear()} Bookar. Todos os direitos reservados.</p>
           </div>
         </footer>
       </div>
