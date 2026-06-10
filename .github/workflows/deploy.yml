@@ -75,7 +75,7 @@ jobs:
       - name: Build image
         run: |
           IMAGE_TAG=${{ github.sha }}
-          docker build -f ./frontend/Dockerfile.prod --build-arg NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL }} --build-arg NEXT_PUBLIC_API_BASE_URL=${{ secrets.NEXT_PUBLIC_API_BASE_URL }} --build-arg NEXT_PUBLIC_TURNSTILE_SITE_KEY=${{ secrets.NEXT_PUBLIC_TURNSTILE_SITE_KEY }} -t $FRONTEND_IMAGE:$IMAGE_TAG ./frontend
+          docker build -f ./frontend/Dockerfile.prod --build-arg NEXT_PUBLIC_GA_ID=${{ secrets.NEXT_PUBLIC_GA_ID }} --build-arg NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL }} --build-arg NEXT_PUBLIC_API_BASE_URL=${{ secrets.NEXT_PUBLIC_API_BASE_URL }} --build-arg NEXT_PUBLIC_TURNSTILE_SITE_KEY=${{ secrets.NEXT_PUBLIC_TURNSTILE_SITE_KEY }} -t $FRONTEND_IMAGE:$IMAGE_TAG ./frontend
           docker tag $FRONTEND_IMAGE:$IMAGE_TAG $FRONTEND_IMAGE:latest
 
       - name: Push image
