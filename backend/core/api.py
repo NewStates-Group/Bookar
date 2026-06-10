@@ -1,6 +1,7 @@
 from accounts.controllers import AuthController
 from courses.controllers import CourseController, LessonController
 from explicador.controllers import ExplicadorController
+from feedback.controllers import FeedbackController
 from folhas.controllers import FolhaController
 from mind_maps.controllers import MindMapController
 from ninja.errors import ValidationError as NinjaValidationError
@@ -21,6 +22,7 @@ api.register_controllers(
     MindMapController,
     ExplicadorController,
     FolhaController,
+    FeedbackController,
 )
 
 

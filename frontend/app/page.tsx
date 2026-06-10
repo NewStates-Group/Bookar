@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import Image from "next/image";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { Sparkles, Zap, Smartphone, PlayCircle } from "lucide-react";
+import { Sparkles, Zap, Smartphone, MessageSquare } from "lucide-react";
+import { FeedbackForm } from "@/components/FeedbackForm";
 
 
 export default function DefinitiveHomePage() {
@@ -22,6 +23,7 @@ export default function DefinitiveHomePage() {
               <a href="#features" className="text-lg font-medium hover:text-cyan-600 transition-colors">Funcionalidades</a>
               <a href="#about" className="text-lg font-medium hover:text-cyan-600 transition-colors">Sobre</a>
               <a href="#pricing" className="text-lg font-medium hover:text-cyan-600 transition-colors">Preços</a>
+              <a href="#feedback" className="text-lg font-medium hover:text-cyan-600 transition-colors">Feedback</a>
             </div>
 
             <div className="flex items-center gap-4">
@@ -105,31 +107,19 @@ export default function DefinitiveHomePage() {
           </div>
         </section>
 
-        {/* Showcase Section */}
-        <section className="py-24 bg-neutral-50 border-y border-black/[0.05]">
-          <div className="max-w-7xl mx-auto px-6 grid md:grid-cols-2 gap-16 items-center">
-            <div className="space-y-8">
-              <h2 className="text-4xl md:text-5xl font-bold tracking-tight">Vê a Bookar em <span className="text-cyan-500">Ação</span>.</h2>
-              <p className="text-lg text-muted-foreground leading-relaxed">
-                Uma plataforma fluida, rápida e inteligente. Desenvolvida para que não percas tempo com burocracias e te foques no que realmente importa: **Aprender.**
-              </p>
-              <ul className="space-y-4">
-                {["Interface Limpa", "Dashboard Intuitivo", "Modo Escuro Integrado"].map((item, i) => (
-                  <li key={i} className="flex items-center gap-3 font-medium text-neutral-700">
-                    <div className="w-5 h-5 rounded-full bg-cyan-100 flex items-center justify-center">
-                      <div className="w-2 h-2 rounded-full bg-cyan-500"></div>
-                    </div>
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div className="relative group">
-              <div className="absolute -inset-4 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-[40px] opacity-20 blur-2xl group-hover:opacity-30 transition-opacity"></div>
-              <div className="relative aspect-video bg-neutral-900 rounded-[32px] border-4 border-white shadow-2xl overflow-hidden flex items-center justify-center">
-                <PlayCircle className="w-16 h-16 text-white/40 cursor-pointer hover:text-white hover:scale-110 transition-all" />
+        {/* Feedback Section */}
+        <section id="feedback" className="py-24 px-6 bg-neutral-50">
+          <div className="max-w-3xl mx-auto text-center space-y-8">
+            <div className="space-y-4">
+              <div className="p-3 bg-cyan-100 w-fit rounded-2xl mx-auto text-cyan-600">
+                <MessageSquare className="w-6 h-6" />
               </div>
+              <h2 className="text-4xl md:text-5xl font-bold tracking-tight">Dá o teu Feedback</h2>
+              <p className="text-lg text-muted-foreground max-w-lg mx-auto">
+                A tua opinião ajuda-nos a melhorar. Partilha connosco a tua experiência.
+              </p>
             </div>
+            <FeedbackForm />
           </div>
         </section>
 

@@ -340,19 +340,15 @@ export default function MessageInput(
                 </Popover>
               )}
 
-              {/* 🎤 Microfone */}
+              {/* 🎤 Microfone (indisponível no momento) */}
               <Button
                 size="icon-sm"
                 variant="ghost"
-                onClick={handleChatMic}
-                disabled={isGenerating}
-                className={cn(
-                  "rounded-md",
-                  isRecordingAudio && "text-red-500 bg-red-50 animate-pulse ring-2 ring-red-500/25"
-                )}
-                title={isRecordingAudio ? "Enviar gravação de voz" : "Falar com o explicador"}
+                disabled
+                className="rounded-md opacity-40 cursor-not-allowed"
+                title="Indisponível no momento"
               >
-                {isRecordingAudio ? <Square size={16} /> : <Mic size={16} />}
+                <Mic size={16} />
               </Button>
 
               {isMultiUserRoom && (

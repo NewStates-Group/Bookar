@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     "mind_maps",
     "explicador",
     "folhas",
+    "feedback",
 ]
 
 MIDDLEWARE = [
