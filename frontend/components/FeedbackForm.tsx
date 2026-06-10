@@ -12,6 +12,7 @@ export function FeedbackForm() {
   const [message, setMessage] = useState("");
   const [turnstileToken, setTurnstileToken] = useState("");
   const [loading, setLoading] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,11 +34,7 @@ export function FeedbackForm() {
         throw new Error(err.message || "Erro ao enviar feedback.");
       }
 
-      toast.success("Feedback enviado com sucesso!");
-      setName("");
-      setEmail("");
-      setMessage("");
-      setTurnstileToken("");
+      setSubmitted(true);
     } catch (err: unknown) {
       const error = err as Error;
       toast.error(error.message || "Erro ao enviar feedback.");
@@ -45,6 +42,34 @@ export function FeedbackForm() {
       setLoading(false);
     }
   };
+
+  if (submitted) {
+    return (
+      <div className="text-center space-y-4 max-w-lg mx-auto py-8">
+        <div className="w-14 h-14 rounded-full bg-cyan-100 dark:bg-cyan-950 flex items-center justify-center mx-auto">
+          <svg className="w-6 h-6 text-cyan-600 dark:text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+          </svg>
+        </div>
+        <h3 className="text-xl font-bold">Obrigado pelo teu feedback!</h3>
+        <p className="text-neutral-500 dark:text-neutral-400 text-sm leading-relaxed max-w-sm mx-auto">
+          A tua opinião é muito importante para nós. Cada sugestão ajuda-nos a tornar a Bookar numa plataforma ainda melhor para ti.
+        </p>
+        <button
+          onClick={() => {
+            setSubmitted(false);
+            setName("");
+            setEmail("");
+            setMessage("");
+            setTurnstileToken("");
+          }}
+          className="text-sm text-cyan-500 hover:text-cyan-600 font-medium transition-colors"
+        >
+          Enviar outro feedback
+        </button>
+      </div>
+    );
+  }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5 max-w-lg mx-auto">
@@ -75,7 +100,7 @@ export function FeedbackForm() {
           onChange={(e) => setMessage(e.target.value)}
           required
           rows={5}
-          className="w-full px-5 py-4 rounded-2xl border border-black/[0.08] bg-white text-base placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-cyan-400/50 transition-shadow resize-none"
+          className="w-full px-5 py-4 rounded-2xl border border-black/[0.08] dark:border-white/[0.12] bg-white dark:bg-neutral-900 text-base placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-cyan-400/50 transition-shadow resize-none"
         />
       </div>
       <div className="flex justify-center">
