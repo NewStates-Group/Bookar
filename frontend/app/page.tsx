@@ -65,7 +65,7 @@ export default function DefinitiveHomePage() {
           </nav>
 
           {/* Hero Section */}
-          <section className="relative min-h-screen flex flex-col items-center justify-center px-6 overflow-hidden">
+          <section className="relative min-h-screen flex flex-col items-center justify-center px-6 pt-24 md:pt-0 overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-b from-white via-white to-neutral-50 dark:from-neutral-950 dark:via-neutral-950 dark:to-neutral-900 -z-10" />
 
             <div className="absolute inset-0 -z-10 overflow-hidden">
@@ -83,22 +83,12 @@ export default function DefinitiveHomePage() {
                 className="flex flex-col items-center md:items-start text-center md:text-left"
               >
                 <div className="flex items-center gap-5 mb-5">
-                  <motion.div
-                    animate={{ y: [0, -8, 0] }}
-                    transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-                    className="p-3 rounded-2xl bg-neutral-900 dark:bg-neutral-100"
-                  >
-                    <Image src="/logo-white.png" alt="Bookar" width={44} height={44} className="shrink-0 md:w-[52px] md:h-[52px]" priority />
-                  </motion.div>
-                  <motion.span
-                    animate={{ y: [0, -8, 0] }}
-                    transition={{ duration: 4, repeat: Infinity, ease: "easeInOut", delay: 0.2 }}
-                    className="text-5xl md:text-7xl font-black tracking-tight"
-                  >
+                  <Image src="/logo-white.png" alt="Bookar" width={52} height={52} className="shrink-0 md:w-[60px] md:h-[60px]" priority />
+                  <span className="text-5xl md:text-7xl font-black tracking-tight">
                     <span className="bg-clip-text text-transparent bg-gradient-to-r from-neutral-900 via-neutral-700 to-neutral-900 dark:from-white dark:via-neutral-300 dark:to-white">
                       Bookar
                     </span>
-                  </motion.span>
+                  </span>
                 </div>
 
                 <motion.div
@@ -136,46 +126,56 @@ export default function DefinitiveHomePage() {
                 </motion.div>
               </motion.div>
 
-              {/* Phone Mockup */}
+              {/* Card Spread */}
               <motion.div
-                initial={{ opacity: 0, x: 30, y: 20 }}
-                animate={{ opacity: 1, x: 0, y: 0 }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
                 transition={{ duration: 0.8, delay: 0.3, ease: [0.16, 1, 0.3, 1] }}
                 className="flex flex-col items-center"
               >
-                <motion.div
-                  animate={{ y: [0, -10, 0] }}
-                  transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
-                  className="relative w-[240px] md:w-[280px]"
-                >
-                  {/* Phone Frame */}
-                  <div className="relative aspect-[9/19] rounded-[36px] bg-neutral-200 dark:bg-neutral-800 p-2 shadow-2xl dark:shadow-neutral-900/50">
-                    <div className="relative w-full h-full rounded-[28px] overflow-hidden bg-neutral-100 dark:bg-neutral-900">
-                      <AnimatePresence mode="wait">
-                        <motion.div
-                          key={activeIdx}
-                          initial={{ opacity: 0, scale: 0.95 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          exit={{ opacity: 0, scale: 1.05 }}
-                          transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-                          className="absolute inset-0"
-                        >
-                          <Image
-                            src={screens[activeIdx].src}
-                            alt={screens[activeIdx].label}
-                            fill
-                            className="object-cover"
-                            sizes="240px"
-                          />
-                        </motion.div>
-                      </AnimatePresence>
-                    </div>
-                    {/* Notch */}
-                    <div className="absolute top-2 left-1/2 -translate-x-1/2 w-1/3 h-6 bg-neutral-900 dark:bg-neutral-950 rounded-b-xl" />
-                  </div>
-                </motion.div>
+                <div className="relative h-[380px] md:h-[460px] w-full max-w-[360px] mx-auto">
+                  {screens.map((s, i) => {
+                    const diff = (i - activeIdx + screens.length) % screens.length;
+                    let pos: number | null;
+                    if (diff === 0) pos = 0;
+                    else if (diff === 1 || diff === -(screens.length - 1)) pos = 1;
+                    else if (diff === screens.length - 1 || diff === -1) pos = -1;
+                    else pos = null;
 
-                <div className="mt-6 text-center space-y-1">
+                    const isLeft = pos === -1;
+                    const isRight = pos === 1;
+
+                    return (
+                      <motion.div
+                        key={i}
+                        animate={{
+                          x: pos === null ? 0 : pos * (isLeft ? -60 : isRight ? 60 : 0),
+                          scale: pos === 0 ? 1 : pos === null ? 0 : 0.82,
+                          rotate: isLeft ? -10 : isRight ? 10 : 0,
+                          zIndex: pos === 0 ? 10 : pos === null ? 0 : 5,
+                          opacity: pos === null ? 0 : 1,
+                        }}
+                        transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+                        className="absolute inset-0 flex items-center justify-center"
+                        style={{ pointerEvents: pos === 0 ? "auto" : "none" }}
+                      >
+                        <div className={`relative w-[200px] md:w-[230px] aspect-[9/19] rounded-[28px] overflow-hidden shadow-2xl dark:shadow-neutral-900/60 ${isLeft || isRight ? "shadow-lg" : ""}`}>
+                          <div className="absolute inset-0 bg-neutral-100 dark:bg-neutral-800">
+                            <Image
+                              src={s.src}
+                              alt={s.label}
+                              fill
+                              className="object-contain"
+                              sizes="230px"
+                            />
+                          </div>
+                        </div>
+                      </motion.div>
+                    );
+                  })}
+                </div>
+
+                <div className="mt-4 text-center space-y-1">
                   <AnimatePresence mode="wait">
                     <motion.p
                       key={activeIdx}
