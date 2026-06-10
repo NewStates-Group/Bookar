@@ -55,7 +55,7 @@ export function FeedbackForm() {
           value={name}
           onChange={(e) => setName(e.target.value)}
           required
-          className="w-full px-5 py-4 rounded-2xl border border-black/[0.08] bg-white text-base placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-cyan-400/50 transition-shadow"
+          className="w-full px-5 py-4 rounded-2xl border border-black/[0.08] dark:border-white/[0.12] bg-white dark:bg-neutral-900 text-base placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-cyan-400/50 transition-shadow"
         />
       </div>
       <div>
@@ -65,7 +65,7 @@ export function FeedbackForm() {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
-          className="w-full px-5 py-4 rounded-2xl border border-black/[0.08] bg-white text-base placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-cyan-400/50 transition-shadow"
+          className="w-full px-5 py-4 rounded-2xl border border-black/[0.08] dark:border-white/[0.12] bg-white dark:bg-neutral-900 text-base placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-cyan-400/50 transition-shadow"
         />
       </div>
       <div>
@@ -82,13 +82,13 @@ export function FeedbackForm() {
         <Turnstile
           siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY!}
           onVerify={(token) => setTurnstileToken(token)}
-          theme="light"
+          theme="auto"
         />
       </div>
       <Button
         type="submit"
         disabled={loading || !turnstileToken}
-        className="w-full h-14 rounded-2xl bg-cyan-500 hover:bg-cyan-600 text-white font-bold text-lg shadow-xl shadow-cyan-200 transition-all hover:-translate-y-1 disabled:opacity-50 disabled:hover:translate-y-0"
+        className="w-full h-14 rounded-2xl bg-cyan-500 hover:bg-cyan-600 text-white font-bold text-lg shadow-xl shadow-cyan-200 dark:shadow-cyan-950 transition-all hover:-translate-y-1 disabled:opacity-50 disabled:hover:translate-y-0"
       >
         {loading ? (
           <Loader2 className="w-5 h-5 animate-spin" />
