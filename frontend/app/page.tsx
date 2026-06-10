@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import Image from "next/image";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { MessageSquare, Sun, Moon } from "lucide-react";
+import { MessageSquare, Sun, Moon, Menu, X } from "lucide-react";
 import { FeedbackForm } from "@/components/FeedbackForm";
 
 const screens = [
@@ -18,6 +18,7 @@ const screens = [
 export default function DefinitiveHomePage() {
   const [dark, setDark] = useState(false);
   const [activeIdx, setActiveIdx] = useState(0);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     const t = setInterval(() => setActiveIdx((i) => (i + 1) % screens.length), 4500);
@@ -50,18 +51,73 @@ export default function DefinitiveHomePage() {
                 >
                   {dark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
                 </button>
-                <Link href="/login">
-                  <Button variant="outline" className="h-9 rounded-full border-neutral-300 dark:border-neutral-700 text-neutral-800 dark:text-neutral-200 text-sm font-semibold px-5 shadow-sm transition-all hover:-translate-y-0.5 hover:bg-cyan-50 dark:hover:bg-cyan-950 hover:border-cyan-300">
-                    Entrar
-                  </Button>
-                </Link>
-                <Link href="/signup">
-                  <Button className="h-9 rounded-full bg-cyan-300 hover:bg-cyan-400 text-black text-sm font-semibold px-5 shadow-sm transition-all hover:-translate-y-0.5">
-                    Cadastrar-se
-                  </Button>
-                </Link>
+                <div className="hidden md:flex items-center gap-3">
+                  <Link href="/login">
+                    <Button variant="outline" className="h-9 rounded-full border-neutral-300 dark:border-neutral-700 text-neutral-800 dark:text-neutral-200 text-sm font-semibold px-5 shadow-sm transition-all hover:-translate-y-0.5 hover:bg-cyan-50 dark:hover:bg-cyan-950 hover:border-cyan-300">
+                      Entrar
+                    </Button>
+                  </Link>
+                  <Link href="/signup">
+                    <Button className="h-9 rounded-full bg-cyan-300 hover:bg-cyan-400 text-black dark:text-white text-sm font-semibold px-5 shadow-sm transition-all hover:-translate-y-0.5">
+                      Cadastrar-se
+                    </Button>
+                  </Link>
+                </div>
+                <button
+                  onClick={() => setMenuOpen(!menuOpen)}
+                  className="md:hidden w-9 h-9 rounded-full flex items-center justify-center text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+                  aria-label="Menu"
+                >
+                  {menuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+                </button>
               </div>
             </div>
+
+            {/* Mobile Menu */}
+            <AnimatePresence>
+              {menuOpen && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10, scale: 0.97 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -10, scale: 0.97 }}
+                  transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+                  className="md:hidden mt-2 p-4 rounded-2xl bg-white/95 dark:bg-neutral-950/95 backdrop-blur-xl border border-black/[0.06] dark:border-white/[0.08] shadow-lg"
+                >
+                  <div className="flex flex-col gap-1">
+                    {[
+                      { href: "#features", label: "Funcionalidades" },
+                      { href: "#about", label: "Sobre" },
+                      { href: "#pricing", label: "Preços" },
+                      { href: "#feedback", label: "Feedback" },
+                    ].map((link) => (
+                      <a
+                        key={link.href}
+                        href={link.href}
+                        onClick={() => setMenuOpen(false)}
+                        className="px-4 py-3 rounded-xl text-sm font-medium text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+                      >
+                        {link.label}
+                      </a>
+                    ))}
+                    <hr className="my-2 border-neutral-200 dark:border-neutral-800" />
+                    <Link
+                      href="/login"
+                      onClick={() => setMenuOpen(false)}
+                      className="px-4 py-3 rounded-xl text-sm font-medium text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+                    >
+                      Entrar
+                    </Link>
+                    <Link
+                      href="/signup"
+                      onClick={() => setMenuOpen(false)}
+                      className="mt-1 px-4 py-3 rounded-xl text-sm font-semibold text-center bg-cyan-300 text-black dark:text-white hover:bg-cyan-400 transition-colors"
+                    >
+                      Cadastrar-se
+                    </Link>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </nav>
 
           {/* Hero Section */}
