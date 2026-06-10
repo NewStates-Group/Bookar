@@ -11,25 +11,30 @@ import { FeedbackForm } from "@/components/FeedbackForm";
 export default function DefinitiveHomePage() {
   return (
     <AnimatePresence mode="wait">
-      <div className="min-h-screen bg-white text-[#111] overflow-x-hidden pt-20">
-        <nav className="fixed top-0 left-0 w-full z-[100] backdrop-blur-md bg-white/70 border-b border-black/[0.05]">
-          <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Image src="/logo.png" alt="Logo" width={36} height={36} />
-              <span className="text-3xl font-bold tracking-tight">Bookar</span>
+      <div className="min-h-screen bg-white text-[#111] overflow-x-hidden">
+        <nav className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] w-[calc(100%-2rem)] max-w-5xl">
+          <div className="flex items-center justify-between px-6 h-16 rounded-2xl bg-white/80 backdrop-blur-xl border border-black/[0.06] shadow-sm">
+            <Link href="/" className="flex items-center gap-2.5">
+              <Image src="/logo.png" alt="Bookar" width={32} height={32} className="shrink-0" />
+              <span className="text-xl font-bold tracking-tight">Bookar</span>
+            </Link>
+
+            <div className="hidden md:flex items-center gap-8">
+              <a href="#features" className="text-sm font-medium text-neutral-600 hover:text-neutral-900 transition-colors">Funcionalidades</a>
+              <a href="#about" className="text-sm font-medium text-neutral-600 hover:text-neutral-900 transition-colors">Sobre</a>
+              <a href="#pricing" className="text-sm font-medium text-neutral-600 hover:text-neutral-900 transition-colors">Preços</a>
+              <a href="#feedback" className="text-sm font-medium text-neutral-600 hover:text-neutral-900 transition-colors">Feedback</a>
             </div>
 
-            <div className="hidden md:flex items-center gap-10">
-              <a href="#features" className="text-lg font-medium hover:text-cyan-600 transition-colors">Funcionalidades</a>
-              <a href="#about" className="text-lg font-medium hover:text-cyan-600 transition-colors">Sobre</a>
-              <a href="#pricing" className="text-lg font-medium hover:text-cyan-600 transition-colors">Preços</a>
-              <a href="#feedback" className="text-lg font-medium hover:text-cyan-600 transition-colors">Feedback</a>
-            </div>
-
-            <div className="flex items-center gap-4">
-              <Link href="/login" className="text-lg font-medium hover:text-cyan-600 transition-colors">Entrar</Link>
+            <div className="flex items-center gap-3">
+              <Link
+                href="/login"
+                className="text-sm font-medium text-neutral-700 hover:text-neutral-900 transition-colors"
+              >
+                Entrar
+              </Link>
               <Link href="/signup">
-                <Button className="rounded-full bg-cyan-500 hover:bg-cyan-600 text-white font-bold text-lg shadow-xl shadow-cyan-200 transition-all hover:-translate-y-1">
+                <Button className="h-9 rounded-full bg-neutral-900 hover:bg-neutral-800 text-white text-sm font-semibold px-5 shadow-sm transition-all hover:-translate-y-0.5">
                   Cadastrar-se
                 </Button>
               </Link>
@@ -38,27 +43,42 @@ export default function DefinitiveHomePage() {
         </nav>
 
         {/* Hero Section */}
-        <section className="relative py-20 md:py-32 px-6 flex flex-col items-center text-center max-w-5xl mx-auto overflow-hidden">
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[600px] bg-cyan-100/30 blur-[120px] -z-10 rounded-full opacity-50"></div>
+        <section className="relative min-h-screen flex flex-col items-center justify-center px-6 overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-b from-white via-white to-neutral-50 -z-10" />
+          <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-[600px] h-[400px] bg-cyan-200/20 blur-[140px] -z-10 rounded-full" />
 
           <motion.div
-            initial={{ opacity: 0, y: 40 }}
+            initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 1, ease: "easeOut" }}
-            className="space-y-6"
+            transition={{ duration: 0.8, ease: "easeOut" }}
+            className="flex flex-col items-center text-center space-y-8"
           >
-            <h1 className="text-6xl md:text-8xl font-black tracking-tighter leading-[0.9] text-balance">
-              Aprende <span className="bg-clip-text text-transparent bg-gradient-to-r from-cyan-600 to-blue-600 italic">Mais Rápido</span> <br /> utilizando IA.
-            </h1>
+            <div className="flex items-center gap-5">
+              <Image
+                src="/logo.png"
+                alt="Bookar"
+                width={72}
+                height={72}
+                className="shrink-0 drop-shadow-sm"
+                priority
+              />
+              <span className="text-7xl md:text-8xl font-black tracking-tight text-neutral-900">
+                Bookar
+              </span>
+            </div>
 
-            <p className="text-xl md:text-2xl text-muted-foreground max-w-2xl mx-auto text-balance font-light leading-relaxed">
-              Transforme a forma como consomes conteúdo educacional. Acelere o seu aprendizado com IA.
+            <div className="h-px w-64 bg-gradient-to-r from-transparent via-neutral-300 to-transparent overflow-hidden relative">
+              <div className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white to-transparent animate-shimmer" />
+            </div>
+
+            <p className="text-lg md:text-xl text-neutral-500 font-medium tracking-wide">
+              Plataforma de aprendizado com IA
             </p>
 
-            <div className="pt-3 flex flex-col sm:flex-row items-center justify-center gap-4">
-              <Link href="/login">
-                <Button className="h-14 px-10 rounded-2xl bg-cyan-500 hover:bg-cyan-600 text-white font-bold text-lg shadow-xl shadow-cyan-200 transition-all hover:-translate-y-1">
-                  Experimentar Agora
+            <div className="pt-4">
+              <Link href="/signup">
+                <Button className="h-14 px-10 rounded-2xl bg-neutral-900 hover:bg-neutral-800 text-white font-bold text-lg shadow-xl transition-all hover:-translate-y-1 hover:shadow-neutral-900/20">
+                  Começar Agora
                 </Button>
               </Link>
             </div>
@@ -161,7 +181,7 @@ export default function DefinitiveHomePage() {
             </div>
           </div>
           <div className="max-w-7xl mx-auto mt-20 pt-8 border-t border-black/[0.05] flex justify-between items-center text-xs text-neutral-400 font-medium">
-            <p>© 2026 Bookar. Todos os direitos reservados.</p>
+            <p>&copy; 2026 Bookar. Todos os direitos reservados.</p>
             <div className="flex gap-6">
               <span className="hover:text-black cursor-pointer">Twitter</span>
               <span className="hover:text-black cursor-pointer">LinkedIn</span>
