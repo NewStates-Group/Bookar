@@ -6,6 +6,7 @@ import { Toaster } from 'sonner'
 import { AuthGuard } from '@/components/AuthGuard'
 import NextTopLoader from 'nextjs-toploader';
 import { GoogleAnalytics } from '@next/third-parties/google'
+import { ThemeProvider } from '@/components/theme-provider'
 
 const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
@@ -58,15 +59,22 @@ export default function RootLayout({
           speed={200}
           shadow="0 0 10px #2563eb,0 0 5px #06b6d4"
         />
-        <Providers>
-          <AuthGuard>
-            {children}
-          </AuthGuard>
-        </Providers>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <Providers>
+            <AuthGuard>
+              {children}
+            </AuthGuard>
+          </Providers>
+        </ThemeProvider>
         <Toaster position='top-right' />
         {/* <script defer src='https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516' integrity='sha512-z4PhNX7vuL3xVChQ1m2AB9Yg5AULVxXcg/SpIdNs6c5H0NE8XYXysP+DGNKHfuwvY7kxvUdBeoGlODJ6+SfaPg==' crossOrigin='anonymous'></script> */}
       </body>
-       <GoogleAnalytics gaId={process.env.NEXT_PUBLIC_GA_ID} />
+      <GoogleAnalytics gaId={process.env.NEXT_PUBLIC_GA_ID ?? ""} />
     </html>
   )
 }

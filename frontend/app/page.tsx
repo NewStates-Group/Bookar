@@ -6,6 +6,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { motion, AnimatePresence, useScroll, useSpring } from "framer-motion";
 import { MessageSquare, Sun, Moon, Menu, X, Bot, Brain, BookOpen, GraduationCap, Sparkles, Globe, Lightbulb, ChevronDown } from "lucide-react";
+import { useTheme } from "next-themes";
 import { FeedbackForm } from "@/components/FeedbackForm";
 
 const screens = [
@@ -16,21 +17,12 @@ const screens = [
 ];
 
 export default function DefinitiveHomePage() {
-  const [dark, setDark] = useState(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("bookar-theme");
-      return saved === "dark";
-    }
-    return false;
-  });
+  const { theme, setTheme, resolvedTheme } = useTheme();
+  const dark = resolvedTheme === "dark";
   const [activeIdx, setActiveIdx] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
   const { scrollYProgress } = useScroll();
   const scaleY = useSpring(scrollYProgress, { stiffness: 200, damping: 30, restDelta: 0.001 });
-
-  useEffect(() => {
-    localStorage.setItem("bookar-theme", dark ? "dark" : "light");
-  }, [dark]);
 
   useEffect(() => {
     const t = setInterval(() => setActiveIdx((i) => (i + 1) % screens.length), 4500);
@@ -79,7 +71,7 @@ export default function DefinitiveHomePage() {
 
               <div className="flex items-center gap-3">
                 <button
-                  onClick={() => setDark(!dark)}
+                  onClick={() => setTheme(dark ? "light" : "dark")}
                   className="w-9 h-9 rounded-full flex items-center justify-center text-neutral-500 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
                   aria-label="Alternar tema"
                 >
