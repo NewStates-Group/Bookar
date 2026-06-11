@@ -341,7 +341,7 @@ export default function MessageInput(
               )}
 
               {/* 🎤 Microfone (indisponível no momento) */}
-              <Button
+              {/* <Button
                 size="icon-sm"
                 variant="ghost"
                 disabled
@@ -349,7 +349,7 @@ export default function MessageInput(
                 title="Indisponível no momento"
               >
                 <Mic size={16} />
-              </Button>
+              </Button> */}
 
               {isMultiUserRoom && (
                 <Button
