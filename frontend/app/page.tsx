@@ -58,7 +58,7 @@ export default function DefinitiveHomePage() {
           <nav className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] w-[calc(100%-2rem)] max-w-5xl">
             <div className="flex items-center justify-between px-6 h-16 rounded-2xl bg-white/80 dark:bg-neutral-950/80 backdrop-blur-xl border border-black/[0.06] dark:border-white/[0.08] shadow-sm dark:shadow-neutral-900/50">
               <Link href="/" className="flex items-center gap-2.5">
-                <Image src={dark ? "/logo-white.png" : "/logo.png"} alt="Bookar" width={32} height={32} className="shrink-0" />
+                <Image src={dark ? "/logo-white.svg" : "/logo.svg"} alt="Bookar" width={32} height={32} className="shrink-0" />
                 <span className="text-xl font-bold tracking-tight">Bookar</span>
               </Link>
 
