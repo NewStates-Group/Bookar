@@ -273,7 +273,6 @@ export default function MindMapDetailPage() {
         `${process.env.NEXT_PUBLIC_API_URL}/mind-maps/${params.id}/share`,
         { method: "POST" }
       );
-      toast.success(res.is_shared ? "Mapa mental agora é público! 🌐" : "Acesso público removido.");
       mutateMindMap();
     } catch (err) {
       toast.error("Erro ao alterar as definições de partilha.");
@@ -483,6 +482,20 @@ export default function MindMapDetailPage() {
       selectedNode.data.title,
       mindMap?.notes?.[selectedNode.data.id]
     );
+  };
+
+  const handleTirarDuvidas = () => {
+    if (!selectedNode || !params.id) return;
+    window.dispatchEvent(new CustomEvent("opencode-explicador", {
+      detail: {
+        context: {
+          course_title: mindMap?.title || "Mapa mental",
+          lesson_title: selectedNode.data.title,
+          lesson_description: selectedNode.data.desc,
+        },
+        prompt: `Ajuda-me a perceber isto: ${selectedNode.data.title}${selectedNode.data.desc ? ` - ${selectedNode.data.desc}` : ""}`,
+      },
+    }));
   };
 
   // Automatically select the first Level 3 node on initial load
@@ -1287,40 +1300,51 @@ export default function MindMapDetailPage() {
                           </div>
                         )}
 
-                        <div className="flex border-b border-slate-200/60 bg-slate-50 p-1.5 gap-1 rounded-t-xl">
-                          <button
-                            type="button"
-                            onClick={() => setActiveSideTab("video")}
-                            className={platformSegmentTab(activeSideTab === "video") + " cursor-pointer"}
-                          >
-                            <Tv className="w-3.5 h-3.5 shrink-0" />
-                            Vídeo
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setActiveSideTab("reading")}
-                            className={platformSegmentTab(activeSideTab === "reading") + " cursor-pointer"}
-                          >
-                            <BookOpen className="w-3.5 h-3.5 shrink-0" />
-                            Leitura
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setActiveSideTab("quiz")}
-                            className={platformSegmentTab(activeSideTab === "quiz") + " cursor-pointer"}
-                          >
-                            <Award className="w-3.5 h-3.5 shrink-0" />
-                            Teste
-                          </button>
-                          <button
-                            type="button"
-                            onClick={handleAnotar}
-                            className={`cursor-pointer ${platformSegmentTab(false)} shrink-0 px-3`}
-                            title="Abrir caderno de notas deste nó"
-                          >
-                            <BookMarked className="w-3.5 h-3.5 shrink-0" />
-                            Notas
-                          </button>
+                        <div className="flex items-center border-b border-slate-200/60 bg-slate-50 p-1 rounded-t-xl">
+                          <div className="flex flex-1 gap-1">
+                            <button
+                              type="button"
+                              onClick={() => setActiveSideTab("video")}
+                              className={platformSegmentTab(activeSideTab === "video") + " cursor-pointer"}
+                            >
+                              <Tv className="w-3.5 h-3.5 shrink-0" />
+                              Vídeo
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setActiveSideTab("reading")}
+                              className={platformSegmentTab(activeSideTab === "reading") + " cursor-pointer"}
+                            >
+                              <BookOpen className="w-3.5 h-3.5 shrink-0" />
+                              Leitura
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setActiveSideTab("quiz")}
+                              className={platformSegmentTab(activeSideTab === "quiz") + " cursor-pointer"}
+                            >
+                              <Award className="w-3.5 h-3.5 shrink-0" />
+                              Teste
+                            </button>
+                          </div>
+                          <div className="flex items-center gap-0.5 ml-2 pl-2 border-l border-slate-200/60">
+                            <button
+                              type="button"
+                              onClick={handleAnotar}
+                              className="flex items-center justify-center w-8 h-8 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-white/80 transition-all cursor-pointer"
+                              title="Abrir caderno de notas deste nó"
+                            >
+                              <BookMarked className="w-4 h-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleTirarDuvidas}
+                              className="flex items-center justify-center w-8 h-8 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-white/80 transition-all cursor-pointer"
+                              title="Tirar dúvidas sobre esta aula"
+                            >
+                              <HelpCircle className="w-4 h-4" />
+                            </button>
+                          </div>
                         </div>
                       </div>
                     )}
