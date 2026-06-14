@@ -70,8 +70,7 @@ export function NotebookProvider({ children }: { children: React.ReactNode }) {
         const folha = await apiRequest(
           `${base}/folhas/lookup?mind_map_id=${encodeURIComponent(mindMapId)}&node_id=${encodeURIComponent(nodeId)}`
         );
-        setEditorFolhaId(folha.id);
-        setCadernoOpen(false);
+        window.dispatchEvent(new CustomEvent("opencode-caderno", { detail: { folhaId: folha.id } }));
       } catch {
         try {
           const created = await apiRequest(`${base}/folhas`, {
@@ -84,8 +83,7 @@ export function NotebookProvider({ children }: { children: React.ReactNode }) {
             }),
           });
           refreshFolhas();
-          setEditorFolhaId(created.id);
-          setCadernoOpen(false);
+          window.dispatchEvent(new CustomEvent("opencode-caderno", { detail: { folhaId: created.id } }));
         } catch (err: any) {
           toast.error(err.message || "Erro ao criar folha de anotação.");
         }
