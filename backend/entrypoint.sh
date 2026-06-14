@@ -17,7 +17,8 @@ echo "Starting Gunicorn (DEBUG=$DEBUG)"
 if [ "$DEBUG" = "True" ] || [ "$DEBUG" = "1" ]; then
     exec watchmedo auto-restart --directory=. --pattern="*.py" --recursive -- uvicorn core.asgi:application \
         --host 0.0.0.0 \
-        --port 8000
+        --port 8000 \
+        --workers 4
 else
     exec newrelic-admin run-program \
         uvicorn core.asgi:application \
