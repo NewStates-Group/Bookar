@@ -206,6 +206,25 @@ class ExplicadorConsumer(AsyncWebsocketConsumer):
         self.user_avatar = avatar_url
         self.user_id = self.user.id if self.user.is_authenticated else None
 
+        # Check participants limit before joining
+        if self.user.is_authenticated and not self.is_owner:
+            current_members = await sync_to_async(room_presence.list_members)(self.room_uuid)
+            if current_members:
+                from accounts.subscription_service import SubscriptionService
+                from ninja.errors import HttpError as NinjaHttpError
+                owner_id = self.room.owner_id
+                try:
+                    await sync_to_async(
+                        lambda: SubscriptionService().check_limit(
+                            User.objects.get(id=owner_id),
+                            "explicador_participants",
+                            len(current_members),
+                        )
+                    )()
+                except NinjaHttpError:
+                    await self.close()
+                    return
+
         member_payload = {
             "connection_id": self.connection_id,
             "name": self.user_name,
@@ -507,6 +526,27 @@ class ExplicadorConsumer(AsyncWebsocketConsumer):
             },
         )
 
+    async def _check_message_limit(self, user_id: int):
+        from accounts.subscription_service import SubscriptionService
+
+        def _check():
+            svc = SubscriptionService()
+            svc.check_and_increment(user_id, "explicador_message")
+
+        try:
+            await sync_to_async(_check)()
+        except Exception as e:
+            error_msg = str(e)
+            await self.send(
+                text_data=json.dumps(
+                    {
+                        "type": "error",
+                        "message": error_msg,
+                    }
+                )
+            )
+            raise
+
     async def handle_chat_message(self, data):
         """Processes chat messages. Lock is required only for @explicador messages."""
         self.is_interrupted = False
@@ -519,6 +559,13 @@ class ExplicadorConsumer(AsyncWebsocketConsumer):
 
         if not message_content and not attachment_data:
             return
+
+        # Check subscription message limit
+        if self.user.is_authenticated:
+            try:
+                await self._check_message_limit(self.user.id)
+            except Exception:
+                return
 
         solo_room = await self._is_solo_room() or bool(
             data.get("direct_to_explicador")

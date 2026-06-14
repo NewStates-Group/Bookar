@@ -1,3 +1,6 @@
+from datetime import date, datetime
+from typing import Optional
+
 from django.contrib.auth import get_user_model
 from ninja import Schema
 from pydantic import EmailStr, field_validator
@@ -104,3 +107,71 @@ class WaitlistEmailIn(Schema):
     email: EmailStr
     code: str
     token: str
+
+
+class SubscriptionPlanOut(Schema):
+    id: int
+    slug: str
+    name: str
+    description: str
+    price: float
+    sort_order: int
+    monthly_limits: bool
+    max_explicador_messages: int | None = None
+    max_explicador_participants: int | None = None
+    max_courses_generated: int | None = None
+    max_mindmaps_generated: int | None = None
+    max_mindmap_modules: int | None = None
+    max_mindmap_quizzes: int | None = None
+    max_mindmap_materials: int | None = None
+
+    @staticmethod
+    def resolve_price(obj):
+        return float(obj.price)
+
+
+class UserSubscriptionOut(Schema):
+    id: int
+    plan: SubscriptionPlanOut | None = None
+    status: str
+    current_period_start: datetime
+    current_period_end: datetime | None = None
+    canceled_at: datetime | None = None
+    payment_gateway: str
+
+
+class UsageMetricOut(Schema):
+    metric: str
+    used: int
+    limit: int | None
+    remaining: int | None
+
+
+class UsageSummaryOut(Schema):
+    metrics: list[UsageMetricOut]
+
+
+class CheckoutIn(Schema):
+    plan_slug: str
+    success_url: str
+    cancel_url: str
+    gateway: str = "stripe"
+
+
+class CheckoutOut(Schema):
+    url: str
+    session_id: str
+
+
+class CancelOut(Schema):
+    success: bool
+    message: str
+
+
+class ConfirmCheckoutIn(Schema):
+    session_id: str
+
+
+class ConfirmCheckoutOut(Schema):
+    success: bool
+    plan: str

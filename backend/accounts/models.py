@@ -29,3 +29,90 @@ class Waitlist(models.Model):
 
     def __str__(self):
         return self.email
+
+
+class SubscriptionPlan(models.Model):
+    slug = models.SlugField(unique=True)
+    name = models.CharField(max_length=100)
+    description = models.TextField(blank=True, default="")
+    price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    is_active = models.BooleanField(default=True)
+    sort_order = models.IntegerField(default=0)
+
+    monthly_limits = models.BooleanField(
+        default=False,
+        help_text="True = limites mensais (Pro/Pro+), False = limites totais/vitalícios (Free)",
+    )
+
+    max_explicador_messages = models.IntegerField(null=True, blank=True, help_text="None = ilimitado")
+    max_explicador_participants = models.IntegerField(null=True, blank=True)
+    max_courses_generated = models.IntegerField(null=True, blank=True)
+    max_mindmaps_generated = models.IntegerField(null=True, blank=True)
+    max_mindmap_modules = models.IntegerField(null=True, blank=True)
+    max_mindmap_quizzes = models.IntegerField(null=True, blank=True)
+    max_mindmap_materials = models.IntegerField(null=True, blank=True)
+
+    gateway_price_id = models.CharField(max_length=255, blank=True, default="")
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["sort_order"]
+
+    def __str__(self):
+        return self.name
+
+
+class UserSubscription(models.Model):
+    class Status(models.TextChoices):
+        ACTIVE = "active", "Activo"
+        CANCELED = "canceled", "Cancelado"
+        PAST_DUE = "past_due", "Vencido"
+        EXPIRED = "expired", "Expirado"
+        TRIALING = "trialing", "Em teste"
+
+    user = models.OneToOneField(
+        User, on_delete=models.CASCADE, related_name="subscription"
+    )
+    plan = models.ForeignKey(
+        SubscriptionPlan, on_delete=models.SET_NULL, null=True, related_name="subscriptions"
+    )
+    status = models.CharField(
+        max_length=20, choices=Status.choices, default=Status.ACTIVE
+    )
+    current_period_start = models.DateTimeField(auto_now_add=True)
+    current_period_end = models.DateTimeField(null=True, blank=True)
+    canceled_at = models.DateTimeField(null=True, blank=True)
+
+    payment_gateway = models.CharField(max_length=20, blank=True, default="")
+    gateway_subscription_id = models.CharField(max_length=255, blank=True, default="")
+    gateway_data = models.JSONField(default=dict, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        plan_name = self.plan.name if self.plan else "Nenhum"
+        return f"{self.user.email} - {plan_name} ({self.status})"
+
+
+class UsageRecord(models.Model):
+    METRIC_CHOICES = [
+        ("explicador_message", "Mensagem no Explicador"),
+        ("course_generated", "Curso Gerado"),
+        ("mindmap_generated", "Mapa Mental Gerado"),
+    ]
+
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="usage_records"
+    )
+    date = models.DateField()
+    metric = models.CharField(max_length=50, choices=METRIC_CHOICES)
+    count = models.IntegerField(default=0)
+
+    class Meta:
+        unique_together = ("user", "date", "metric")
+
+    def __str__(self):
+        return f"{self.user.email} - {self.metric} - {self.date}: {self.count}"

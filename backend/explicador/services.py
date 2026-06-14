@@ -1,6 +1,8 @@
 from django.contrib.auth import get_user_model
 from ninja.errors import HttpError
 
+from accounts.subscription_service import SubscriptionService
+
 from .models import ExplicadorRoom
 
 User = get_user_model()

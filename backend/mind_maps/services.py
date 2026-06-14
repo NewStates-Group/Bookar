@@ -1,3 +1,4 @@
+from accounts.subscription_service import SubscriptionService
 from django.core.cache import cache
 from django.db import models
 from ninja.errors import HttpError
@@ -29,6 +30,8 @@ class MindMapService:
         return maps
 
     def create_mind_map(self, user, topic: str, language: str = "pt"):
+        SubscriptionService().check_and_increment(user, "mindmap_generated")
+
         mind_map = MindMap.objects.create(
             user=user,
             topic=topic,
@@ -91,6 +94,38 @@ class MindMapService:
                         return n3
         return None
 
+    def _count_nodes_with_content(self, mind_map):
+        """Count how many nodes already have content generated."""
+        count = 0
+        for n1 in mind_map.nodes:
+            if n1.get("text_content"):
+                count += 1
+            for n2 in n1.get("children", []):
+                if n2.get("text_content"):
+                    count += 1
+                for n3 in n2.get("children", []):
+                    if n3.get("text_content"):
+                        count += 1
+        return count
+
+    def _count_nodes_with_quiz(self, mind_map):
+        """Count how many nodes have quizzes generated."""
+        if not mind_map.quizzes:
+            return 0
+        return len(mind_map.quizzes)
+
+    def _check_mindmap_module_limit(self, mind_map):
+        existing = self._count_nodes_with_content(mind_map)
+        SubscriptionService().check_limit(
+            mind_map.user, "mindmap_module", existing
+        )
+
+    def _check_mindmap_quiz_limit(self, mind_map):
+        existing = self._count_nodes_with_quiz(mind_map)
+        SubscriptionService().check_limit(
+            mind_map.user, "mindmap_quiz", existing
+        )
+
     def get_node_content(self, uuid_str: str, node_id: str, user):
         from courses.utils import extract_json, generate_text_with_fallback
 
@@ -110,6 +145,9 @@ class MindMapService:
                 "text_content": node["text_content"],
                 "additional_resources": node.get("additional_resources", []),
             }
+
+        # Check subscription limit for generating new module content
+        self._check_mindmap_module_limit(mind_map)
 
         # Otherwise, generate dynamically on-demand using AI
         lang = getattr(mind_map, "language", "pt")
@@ -239,6 +277,9 @@ class MindMapService:
                     }
                 )
             return {"questions": sanitized_questions}
+
+        # Check subscription limit before generating new quiz
+        self._check_mindmap_quiz_limit(mind_map)
 
         # Generate dynamically on-demand using AI
         lang = getattr(mind_map, "language", "pt")

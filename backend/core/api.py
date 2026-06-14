@@ -1,4 +1,4 @@
-from accounts.controllers import AuthController
+from accounts.controllers import AuthController, SubscriptionController
 from courses.controllers import CourseController, LessonController
 from explicador.controllers import ExplicadorController
 from feedback.controllers import FeedbackController
@@ -17,6 +17,7 @@ api = NinjaExtraAPI(
 
 api.register_controllers(
     AuthController,
+    SubscriptionController,
     CourseController,
     LessonController,
     MindMapController,

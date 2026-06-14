@@ -2,6 +2,7 @@ import logging
 from time import perf_counter
 import uuid
 
+from accounts.subscription_service import SubscriptionService
 from core.utils import send_user_update
 from django.core.cache import cache
 from django.db.models import Prefetch
@@ -318,8 +319,10 @@ class CourseService:
             self.enroll_course(user, existing_course.id)
             return existing_course
 
-        # 3. If no existing course, create new one
-        # Course no longer has 'user' (owner) field. First enrollment identifies creator.
+        # 3. Check subscription limit before creating new course
+        SubscriptionService().check_and_increment(user, "course_generated")
+
+        # 4. If no existing course, create new one
         course = Course.objects.create(
             level=level, max_modules=num_modules or 4, owner=user
         )

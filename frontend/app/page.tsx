@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import Image from "next/image";
 import Link from "next/link";
 import { motion, AnimatePresence, useScroll, useSpring } from "framer-motion";
-import { MessageSquare, Sun, Moon, Menu, X, Bot, Brain, BookOpen, GraduationCap, Sparkles, Globe, Lightbulb, ChevronDown } from "lucide-react";
+import { MessageSquare, Sun, Moon, Menu, X, Bot, Brain, BookOpen, GraduationCap, Sparkles, Globe, Lightbulb, ChevronDown, Check, Crown } from "lucide-react";
 import { useTheme } from "next-themes";
 import { FeedbackForm } from "@/components/FeedbackForm";
 
@@ -66,6 +66,7 @@ export default function DefinitiveHomePage() {
                 <a href="#home" className="text-sm font-medium text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors">Início</a>
                 <a href="#about" className="text-sm font-medium text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors">Sobre Nós</a>
                 <a href="#features" className="text-sm font-medium text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors">Funcionalidades</a>
+                <a href="#pricing" className="text-sm font-medium text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors">Preços</a>
                 <a href="#feedback" className="text-sm font-medium text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors">Feedback</a>
               </div>
 
@@ -114,6 +115,7 @@ export default function DefinitiveHomePage() {
                       { href: "#home", label: "Início" },
                       { href: "#about", label: "Sobre Nós" },
                       { href: "#features", label: "Funcionalidades" },
+                      { href: "#pricing", label: "Preços" },
                       { href: "#feedback", label: "Feedback" },
                     ].map((link) => (
                       <a
@@ -291,7 +293,7 @@ export default function DefinitiveHomePage() {
               transition={{ delay: 1.5, duration: 0.6 }}
               className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1 text-neutral-400 hover:text-cyan-500 transition-colors cursor-pointer"
             >
-              <span className="text-xs font-medium tracking-wider uppercase">Scroll</span>
+              <span className="text-xs font-medium tracking-wider uppercase"></span>
               <motion.div
                 animate={{ y: [0, 6, 0] }}
                 transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
@@ -524,6 +526,145 @@ export default function DefinitiveHomePage() {
                 </motion.div>
               ))}
             </div>
+            </div>
+          </motion.section>
+
+          {/* Pricing Section */}
+          <motion.section
+            id="pricing"
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
+            viewport={{ once: true, margin: "-10%" }}
+            transition={{ duration: 0.7 }}
+            className="min-h-screen flex items-center px-6 bg-fixed bg-gradient-to-b from-white via-white to-cyan-50/30 dark:from-neutral-950 dark:via-neutral-950 dark:to-neutral-900"
+          >
+            <div className="max-w-6xl mx-auto w-full py-24">
+              <motion.div
+                initial={{ opacity: 0, y: 40 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+                className="text-center space-y-4 mb-16"
+              >
+                <h2 className="text-4xl md:text-5xl font-bold tracking-tight">Escolhe o teu plano</h2>
+                <p className="text-muted-foreground max-w-xl mx-auto">
+                  Começa grátis e faz upgrade quando precisares de mais.
+                </p>
+              </motion.div>
+
+              <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+                {[
+                  {
+                    slug: "free",
+                    name: "Free",
+                    price: "Grátis",
+                    desc: "Para experimentares a plataforma.",
+                    popular: false,
+                    features: [
+                      "1 mapa mental",
+                      "1 módulo por mapa",
+                      "3 mensagens no explicador",
+                      "Sem convidados na sala",
+                    ],
+                    cta: "Começar Grátis",
+                    href: "/signup",
+                  },
+                  {
+                    slug: "pro",
+                    name: "Pro",
+                    price: "6500 Kz",
+                    desc: "Para estudantes a sério.",
+                    popular: true,
+                    features: [
+                      "10 mapas mentais/mês",
+                      "Módulos ilimitados por mapa",
+                      "Testes e materiais ilimitados",
+                      "150 mensagens no explicador/mês",
+                      "Convida até 2 pessoas por sala",
+                    ],
+                    cta: "Assinar Agora",
+                    href: "/pricing",
+                  },
+                  {
+                    slug: "pro_plus",
+                    name: "Pro+",
+                    price: "12 000 Kz",
+                    desc: "Para uso intensivo.",
+                    popular: false,
+                    features: [
+                      "20 mapas mentais/mês",
+                      "Módulos ilimitados por mapa",
+                      "Testes e materiais ilimitados",
+                      "1000 mensagens no explicador/mês",
+                      "Convida até 5 pessoas por sala",
+                    ],
+                    cta: "Assinar Agora",
+                    href: "/pricing",
+                  },
+                ].map((plan, idx) => (
+                  <motion.div
+                    key={plan.slug}
+                    initial={{ opacity: 0, y: 30 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: idx * 0.15, duration: 0.5 }}
+                    className={`relative flex flex-col rounded-3xl border-2 p-8 transition-all hover:shadow-lg ${
+                      plan.popular
+                        ? "border-cyan-300 shadow-md bg-white dark:bg-neutral-900"
+                        : "border-neutral-100 dark:border-neutral-800 bg-white dark:bg-neutral-950 hover:border-neutral-200 dark:hover:border-neutral-700"
+                    }`}
+                  >
+                    {plan.popular && (
+                      <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                        <span className="bg-cyan-400 text-black text-xs font-semibold px-4 py-1 rounded-full">
+                          Mais Popular
+                        </span>
+                      </div>
+                    )}
+
+                    <div className="text-center pb-6 border-b border-neutral-100 dark:border-neutral-800">
+                      <h3 className="text-xl font-bold mb-1">{plan.name}</h3>
+                      <p className="text-sm text-neutral-500 mb-4">{plan.desc}</p>
+                      <div className="flex items-baseline justify-center gap-1">
+                        <span className="text-4xl font-extrabold">{plan.price}</span>
+                        {plan.price !== "Grátis" && (
+                          <span className="text-sm text-neutral-500">/mês</span>
+                        )}
+                      </div>
+                    </div>
+
+                    <ul className="flex-1 space-y-3 py-6">
+                      {plan.features.map((f) => (
+                        <li key={f} className="flex items-center gap-3 text-sm text-neutral-700 dark:text-neutral-300">
+                          <Check className="w-4 h-4 text-cyan-400 shrink-0" />
+                          {f}
+                        </li>
+                      ))}
+                    </ul>
+
+                    <Link href={plan.href}>
+                      <Button
+                        className={`w-full h-12 rounded-xl font-semibold ${
+                          plan.popular
+                            ? "bg-cyan-400 hover:bg-cyan-500 text-black"
+                            : "bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 text-neutral-900 dark:text-neutral-100"
+                        }`}
+                      >
+                        {plan.cta}
+                      </Button>
+                    </Link>
+                  </motion.div>
+                ))}
+              </div>
+
+              <div className="text-center mt-12">
+                <Link
+                  href="/pricing"
+                  className="text-sm text-cyan-500 hover:text-cyan-600 font-medium transition-colors"
+                >
+                  Ver comparação detalhada →
+                </Link>
+              </div>
             </div>
           </motion.section>
 

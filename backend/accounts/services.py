@@ -16,7 +16,7 @@ from google.oauth2 import id_token
 from ninja.errors import HttpError
 from ninja_jwt.tokens import RefreshToken
 
-from .models import EmailVerificationCode
+from .models import EmailVerificationCode, SubscriptionPlan, UserSubscription
 from .tasks import (
     send_password_reset_email_task,
     send_verification_email_task,
@@ -49,6 +49,17 @@ class AuthService:
 
         # Success, clear code
         EmailVerificationCode.objects.filter(email=email).delete()
+
+        # Create free subscription
+        free_plan = SubscriptionPlan.objects.filter(slug="free").first()
+        if free_plan:
+            UserSubscription.objects.get_or_create(
+                user=user,
+                defaults={
+                    "plan": free_plan,
+                    "status": UserSubscription.Status.ACTIVE,
+                },
+            )
 
         return user
 
@@ -224,6 +235,15 @@ class AuthService:
                                 is_active=True,
                             )
                         print(f">>> DEBUG: User created: ID={user.id}")
+                        free_plan = SubscriptionPlan.objects.filter(slug="free").first()
+                        if free_plan:
+                            UserSubscription.objects.get_or_create(
+                                user=user,
+                                defaults={
+                                    "plan": free_plan,
+                                    "status": UserSubscription.Status.ACTIVE,
+                                },
+                            )
                     except Exception as e:
                         print(f">>> DEBUG: Creation failed: {type(e).__name__}: {e}")
                         # Final, final fallback
@@ -311,6 +331,15 @@ class AuthService:
                 user = User.objects.create_user(
                     email=email, username=username, is_active=True
                 )
+                free_plan = SubscriptionPlan.objects.filter(slug="free").first()
+                if free_plan:
+                    UserSubscription.objects.get_or_create(
+                        user=user,
+                        defaults={
+                            "plan": free_plan,
+                            "status": UserSubscription.Status.ACTIVE,
+                        },
+                    )
 
             refresh = RefreshToken.for_user(user)
             return {

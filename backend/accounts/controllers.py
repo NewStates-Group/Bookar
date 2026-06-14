@@ -9,6 +9,11 @@ from ninja_jwt.controller import NinjaJWTDefaultController, schema
 from accounts.schemas import GoogleLoginIn
 
 from .schemas import (
+    CancelOut,
+    CheckoutIn,
+    CheckoutOut,
+    ConfirmCheckoutIn,
+    ConfirmCheckoutOut,
     EmailCheckIn,
     EmailCheckOut,
     LoginIn,
@@ -19,10 +24,17 @@ from .schemas import (
     RegisterIn,
     RegisterOut,
     SendVerificationIn,
+    SubscriptionPlanOut,
+    UsageSummaryOut,
+    UserSubscriptionOut,
     WaitlistEmailIn,
 )
 from .services import AuthService
+from .subscription_service import SubscriptionService
 from .throttling import AnonRateThrottle, DynamicRateThrottle
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 @api_controller("auth/", tags=["Auth"])
@@ -123,3 +135,48 @@ class AuthController(NinjaJWTDefaultController):
     @route.get("waitlist/count")
     def get_waitlist_count(self):
         return self.auth_service.get_waitlist_count()
+
+
+@api_controller("subscriptions", tags=["Subscriptions"], auth=JWTAuth())
+class SubscriptionController:
+    @inject
+    def __init__(self, subscription_service: SubscriptionService):
+        self.subscription_service = subscription_service
+
+    @route.get("plans", response=list[SubscriptionPlanOut], auth=None)
+    def list_plans(self, request):
+        return self.subscription_service.list_plans()
+
+    @route.get("my", response=UserSubscriptionOut)
+    def my_subscription(self, request):
+        return self.subscription_service.get_user_subscription(request.user)
+
+    @route.get("usage", response=UsageSummaryOut)
+    def my_usage(self, request):
+        return self.subscription_service.get_usage_summary(request.user)
+
+    @route.post("checkout", response=CheckoutOut)
+    def create_checkout(self, request, data: CheckoutIn):
+        result = self.subscription_service.upgrade(
+            request.user,
+            data.plan_slug,
+            gateway=data.gateway,
+            success_url=data.success_url,
+            cancel_url=data.cancel_url,
+        )
+        if isinstance(result, dict) and "url" in result:
+            return result
+        return {"url": "", "session_id": ""}
+
+    @route.post("cancel", response=CancelOut)
+    def cancel_subscription(self, request):
+        return self.subscription_service.cancel(request.user)
+
+    @route.post("webhook/{gateway}", auth=None)
+    def webhook(self, request, gateway: str):
+        return self.subscription_service.handle_webhook(request, gateway)
+
+    @route.post("confirm", response=ConfirmCheckoutOut)
+    def confirm_checkout(self, request, data: ConfirmCheckoutIn):
+        logger.critical("DATA: " + data.session_id)
+        return self.subscription_service.confirm_checkout(request.user, data.session_id)

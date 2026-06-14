@@ -1,6 +1,6 @@
 "use client";
 
-import { signIn } from "next-auth/react";
+import { signIn, useSession } from "next-auth/react";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ import { Turnstile } from "next-turnstile";
 import { clearPendingExplicadorRoom, getPendingExplicadorRoom } from "@/lib/pending-explicador-room";
 
 export default function LoginPage() {
+  const { data: session } = useSession();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [step, setStep] = useState<"email" | "password" | "reset-success">("email");
@@ -24,6 +25,14 @@ export default function LoginPage() {
   const [cooldown, setCooldown] = useState(0);
   const [forgotPasswordCooldown, setForgotPasswordCooldown] = useState(0);
   const router = useRouter();
+
+  useEffect(() => {
+    const redirectTo = localStorage.getItem("redirectTo");
+    if (redirectTo && session) {
+      localStorage.removeItem("redirectTo");
+      router.replace(redirectTo);
+    }
+  }, [session, router]);
 
   useEffect(() => {
     if (cooldown > 0) {
@@ -115,6 +124,12 @@ export default function LoginPage() {
           toast.error(result.error);
         }
       } else {
+        const redirectTo = localStorage.getItem("redirectTo");
+        localStorage.removeItem("redirectTo");
+        if (redirectTo) {
+          router.replace(redirectTo);
+          return;
+        }
         const pendingRoom = getPendingExplicadorRoom();
         console.log(pendingRoom)
         if (pendingRoom) {
@@ -158,6 +173,7 @@ export default function LoginPage() {
   };
 
   const handleGoogleLogin = () => {
+    localStorage.setItem("redirectTo", window.location.href);
     window.location.href = "/auth/login/google";
   };
 
@@ -173,7 +189,7 @@ export default function LoginPage() {
         <div className="absolute inset-0 bg-gradient-to-bl from-cyan-500/20 to-black/40 z-10" />
         <Image
           src="/login.jpg"
-          alt="Login Background"
+          alt=""
           fill
           className="object-cover opacity-50"
           priority
