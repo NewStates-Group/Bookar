@@ -41,9 +41,9 @@ const limitLabels: Record<string, { label: string; hideWhenZero?: boolean; struc
   max_mindmap_materials: { label: "Materiais de leitura", structural: true },
 };
 
-function formatLimit(value: number | null, monthly: boolean, structural: boolean = false): string {
+function formatLimit(value: number | null, monthly: boolean, structural: boolean = false): any {
   if (value === null) return "Ilimitado";
-  if (value === 0) return "—";
+  if (value === 0) return <X className="w-3 h-3 text-red-600" />;
   if (structural) return `${value}`;
   return `${value}${monthly ? "/mês" : ""}`;
 }
@@ -88,7 +88,8 @@ function PlanCard({
           <span className="text-4xl font-extrabold">
             {isFree ? "Grátis" : `${priceNum.toLocaleString('pt-AO', {
               style: 'currency',
-              currency: 'AOA'
+              currency: 'AOA',
+              minimumFractionDigits: 0
             })}`}
           </span>
           {!isFree && (
@@ -228,7 +229,10 @@ export default function PricingPage() {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
       <div className="max-w-6xl mx-auto px-4 py-16">
         <Link
-          href="/"
+          href="#"
+          onClick={(e) => {
+            router.back()
+          }}
           className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-slate-800 mb-8 transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
@@ -256,11 +260,9 @@ export default function PricingPage() {
           ))}
         </div>
 
-        <div className="text-center mt-12 text-sm text-slate-400">
+        <div className="text-center py-6 text-sm md:text-base text-slate-400">
           <p>
-            Todos os planos incluem acesso às funcionalidades base da plataforma.
-            <br />
-            Pagamento seguro via Stripe. Podes cancelar quando quiseres.
+            Todos os planos incluem acesso às funcionalidades da plataforma. Pagamento seguro via Stripe/Comprovativo
           </p>
         </div>
       </div>
