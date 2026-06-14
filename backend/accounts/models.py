@@ -97,6 +97,29 @@ class UserSubscription(models.Model):
         return f"{self.user.email} - {plan_name} ({self.status})"
 
 
+class SubscriptionHistory(models.Model):
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="subscription_history"
+    )
+    plan = models.ForeignKey(
+        SubscriptionPlan, on_delete=models.SET_NULL, null=True
+    )
+    status = models.CharField(max_length=20)
+    payment_gateway = models.CharField(max_length=20, blank=True, default="")
+    period_start = models.DateTimeField()
+    period_end = models.DateTimeField(null=True, blank=True)
+    canceled_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name_plural = "subscription histories"
+        ordering = ["-period_start"]
+
+    def __str__(self):
+        plan_name = self.plan.name if self.plan else "Nenhum"
+        return f"{self.user.email} - {plan_name} ({self.status})"
+
+
 class UsageRecord(models.Model):
     METRIC_CHOICES = [
         ("explicador_message", "Mensagem no Explicador"),

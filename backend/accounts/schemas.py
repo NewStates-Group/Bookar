@@ -37,6 +37,17 @@ class UserStatsSchema(Schema):
     certificates_issued: int
 
 
+class UserFullStatsSchema(Schema):
+    total_courses: int
+    ongoing_courses: int
+    finished_courses: int
+    certificates_issued: int
+    total_mindmaps: int
+    total_rooms: int
+    total_messages: int
+    active_rooms: int
+
+
 class RegisterOut(Schema):
     id: int
     email: str
@@ -175,3 +186,14 @@ class ConfirmCheckoutIn(Schema):
 class ConfirmCheckoutOut(Schema):
     success: bool
     plan: str
+
+
+class SubscriptionHistoryOut(Schema):
+    id: int
+    plan: SubscriptionPlanOut | None = None
+    status: str
+    payment_gateway: str
+    period_start: datetime
+    period_end: datetime | None = None
+    canceled_at: datetime | None = None
+    created_at: datetime

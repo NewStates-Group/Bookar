@@ -129,6 +129,39 @@ class AuthService:
             "certificates_issued": finished_count,
         }
 
+    def get_full_stats(self, user):
+        from courses.models import CourseEnrollment
+        from mind_maps.models import MindMap
+        from explicador.models import ExplicadorRoom
+
+        course_enrollments = CourseEnrollment.objects.filter(user=user, deleted=False)
+        total_courses = course_enrollments.count()
+        finished_courses = 0
+        for enrollment in course_enrollments:
+            if enrollment.course.is_fully_completed(user):
+                finished_courses += 1
+
+        mindmaps = MindMap.objects.filter(user=user)
+        total_mindmaps = mindmaps.count()
+
+        rooms = ExplicadorRoom.objects.filter(owner=user)
+        total_rooms = rooms.count()
+        active_rooms = rooms.filter(is_active=True).count()
+        total_messages = 0
+        for room in rooms:
+            total_messages += len(room.chat_history or [])
+
+        return {
+            "total_courses": total_courses,
+            "ongoing_courses": total_courses - finished_courses,
+            "finished_courses": finished_courses,
+            "certificates_issued": finished_courses,
+            "total_mindmaps": total_mindmaps,
+            "total_rooms": total_rooms,
+            "total_messages": total_messages,
+            "active_rooms": active_rooms,
+        }
+
     def get_google_auth_url(self):
         params = {
             "client_id": settings.GOOGLE_CLIENT_ID,

@@ -24,8 +24,10 @@ from .schemas import (
     RegisterIn,
     RegisterOut,
     SendVerificationIn,
+    SubscriptionHistoryOut,
     SubscriptionPlanOut,
     UsageSummaryOut,
+    UserFullStatsSchema,
     UserSubscriptionOut,
     WaitlistEmailIn,
 )
@@ -88,6 +90,10 @@ class AuthController(NinjaJWTDefaultController):
         if stats:
             user.stats = self.auth_service.get_user_stats(user)
         return user
+
+    @route.get("stats", response=UserFullStatsSchema, auth=JWTAuth())
+    def full_stats(self, request):
+        return self.auth_service.get_full_stats(request.user)
 
     @route.put("profile", response=RegisterOut, auth=JWTAuth())
     def update_profile(self, request, data: ProfileUpdateIn):
@@ -154,6 +160,10 @@ class SubscriptionController:
     @route.get("usage", response=UsageSummaryOut)
     def my_usage(self, request):
         return self.subscription_service.get_usage_summary(request.user)
+
+    @route.get("history", response=list[SubscriptionHistoryOut])
+    def my_history(self, request):
+        return self.subscription_service.get_history(request.user)
 
     @route.post("checkout", response=CheckoutOut)
     def create_checkout(self, request, data: CheckoutIn):

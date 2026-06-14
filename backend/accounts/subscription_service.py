@@ -9,7 +9,7 @@ from ninja.errors import HttpError
 
 from accounts.payment import get_provider
 
-from .models import SubscriptionPlan, UsageRecord, UserSubscription
+from .models import SubscriptionHistory, SubscriptionPlan, UsageRecord, UserSubscription
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
@@ -210,6 +210,7 @@ class SubscriptionService:
     def _assign_plan(self, user, plan):
         """Directly assign a plan to a user (for free plans or admin)."""
         sub = self._get_or_create_subscription(user)
+        self._log_history(user, sub)
         sub.plan = plan
         sub.status = UserSubscription.Status.ACTIVE
         sub.payment_gateway = "manual"
@@ -220,6 +221,22 @@ class SubscriptionService:
         sub.save()
         return sub
 
+    def _log_history(self, user, sub):
+        """Log current subscription state to history before it changes."""
+        SubscriptionHistory.objects.create(
+            user=user,
+            plan=sub.plan,
+            status=sub.status,
+            payment_gateway=sub.payment_gateway,
+            period_start=sub.current_period_start,
+            period_end=sub.current_period_end,
+            canceled_at=sub.canceled_at,
+        )
+
+    def get_history(self, user):
+        """Get all subscription history for a user."""
+        return SubscriptionHistory.objects.filter(user=user).select_related("plan")
+
     def cancel(self, user, gateway: str = ""):
         """Cancel user's current subscription."""
         sub = self._get_or_create_subscription(user)
@@ -227,6 +244,8 @@ class SubscriptionService:
 
         if not plan or plan.slug == "free":
             raise HttpError(400, "Não tens uma subscrição ativa para cancelar.")
+
+        self._log_history(user, sub)
 
         if sub.payment_gateway and sub.payment_gateway != "manual":
             provider = get_provider(sub.payment_gateway)
@@ -290,6 +309,7 @@ class SubscriptionService:
 
             plan = self.get_plan_by_slug(plan_slug)
             sub = self._get_or_create_subscription(user)
+            self._log_history(user, sub)
             sub.plan = plan
             sub.status = UserSubscription.Status.ACTIVE
             sub.payment_gateway = "stripe"

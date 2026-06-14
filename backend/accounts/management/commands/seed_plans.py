@@ -22,7 +22,7 @@ PLANS = [
     {
         "slug": "pro",
         "name": "Pro",
-        "description": "Para estudantes a sério. Limites mensais generosos.",
+        "description": "Para estudantes a sério.",
         "gateway_price_id": "price_1Ti12fGckpVNeKCFoxkCJWvt",
         "price": 6500,
         "sort_order": 1,
@@ -38,7 +38,7 @@ PLANS = [
     {
         "slug": "pro_plus",
         "name": "Pro+",
-        "description": "Para uso intensivo. Tudo ilimitado ou limites muito altos.",
+        "description": "Para aqueles que estudam de verdade.",
         "gateway_price_id": "price_1Ti14JGckpVNeKCFB0KW5Kdg",
         "price": 12000,
         "sort_order": 2,
