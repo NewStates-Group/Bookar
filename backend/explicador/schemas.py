@@ -6,8 +6,8 @@ from .models import ExplicadorRoom
 
 
 class ExplicadorCourseContextIn(Schema):
-    course_id: str
-    course_title: str
+    course_id: Optional[str] = None
+    course_title: Optional[str] = None
     module_name: Optional[str] = None
     lesson_id: Optional[str] = None
     lesson_title: Optional[str] = None
@@ -40,3 +40,9 @@ class ExplicadorRoomOut(ModelSchema):
 class ExplicadorRoomDetailOut(ExplicadorRoomOut):
     whiteboard_data: Optional[Dict[str, Any]] = None
     chat_history: Optional[List[Dict[str, Any]]] = None
+
+
+class ExplicadorAskIn(Schema):
+    message: str
+    history: Optional[List[Dict[str, str]]] = None
+    context: Optional[ExplicadorCourseContextIn] = None
