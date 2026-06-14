@@ -8,11 +8,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Loader2, Upload, BookOpen, CheckCircle, GraduationCap, Sparkles, Crown } from "lucide-react";
+import { Loader2, Upload } from "lucide-react";
 import { apiRequest } from "@/lib/api";
-import Link from "next/link";
 import { ConfirmUpgradeModal } from "@/components/ConfirmUpgradeModal";
 
 interface Profile {
@@ -20,31 +18,6 @@ interface Profile {
     first_name: string;
     last_name: string;
     avatar: string | null;
-    stats: {
-      ongoing_courses: number;
-      finished_courses: number;
-      certificates_issued: number;
-    } | null;
-  }
-
-  interface SubscriptionPlan {
-    slug: string;
-    name: string;
-    monthly_limits: boolean;
-    max_explicador_messages: number | null;
-    max_explicador_participants: number | null;
-    max_courses_generated: number | null;
-    max_mindmaps_generated: number | null;
-    max_mindmap_modules: number | null;
-    max_mindmap_quizzes: number | null;
-    max_mindmap_materials: number | null;
-  }
-
-  interface UsageMetric {
-    metric: string;
-    used: number;
-    limit: number | null;
-    remaining: number | null;
   }
 
 export default function ProfilePage() {
@@ -60,12 +33,10 @@ export default function ProfilePage() {
         last_name: "",
     });
     const [freshUser, setFreshUser] = useState<Profile | null>(null);
-    const [subscription, setSubscription] = useState<{ plan: SubscriptionPlan | null; status: string } | null>(null);
-    const [usage, setUsage] = useState<UsageMetric[]>([]);
     const [confirmStatus, setConfirmStatus] = useState<"idle" | "pending" | "success" | "error">("idle");
     const [confirmError, setConfirmError] = useState<string>("");
 
-    // Confirm pending Stripe checkout after redirect
+    // Confirm pending Stripe checkout after redirect — runs before data fetch
     useEffect(() => {
         if (!session?.accessToken) return;
         const params = new URLSearchParams(window.location.search);
@@ -80,7 +51,6 @@ export default function ProfilePage() {
             .then(() => {
                 setConfirmStatus("success");
                 window.history.replaceState({}, "", "/app/profile");
-                hasFetched.current = false;
                 setTimeout(() => {
                     setConfirmStatus("idle");
                 }, 1500);
@@ -95,24 +65,20 @@ export default function ProfilePage() {
     }, [session?.accessToken]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // Fetch fresh profile data directly from API
+    const hasSessionId = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("session_id");
     useEffect(() => {
         if (!session?.accessToken || hasFetched.current) return;
+        if (hasSessionId && confirmStatus !== "error") return;
         hasFetched.current = true;
 
-        Promise.all([
-            apiRequest(`${process.env.NEXT_PUBLIC_API_URL}/auth/me?stats=1`),
-            apiRequest(`${process.env.NEXT_PUBLIC_API_URL}/subscriptions/my`),
-            apiRequest(`${process.env.NEXT_PUBLIC_API_URL}/subscriptions/usage`),
-        ])
-            .then(([profile, sub, usageData]: any) => {
+        apiRequest(`${process.env.NEXT_PUBLIC_API_URL}/auth/me`)
+            .then((profile: any) => {
                 setFreshUser(profile as Profile);
                 setFormData({
                     email: profile.email,
                     first_name: profile.first_name,
                     last_name: profile.last_name,
                 });
-                setSubscription(sub as { plan: SubscriptionPlan | null; status: string });
-                setUsage((usageData?.metrics || []) as UsageMetric[]);
             })
             .catch(() => {
                 toast.error("Erro ao carregar perfil");
@@ -194,7 +160,7 @@ export default function ProfilePage() {
         : "";
 
     if (isPageLoading) return (
-        <div className="flex items-center justify-center py-20">
+        <div className="min-h-screen flex items-center justify-center py-20">
           <div className="text-center space-y-4">
             <Loader2 className="w-10 h-10 animate-spin text-primary mx-auto" />
             <p className="text-muted-foreground">Carregando seus dados...</p>
@@ -213,12 +179,11 @@ export default function ProfilePage() {
             {/* Cabeçalho */}
             <div>
                 <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">O Meu Perfil</h1>
-                <p className="text-sm text-slate-500 mt-1">Gere as tuas informações e acompanha o teu progresso de aprendizagem.</p>
+                <p className="text-sm text-slate-500 mt-1">Gere as tuas informações pessoais.</p>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-                {/* Informações de Perfil */}
-                <Card className="lg:col-span-2 shadow-sm border-slate-200">
+            {/* Informações de Perfil */}
+            <Card className="shadow-sm border-slate-200">
                     <CardHeader className="pb-4">
                         <CardTitle className="text-xl font-bold text-slate-900">Resumo do Perfil</CardTitle>
                         <CardDescription>Visualiza e edita as suas informações pessoais.</CardDescription>
@@ -297,125 +262,6 @@ export default function ProfilePage() {
                         </form>
                     </CardContent>
                 </Card>
-
-                {/* Estatísticas */}
-                <div className="w-full space-y-6">
-                    <Card className="bg-card border-slate-200 overflow-hidden relative shadow-sm">
-                        <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/5 blur-3xl -mr-16 -mt-16 pointer-events-none" />
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-lg font-bold text-slate-900">As Suas Estatísticas</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-3">
-                            <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border border-slate-100">
-                                <div className="flex items-center gap-3">
-                                    <div className="p-2 bg-cyan-500/10 rounded-md">
-                                        <BookOpen className="h-5 w-5 text-cyan-500" />
-                                    </div>
-                                    <span className="text-sm font-medium text-slate-700">Em Curso</span>
-                                </div>
-                                <span className="text-xl font-bold text-slate-900">{freshUser?.stats?.ongoing_courses ?? 0}</span>
-                            </div>
-                            <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border border-slate-100">
-                                <div className="flex items-center gap-3">
-                                    <div className="p-2 bg-green-500/10 rounded-md">
-                                        <CheckCircle className="h-5 w-5 text-green-500" />
-                                    </div>
-                                    <span className="text-sm font-medium text-slate-700">Concluídos</span>
-                                </div>
-                                <span className="text-xl font-bold text-slate-900">{freshUser?.stats?.finished_courses ?? 0}</span>
-                            </div>
-                            <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border border-slate-100">
-                                <div className="flex items-center gap-3">
-                                    <div className="p-2 bg-yellow-500/10 rounded-md">
-                                        <GraduationCap className="h-5 w-5 text-yellow-500" />
-                                    </div>
-                                    <span className="text-sm font-medium text-slate-700">Certificados</span>
-                                </div>
-                                <span className="text-xl font-bold text-slate-900">{freshUser?.stats?.certificates_issued ?? 0}</span>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    {/* Plano Atual */}
-                    <Card className="bg-card border-slate-200 overflow-hidden relative shadow-sm">
-                        <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/5 blur-3xl -mr-16 -mt-16 pointer-events-none" />
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                                <Crown className="h-5 w-5 text-amber-500" />
-                                Plano Atual
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-3">
-                            <div className="flex items-center justify-between">
-                                <span className="text-sm font-medium text-slate-600">Plano</span>
-                                <Badge
-                                    variant={subscription?.plan?.slug === "free" ? "outline" : "default"}
-                                    className={
-                                        subscription?.plan?.slug === "pro_plus"
-                                            ? "bg-purple-500 hover:bg-purple-600"
-                                            : subscription?.plan?.slug === "pro"
-                                            ? "bg-cyan-500 hover:bg-cyan-600"
-                                            : ""
-                                    }
-                                >
-                                    {subscription?.plan?.name ?? "Free"}
-                                </Badge>
-                            </div>
-
-                            {usage.length > 0 && (
-                                <div className="space-y-2 pt-2 border-t border-slate-100">
-                                    {usage.map((m) => {
-                                        const pct = m.limit && m.limit > 0
-                                            ? Math.round((m.used / m.limit) * 100)
-                                            : 0;
-                                        const labels: Record<string, string> = {
-                                            explicador_message: "Mensagens",
-                                            course_generated: "Cursos",
-                                            mindmap_generated: "Mapas Mentais",
-                                        };
-                                        return (
-                                            <div key={m.metric} className="space-y-1">
-                                                <div className="flex justify-between text-xs">
-                                                    <span className="text-slate-500">{labels[m.metric] || m.metric}</span>
-                                                    <span className="font-medium text-slate-700">
-                                                        {m.limit === null ? `${m.used}` : `${m.used}/${m.limit}`}
-                                                    </span>
-                                                </div>
-                                                {m.limit !== null && (
-                                                    <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                                                        <div
-                                                            className={`h-full rounded-full transition-all ${
-                                                                pct >= 80 ? "bg-red-400" : pct >= 50 ? "bg-amber-400" : "bg-cyan-400"
-                                                            }`}
-                                                            style={{ width: `${Math.min(pct, 100)}%` }}
-                                                        />
-                                                    </div>
-                                                )}
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            )}
-
-                            {subscription?.plan?.slug === "free" && (
-                                <Link href="/pricing">
-                                    <Button className="w-full mt-2 bg-cyan-400 hover:bg-cyan-500 text-black font-semibold text-sm">
-                                        <Sparkles className="w-4 h-4 mr-1" />
-                                        Fazer Upgrade
-                                    </Button>
-                                </Link>
-                            )}
-                            {subscription?.plan?.slug && subscription.plan.slug !== "free" && (
-                                <Link href="/pricing">
-                                    <Button variant="outline" className="w-full mt-2 text-sm">
-                                        Gerir Subscrição
-                                    </Button>
-                                </Link>
-                            )}
-                        </CardContent>
-                    </Card>
-                </div>
-            </div>
             </div>
         </>
     );
