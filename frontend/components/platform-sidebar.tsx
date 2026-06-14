@@ -14,11 +14,16 @@ import {
   Loader2,
   Plus,
   Bot,
+  Crown,
+  BarChart3,
+  Sun,
+  Moon,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
+import { useTheme } from "next-themes";
 import useSWR from "swr";
 import { authenticatedFetcher, apiRequest } from "@/lib/api";
 import {
@@ -68,9 +73,11 @@ export function PlatformSidebar({
   closeMobile,
 }: PlatformSidebarProps) {
   const { data: session } = useSession();
+  const { theme, setTheme, resolvedTheme } = useTheme();
   const pathname = usePathname();
   const router = useRouter();
   const user = session?.user as any;
+  const dark = resolvedTheme === "dark";
 
   const isExplicadorActive = pathname.startsWith("/app/explicador");
 
@@ -128,7 +135,6 @@ export function PlatformSidebar({
       const nextLocal = localRooms.filter((r) => r.id !== id);
       setLocalRooms(nextLocal);
       localStorage.setItem("bookar-explicador-history", JSON.stringify(nextLocal));
-      toast.success("Sala removida do histórico local.");
     }
 
     if (inApi) {
@@ -160,8 +166,7 @@ export function PlatformSidebar({
 
       {/* ── Header Logo & Toggle ── */}
       <div className={`flex items-center justify-between px-4 py-4 border-b border-slate-200/60 ${!isExpanded ? "flex-col gap-4" : ""}`}>
-        <Link
-          href="/app/courses"
+        <div
           onClick={closeMobile}
           className="flex items-center gap-3 group flex-shrink-0"
         >
@@ -179,7 +184,7 @@ export function PlatformSidebar({
               Bookar
             </span>
           )}
-        </Link>
+        </div>
 
         {/* Mobile close button (only relevant inside drawer) */}
         {isExpanded && (
@@ -303,7 +308,20 @@ export function PlatformSidebar({
         )}
       </nav>
 
-      {/* Desktop collapse toggle (bottom, right above the profile avatar) */}
+      {/* Theme toggle */}
+      <div className={`px-3 pb-1 flex-shrink-0 hidden md:block ${!isExpanded ? "flex justify-center" : ""}`}>
+        <button
+          onClick={() => setTheme(dark ? "light" : "dark")}
+          title={dark ? "Modo claro" : "Modo escuro"}
+          className={`flex items-center rounded-xl text-sm font-medium text-slate-500 hover:text-slate-800 hover:bg-slate-200/40 border border-transparent transition-all duration-200 cursor-pointer ${isExpanded ? "px-3 py-2 gap-3 w-full" : "p-2.5 justify-center"
+            }`}
+        >
+          {dark ? <Sun className="w-4.5 h-4.5" /> : <Moon className="w-4.5 h-4.5" />}
+          {isExpanded && <span>{dark ? "Modo claro" : "Modo escuro"}</span>}
+        </button>
+      </div>
+
+      {/* Desktop collapse toggle */}
       <div className={`px-3 pb-2 flex-shrink-0 hidden md:block ${!isExpanded ? "flex justify-center" : ""}`}>
         <button
           onClick={toggleSidebar}
@@ -374,44 +392,6 @@ export function PlatformSidebar({
             sideOffset={10}
             className="w-60 bg-white border border-slate-200 text-slate-700 shadow-2xl rounded-xl py-1.5"
           >
-            {/* Profile label */}
-            <DropdownMenuLabel className="pb-2">
-              <div className="flex items-center gap-2.5 px-1">
-                <div className="w-8 h-8 rounded-lg border border-slate-200 overflow-hidden bg-slate-100 flex-shrink-0">
-                  {user?.avatar ? (
-                    <Avatar className="w-8 h-8 rounded-none">
-                      <AvatarImage
-                        src={
-                          user.avatar.startsWith("http")
-                            ? user.avatar
-                            : `${process.env.NEXT_PUBLIC_API_URL}${user.avatar}`
-                        }
-                        alt={user.first_name || user.email}
-                      />
-                      <AvatarFallback className="rounded-none bg-slate-200 text-slate-750 text-xs font-bold">
-                        {(user.first_name || user.email || "U")[0]?.toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <User className="w-3.5 h-3.5 text-slate-500" />
-                    </div>
-                  )}
-                </div>
-                <div className="min-w-0">
-                  <p className="font-semibold text-slate-800 text-sm truncate">
-                    {user?.first_name
-                      ? `${user.first_name} ${user.last_name || ""}`.trim()
-                      : "Minha Conta"}
-                  </p>
-                  <p className="text-[11px] text-slate-500 truncate">{user?.email}</p>
-                </div>
-              </div>
-            </DropdownMenuLabel>
-
-            <DropdownMenuSeparator className="bg-slate-100 my-1" />
-
-            {/* Profile link */}
             <DropdownMenuItem asChild>
               <Link
                 href="/app/profile"
@@ -423,6 +403,26 @@ export function PlatformSidebar({
               </Link>
             </DropdownMenuItem>
 
+            <DropdownMenuItem asChild>
+              <Link
+                href="/app/subscription"
+                onClick={closeMobile}
+                className="flex items-center gap-2.5 px-3 py-2 text-sm cursor-pointer hover:bg-slate-50 focus:bg-slate-50 text-slate-700 hover:text-slate-900 focus:text-slate-900 rounded-lg mx-1"
+              >
+                <Crown className="w-4 h-4 text-muted-foreground" />
+                <span>Subscrição</span>
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link
+                href="/app/stats"
+                onClick={closeMobile}
+                className="flex items-center gap-2.5 px-3 py-2 text-sm cursor-pointer hover:bg-slate-50 focus:bg-slate-50 text-slate-700 hover:text-slate-900 focus:text-slate-900 rounded-lg mx-1"
+              >
+                <BarChart3 className="w-4 h-4 text-slate-400" />
+                <span>Estatísticas</span>
+              </Link>
+            </DropdownMenuItem>
             <DropdownMenuSeparator className="bg-slate-100 my-1" />
 
             {/* Sign out */}
@@ -430,7 +430,7 @@ export function PlatformSidebar({
               onClick={() => signOut({ callbackUrl: "/login" })}
               className="flex items-center gap-2.5 px-3 py-2 text-sm cursor-pointer text-red-600 hover:text-red-500 hover:bg-red-50 focus:text-red-500 focus:bg-red-50 rounded-lg mx-1 mb-0.5"
             >
-              <LogOut className="w-4 h-4" />
+              <LogOut className="w-4 h-4 text-red-500 focus:text-red-500" />
               <span>Sair</span>
             </DropdownMenuItem>
           </DropdownMenuContent>

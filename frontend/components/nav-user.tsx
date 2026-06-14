@@ -21,7 +21,7 @@ import {
     SidebarMenuItem,
     useSidebar,
 } from "@/components/ui/sidebar"
-import { LogOut } from "lucide-react"
+import { Crown, LogOut, BarChart3 } from "lucide-react"
 import { signOut, useSession } from "next-auth/react"
 import Link from "next/link"
 
@@ -77,8 +77,17 @@ export function NavUser() {
                                     Conta
                                 </Link>
                             </DropdownMenuItem>
-                            <DropdownMenuItem>
-                                Subscrição
+                            <DropdownMenuItem asChild>
+                                <Link href="/app/subscription" className="cursor-pointer">
+                                    <Crown className="w-4 h-4 text-muted-foreground mr-2" />
+                                    Subscrição
+                                </Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem asChild>
+                                <Link href="/app/stats" className="cursor-pointer">
+                                    <BarChart3 className="w-4 h-4 text-muted-foreground mr-2" />
+                                    Estatísticas
+                                </Link>
                             </DropdownMenuItem>
                             <DropdownMenuItem>
                                 Notificações
@@ -87,7 +96,7 @@ export function NavUser() {
                         <DropdownMenuSeparator />
                         <DropdownMenuItem onClick={() => {
                             signOut({ callbackUrl: '/login' })
-                        }} className="cursor-pointer text-error">
+                        }} className="cursor-pointer text-error text-red-500 focus:text-red-500">
                             <span>Sair</span>
                         </DropdownMenuItem>
                     </DropdownMenuContent>
