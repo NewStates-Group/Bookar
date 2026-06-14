@@ -212,7 +212,7 @@ export default function SignupPage() {
         <div className="absolute inset-0 bg-gradient-to-bl from-cyan-500/20 to-black/40 z-10" />
         <Image
           src="/signup.jpg"
-          alt="Signup Background"
+          alt=""
           fill
           className="object-cover opacity-50"
           priority
