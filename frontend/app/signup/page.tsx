@@ -8,11 +8,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import Image from "next/image";
-import { User, Mail, Lock, Loader2, ArrowRight, AlertCircle, ShieldCheck, ChevronRight } from "lucide-react";
+import { User, Mail, Lock, Loader2, ArrowRight, AlertCircle, ShieldCheck, Home } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { Turnstile } from "next-turnstile";
+import { useTheme } from "next-themes";
 
 interface ValidationErrors {
   [key: string]: string[];
@@ -27,6 +28,7 @@ const ERROR_MESSAGES: Record<string, string> = {
 };
 
 export default function SignupPage() {
+  const { resolvedTheme: theme } = useTheme()
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
@@ -201,8 +203,7 @@ export default function SignupPage() {
   };
 
   return (
-    <div className="min-h-screen w-full flex flex-row-reverse">
-      {/* Right Side - Image/Branding */}
+    <div className="min-h-screen w-full flex flex-row">
       <motion.div
         initial={{ opacity: 0, x: 20 }}
         animate={{ opacity: 1, x: 0 }}
@@ -210,36 +211,28 @@ export default function SignupPage() {
         className="hidden lg:flex w-1/2 bg-black items-center justify-center relative overflow-hidden"
       >
         <div className="absolute inset-0 bg-gradient-to-bl from-cyan-500/20 to-black/40 z-10" />
-        <Image
-          src="/signup.jpg"
-          alt=""
-          fill
-          className="object-cover opacity-50"
-          priority
-        />
-        <Link
-          href="/"
-          className="absolute p-12 top-0 right-0 cursor-pointer z-50"
-        >
-          <ChevronRight className="text-white" size={30} />
-        </Link>
-        <div className="relative z-20 text-white p-12 max-w-lg text-right">
+        <div className="relative z-20 text-white p-12 max-w-xl">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2, duration: 0.5 }}
-          >
-            <h1 className="text-5xl font-bold mb-6">Junte-se à Comunidade.</h1>
+          > 
+            <Link
+              href="/"
+              className="flex flex-row items-center gap-2 mb-8"
+            >
+              <Image alt="Bookar Logo" src={theme === "dark" ? "/logo-white.png" : "/logo.png"} className="text-white" width={55} height={55} />
+              <p className={`font-bold text-5xl text-${theme === "dark" ? "white" : "black"} text-left`}>Bookar</p>
+            </Link>
+            <h1 className="text-5xl font-bold mb-6">Junte-se à nós, estudante.</h1>
             <p className="text-xl text-gray-300">
-              Crie sua conta e tenha acesso ilimitado a conteúdos exclusivos para impulsionar sua carreira.
+              Crie sua conta e tenha acesso a ferramentas que vão impulsionar o teu aprendizado.
             </p>
           </motion.div>
         </div>
       </motion.div>
 
-      {/* Left Side - Form */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-background">
-
         <motion.div
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
@@ -248,7 +241,7 @@ export default function SignupPage() {
         >
           <div className="text-center lg:text-left">
             <Link href="/" className="lg:hidden inline-flex items-center gap-2 mb-8">
-              <Image src="/logo.png" width={40} height={40} alt="Bookar Logo" />
+              <Image src={theme === "dark" ? "/logo-white.png" : "/logo.png"} width={40} height={40} alt="Bookar Logo" />
               <span className="text-2xl font-bold">Bookar</span>
             </Link>
             <h2 className="text-3xl font-bold tracking-tight">Criar Conta</h2>
@@ -438,7 +431,7 @@ export default function SignupPage() {
               <Turnstile
                 siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY!}
                 onVerify={(token) => setTurnstileToken(token)}
-                theme="light"
+                theme={theme === "light" ? "light" : "dark"}
               />
             </div>
 

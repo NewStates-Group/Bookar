@@ -6,15 +6,17 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { User, Lock, Loader2, ArrowRight, AlertCircle, ChevronLeft, MailCheck } from "lucide-react";
+import { User, Lock, Loader2, ArrowRight, AlertCircle, Home, MailCheck } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import Image from "next/image";
 import { motion } from "framer-motion";
 import { Turnstile } from "next-turnstile";
 import { clearPendingExplicadorRoom, getPendingExplicadorRoom } from "@/lib/pending-explicador-room";
+import { useTheme } from "next-themes";
 
 export default function LoginPage() {
+  const { resolvedTheme: theme } = useTheme()
   const { data: session } = useSession();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -179,7 +181,6 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen w-full flex">
-      {/* Left Side - Image/Branding */}
       <motion.div
         initial={{ opacity: 0, x: -20 }}
         animate={{ opacity: 1, x: 0 }}
@@ -187,34 +188,27 @@ export default function LoginPage() {
         className="hidden lg:flex w-1/2 bg-black items-center justify-center relative overflow-hidden"
       >
         <div className="absolute inset-0 bg-gradient-to-bl from-cyan-500/20 to-black/40 z-10" />
-        <Image
-          src="/login.jpg"
-          alt=""
-          fill
-          className="object-cover opacity-50"
-          priority
-        />
-        <Link
-          href="/"
-          className="absolute p-12 top-0 left-0 cursor-pointer z-50"
-        >
-          <ChevronLeft className="text-white" size={30} />
-        </Link>
         <div className="relative z-20 text-white p-12 max-w-lg">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2, duration: 0.5 }}
           >
-            <Image src="/logo-white.png" width={60} height={60} alt="Bookar Logo" className="mb-8" />
-            <h1 className="text-5xl font-bold mb-6">Bem-vindo de volta.</h1>
+            <Link
+              href="/"
+              className="flex flex-row items-center gap-2 mb-8"
+            >
+              <Image alt="Bookar Logo" src={theme === "dark" ? "/logo-white.png" : "/logo.png"} className="text-white" width={55} height={55} />
+              <p className={`font-bold text-5xl text-${theme === "dark" ? "white" : "black"} text-left`}>Bookar</p>
+            </Link>
+            <h1 className="text-5xl font-bold mb-6">Bem-vindo de volta, estudante.</h1>
             <p className="text-xl text-gray-300">
-              Continue sua jornada de aprendizado. Sua próxima conquista está a apenas um login de distância.
+              Continue a sua jornada de aprendizado, tudo está a apenas um clique de distância.
             </p>
           </motion.div>
         </div>
       </motion.div>
-      {/* Right Side - Form */}
+
       <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-background">
         <motion.div
           initial={{ opacity: 0, x: 20 }}
@@ -224,7 +218,7 @@ export default function LoginPage() {
         >
           <div className="text-center lg:text-left">
             <Link href="/" className="lg:hidden inline-flex items-center gap-2 mb-8">
-              <Image src="/logo.png" width={40} height={40} alt="Bookar Logo" />
+              <Image src={theme === "dark" ? "/logo-white.png" : "/logo.png"} width={40} height={40} alt="Bookar Logo" />
               <span className="text-2xl font-bold">Bookar</span>
             </Link>
             <h2 className="text-3xl font-bold tracking-tight">Login</h2>
