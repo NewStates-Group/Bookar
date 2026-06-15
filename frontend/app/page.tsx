@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
 import Link from "next/link";
-import { motion, AnimatePresence, useScroll, useSpring } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { MessageSquare, Sun, Moon, Menu, X, Bot, Brain, BookOpen, GraduationCap, Sparkles, Globe, Lightbulb, ChevronDown, Check, Crown } from "lucide-react";
 import { useTheme } from "next-themes";
 import { FeedbackForm } from "@/components/FeedbackForm";
@@ -17,46 +17,31 @@ const screens = [
 ];
 
 export default function DefinitiveHomePage() {
-  const { theme, setTheme, resolvedTheme } = useTheme();
+  const { setTheme, resolvedTheme } = useTheme();
   const dark = resolvedTheme === "dark";
   const [activeIdx, setActiveIdx] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
-  const { scrollYProgress } = useScroll();
-  const scaleY = useSpring(scrollYProgress, { stiffness: 200, damping: 30, restDelta: 0.001 });
 
   useEffect(() => {
     const t = setInterval(() => setActiveIdx((i) => (i + 1) % screens.length), 4500);
     return () => clearInterval(t);
   }, []);
 
-  const scrollToNext = useCallback(() => {
-    const sections = document.querySelectorAll("section[id]");
-    const scrollPos = window.scrollY + 100;
-    for (const s of sections) {
-      if (s instanceof HTMLElement && s.offsetTop > scrollPos) {
-        s.scrollIntoView({ behavior: "smooth" });
-        break;
-      }
-    }
-  }, []);
-
   return (
     <AnimatePresence mode="wait">
-      <style>{`
+      <style>
+        {`
         html { scroll-behavior: smooth; }
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #22d3ee; border-radius: 3px; }
         ::-webkit-scrollbar-thumb:hover { background: #06b6d4; }
-      `}</style>
+      `}
+      </style>
       <div className={`min-h-screen overflow-x-hidden scroll-smooth ${dark ? "dark" : ""}`}>
-        <motion.div
-          className="fixed top-0 left-0 right-0 z-[110] h-[3px] bg-gradient-to-r from-cyan-300 via-sky-400 to-cyan-300 origin-left"
-          style={{ scaleX: scaleY }}
-        />
         <div className="bg-white dark:bg-neutral-950 text-neutral-900 dark:text-neutral-100 transition-colors duration-300">
-          <nav className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] w-[calc(100%-2rem)] max-w-5xl">
-            <div className="flex items-center justify-between px-6 h-16 rounded-2xl bg-white/80 dark:bg-neutral-950/80 backdrop-blur-xl border border-black/[0.06] dark:border-white/[0.08] shadow-sm dark:shadow-neutral-900/50">
+          <nav className="fixed top-0 left-1/2 -translate-x-1/2 z-[100] w-full">
+            <div className="flex items-center justify-between px-5 md:px-20 h-16 bg-white/80 dark:bg-neutral-950/80 backdrop-blur-xl shadow-sm dark:shadow-neutral-900/50">
               <Link href="/" className="flex items-center gap-2.5">
                 <Image src={dark ? "/logo-white.svg" : "/logo.svg"} alt="Bookar" width={32} height={32} className="shrink-0" />
                 <span className="text-xl font-bold tracking-tight">Bookar</span>
@@ -148,7 +133,6 @@ export default function DefinitiveHomePage() {
             </AnimatePresence>
           </nav>
 
-          {/* Hero Section */}
           <section id="home" className="relative min-h-screen flex flex-col items-center justify-center px-6 pt-24 md:pt-0 overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-b from-white via-white to-neutral-50 dark:from-neutral-950 dark:via-neutral-950 dark:to-neutral-900 -z-10" />
 
@@ -166,21 +150,13 @@ export default function DefinitiveHomePage() {
                 transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
                 className="flex flex-col items-center md:items-start text-center md:text-left"
               >
-                <div className="flex items-center gap-4 mb-6">
-                  <Image src={dark ? "/logo-white.png" : "/logo.png"} alt="Bookar" width={48} height={48} className="shrink-0 md:w-[56px] md:h-[56px]" priority />
-                  <span className="text-4xl md:text-6xl font-black tracking-tight">
-                    <span className="bg-clip-text text-transparent bg-gradient-to-r from-neutral-900 via-neutral-700 to-neutral-900 dark:from-white dark:via-neutral-300 dark:to-white">
-                      Bookar
-                    </span>
-                  </span>
-                </div>
 
                 <h2 className="text-3xl md:text-5xl font-bold text-cyan-500 mb-4 leading-tight">
-                  Aprende mais rápido com IA
+                  Aprendizado mais rápido com IA
                 </h2>
 
                 <p className="text-base md:text-lg text-neutral-500 dark:text-neutral-400 leading-relaxed max-w-lg mb-8">
-                  O Bookar é o teu parceiro de aprendizagem inteligente. Cria mapas mentais dinâmicos, gera cursos personalizados com IA e tira todas as tuas dúvidas em tempo real.
+                  Cria mapas mentais dinâmicos, gera cursos personalizados com IA e tira todas as tuas dúvidas em tempo real.
                 </p>
 
                 <motion.div
@@ -196,7 +172,6 @@ export default function DefinitiveHomePage() {
                 </motion.div>
               </motion.div>
 
-              {/* Card Spread */}
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -276,31 +251,14 @@ export default function DefinitiveHomePage() {
                       <button
                         key={i}
                         onClick={() => setActiveIdx(i)}
-                        className={`rounded-full transition-all duration-300 ${
-                          i === activeIdx ? "w-6 h-2 bg-cyan-300" : "w-2 h-2 bg-neutral-300 dark:bg-neutral-700"
-                        }`}
+                        className={`rounded-full transition-all duration-300 ${i === activeIdx ? "w-6 h-2 bg-cyan-300" : "w-2 h-2 bg-neutral-300 dark:bg-neutral-700"
+                          }`}
                       />
                     ))}
                   </div>
                 </div>
               </motion.div>
             </div>
-
-            <motion.button
-              onClick={scrollToNext}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 1.5, duration: 0.6 }}
-              className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1 text-neutral-400 hover:text-cyan-500 transition-colors cursor-pointer"
-            >
-              <span className="text-xs font-medium tracking-wider uppercase"></span>
-              <motion.div
-                animate={{ y: [0, 6, 0] }}
-                transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-              >
-                <ChevronDown className="w-4 h-4" />
-              </motion.div>
-            </motion.button>
           </section>
 
           <motion.section
@@ -323,7 +281,7 @@ export default function DefinitiveHomePage() {
                   whileInView={{ opacity: 1, scale: 1 }}
                   viewport={{ once: true }}
                   transition={{ delay: 0.1, duration: 0.5 }}
-                  className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-xs font-semibold text-neutral-600 dark:text-neutral-400 tracking-wide uppercase"
+                  className="inline-flex items-center gap-2 text-base font-semibold text-neutral-800 dark:text-neutral-300 tracking-wide uppercase"
                 >
                   Sobre Nós
                 </motion.div>
@@ -456,7 +414,6 @@ export default function DefinitiveHomePage() {
             </div>
           </motion.section>
 
-          {/* Features Grid */}
           <motion.section
             id="features"
             initial={{ opacity: 0 }}
@@ -465,67 +422,67 @@ export default function DefinitiveHomePage() {
             transition={{ duration: 0.7 }}
             className="min-h-screen flex flex-col items-center justify-center px-6 bg-fixed bg-gradient-to-b from-cyan-50/50 via-white to-white dark:from-neutral-900 dark:via-neutral-950 dark:to-neutral-950">
             <div className="max-w-7xl mx-auto w-full space-y-20">
-            <motion.div
-              initial={{ opacity: 0, y: 40 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
-              className="text-center space-y-4"
-            >
-              <h2 className="text-4xl md:text-5xl font-bold tracking-tight">O que nos torna diferentes</h2>
-              <p className="text-muted-foreground max-w-xl mx-auto">Tecnologia de ponta ao serviço do teu crescimento profissional.</p>
-            </motion.div>
+              <motion.div
+                initial={{ opacity: 0, y: 40 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+                className="text-center space-y-4"
+              >
+                <h2 className="text-4xl md:text-5xl font-bold tracking-tight">O que nos torna diferentes</h2>
+                <p className="text-muted-foreground max-w-xl mx-auto">Tecnologia de ponta ao serviço do teu crescimento profissional.</p>
+              </motion.div>
 
-            <div className="grid md:grid-cols-3 gap-6">
-              {[
-                {
-                  title: "Cursos com IA",
-                  desc: "Gera cursos completos com inteligência artificial sobre qualquer tema. Conteúdo estruturado em módulos com vídeo, áudio e materiais de apoio.",
-                  icon: (
-                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M4.26 10.147a60.438 60.438 0 0 0-.491 6.347A48.62 48.62 0 0 1 12 20.904a48.62 48.62 0 0 1 8.232-4.41 60.46 60.46 0 0 0-.491-6.347m-15.482 0a50.636 50.636 0 0 0-2.658-.813A59.906 59.906 0 0 1 12 3.493a59.903 59.903 0 0 1 10.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.717 50.717 0 0 1 12 13.489a50.702 50.702 0 0 1 7.74-3.342" />
-                    </svg>
-                  ),
-                },
-                {
-                  title: "Mapas Mentais",
-                  desc: "Transforma qualquer conteúdo em mapas mentais interativos. Visualiza conexões entre conceitos e acelera a tua compreensão.",
-                  icon: (
-                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25" />
-                    </svg>
-                  ),
-                },
-                {
-                  title: "Explicador IA",
-                  desc: "Tutor virtual por voz que responde às tuas dúvidas em tempo real. Explicações claras e contextuais baseadas no teu progresso.",
-                  icon: (
-                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 0 0 6-6v-1.5m-6 7.5a6 6 0 0 1-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 0 1-3-3V4.5a3 3 0 1 1 6 0v8.25a3 3 0 0 1-3 3Z" />
-                    </svg>
-                  ),
-                },
-              ].map((feature, idx) => (
-                <motion.div
-                  key={idx}
-                  initial={{ opacity: 0, y: 30 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: idx * 0.15, duration: 0.5 }}
-                  whileHover={{ y: -8 }}
-                  className="group relative bg-white dark:bg-neutral-900 p-8 rounded-3xl border border-neutral-100 dark:border-neutral-800 shadow-sm hover:shadow-lg transition-all duration-300"
-                >
-                  <div className="absolute inset-0 rounded-3xl bg-gradient-to-b from-cyan-50/50 dark:from-cyan-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                  <div className="relative z-10">
-                    <div className="p-3 bg-neutral-50 dark:bg-neutral-800 w-fit rounded-xl mb-5 text-cyan-500 group-hover:bg-cyan-50 dark:group-hover:bg-cyan-950 group-hover:text-cyan-600 transition-colors duration-300">
-                      {feature.icon}
+              <div className="grid md:grid-cols-3 gap-6">
+                {[
+                  {
+                    title: "Cursos com IA",
+                    desc: "Gera cursos completos com inteligência artificial sobre qualquer tema. Conteúdo estruturado em módulos com vídeo, áudio e materiais de apoio.",
+                    icon: (
+                      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M4.26 10.147a60.438 60.438 0 0 0-.491 6.347A48.62 48.62 0 0 1 12 20.904a48.62 48.62 0 0 1 8.232-4.41 60.46 60.46 0 0 0-.491-6.347m-15.482 0a50.636 50.636 0 0 0-2.658-.813A59.906 59.906 0 0 1 12 3.493a59.903 59.903 0 0 1 10.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.717 50.717 0 0 1 12 13.489a50.702 50.702 0 0 1 7.74-3.342" />
+                      </svg>
+                    ),
+                  },
+                  {
+                    title: "Mapas Mentais",
+                    desc: "Transforma qualquer conteúdo em mapas mentais interativos. Visualiza conexões entre conceitos e acelera a tua compreensão.",
+                    icon: (
+                      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25" />
+                      </svg>
+                    ),
+                  },
+                  {
+                    title: "Explicador IA",
+                    desc: "Tutor virtual por voz que responde às tuas dúvidas em tempo real. Explicações claras e contextuais baseadas no teu progresso.",
+                    icon: (
+                      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 0 0 6-6v-1.5m-6 7.5a6 6 0 0 1-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 0 1-3-3V4.5a3 3 0 1 1 6 0v8.25a3 3 0 0 1-3 3Z" />
+                      </svg>
+                    ),
+                  },
+                ].map((feature, idx) => (
+                  <motion.div
+                    key={idx}
+                    initial={{ opacity: 0, y: 30 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: idx * 0.15, duration: 0.5 }}
+                    whileHover={{ y: -8 }}
+                    className="group relative bg-white dark:bg-neutral-900 p-8 rounded-3xl border border-neutral-100 dark:border-neutral-800 shadow-sm hover:shadow-lg transition-all duration-300"
+                  >
+                    <div className="absolute inset-0 rounded-3xl bg-gradient-to-b from-cyan-50/50 dark:from-cyan-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                    <div className="relative z-10">
+                      <div className="p-3 bg-neutral-50 dark:bg-neutral-800 w-fit rounded-xl mb-5 text-cyan-500 group-hover:bg-cyan-50 dark:group-hover:bg-cyan-950 group-hover:text-cyan-600 transition-colors duration-300">
+                        {feature.icon}
+                      </div>
+                      <h3 className="text-xl font-bold mb-3 text-neutral-900 dark:text-neutral-100">{feature.title}</h3>
+                      <p className="text-sm text-neutral-500 dark:text-neutral-400 leading-relaxed">{feature.desc}</p>
                     </div>
-                    <h3 className="text-xl font-bold mb-3 text-neutral-900 dark:text-neutral-100">{feature.title}</h3>
-                    <p className="text-sm text-neutral-500 dark:text-neutral-400 leading-relaxed">{feature.desc}</p>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
+                  </motion.div>
+                ))}
+              </div>
             </div>
           </motion.section>
 
@@ -608,11 +565,10 @@ export default function DefinitiveHomePage() {
                     whileInView={{ opacity: 1, y: 0 }}
                     viewport={{ once: true }}
                     transition={{ delay: idx * 0.15, duration: 0.5 }}
-                    className={`relative flex flex-col rounded-3xl border-2 p-8 transition-all hover:shadow-lg ${
-                      plan.popular
+                    className={`relative flex flex-col rounded-3xl border-2 p-8 transition-all hover:shadow-lg ${plan.popular
                         ? "border-cyan-300 shadow-md bg-white dark:bg-neutral-900"
                         : "border-neutral-100 dark:border-neutral-800 bg-white dark:bg-neutral-950 hover:border-neutral-200 dark:hover:border-neutral-700"
-                    }`}
+                      }`}
                   >
                     {plan.popular && (
                       <div className="absolute -top-3 left-1/2 -translate-x-1/2">
@@ -644,11 +600,10 @@ export default function DefinitiveHomePage() {
 
                     <Link href={plan.href}>
                       <Button
-                        className={`w-full h-12 rounded-xl font-semibold ${
-                          plan.popular
+                        className={`w-full h-12 rounded-xl font-semibold ${plan.popular
                             ? "bg-cyan-400 hover:bg-cyan-500 text-black"
                             : "bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 text-neutral-900 dark:text-neutral-100"
-                        }`}
+                          }`}
                       >
                         {plan.cta}
                       </Button>
