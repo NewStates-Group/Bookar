@@ -1,6 +1,7 @@
 from .base import BasePaymentProvider
 from .stripe import StripePaymentProvider
 from .manual import ManualPaymentProvider
+from .kambafy import KambafyPaymentProvider
 
 _providers: dict[str, type[BasePaymentProvider]] = {}
 
@@ -18,5 +19,9 @@ def get_provider(gateway: str) -> BasePaymentProvider:
 
 register_provider(StripePaymentProvider)
 register_provider(ManualPaymentProvider)
+register_provider(KambafyPaymentProvider)
 
-__all__ = ["BasePaymentProvider", "StripePaymentProvider", "ManualPaymentProvider", "register_provider", "get_provider"]
+__all__ = [
+    "BasePaymentProvider", "StripePaymentProvider", "ManualPaymentProvider",
+    "KambafyPaymentProvider", "register_provider", "get_provider",
+]

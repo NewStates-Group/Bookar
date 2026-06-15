@@ -9,6 +9,8 @@ import { apiRequest } from "@/lib/api";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { GatewaySelectModal } from "@/components/GatewaySelectModal";
+
 
 interface Plan {
   id: number;
@@ -148,6 +150,8 @@ export default function PricingPage() {
   const [currentPlan, setCurrentPlan] = useState<Plan | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isUpgrading, setIsUpgrading] = useState<string | null>(null);
+  const [selectedPlanSlug, setSelectedPlanSlug] = useState<string | null>(null);
+  const [gatewayModalOpen, setGatewayModalOpen] = useState(false);
 
   useEffect(() => {
     async function fetchData() {
@@ -174,7 +178,7 @@ export default function PricingPage() {
     fetchData();
   }, [session]);
 
-  const handleUpgrade = async (planSlug: string) => {
+  const handleUpgrade = async (planSlug: string, gateway: string) => {
     if (!session) {
       localStorage.setItem("redirectTo", "/pricing");
       router.push("/login");
@@ -187,7 +191,7 @@ export default function PricingPage() {
       return;
     }
 
-    const successUrl = `${window.location.origin}/app/profile?upgraded=true&session_id={CHECKOUT_SESSION_ID}`;
+    const successUrl = `${window.location.origin}/app/profile?upgraded=true&gateway=${gateway}&session_id={CHECKOUT_SESSION_ID}`;
     const cancelUrl = window.location.href;
 
     try {
@@ -199,7 +203,7 @@ export default function PricingPage() {
             plan_slug: planSlug,
             success_url: successUrl,
             cancel_url: cancelUrl,
-            gateway: "stripe",
+            gateway,
           }),
         }
       );
@@ -207,13 +211,33 @@ export default function PricingPage() {
       if (url) {
         window.location.href = url;
       } else {
-        // If no URL, it's a free plan assigned directly
         window.location.reload();
       }
     } catch (err) {
       console.error("Upgrade failed", err);
     } finally {
       setIsUpgrading(null);
+    }
+  };
+
+  const handlePlanSelect = (planSlug: string) => {
+    if (!session) {
+      localStorage.setItem("redirectTo", "/pricing");
+      router.push("/login");
+      return;
+    }
+    if (planSlug === "free") {
+      handleUpgrade(planSlug, "");
+      return;
+    }
+    setSelectedPlanSlug(planSlug);
+    setGatewayModalOpen(true);
+  };
+
+  const handleGatewaySelect = (gateway: "stripe" | "kambafy") => {
+    setGatewayModalOpen(false);
+    if (selectedPlanSlug) {
+      handleUpgrade(selectedPlanSlug, gateway);
     }
   };
 
@@ -255,17 +279,25 @@ export default function PricingPage() {
               plan={plan}
               isCurrent={currentPlan?.slug === plan.slug}
               isLoading={isUpgrading === plan.slug}
-              onSelect={() => handleUpgrade(plan.slug)}
+              onSelect={() => handlePlanSelect(plan.slug)}
             />
           ))}
         </div>
 
         <div className="text-center py-6 text-sm md:text-base text-slate-400">
           <p>
-            Todos os planos incluem acesso às funcionalidades da plataforma. Pagamento seguro via Stripe/Comprovativo
+            Todos os planos incluem acesso às funcionalidades da plataforma. Pagamento seguro via Stripe ou Kambafy.
           </p>
         </div>
       </div>
+
+      <GatewaySelectModal
+        open={gatewayModalOpen}
+        onOpenChange={setGatewayModalOpen}
+        planName={plans.find((p) => p.slug === selectedPlanSlug)?.name || ""}
+        onSelect={handleGatewaySelect}
+        isLoading={isUpgrading === selectedPlanSlug}
+      />
     </div>
   );
 }

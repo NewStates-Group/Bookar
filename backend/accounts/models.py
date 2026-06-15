@@ -53,6 +53,7 @@ class SubscriptionPlan(models.Model):
     max_mindmap_materials = models.IntegerField(null=True, blank=True)
 
     gateway_price_id = models.CharField(max_length=255, blank=True, default="")
+    kambafy_price_id = models.CharField(max_length=255, blank=True, default="")
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

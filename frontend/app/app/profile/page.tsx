@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { Loader2, Upload } from "lucide-react";
 import { apiRequest } from "@/lib/api";
 import { ConfirmUpgradeModal } from "@/components/ConfirmUpgradeModal";
+import { useRouter } from "next/navigation";
 
 interface Profile {
     email: string;
@@ -21,6 +22,7 @@ interface Profile {
   }
 
 export default function ProfilePage() {
+    const router = useRouter();
     const { data: session, update } = useSession();
     const [isLoading, setIsLoading] = useState(false);
     const [isPageLoading, setIsPageLoading] = useState<Boolean>(true);
@@ -36,24 +38,24 @@ export default function ProfilePage() {
     const [confirmStatus, setConfirmStatus] = useState<"idle" | "pending" | "success" | "error">("idle");
     const [confirmError, setConfirmError] = useState<string>("");
 
-    // Confirm pending Stripe checkout after redirect — runs before data fetch
+    // Confirm pending checkout after redirect — runs before data fetch
     useEffect(() => {
         if (!session?.accessToken) return;
         const params = new URLSearchParams(window.location.search);
         const sessionId = params.get("session_id");
+        const gateway = params.get("gateway") || "stripe";
         if (!sessionId) return;
 
         setConfirmStatus("pending");
         apiRequest(`${process.env.NEXT_PUBLIC_API_URL}/subscriptions/confirm`, {
             method: "POST",
-            body: JSON.stringify({ session_id: sessionId }),
+            body: JSON.stringify({ session_id: sessionId, gateway }),
         })
             .then(() => {
                 setConfirmStatus("success");
-                window.history.replaceState({}, "", "/app/profile");
                 setTimeout(() => {
-                    setConfirmStatus("idle");
-                }, 1500);
+                    router.push("/app/subscription");
+                }, 1000);
             })
             .catch((err: Error) => {
                 setConfirmError(err.message || "Erro ao confirmar pagamento");
@@ -65,10 +67,10 @@ export default function ProfilePage() {
     }, [session?.accessToken]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // Fetch fresh profile data directly from API
-    const hasSessionId = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("session_id");
     useEffect(() => {
         if (!session?.accessToken || hasFetched.current) return;
-        if (hasSessionId && confirmStatus !== "error") return;
+        const hasSessionId = new URLSearchParams(window.location.search).has("session_id");
+        if (hasSessionId && (confirmStatus === "idle" || confirmStatus === "pending" || confirmStatus === "success")) return;
         hasFetched.current = true;
 
         apiRequest(`${process.env.NEXT_PUBLIC_API_URL}/auth/me`)
@@ -86,7 +88,7 @@ export default function ProfilePage() {
             .finally(() => {
                 setIsPageLoading(false);
             });
-    }, [session?.accessToken]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [session?.accessToken, confirmStatus]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const handleUpdateProfile = async (e: React.FormEvent) => {
         e.preventDefault();

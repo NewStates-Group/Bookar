@@ -181,6 +181,7 @@ class CancelOut(Schema):
 
 class ConfirmCheckoutIn(Schema):
     session_id: str
+    gateway: str = "stripe"
 
 
 class ConfirmCheckoutOut(Schema):

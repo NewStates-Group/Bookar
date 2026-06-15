@@ -3,12 +3,29 @@ import React from "react";
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Loader2, Crown, Sparkles, CheckCircle2, XCircle, CreditCard, Calendar, AlertTriangle, Clock, ChevronDown, ChevronUp, RotateCw, DollarSign } from "lucide-react";
+import { Loader2, Crown, Sparkles, CheckCircle2, XCircle, CreditCard, Calendar, AlertTriangle, Clock, ChevronDown, ChevronUp, RotateCw, DollarSign, ArrowLeftRight, X } from "lucide-react";
 import { apiRequest } from "@/lib/api";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { GatewaySelectModal } from "@/components/GatewaySelectModal";
+
+interface Plan {
+  id: number;
+  slug: string;
+  name: string;
+  description: string;
+  price: string;
+  monthly_limits: boolean;
+  max_explicador_messages: number | null;
+  max_explicador_participants: number | null;
+  max_courses_generated: number | null;
+  max_mindmaps_generated: number | null;
+  max_mindmap_modules: number | null;
+  max_mindmap_quizzes: number | null;
+  max_mindmap_materials: number | null;
+}
 
 interface SubscriptionPlan {
   id: number;
@@ -94,6 +111,23 @@ function formatDateTime(dateStr: string | null): string {
   });
 }
 
+const limitLabels: Record<string, { label: string; hideWhenZero?: boolean; structural?: boolean }> = {
+  max_explicador_messages: { label: "Mensagens no Explicador" },
+  max_explicador_participants: { label: "Convidados por sala", structural: true },
+  max_courses_generated: { label: "Cursos gerados", hideWhenZero: true },
+  max_mindmaps_generated: { label: "Mapas mentais gerados" },
+  max_mindmap_modules: { label: "Módulos por mapa mental", structural: true },
+  max_mindmap_quizzes: { label: "Testes por mapa mental", structural: true },
+  max_mindmap_materials: { label: "Materiais de leitura", structural: true },
+};
+
+function formatLimit(value: number | null, monthly: boolean, structural: boolean = false): any {
+  if (value === null) return "Ilimitado";
+  if (value === 0) return <X className="w-3 h-3 text-red-600" />;
+  if (structural) return `${value}`;
+  return `${value}${monthly ? "/mês" : ""}`;
+}
+
 const planColors: Record<string, string> = {
   free: "text-slate-600",
   pro: "text-cyan-700",
@@ -102,12 +136,18 @@ const planColors: Record<string, string> = {
 
 export default function SubscriptionPage() {
   const { data: session } = useSession();
+  const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
   const [subscription, setSubscription] = useState<UserSubscription | null>(null);
   const [usage, setUsage] = useState<UsageMetric[]>([]);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [plans, setPlans] = useState<Plan[]>([]);
+  const [showPricing, setShowPricing] = useState(false);
+  const [isUpgrading, setIsUpgrading] = useState<string | null>(null);
+  const [gatewayPlanSlug, setGatewayPlanSlug] = useState<string | null>(null);
+  const [gatewayModalOpen, setGatewayModalOpen] = useState(false);
 
   useEffect(() => {
     if (!session?.accessToken) return;
@@ -115,10 +155,12 @@ export default function SubscriptionPage() {
     Promise.all([
       apiRequest(`${process.env.NEXT_PUBLIC_API_URL}/subscriptions/my`),
       apiRequest(`${process.env.NEXT_PUBLIC_API_URL}/subscriptions/usage`),
+      apiRequest(`${process.env.NEXT_PUBLIC_API_URL}/subscriptions/plans`),
     ])
-      .then(([sub, usageData]: any) => {
+      .then(([sub, usageData, plansData]: any) => {
         setSubscription(sub as UserSubscription);
         setUsage((usageData?.metrics || []) as UsageMetric[]);
+        setPlans(plansData as Plan[]);
       })
       .catch(() => {
         toast.error("Erro ao carregar dados da subscrição");
@@ -127,6 +169,65 @@ export default function SubscriptionPage() {
         setIsLoading(false);
       });
   }, [session?.accessToken]);
+
+  const handleUpgrade = async (planSlug: string, gateway: string) => {
+    if (!session) {
+      localStorage.setItem("redirectTo", "/app/subscription");
+      router.push("/login");
+      return;
+    }
+    setIsUpgrading(planSlug);
+
+    if (planSlug === "free") {
+      setIsUpgrading(null);
+      return;
+    }
+
+    const successUrl = `${window.location.origin}/app/profile?upgraded=true&gateway=${gateway}&session_id={CHECKOUT_SESSION_ID}`;
+    const cancelUrl = window.location.href;
+
+    try {
+      const result = await apiRequest(
+        `${process.env.NEXT_PUBLIC_API_URL}/subscriptions/checkout`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            plan_slug: planSlug,
+            success_url: successUrl,
+            cancel_url: cancelUrl,
+            gateway,
+          }),
+        }
+      );
+      const { url } = result as { url: string };
+      if (url) {
+        window.location.href = url;
+      } else {
+        window.location.reload();
+      }
+    } catch (err) {
+      console.error("Upgrade failed", err);
+      toast.error("Erro ao iniciar upgrade. Tenta novamente.");
+    } finally {
+      setIsUpgrading(null);
+    }
+  };
+
+  const handlePlanSelect = (planSlug: string) => {
+    if (planSlug === "free") {
+      handleUpgrade(planSlug, "");
+      return;
+    }
+    setGatewayPlanSlug(planSlug);
+    setGatewayModalOpen(true);
+  };
+
+  const handleGatewaySelect = (gateway: "stripe" | "kambafy") => {
+    setGatewayModalOpen(false);
+    if (gatewayPlanSlug) {
+      handleUpgrade(gatewayPlanSlug, gateway);
+    }
+  };
 
   function loadHistory() {
     setHistoryOpen(true);
@@ -234,13 +335,31 @@ export default function SubscriptionPage() {
 
             <div className="flex flex-col sm:flex-row gap-2 pt-2">
               {(!plan || plan.slug === "free") && (
-                <Link href="/pricing" className="flex-1">
-                  <Button className="w-full bg-cyan-500 hover:bg-cyan-600 text-white font-semibold gap-1.5">
-                    <Sparkles className="w-4 h-4" />
-                    Fazer Upgrade
-                  </Button>
-                </Link>
+                <Button
+                  className="flex-1 bg-cyan-500 hover:bg-cyan-600 text-white font-semibold gap-1.5"
+                  onClick={() => { setShowPricing(true); window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" }); }}
+                >
+                  <Sparkles className="w-4 h-4" />
+                  Fazer Upgrade
+                </Button>
               )}
+              {plan && plan.slug !== "free" && (
+                <Button
+                  className="flex-1 bg-cyan-500 hover:bg-cyan-600 text-white font-semibold gap-1.5"
+                  onClick={() => { setShowPricing(true); window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" }); }}
+                >
+                  <ArrowLeftRight className="w-4 h-4" />
+                  Trocar de Plano
+                </Button>
+              )}
+              <Button
+                variant="outline"
+                className="flex-1 border-slate-300 gap-1.5"
+                onClick={() => { setShowPricing(!showPricing); }}
+              >
+                <Crown className="w-4 h-4" />
+                {showPricing ? "Fechar Planos" : "Ver Planos"}
+              </Button>
             </div>
           </CardContent>
         </Card>
@@ -285,6 +404,108 @@ export default function SubscriptionPage() {
           </CardContent>
         </Card>
       </div>
+
+      {showPricing && plans.length > 0 && (
+        <Card className="border-slate-200 shadow-sm overflow-hidden">
+          <CardHeader className="text-center flex flex-col items-center justify-center">
+            <CardTitle className="text-xl text-center font-bold text-slate-900 flex items-center gap-2">
+              Escolhe o teu plano
+            </CardTitle>
+            <CardDescription>
+              Compara os planos disponíveis e escolhe o que melhor se adequa a ti.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid md:grid-cols-3 gap-4">
+              {plans.map((p) => {
+                const isCurrent = plan?.slug === p.slug;
+                const priceNum = parseFloat(p.price);
+                const isFree = p.slug === "free";
+                return (
+                  <Card
+                    key={p.slug}
+                    className={`relative flex flex-col border-2 transition-all hover:shadow-md ${isCurrent
+                        ? "border-cyan-400 shadow-sm"
+                        : p.slug === "pro"
+                          ? "border-cyan-200 hover:border-cyan-300"
+                          : "border-slate-200 hover:border-slate-300"
+                      }`}
+                  >
+                    {p.slug === "pro" && !isCurrent && (
+                      <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-10">
+                        <Badge className="bg-cyan-400 hover:bg-cyan-500 text-black text-xs px-4 py-1">
+                          Mais Popular
+                        </Badge>
+                      </div>
+                    )}
+
+                    <CardHeader className="text-center pb-3">
+                      <CardTitle className="text-lg font-bold">{p.name}</CardTitle>
+                      <CardDescription className="text-sm text-slate-500 min-h-[36px]">
+                        {p.description}
+                      </CardDescription>
+                      <div className="mt-2">
+                        <span className="text-3xl font-extrabold">
+                          {isFree ? "Grátis" : `${priceNum.toLocaleString('pt-AO', {
+                            style: 'currency',
+                            currency: 'AOA',
+                            minimumFractionDigits: 0
+                          })}`}
+                        </span>
+                        {!isFree && (
+                          <span className="text-sm text-slate-500 ml-1">/mês</span>
+                        )}
+                      </div>
+                    </CardHeader>
+
+                    <CardContent className="flex-1 space-y-2 pb-3">
+                      {Object.entries(limitLabels).map(([key, cfg]) => {
+                        const value = p[key as keyof Plan] as number | null;
+                        if (value === 0 && cfg.hideWhenZero) return null;
+                        return (
+                          <div key={key} className="flex items-center justify-between text-sm">
+                            <span className="text-slate-600">{cfg.label}</span>
+                            <span className="font-medium text-slate-800">
+                              {formatLimit(value, p.monthly_limits, cfg.structural)}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </CardContent>
+
+                    <CardFooter className="pt-2">
+                      {isCurrent ? (
+                        <Button className="w-full" variant="outline" disabled>
+                          Plano Atual
+                        </Button>
+                      ) : isFree ? (
+                        <Button className="w-full" variant="outline" disabled>
+                          Grátis
+                        </Button>
+                      ) : (
+                        <Button
+                          className="w-full bg-cyan-400 hover:bg-cyan-500 text-black font-semibold"
+                          onClick={() => handlePlanSelect(p.slug)}
+                          disabled={isUpgrading === p.slug}
+                        >
+                          {isUpgrading === p.slug ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              A processar...
+                            </>
+                          ) : (
+                            "Assinar Agora"
+                          )}
+                        </Button>
+                      )}
+                    </CardFooter>
+                  </Card>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Card className="border-none shadow-none bg-transparent!">
         <button
@@ -357,6 +578,14 @@ export default function SubscriptionPage() {
           </CardContent>
         )}
       </Card>
+
+      <GatewaySelectModal
+        open={gatewayModalOpen}
+        onOpenChange={setGatewayModalOpen}
+        planName={plans.find((p) => p.slug === gatewayPlanSlug)?.name || ""}
+        onSelect={handleGatewaySelect}
+        isLoading={isUpgrading === gatewayPlanSlug}
+      />
     </div>
   );
 }

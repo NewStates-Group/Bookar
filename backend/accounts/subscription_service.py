@@ -265,61 +265,69 @@ class SubscriptionService:
         provider = get_provider(gateway)
         return provider.handle_webhook(request)
 
-    def confirm_checkout(self, user, session_id: str):
-        """Synchronously confirm a Stripe checkout session and update the user's plan."""
-        logger.info(f"confirm_checkout called for user {user.id} with session {session_id}")
-        from accounts.payment.stripe import StripePaymentProvider
+    def confirm_checkout(self, user, session_id: str, gateway: str = "stripe"):
+        """Synchronously confirm a checkout session and update the user's plan."""
+        logger.info(f"confirm_checkout called for user {user.id} gateway={gateway} session={session_id}")
+
         try:
-            try:
-                provider = StripePaymentProvider()
-            except Exception as e:
-                logger.critical("Stripe init failed")
-                raise HttpError(500, "Erro ao conectar com o Stripe")
+            provider = get_provider(gateway)
+        except ValueError:
+            raise HttpError(400, f"Gateway de pagamento inválido: {gateway}")
 
-            try:
-                session = provider.retrieve_checkout_session(session_id)
-            except Exception as e:
-                logger.critical("Failed to retrieve Stripe session")
-                raise HttpError(500, f"Erro ao verificar sessão: {e}")
+        session = provider.retrieve_checkout_session(session_id)
 
-            if not session:
-                logger.critical(f"Session {session_id} not found in Stripe")
-                raise HttpError(404, "Sessão de pagamento não encontrada")
+        if not session:
+            logger.warning(f"Session {session_id} not found in {gateway}")
+            raise HttpError(404, "Sessão de pagamento não encontrada")
 
+        if gateway == "stripe":
             status = getattr(session, "status", None)
-
             if status != "complete":
                 raise HttpError(400, f"Pagamento ainda não foi concluído (status: {status})")
 
             sub_id = getattr(session, "subscription", None)
             metadata = session.metadata or {}
-            plan_slug, session_user_id = [None] * 2
-            
-            try:
-                plan_slug = metadata["plan_slug"]
-                session_user_id = metadata["user_id"]
-            except KeyError:
-                raise HttpError(400, "Requisição incompleta")
+        else:
+            status = session.get("status", "")
+            status_map = {
+                "completed": "complete", "active": "complete",
+                "paid": "complete", "success": "complete",
+            }
+            mapped = status_map.get(status, status)
+            if mapped != "complete":
+                raise HttpError(400, f"Pagamento ainda não foi concluído (status: {status})")
 
-            if str(session_user_id) != str(user.id) or not plan_slug:
-                raise HttpError(403, "Erro no plano/sessão")
+            sub_id = session.get("subscription_id", session.get("id", ""))
+            metadata = session.get("metadata", {})
+        plan_slug, session_user_id = [None] * 2
 
-            if not sub_id:
-                raise HttpError(404, "Subscrição não encontrada")
+        try:
+            plan_slug = metadata["plan_slug"]
+            session_user_id = metadata["user_id"]
+        except KeyError:
+            raise HttpError(400, "Requisição incompleta")
 
-            plan = self.get_plan_by_slug(plan_slug)
-            sub = self._get_or_create_subscription(user)
-            self._log_history(user, sub)
-            sub.plan = plan
-            sub.status = UserSubscription.Status.ACTIVE
-            sub.payment_gateway = "stripe"
-            sub.gateway_subscription_id = sub_id or ""
-            sub.current_period_start = timezone.now()
-            sub.canceled_at = None
-            sub.save()
-            return {"success": True, "plan": plan_slug}
-        except Exception as e:
-            logger.critical("ERROR: "+ str(e))
-            return {"success": False, "plan": ""}
+        if not plan_slug or not session_user_id:
+            raise HttpError(400, "Requisição incompleta")
+
+        if str(session_user_id) != str(user.id):
+            raise HttpError(403, "Erro no plano/sessão")
+
+        plan = self.get_plan_by_slug(plan_slug)
+        sub = self._get_or_create_subscription(user)
+        self._log_history(user, sub)
+        sub.plan = plan
+        sub.status = UserSubscription.Status.ACTIVE
+        sub.payment_gateway = gateway
+        sub.gateway_subscription_id = sub_id or ""
+        now = timezone.now()
+        sub.current_period_start = now
+        if plan.monthly_limits:
+            sub.current_period_end = now + timedelta(days=30)
+        else:
+            sub.current_period_end = None
+        sub.canceled_at = None
+        sub.save()
+        return {"success": True, "plan": plan_slug}
 
 

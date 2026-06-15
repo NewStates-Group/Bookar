@@ -188,5 +188,4 @@ class SubscriptionController:
 
     @route.post("confirm", response=ConfirmCheckoutOut)
     def confirm_checkout(self, request, data: ConfirmCheckoutIn):
-        logger.critical("DATA: " + data.session_id)
-        return self.subscription_service.confirm_checkout(request.user, data.session_id)
+        return self.subscription_service.confirm_checkout(request.user, data.session_id, data.gateway)
