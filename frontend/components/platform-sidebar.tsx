@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import { useTheme } from "next-themes";
 import useSWR from "swr";
@@ -45,7 +45,6 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { ChevronDown, CheckCircle2, Lock as LockIcon, PlayCircle } from "lucide-react";
 
 interface PlatformSidebarProps {
   isOpen: boolean;
@@ -198,34 +197,30 @@ export function PlatformSidebar({
         )}
       </div>
 
-      {/* ── Navigation Links / Course Content ── */}
+      {/* ── Navigation Links ── */}
       <nav className="flex-1 px-3 py-3 overflow-y-auto space-y-0.5 scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-neutral-700 scrollbar-track-transparent">
-        {isExpanded && pathname.startsWith("/app/courses/watch") ? (
-          <CourseWatchTree closeMobile={closeMobile} />
-        ) : (
-          <>
-            {menuItems.map((item) => {
-              const isActive = pathname.startsWith(item.href);
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={closeMobile}
-                  title={!isExpanded ? item.title : undefined}
-                  className={`flex items-center rounded-xl text-sm font-medium transition-all duration-200 ${isExpanded ? "px-3 py-2.5 gap-3" : "p-2.5 justify-center"
-                    } ${isActive
-                      ? "bg-white dark:bg-neutral-800 text-slate-900 dark:text-neutral-100 border border-slate-200/80 dark:border-neutral-700 shadow-sm font-semibold"
-                      : "text-slate-600 dark:text-neutral-400 hover:text-slate-900 dark:hover:text-neutral-100 hover:bg-slate-200/40 dark:hover:bg-neutral-800 border border-transparent"
-                    }`}
-                >
-                  <item.icon
-                    className={`w-[20px] h-[20px] flex-shrink-0 transition-colors duration-200 ${isActive ? "text-cyan-600 dark:text-cyan-400" : "text-slate-500 dark:text-neutral-400"
-                      }`}
-                  />
-                  {isExpanded && <span className="truncate">{item.title}</span>}
-                </Link>
-              );
-            })}
+        {menuItems.map((item) => {
+          const isActive = pathname.startsWith(item.href);
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              onClick={closeMobile}
+              title={!isExpanded ? item.title : undefined}
+              className={`flex items-center rounded-xl text-sm font-medium transition-all duration-200 ${isExpanded ? "px-3 py-2.5 gap-3" : "p-2.5 justify-center"
+                } ${isActive
+                  ? "bg-white dark:bg-neutral-800 text-slate-900 dark:text-neutral-100 border border-slate-200/80 dark:border-neutral-700 shadow-sm font-semibold"
+                  : "text-slate-600 dark:text-neutral-400 hover:text-slate-900 dark:hover:text-neutral-100 hover:bg-slate-200/40 dark:hover:bg-neutral-800 border border-transparent"
+                }`}
+            >
+              <item.icon
+                className={`w-[20px] h-[20px] flex-shrink-0 transition-colors duration-200 ${isActive ? "text-cyan-600 dark:text-cyan-400" : "text-slate-500 dark:text-neutral-400"
+                  }`}
+              />
+              {isExpanded && <span className="truncate">{item.title}</span>}
+            </Link>
+          );
+        })}
 
         {/* Tutor — coming soon dialog */}
         <Dialog>
@@ -310,8 +305,6 @@ export function PlatformSidebar({
               })}
             </div>
           </div>
-        )}
-          </>
         )}
       </nav>
 
@@ -478,184 +471,5 @@ export function PlatformSidebar({
         </aside>
       </div>
     </>
-  );
-}
-
-// ── Course Watch Tree ──
-
-interface WatchLesson {
-  id: string;
-  title: string;
-  duration: number;
-  watched: boolean;
-  status: string;
-}
-
-interface WatchModule {
-  id: string;
-  name: string;
-  lessons: WatchLesson[];
-  quiz_id?: string;
-  last_quiz_score?: number;
-  last_quiz_passed?: boolean;
-}
-
-interface WatchCourse {
-  id: string;
-  title: string;
-  modules: WatchModule[];
-}
-
-function CourseWatchTree({ closeMobile }: { closeMobile: () => void }) {
-  const { data: session } = useSession();
-  const pathname = usePathname();
-  const [courseId, setCourseId] = React.useState<string | null>(null);
-  const [expandedModules, setExpandedModules] = React.useState<Record<string, boolean>>({});
-  const [lessonId, setLessonId] = React.useState<string | null>(null);
-  const [quizId, setQuizId] = React.useState<string | null>(null);
-
-  React.useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    setCourseId(params.get('c'));
-    setLessonId(params.get('l'));
-    setQuizId(params.get('id'));
-  }, [pathname]);
-
-  const { data: course, isLoading } = useSWR<WatchCourse>(
-    session?.accessToken && courseId
-      ? [`${process.env.NEXT_PUBLIC_API_URL}/courses/${courseId}`, session.accessToken]
-      : null,
-    // @ts-ignore
-    authenticatedFetcher,
-    { revalidateOnFocus: false, dedupingInterval: 60000 }
-  );
-
-  React.useEffect(() => {
-    if (course?.modules) {
-      const newExpanded: Record<string, boolean> = {};
-      course.modules.forEach((m) => {
-        const hasActive = m.lessons.some((l) => l.id === lessonId) ||
-          (lessonId === "quiz" && quizId === m.id);
-        if (hasActive) newExpanded[m.id] = true;
-      });
-      setExpandedModules((prev) => ({ ...prev, ...newExpanded }));
-    }
-  }, [course, lessonId, quizId]);
-
-  const totalLessons = course?.modules.reduce((s, m) => s + m.lessons.length, 0) || 0;
-  const watchedLessons = course?.modules.reduce(
-    (s, m) => s + m.lessons.filter((l) => l.watched).length, 0
-  ) || 0;
-  const progressPct = totalLessons > 0 ? Math.round((watchedLessons / totalLessons) * 100) : 0;
-
-  return (
-    <div className="flex flex-col h-full">
-      {/* Course header */}
-      <div className="pb-3 border-b border-slate-200/60 dark:border-neutral-800 mb-3">
-        <h2 className="text-sm font-bold text-slate-800 dark:text-neutral-100 truncate">
-          {course?.title || "Carregando..."}
-        </h2>
-        <p className="text-[11px] text-slate-500 dark:text-neutral-400 mt-0.5">
-          {course?.modules.length || 0} módulos &middot; {watchedLessons}/{totalLessons} aulas
-        </p>
-        <div className="mt-2 bg-slate-200 dark:bg-neutral-800 rounded-full h-1.5 overflow-hidden">
-          <div
-            className="h-full bg-gradient-to-r from-cyan-500 to-cyan-400 transition-all duration-300"
-            style={{ width: `${progressPct}%` }}
-          />
-        </div>
-        <p className="text-[10px] text-slate-400 dark:text-neutral-500 mt-0.5">{progressPct}% completo</p>
-      </div>
-
-      {/* Module tree */}
-      <div className="flex-1 overflow-y-auto -mx-3 px-3 space-y-0.5">
-        {isLoading ? (
-          <div className="flex justify-center py-8">
-            <Loader2 className="w-5 h-5 animate-spin text-slate-400 dark:text-neutral-500" />
-          </div>
-        ) : !course?.modules?.length ? (
-          <p className="text-sm text-slate-500 dark:text-neutral-400 p-3">Nenhum módulo disponível</p>
-        ) : (
-          course.modules.map((mod, mi) => (
-            <div key={mod.id}>
-              <button
-                onClick={() => setExpandedModules((p) => ({ ...p, [mod.id]: !p[mod.id] }))}
-                className="w-full flex items-center justify-between px-3 py-2.5 text-slate-600 dark:text-neutral-400 hover:bg-slate-200/40 dark:hover:bg-neutral-800 transition-colors rounded-lg"
-              >
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className="text-[10px] font-bold text-slate-400 dark:text-neutral-500 flex-shrink-0 border border-slate-300/60 dark:border-neutral-600 rounded-full w-5 h-5 flex items-center justify-center">
-                    {mi + 1}
-                  </span>
-                  <span className="text-sm font-semibold text-slate-700 dark:text-neutral-300 truncate">{mod.name}</span>
-                </div>
-                <ChevronDown
-                  className={`w-3.5 h-3.5 flex-shrink-0 transition-transform ${expandedModules[mod.id] ? "rotate-180" : ""}`}
-                />
-              </button>
-
-              {expandedModules[mod.id] && (
-                <div className="ml-2 space-y-0.5 my-1">
-                  {mod.lessons.map((lesson) => {
-                    const isActive = lessonId === lesson.id;
-                    const isPending = lesson.status === "PENDING";
-                    return (
-                      <Link
-                        key={lesson.id}
-                        href={`/app/courses/watch?l=${lesson.id}&c=${courseId}`}
-                        onClick={closeMobile}
-                        className={`flex items-center gap-2.5 px-3 py-2 text-sm rounded-lg transition-all cursor-pointer ${isActive
-                          ? "bg-cyan-300/10 text-cyan-600 dark:text-cyan-400 border-l-2 border-cyan-500"
-                          : isPending
-                            ? "opacity-50 pointer-events-none text-slate-400 dark:text-neutral-500"
-                            : "text-slate-500 dark:text-neutral-400 hover:bg-slate-200/40 dark:hover:bg-neutral-800 hover:text-slate-700 dark:hover:text-neutral-200"
-                          }`}
-                      >
-                        {lesson.status === "READY" ? (
-                          <PlayCircle className="w-3.5 h-3.5 flex-shrink-0" />
-                        ) : lesson.status === "PROCESSING" ? (
-                          <Loader2 className="w-3.5 h-3.5 flex-shrink-0 animate-spin" />
-                        ) : (
-                          <LockIcon className="w-3.5 h-3.5 flex-shrink-0 text-slate-400 dark:text-neutral-500" />
-                        )}
-                        <span className="flex-1 truncate text-sm">{lesson.title}</span>
-                        {lesson.watched && (
-                          <CheckCircle2 className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />
-                        )}
-                      </Link>
-                    );
-                  })}
-
-                  {mod.quiz_id && (
-                    <Link
-                      href={`/app/courses/watch?l=quiz&id=${mod.id}&c=${courseId}`}
-                      onClick={closeMobile}
-                      className={`flex items-center gap-2.5 px-3 py-2 text-sm rounded-lg transition-all cursor-pointer ${
-                        lessonId === "quiz" && quizId === mod.id
-                          ? "bg-cyan-300/10 text-cyan-600 dark:text-cyan-400 border-l-2 border-cyan-500"
-                          : "text-slate-500 dark:text-neutral-400 hover:bg-slate-200/40 dark:hover:bg-neutral-800 hover:text-slate-700 dark:hover:text-neutral-200"
-                      }`}
-                    >
-                      <span className="w-3.5 h-3.5 rounded-full border border-slate-300 dark:border-neutral-600 flex items-center justify-center flex-shrink-0">
-                        <span className="text-[8px] font-bold text-slate-500 dark:text-neutral-400">?</span>
-                      </span>
-                      <span className="flex-1 truncate text-sm">{mod.name}</span>
-                      {mod.last_quiz_score !== undefined && mod.last_quiz_score !== null && (
-                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-                          mod.last_quiz_passed
-                            ? "bg-green-500/20 text-green-600"
-                            : "bg-red-500/20 text-red-600"
-                        }`}>
-                          {mod.last_quiz_score.toFixed(1)}
-                        </span>
-                      )}
-                    </Link>
-                  )}
-                </div>
-              )}
-            </div>
-          ))
-        )}
-      </div>
-    </div>
   );
 }
