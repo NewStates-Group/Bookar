@@ -1,5 +1,5 @@
+import { BookarLoader } from "@/components/BookarLoader";
+
 export default function Loading() {
-    return (
-        <h1>loading</h1>
-    );
+    return <BookarLoader />
 }
