@@ -3,12 +3,11 @@
 import { useSession } from "next-auth/react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Loader2, ArrowRight, ChevronLeft, ChevronRight, HelpCircle, X, Menu, ArrowLeft, Award, FileDown, FileText, ExternalLink, BookOpen, GripVertical } from "lucide-react";
+import { Loader2, HelpCircle, X, ArrowLeft, Award, FileDown, BookOpen, GripVertical } from "lucide-react";
 import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { ExplicadorPromptDialog } from "@/components/ExplicadorPromptDialog";
 import { buildExplicadorCourseContext } from "@/lib/explicador-course-context";
 import { toast } from "sonner";
-import { CourseWatchSidebar } from "@/components/course-sidebar";
 import Link from "next/link";
 import { BuildingBlocksLoader } from "@/components/ui/building-blocks-loader";
 import { QuizView } from "@/components/quiz-view";
@@ -80,11 +79,7 @@ export default function WatchPage() {
     const [viewMode, setViewMode] = useState<"video" | "quiz">("video");
     const [played, setPlayed] = useState(false);
     const [ended, setEnded] = useState(false);
-    const [sidebarOpen, setSidebarOpen] = useState(false);
     const [explicadorOpen, setExplicadorOpen] = useState(false);
-    const [previousLesson, setPreviousLesson] = useState<Lesson | null>(null)
-    const [nextLesson, setNextLesson] = useState<Lesson | null>(null)
-    const [nextQuiz, setNextQuiz] = useState<{ id: string, moduleId: string } | null>(null)
     const [materialSidebarOpen, setMaterialSidebarOpen] = useState(false);
     const [activeMaterialContent, setActiveMaterialContent] = useState<string | null>(null);
 
@@ -214,51 +209,6 @@ export default function WatchPage() {
     }, [played, ended, lessonID])
 
 
-    useEffect(() => {
-        if (course) {
-            const allLessons = course.modules.flatMap(m => m.lessons);
-
-            if (lessonID === 'quiz' && quizID) {
-                // For quiz view, find the module by its ID (quizID now contains module.id)
-                const moduleWithQuiz = course.modules.find(m => m.id.toString() === quizID);
-                if (moduleWithQuiz) {
-                    const lastLessonOfModule = moduleWithQuiz.lessons[moduleWithQuiz.lessons.length - 1];
-                    if (lastLessonOfModule) {
-                        const currentIndex = allLessons.findIndex(l => l.id === lastLessonOfModule.id);
-                        setPreviousLesson(allLessons[currentIndex] || null);
-                        setNextLesson(allLessons[currentIndex + 1] || null);
-                        setNextQuiz(null); // No quiz after a quiz
-                    }
-                }
-            } else if (lesson && lesson.id) {
-                // For regular lesson view
-                const currentIndex = allLessons.findIndex(l => l.id === lesson.id);
-                if (currentIndex !== -1) {
-                    setPreviousLesson(allLessons[currentIndex - 1] || null);
-
-                    // Check if this is the last lesson of a module with a quiz
-                    const currentModule = course.modules.find(m =>
-                        m.lessons.some(l => l.id === lesson.id)
-                    );
-
-                    if (currentModule) {
-                        const isLastLessonOfModule = currentModule.lessons[currentModule.lessons.length - 1]?.id === lesson.id;
-
-                        if (isLastLessonOfModule && currentModule.quiz_id) {
-                            // Next item is the module quiz
-                            setNextQuiz({ id: currentModule.id, moduleId: currentModule.id });
-                            setNextLesson(null);
-                        } else {
-                            // Next item is a regular lesson
-                            setNextLesson(allLessons[currentIndex + 1] || null);
-                            setNextQuiz(null);
-                        }
-                    }
-                }
-            }
-        }
-    }, [course, lesson, lessonID, quizID]);
-
     const explicadorCourseContext = useMemo(() => {
         if (!course || !courseID) return null;
 
@@ -349,15 +299,9 @@ export default function WatchPage() {
         }
     }, [materialSidebarOpen, lesson?.title, activeMaterialContent]);
 
-    const canGoNext = (() => {
-        if (nextQuiz) return true; // backend controla
-        if (nextLesson) return lesson?.watched;
-        return false;
-    })();
-
     if (status === "loading" || isLoadingCourse || isLoadingLesson) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-white to-slate-50">
+            <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-white to-slate-50 dark:from-neutral-950 dark:via-neutral-950 dark:to-neutral-900">
                 <div className="text-center space-y-4">
                     <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto" />
                     <p className="text-muted-foreground font-medium">Carregando as informações da aula...</p>
@@ -381,102 +325,28 @@ export default function WatchPage() {
     }
 
     return (
-        <div className="flex h-screen bg-background overflow-hidden font-sans">
-            <div className={`fixed min-h-screen z-[100] md:static transition-all duration-300 overflow-hidden ${sidebarOpen ? "w-[25rem]" : "w-0"} bg-card border-r border-border `}>
-                {sidebarOpen && <CourseWatchSidebar course={course} currentLessonId={lesson?.id} isEnded={ended} onClose={() => setSidebarOpen(!sidebarOpen)} />}
+        <div className="flex flex-col min-h-screen bg-background font-sans">
+            <div className="h-14 flex items-center gap-2 px-4 border-b border-border sticky top-0 z-30 bg-background">
+                <Link
+                    href={`/app/courses/${courseID}`}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-foreground/70 hover:text-foreground hover:bg-muted transition-colors"
+                >
+                    <ArrowLeft className="w-4 h-4" />
+                    <span>Voltar ao Curso</span>
+                </Link>
+                <div className="flex-1" />
+                <button
+                    onClick={() => setExplicadorOpen(true)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-foreground/70 hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+                >
+                    <HelpCircle className="w-4 h-4" />
+                    <span className="hidden md:block">Dúvidas</span>
+                </button>
             </div>
 
-            <div className="flex-1 flex flex-col overflow-hidden bg-background">
-                <div className="h-16 grid grid-cols-5 border-b border-border">
-                    <Link
-                        href={`/app/courses/${courseID}`}
-                        className="flex gap-1 items-center justify-center border-r cursor-pointer hover:bg-muted transition-colors px-4"
-                    >
-                        <ArrowLeft className="w-5 h-5 " />
-                        <span className="hidden md:block ml-1">
-                            Voltar
-                        </span>
-                    </Link>
-                    <button
-                        onClick={() => setSidebarOpen(!sidebarOpen)}
-                        className="flex gap-1 items-center justify-center border-r cursor-pointer hover:bg-muted transition-colors"
-                    >
-                        {sidebarOpen ? (
-                            <>
-                                <X className="w-5 h-5 text-foreground/70" />
-                                <span className="hidden md:block">
-                                    Fechar Menu
-                                </span>
-                            </>
-                        ) : (
-                            <>
-                                <Menu className="w-5 h-5 text-foreground/70" />
-                                <span className="hidden md:block">
-                                    Abrir Menu
-                                </span>
-                            </>
-                        )
-                        }
-
-                    </button>
-                    <button
-                        disabled={!previousLesson}
-                        className={`border-r flex gap-2 items-center justify-center hover:bg-muted transition-colors ${!previousLesson ? "opacity-70 cursor-not-allowed" : "cursor-pointer"}`}
-                    >
-                        {previousLesson ? (
-                            <Link className="flex items-center justify-center gap-2" href={`/app/courses/watch?l=${previousLesson.id}&c=${courseID}`}>
-                                <ChevronLeft className="w-4 h-4" />
-                                <span className="hidden md:block">
-                                    Aula Anterior
-                                </span>
-                            </Link>
-                        ) : (
-                            <div className="flex items-center justify-center gap-2 text-foreground/50">
-                                <ChevronLeft className="w-4 h-4" />
-                                <span className="hidden md:block">
-                                    Aula Anterior
-                                </span>
-                            </div>
-                        )}
-                    </button>
-                    <button
-                        disabled={!canGoNext}
-                        className={`border-r flex gap-2 items-center justify-center transition-colors ${!canGoNext ? "opacity-70 cursor-not-allowed" : "cursor-pointer hover:bg-muted"}`}
-                    >
-                        {(() => {
-                            if (!canGoNext) {
-                                return (
-                                    <div className="flex items-center justify-center gap-2 text-foreground/50">
-                                        <span className="hidden md:block">
-                                            {nextQuiz ? "Hora do Quiz" : "Próxima Aula"}
-                                        </span>
-                                        <ChevronRight className="w-4 h-4" />
-                                    </div>
-                                );
-                            }
-
-                            return (
-                                <Link className="flex items-center justify-center gap-2" href={`/app/courses/watch?l=${nextQuiz ? "quiz&id=" + nextQuiz.id : nextLesson?.id}&c=${courseID}`}>
-                                    <span className="hidden md:block">
-                                        {nextQuiz ? "Hora do Quiz" : "Próxima Aula"}
-                                    </span>
-                                    <ChevronRight className="w-4 h-4" />
-                                </Link>
-                            );
-                        })()}
-                    </button>
-
-                    <button className="flex gap-2 items-center cursor-pointer justify-center border-r hover:bg-muted transition-colors" onClick={() => setExplicadorOpen(true)}>
-                        <HelpCircle className="w-5 h-5" />
-                        <span className="hidden md:block">
-                            Dúvidas
-                        </span>
-                    </button>
-                </div>
-
-                <div className="flex-1 flex overflow-hidden">
-                    <div className="flex-1 overflow-y-auto flex flex-col">
-                        <div className="flex-1">
+            <div className="flex-1 flex overflow-hidden min-h-0">
+                <div className="flex-1 overflow-y-auto flex flex-col">
+                    <div className="flex-1">
                             {viewMode === "quiz" && quizID ? (
                                 <QuizView
                                     quizId={quizID}
@@ -621,7 +491,6 @@ export default function WatchPage() {
                             </div>
                         </div>
                     )}
-                </div>
             </div>
 
             {materialSidebarOpen && activeMaterialContent && (

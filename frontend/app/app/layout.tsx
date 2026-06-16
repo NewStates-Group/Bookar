@@ -53,17 +53,8 @@ export default function AppLayout({
     localStorage.setItem("bookar-sidebar-open", String(nextState));
   };
 
-  // If the path is watch mode, render immersive full screen without navigation
-  if (pathname === "/app/courses/watch") {
-    return (
-      <main className="min-h-screen bg-slate-50">
-        {children}
-        <AppFloatingMenu />
-      </main>
-    );
-  }
-
   const isExplicadorRoom = pathname.startsWith("/app/explicador/") && pathname !== "/app/explicador";
+  const isWatchPage = pathname.startsWith("/app/courses/watch");
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50 dark:from-neutral-950 dark:via-neutral-950 dark:to-neutral-900 text-slate-800 dark:text-neutral-100 antialiased">
@@ -76,7 +67,7 @@ export default function AppLayout({
       />
 
       {/* Mobile Sticky Navigation Header (Left-aligned Hamburger, Logo & Name) */}
-      {!isExplicadorRoom && (
+      {!isExplicadorRoom && !isWatchPage && (
         <header className="md:hidden sticky top-0 z-30 flex items-center gap-3 w-full h-14 px-4 bg-white/95 dark:bg-neutral-950/95 backdrop-blur-sm border-b border-slate-200/60 dark:border-neutral-800 shadow-sm select-none">
           <button
             onClick={() => setIsMobileOpen(true)}
