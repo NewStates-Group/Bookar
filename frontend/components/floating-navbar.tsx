@@ -43,7 +43,7 @@ export function FloatingNavbar() {
                         alt="Logo"
                         width={25}
                         height={25}
-                        className="w-9 h-9 md:w-10 md:h-10 object-contain"
+                        className="w-9 h-9 md:w-10 md:h-10 object-contain dark:invert"
                         priority
                     />
                     <span className="hidden md:block text-3xl font-bold ml-2">Bookar</span>

@@ -339,12 +339,12 @@ export function AppFloatingMenu() {
               onClick={handleOpenExplicador}
               className="flex items-center group cursor-pointer"
             >
-              <span className="px-2.5 py-1 text-xs font-semibold text-slate-600 bg-white/95 backdrop-blur-sm border border-slate-200/60 shadow-sm rounded-lg mr-2 transition-all duration-200 group-hover:text-cyan-600 group-hover:border-cyan-200/50 group-hover:bg-cyan-50/20 select-none">
+              <span className="px-2.5 py-1 text-xs font-semibold text-slate-600 dark:text-neutral-300 bg-white/95 dark:bg-neutral-900/95 backdrop-blur-sm border border-slate-200/60 dark:border-neutral-700/60 shadow-sm rounded-lg mr-2 transition-all duration-200 group-hover:text-cyan-600 dark:group-hover:text-cyan-400 group-hover:border-cyan-200/50 dark:group-hover:border-cyan-700/50 group-hover:bg-cyan-50/20 dark:group-hover:bg-cyan-950/20 select-none">
                 Explicador
               </span>
               <button
                 type="button"
-                className="w-11 h-11 rounded-xl bg-white border border-slate-200/80 text-slate-500 shadow-sm group-hover:shadow-md group-hover:text-cyan-600 group-hover:border-cyan-200 group-hover:bg-cyan-50/30 transition-all duration-200 flex items-center justify-center cursor-pointer"
+                className="w-11 h-11 rounded-xl bg-white dark:bg-neutral-900 border border-slate-200/80 dark:border-neutral-700/80 text-slate-500 dark:text-neutral-400 shadow-sm group-hover:shadow-md group-hover:text-cyan-600 dark:group-hover:text-cyan-400 group-hover:border-cyan-200 dark:group-hover:border-cyan-700 group-hover:bg-cyan-50/30 dark:group-hover:bg-cyan-950/30 transition-all duration-200 flex items-center justify-center cursor-pointer"
               >
                 <Bot className="w-5 h-5" />
               </button>
@@ -355,12 +355,12 @@ export function AppFloatingMenu() {
               onClick={handleOpenCaderno}
               className="flex items-center group cursor-pointer"
             >
-              <span className="px-2.5 py-1 text-xs font-semibold text-slate-600 bg-white/95 backdrop-blur-sm border border-slate-200/60 shadow-sm rounded-lg mr-2 transition-all duration-200 group-hover:text-cyan-600 group-hover:border-cyan-200/50 group-hover:bg-cyan-50/20 select-none">
+              <span className="px-2.5 py-1 text-xs font-semibold text-slate-600 dark:text-neutral-300 bg-white/95 dark:bg-neutral-900/95 backdrop-blur-sm border border-slate-200/60 dark:border-neutral-700/60 shadow-sm rounded-lg mr-2 transition-all duration-200 group-hover:text-cyan-600 dark:group-hover:text-cyan-400 group-hover:border-cyan-200/50 dark:group-hover:border-cyan-700/50 group-hover:bg-cyan-50/20 dark:group-hover:bg-cyan-950/20 select-none">
                 Anotações
               </span>
               <button
                 type="button"
-                className="w-11 h-11 rounded-xl bg-white border border-slate-200/80 text-slate-500 shadow-sm group-hover:shadow-md group-hover:text-cyan-600 group-hover:border-cyan-200 group-hover:bg-cyan-50/30 transition-all duration-200 flex items-center justify-center cursor-pointer"
+                className="w-11 h-11 rounded-xl bg-white dark:bg-neutral-900 border border-slate-200/80 dark:border-neutral-700/80 text-slate-500 dark:text-neutral-400 shadow-sm group-hover:shadow-md group-hover:text-cyan-600 dark:group-hover:text-cyan-400 group-hover:border-cyan-200 dark:group-hover:border-cyan-700 group-hover:bg-cyan-50/30 dark:group-hover:bg-cyan-950/30 transition-all duration-200 flex items-center justify-center cursor-pointer"
               >
                 <BookMarked className="w-5 h-5" />
               </button>
@@ -386,32 +386,32 @@ export function AppFloatingMenu() {
         </button>
 
         {explicadorOpen && (
-          <div className="absolute bottom-full right-0 mb-2 z-50 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-200 flex flex-col max-h-[70vh]">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-cyan-50 flex-shrink-0">
+          <div className="absolute bottom-full right-0 mb-2 z-50 w-80 sm:w-96 bg-white dark:bg-neutral-950 rounded-2xl shadow-2xl border border-slate-200 dark:border-neutral-700 overflow-hidden animate-in fade-in zoom-in-95 duration-200 flex flex-col max-h-[70vh]">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-neutral-800 bg-cyan-50 dark:bg-cyan-950/30 flex-shrink-0">
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-lg bg-cyan-500 flex items-center justify-center">
                   <Bot className="w-4 h-4 text-white" />
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-slate-800">Explicador</p>
-                  <p className="text-[10px] text-slate-500">Tire as suas dúvidas</p>
+                  <p className="text-sm font-semibold text-slate-800 dark:text-neutral-100">Explicador</p>
+                  <p className="text-[10px] text-slate-500 dark:text-neutral-400">Tire as suas dúvidas</p>
                 </div>
               </div>
               <button
                 onClick={() => setExplicadorOpen(false)}
-                className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-600 hover:bg-white/60 transition-all cursor-pointer"
+                className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 dark:text-neutral-500 hover:text-slate-600 dark:hover:text-neutral-300 hover:bg-white/60 dark:hover:bg-neutral-800 transition-all cursor-pointer"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
             </div>
 
-            <div ref={chatContainerRef} className="flex-1 overflow-y-auto min-h-0 px-4 py-3 space-y-3 bg-white">
+            <div ref={chatContainerRef} className="flex-1 overflow-y-auto min-h-0 px-4 py-3 space-y-3 bg-white dark:bg-neutral-950">
               {chatMessages.length === 0 && !isStreaming ? (
                 <div className="flex flex-col items-center justify-center py-8 text-center min-h-[160px]">
-                  <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center mb-3">
-                    <Sparkles className="w-5 h-5 text-slate-300" />
+                  <div className="w-10 h-10 rounded-xl bg-slate-50 dark:bg-neutral-800 border border-slate-100 dark:border-neutral-700 flex items-center justify-center mb-3">
+                    <Sparkles className="w-5 h-5 text-slate-300 dark:text-neutral-500" />
                   </div>
-                  <p className="text-sm text-slate-500 leading-relaxed">
+                  <p className="text-sm text-slate-500 dark:text-neutral-400 leading-relaxed">
                     Faça pergunta ao Explicador IA.
                   </p>
                 </div>
@@ -428,7 +428,7 @@ export function AppFloatingMenu() {
                       <div
                         className={`max-w-[85%] rounded-2xl px-3.5 py-2 text-sm leading-relaxed whitespace-pre-wrap ${msg.role === "user"
                           ? "bg-cyan-500 text-white rounded-tr-md"
-                          : "bg-slate-100 text-slate-700"
+                          : "bg-slate-100 dark:bg-neutral-800 text-slate-700 dark:text-neutral-200"
                         }`}
                       >
                         {isLastAssistant && !streamingContent && !msg.content ? (
@@ -454,20 +454,20 @@ export function AppFloatingMenu() {
               )}
             </div>
 
-            <div className="flex-shrink-0 px-4 pb-4 pt-2 border-t border-slate-100">
-              <form onSubmit={handleSubmit} className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1 focus-within:border-cyan-300 focus-within:ring-2 focus-within:ring-cyan-500/10 transition-all">
+            <div className="flex-shrink-0 px-4 pb-4 pt-2 border-t border-slate-100 dark:border-neutral-800">
+              <form onSubmit={handleSubmit} className="flex items-center gap-2 bg-slate-50 dark:bg-neutral-900 border border-slate-200 dark:border-neutral-700 rounded-xl px-3 py-1 focus-within:border-cyan-300 focus-within:ring-2 focus-within:ring-cyan-500/10 transition-all">
                 <input
                   ref={chatInputRef}
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
                   placeholder="Qual é a tua dúvida?"
                   disabled={isStreaming}
-                  className="flex-1 h-10 bg-transparent text-sm text-slate-800 placeholder:text-slate-400 outline-none border-0"
+                  className="flex-1 h-10 bg-transparent text-sm text-slate-800 dark:text-neutral-200 placeholder:text-slate-400 dark:placeholder:text-neutral-500 outline-none border-0"
                 />
                 <button
                   type="submit"
                   disabled={isStreaming || !prompt.trim()}
-                  className="w-8 h-8 flex items-center justify-center rounded-lg bg-cyan-500 text-white disabled:bg-slate-200 disabled:text-slate-400 hover:bg-cyan-600 transition-all cursor-pointer flex-shrink-0"
+                  className="w-8 h-8 flex items-center justify-center rounded-lg bg-cyan-500 text-white disabled:bg-slate-200 dark:disabled:bg-neutral-700 disabled:text-slate-400 dark:disabled:text-neutral-500 hover:bg-cyan-600 transition-all cursor-pointer flex-shrink-0"
                 >
                   {isStreaming ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                 </button>
@@ -478,21 +478,21 @@ export function AppFloatingMenu() {
 
         {/* Caderno de Notas Bubble */}
         {cadernoOpen && !selectedFolhaId && (
-          <div className="absolute bottom-full right-0 mb-2 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-200 flex flex-col max-h-[70vh]">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50">
+          <div className="absolute bottom-full right-0 mb-2 w-80 sm:w-96 bg-white dark:bg-neutral-950 rounded-2xl shadow-2xl border border-slate-200 dark:border-neutral-700 overflow-hidden animate-in fade-in zoom-in-95 duration-200 flex flex-col max-h-[70vh]">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-neutral-800 bg-slate-50 dark:bg-neutral-900">
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-lg bg-slate-700 flex items-center justify-center">
                   <BookMarked className="w-4 h-4 text-white" />
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-slate-800">Anotações</p>
-                  <p className="text-[10px] text-slate-500">{folhas?.length || 0} folhas</p>
+                  <p className="text-sm font-semibold text-slate-800 dark:text-neutral-100">Anotações</p>
+                  <p className="text-[10px] text-slate-500 dark:text-neutral-400">{folhas?.length || 0} folhas</p>
                 </div>
               </div>
               <button
                 onClick={handleCreateFolha}
                 disabled={creatingFolha}
-                className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-700 text-white text-xs font-semibold hover:bg-slate-800 disabled:bg-slate-200 disabled:text-slate-400 transition-all cursor-pointer"
+                className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-700 text-white text-xs font-semibold hover:bg-slate-800 disabled:bg-slate-200 dark:disabled:bg-neutral-700 disabled:text-slate-400 dark:disabled:text-neutral-500 transition-all cursor-pointer"
               >
                 {creatingFolha ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -503,15 +503,15 @@ export function AppFloatingMenu() {
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto min-h-0 px-4 py-3 space-y-2 bg-white">
+            <div className="flex-1 overflow-y-auto min-h-0 px-4 py-3 space-y-2 bg-white dark:bg-neutral-950">
               {folhasLoading ? (
                 <div className="flex justify-center py-8">
-                  <Loader2 className="w-6 h-6 animate-spin text-slate-500" />
+                  <Loader2 className="w-6 h-6 animate-spin text-slate-500 dark:text-neutral-400" />
                 </div>
               ) : !folhas?.length ? (
                 <div className="flex flex-row items-center justify-center py-4 gap-2 text-center">
-                  <StickyNote className="w-4 h-4 text-slate-300" />
-                  <p className="text-sm text-slate-500">Nenhuma folha ainda.</p>
+                  <StickyNote className="w-4 h-4 text-slate-300 dark:text-neutral-600" />
+                  <p className="text-sm text-slate-500 dark:text-neutral-400">Nenhuma folha ainda.</p>
                 </div>
               ) : (
                 folhas.map((folha) => (
@@ -521,9 +521,9 @@ export function AppFloatingMenu() {
 
                   >
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-slate-800 truncate hover:underline cursor-pointer" onClick={() => setSelectedFolhaId(folha.id)}>{folha.title}</p>
+                      <p className="text-sm font-semibold text-slate-800 dark:text-neutral-200 truncate hover:underline cursor-pointer" onClick={() => setSelectedFolhaId(folha.id)}>{folha.title}</p>
                     </div>
-                    <span className="text-[10px] text-slate-400">{formatDate(folha.updated_at)}</span>
+                    <span className="text-[10px] text-slate-400 dark:text-neutral-500">{formatDate(folha.updated_at)}</span>
                   </div>
                 ))
               )}
@@ -533,13 +533,13 @@ export function AppFloatingMenu() {
 
         {/* Editor inline no bubble */}
         {cadernoOpen && selectedFolhaId && (
-          <div className="absolute bottom-full right-0 mb-2 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-200 flex flex-col max-h-[70vh]">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50">
+          <div className="absolute bottom-full right-0 mb-2 w-80 sm:w-96 bg-white dark:bg-neutral-950 rounded-2xl shadow-2xl border border-slate-200 dark:border-neutral-700 overflow-hidden animate-in fade-in zoom-in-95 duration-200 flex flex-col max-h-[70vh]">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-neutral-800 bg-slate-50 dark:bg-neutral-900">
               <div className="flex items-center gap-2 min-w-0 flex-1">
               <button
                 onClick={handleBackToList}
                 disabled={saveStatus === "saving"}
-                className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-600 hover:bg-white/60 transition-all flex-shrink-0 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 dark:text-neutral-500 hover:text-slate-600 dark:hover:text-neutral-300 hover:bg-white/60 dark:hover:bg-neutral-800 transition-all flex-shrink-0 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
               >
                 {saveStatus === "saving" ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowLeft className="w-4 h-4" />}
               </button>
@@ -547,7 +547,7 @@ export function AppFloatingMenu() {
                   value={editorTitle}
                   onChange={(e) => handleTitleChange(e.target.value)}
                   placeholder="Título da folha"
-                  className="text-sm font-bold text-slate-800 placeholder:text-slate-400 bg-transparent border-none outline-none focus:ring-0 min-w-0 flex-1"
+                  className="text-sm font-bold text-slate-800 dark:text-neutral-100 placeholder:text-slate-400 dark:placeholder:text-neutral-500 bg-transparent border-none outline-none focus:ring-0 min-w-0 flex-1"
                 />
               </div>
               <div className="flex items-center gap-1 flex-shrink-0">
@@ -557,7 +557,7 @@ export function AppFloatingMenu() {
                       handleCloseCaderno();
                       router.push(`/app/mind-maps/${folhaData.mind_map_id}`);
                     }}
-                    className="w-7 h-7 flex items-center justify-center rounded-lg text-cyan-600 hover:text-cyan-700 hover:bg-cyan-50 transition-all cursor-pointer"
+                    className="w-7 h-7 flex items-center justify-center rounded-lg text-cyan-600 dark:text-cyan-400 hover:text-cyan-700 dark:hover:text-cyan-300 hover:bg-cyan-50 dark:hover:bg-cyan-950/50 transition-all cursor-pointer"
                   >
                     <Network className="w-3.5 h-3.5" />
                   </button>
@@ -566,7 +566,7 @@ export function AppFloatingMenu() {
                   type="button"
                   onClick={(e) => selectedFolhaId && handleDeleteFolha(e, selectedFolhaId)}
                   disabled={deletingFolhaId === selectedFolhaId}
-                  className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-all cursor-pointer"
+                  className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 dark:text-neutral-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/50 transition-all cursor-pointer"
                 >
                   {deletingFolhaId === selectedFolhaId ? (
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -579,17 +579,17 @@ export function AppFloatingMenu() {
 
             {folhaLoading ? (
               <div className="flex items-center justify-center py-16">
-                <Loader2 className="w-6 h-6 animate-spin text-slate-500" />
+                <Loader2 className="w-6 h-6 animate-spin text-slate-500 dark:text-neutral-400" />
               </div>
             ) : (
               <>
                 {/* Content */}
-                <div className="flex-1 overflow-y-auto px-4 py-3 bg-white min-h-[200px]">
+                <div className="flex-1 overflow-y-auto px-4 py-3 bg-white dark:bg-neutral-950 min-h-[200px]">
                   <textarea
                     value={editorContent}
                     onChange={(e) => handleContentChange(e.target.value)}
                     placeholder="Escreve as tuas anotações..."
-                    className="w-full min-h-[180px] resize-none border-none focus:ring-0 focus:outline-none bg-transparent text-sm text-slate-700 leading-relaxed placeholder:text-slate-400"
+                    className="w-full min-h-[180px] resize-none border-none focus:ring-0 focus:outline-none bg-transparent text-sm text-slate-700 dark:text-neutral-300 leading-relaxed placeholder:text-slate-400 dark:placeholder:text-neutral-500"
                   />
                 </div>
               </>

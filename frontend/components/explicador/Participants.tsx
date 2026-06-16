@@ -12,9 +12,9 @@ export default function Participants({
 }) {
     return (
         <Dialog open={showParticipantsModal} onOpenChange={setShowParticipantsModal}>
-            <DialogContent className="sm:max-w-md border-slate-200 bg-white text-slate-800 shadow-2xl rounded-2xl p-6">
+            <DialogContent className="sm:max-w-md border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-slate-800 dark:text-neutral-100 shadow-2xl rounded-2xl p-6">
                 <DialogHeader>
-                    <DialogTitle className="text-xl font-bold flex items-center gap-2 text-slate-800">
+                    <DialogTitle className="text-xl font-bold flex items-center gap-2 text-slate-800 dark:text-neutral-100">
                         <Users className="w-5 h-5 text-cyan-600" />
                         Pessoas na Sala
                     </DialogTitle>
@@ -22,9 +22,9 @@ export default function Participants({
 
                 <div className="space-y-3.5 mt-4">
                     {combinedRoster.map((member: any) => (
-                        <div key={member.connectionId} className="flex items-center justify-between p-2 rounded-xl hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-100">
+                        <div key={member.connectionId} className="flex items-center justify-between p-2 rounded-xl hover:bg-slate-50 dark:hover:bg-neutral-800/50 transition-colors border border-transparent hover:border-slate-100 dark:hover:border-neutral-700">
                             <div className="flex items-center gap-3">
-                                <div className="w-9 h-9 rounded-full border border-slate-200 overflow-hidden bg-slate-100 flex items-center justify-center relative shadow-sm">
+                                <div className="w-9 h-9 rounded-full border border-slate-200 dark:border-neutral-700 overflow-hidden bg-slate-100 dark:bg-neutral-800 flex items-center justify-center relative shadow-sm">
                                     {member.avatar ? (
                                         <img
                                             src={member.avatar.startsWith("http") ? member.avatar : `${process.env.NEXT_PUBLIC_API_URL}${member.avatar}`}
@@ -32,16 +32,16 @@ export default function Participants({
                                             className="w-full h-full object-cover"
                                         />
                                     ) : (
-                                        <span className="text-sm font-bold text-slate-500 uppercase">
+                                        <span className="text-sm font-bold text-slate-500 dark:text-neutral-400 uppercase">
                                             {member.name[0]}
                                         </span>
                                     )}
                                 </div>
                                 <div>
-                                    <h4 className="font-semibold text-sm text-slate-750 flex items-center gap-1.5">
+                                    <h4 className="font-semibold text-sm text-slate-700 dark:text-neutral-300 flex items-center gap-1.5">
                                         {member.name}
                                         {member.isSelf && (
-                                            <span className="text-[9px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-md border border-slate-200/60 font-medium">
+                                            <span className="text-[9px] bg-slate-100 dark:bg-neutral-800 text-slate-500 dark:text-neutral-400 px-1.5 py-0.5 rounded-md border border-slate-200/60 dark:border-neutral-700 font-medium">
                                                 Tu
                                             </span>
                                         )}
@@ -59,21 +59,21 @@ export default function Participants({
                                     {member.isMicOn ? (
                                         <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" title="Microfone ativo" />
                                     ) : (
-                                        <span className="w-2 h-2 rounded-full bg-slate-350" title="Microfone desligado" />
+                                        <span className="w-2 h-2 rounded-full bg-slate-400 dark:bg-neutral-600" title="Microfone desligado" />
                                     )}
-                                    <span className="text-[10px] text-slate-400 font-semibold select-none">
+                                    <span className="text-[10px] text-slate-400 dark:text-neutral-500 font-semibold select-none">
                                         {member.isMicOn ? "A falar" : "Mudo"}
                                     </span>
                                 </div>
 
                                 {/* Listening status */}
-                                <div className="flex items-center gap-1 border-l border-slate-200 pl-2.5">
+                                <div className="flex items-center gap-1 border-l border-slate-200 dark:border-neutral-700 pl-2.5">
                                     {member.isListening ? (
                                         <span title="A ouvir"><Volume2 className="w-3.5 h-3.5 text-cyan-600 animate-pulse" /></span>
                                     ) : (
-                                        <span title="Sem áudio"><Volume2 className="w-3.5 h-3.5 text-slate-350" /></span>
+                                        <span title="Sem áudio"><Volume2 className="w-3.5 h-3.5 text-slate-400 dark:text-neutral-600" /></span>
                                     )}
-                                    <span className="text-[10px] text-slate-400 font-semibold select-none">
+                                    <span className="text-[10px] text-slate-400 dark:text-neutral-500 font-semibold select-none">
                                         {member.isListening ? "A ouvir" : "Sem áudio"}
                                     </span>
                                 </div>

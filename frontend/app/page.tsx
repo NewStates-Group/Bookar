@@ -41,13 +41,15 @@ export default function DefinitiveHomePage() {
       <div className={`min-h-screen overflow-x-hidden scroll-smooth ${dark ? "dark" : ""}`}>
         <div className="bg-white dark:bg-neutral-950 text-neutral-900 dark:text-neutral-100 transition-colors duration-300">
           <nav className="fixed top-0 left-1/2 -translate-x-1/2 z-[100] w-full">
-            <div className="flex items-center justify-between px-5 md:px-20 h-16 bg-white/80 dark:bg-neutral-950/80 backdrop-blur-xl shadow-sm dark:shadow-neutral-900/50">
-              <Link href="/" className="flex items-center gap-2.5">
-                <Image src={dark ? "/logo-white.svg" : "/logo.svg"} alt="Bookar" width={32} height={32} className="shrink-0" />
-                <span className="text-xl font-bold tracking-tight">Bookar</span>
-              </Link>
+            <div className="grid grid-cols-2 md:grid-cols-3 items-center px-5 md:px-20 h-16 bg-white/80 dark:bg-neutral-950/80 backdrop-blur-xl shadow-sm dark:shadow-neutral-900/50">
+              <div className="flex justify-start">
+                <Link href="/" className="flex items-center gap-2.5">
+                  <Image src="/logo.svg" alt="Bookar" width={32} height={32} className="shrink-0 dark:invert" />
+                  <span className="text-3xl font-bold tracking-tight">Bookar</span>
+                </Link>
+              </div>
 
-              <div className="hidden md:flex items-center gap-8">
+              <div className="hidden md:flex items-center justify-center gap-8">
                 <a href="#home" className="text-sm font-medium text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors">Início</a>
                 <a href="#about" className="text-sm font-medium text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors">Sobre Nós</a>
                 <a href="#features" className="text-sm font-medium text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors">Funcionalidades</a>
@@ -55,7 +57,7 @@ export default function DefinitiveHomePage() {
                 <a href="#feedback" className="text-sm font-medium text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors">Feedback</a>
               </div>
 
-              <div className="flex items-center gap-3">
+              <div className="flex items-center justify-end gap-3">
                 <button
                   onClick={() => setTheme(dark ? "light" : "dark")}
                   className="w-9 h-9 rounded-full flex items-center justify-center text-neutral-500 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
@@ -70,7 +72,7 @@ export default function DefinitiveHomePage() {
                     </Button>
                   </Link>
                   <Link href="/signup">
-                    <Button className="h-9 rounded-full bg-cyan-300 hover:bg-cyan-400 text-black dark:text-white text-sm font-semibold px-5 shadow-sm transition-all hover:-translate-y-0.5">
+                    <Button className="h-9 rounded-full bg-cyan-300 hover:bg-cyan-400 text-black dark:text-black text-sm font-bold px-5 shadow-sm transition-all hover:-translate-y-0.5">
                       Cadastrar-se
                     </Button>
                   </Link>
@@ -566,8 +568,8 @@ export default function DefinitiveHomePage() {
                     viewport={{ once: true }}
                     transition={{ delay: idx * 0.15, duration: 0.5 }}
                     className={`relative flex flex-col rounded-3xl border-2 p-8 transition-all hover:shadow-lg ${plan.popular
-                        ? "border-cyan-300 shadow-md bg-white dark:bg-neutral-900"
-                        : "border-neutral-100 dark:border-neutral-800 bg-white dark:bg-neutral-950 hover:border-neutral-200 dark:hover:border-neutral-700"
+                      ? "border-cyan-300 shadow-md bg-white dark:bg-neutral-900"
+                      : "border-neutral-100 dark:border-neutral-800 bg-white dark:bg-neutral-950 hover:border-neutral-200 dark:hover:border-neutral-700"
                       }`}
                   >
                     {plan.popular && (
@@ -601,8 +603,8 @@ export default function DefinitiveHomePage() {
                     <Link href={plan.href}>
                       <Button
                         className={`w-full h-12 rounded-xl font-semibold ${plan.popular
-                            ? "bg-cyan-400 hover:bg-cyan-500 text-black"
-                            : "bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 text-neutral-900 dark:text-neutral-100"
+                          ? "bg-cyan-400 hover:bg-cyan-500 text-black"
+                          : "bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 text-neutral-900 dark:text-neutral-100"
                           }`}
                       >
                         {plan.cta}
@@ -675,7 +677,7 @@ export default function DefinitiveHomePage() {
             <div className="max-w-5xl mx-auto flex flex-col md:flex-row justify-between items-start gap-12">
               <div className="space-y-4 max-w-xs">
                 <div className="flex items-center gap-2">
-                  <Image src={dark ? "/logo-white.png" : "/logo.png"} alt="Logo" width={28} height={28} />
+                  <Image src="/logo.png" alt="Logo" width={28} height={28} className="dark:invert" />
                   <span className="text-lg font-bold tracking-tight">Bookar</span>
                 </div>
                 <p className="text-sm text-neutral-400">O futuro da educação é agora.</p>

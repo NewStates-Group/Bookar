@@ -1259,7 +1259,7 @@ export default function ExplicadorRoomPage() {
       ref={splitContainerRef}
       onPointerMove={handleSplitterPointerMove}
       style={{ height: viewportHeight }}
-      className="explicador-room-container flex w-full overflow-hidden bg-transparent text-slate-800 select-none"
+      className="explicador-room-container flex w-full overflow-hidden bg-transparent text-slate-800 dark:text-neutral-100 select-none"
     >
       <style>{`
         .font-handwriting {
@@ -1268,6 +1268,9 @@ export default function ExplicadorRoomPage() {
         .blackboard-grid {
           background-image: radial-gradient(rgba(0, 0, 0, 0.05) 1px, transparent 1px);
           background-size: 20px 20px;
+        }
+        .dark .blackboard-grid {
+          background-image: radial-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px);
         }
         @keyframes slideUpFade {
           from {
@@ -1312,7 +1315,7 @@ export default function ExplicadorRoomPage() {
 
       <div
         style={{ width: isMobile ? (showWhiteboard ? "0%" : "100%") : (showWhiteboard ? `${splitPct}%` : "100%") }}
-        className={`bg-transparent flex flex-col overflow-hidden shrink-0 h-full select-text transition-[width] duration-500 ease-in-out ${showWhiteboard ? (isMobile ? "hidden" : "border-r border-slate-200") : ""
+        className={`bg-transparent flex flex-col overflow-hidden shrink-0 h-full select-text transition-[width] duration-500 ease-in-out ${showWhiteboard ? (isMobile ? "hidden" : "border-r border-slate-200 dark:border-neutral-700") : ""
           }`}
       >
         <Header
@@ -1370,9 +1373,9 @@ export default function ExplicadorRoomPage() {
         <div
           onPointerDown={handleSplitterPointerDown}
           onPointerUp={handleSplitterPointerUp}
-          className="w-1.5 hover:w-2 bg-slate-200 hover:bg-cyan-500 cursor-col-resize transition-all shrink-0 z-40 relative h-full flex items-center justify-center group"
+          className="w-1.5 hover:w-2 bg-slate-200 dark:bg-neutral-700 hover:bg-cyan-500 cursor-col-resize transition-all shrink-0 z-40 relative h-full flex items-center justify-center group"
         >
-          <div className="w-0.5 h-8 rounded-full bg-slate-400 group-hover:bg-white" />
+          <div className="w-0.5 h-8 rounded-full bg-slate-400 dark:bg-neutral-600 group-hover:bg-white dark:group-hover:bg-neutral-100" />
         </div>
       )}
 

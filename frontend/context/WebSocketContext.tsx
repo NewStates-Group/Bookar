@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useRef, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
 import { ensureFreshSession } from "@/lib/auth-session";
 
@@ -127,21 +127,26 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     };
   }, [status]);
 
-  const sendMessage = (data: any) => {
+  const sendMessage = useCallback((data: any) => {
     if (socketRef.current?.readyState === WebSocket.OPEN) {
       socketRef.current.send(JSON.stringify(data));
     }
-  };
+  }, []);
 
-  const addListener = (callback: (data: any) => void) => {
+  const addListener = useCallback((callback: (data: any) => void) => {
     listenersRef.current.add(callback);
     return () => {
       listenersRef.current.delete(callback);
     };
-  };
+  }, []);
+
+  const ctxValue = useMemo(
+    () => ({ lastMessage, isConnected, sendMessage, addListener }),
+    [lastMessage, isConnected, sendMessage, addListener]
+  );
 
   return (
-    <WebSocketContext.Provider value={{ lastMessage, isConnected, sendMessage, addListener }}>
+    <WebSocketContext.Provider value={ctxValue}>
       {children}
     </WebSocketContext.Provider>
   );

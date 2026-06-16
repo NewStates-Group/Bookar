@@ -66,7 +66,7 @@ export default function AppLayout({
   const isExplicadorRoom = pathname.startsWith("/app/explicador/") && pathname !== "/app/explicador";
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50 text-slate-800 antialiased">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50 dark:from-neutral-950 dark:via-neutral-950 dark:to-neutral-900 text-slate-800 dark:text-neutral-100 antialiased">
       {/* Side Navigation Component */}
       <PlatformSidebar
         isOpen={isSidebarOpen}
@@ -77,17 +77,17 @@ export default function AppLayout({
 
       {/* Mobile Sticky Navigation Header (Left-aligned Hamburger, Logo & Name) */}
       {!isExplicadorRoom && (
-        <header className="md:hidden sticky top-0 z-30 flex items-center gap-3 w-full h-14 px-4 bg-white/95 backdrop-blur-sm border-b border-slate-200/60 shadow-sm select-none">
+        <header className="md:hidden sticky top-0 z-30 flex items-center gap-3 w-full h-14 px-4 bg-white/95 dark:bg-neutral-950/95 backdrop-blur-sm border-b border-slate-200/60 dark:border-neutral-800 shadow-sm select-none">
           <button
             onClick={() => setIsMobileOpen(true)}
-            className="p-1.5 rounded-lg text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+            className="p-1.5 rounded-lg text-slate-600 dark:text-neutral-400 hover:bg-slate-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
           >
             <Menu className="w-6 h-6" />
           </button>
           
           <div className="flex items-center gap-2">
-            <Image src="/logo.png" alt="Logo" width={24} height={24} />
-            <span className="font-bold text-lg text-slate-800 tracking-tight">Bookar</span>
+            <Image src="/logo.svg" alt="Logo" width={24} height={24} className="dark:invert"/>
+            <span className="font-bold text-lg text-slate-800 dark:text-neutral-100 tracking-tight">Bookar</span>
           </div>
         </header>
       )}

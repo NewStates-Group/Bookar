@@ -52,7 +52,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                             className="data-[slot=sidebar-menu-button]:!p-1.5"
                         >
                             <Link href="/" className="p-6 flex items-center justify-center gap-2 mb-6">
-                                <Image src={"/logo.png"} width={40} height={40} alt="Bookar Logo" />
+                                <Image src="/logo.svg" width={40} height={40} alt="Bookar Logo" className="dark:invert" />
                                 <span className="text-3xl font-bold">Bookar</span>
                             </Link>
                         </SidebarMenuButton>

@@ -145,7 +145,7 @@ export default function MindMapsPage() {
       <div className="flex justify-between items-center mb-8">
         <div>
           <h1 className="text-3xl font-bold">Mapas Mentais</h1>
-          <span className="text-sm text-gray-700">
+          <span className="text-sm text-gray-700 dark:text-gray-300">
             Crie trilhas de aprendizagem visuais interativas a partir de qualquer
             assunto com ajuda de inteligência artificial.
           </span>
@@ -160,7 +160,7 @@ export default function MindMapsPage() {
               <div className="w-12 h-12 rounded-full bg-cyan-500/10 flex items-center justify-center group-hover:scale-110 group-hover:bg-cyan-500/20 transition-all duration-300">
                 <Plus className="w-6 h-6 text-cyan-500" />
               </div>
-              <span className="font-bold text-gray-700 mt-4 group-hover:text-cyan-500 transition-colors">
+              <span className="font-bold text-gray-700 dark:text-gray-300 mt-4 group-hover:text-cyan-500 transition-colors">
                 Novo Mapa Mental
               </span>
             </Card>
@@ -181,7 +181,7 @@ export default function MindMapsPage() {
 
             <form onSubmit={handleCreateMindMap} className="space-y-4 mt-4">
               <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wide">Assunto</label>
+                <label className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide">Assunto</label>
                 <Input
                   placeholder="Ex: Introdução ao React Hooks, Docker do zero, Microserviços..."
                   value={topic}
@@ -233,7 +233,7 @@ export default function MindMapsPage() {
             <Button
               variant="ghost"
               size="icon"
-              className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-red-500 hover:bg-red-50/50 rounded-full transition-all duration-300"
+              className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-red-500 hover:bg-red-50/50 dark:hover:bg-red-950/30 rounded-full transition-all duration-300"
               onClick={(e) => openDeleteDialog(map, e)}
               disabled={isDeleting === map.uuid}
             >
@@ -248,7 +248,7 @@ export default function MindMapsPage() {
             {map.status === "PROCESSING" && (
               <div className="flex flex-col items-center justify-center flex-1 py-4">
                 <Loader2 className="w-10 h-10 text-cyan-500 animate-spin mb-3" />
-                <h3 className="font-bold text-center text-sm text-gray-700 capitalize max-w-[80%] line-clamp-1">
+                <h3 className="font-bold text-center text-sm text-gray-700 dark:text-gray-300 capitalize max-w-[80%] line-clamp-1">
                   {map.topic}
                 </h3>
                 <span className="text-xs text-muted-foreground mt-1">
@@ -260,7 +260,7 @@ export default function MindMapsPage() {
             {/* FAILED CARD */}
             {map.status === "FAILED" && (
               <div className="flex flex-col items-center justify-center flex-1 py-4 gap-2">
-                <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+                <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
                   <X className="w-5 h-5 text-red-500" />
                 </div>
                 <h3 className="font-bold text-center text-sm text-red-500 capitalize max-w-[80%] line-clamp-1">
@@ -282,16 +282,16 @@ export default function MindMapsPage() {
                         router.push(`/app/mind-maps/${map.uuid}`);
                       }
                     }}
-                    className="font-medium hover:underline cursor-pointer text-gray-800 text-lg capitalize line-clamp-2 leading-snug hover:text-cyan-500 transition-colors">
+                    className="font-medium hover:underline cursor-pointer text-gray-800 dark:text-gray-200 text-lg capitalize line-clamp-2 leading-snug hover:text-cyan-500 transition-colors">
                     {map.title}
                   </h3>
 
-                  <p className="text-sm text-gray-500 line-clamp-3 leading-relaxed mt-1">
+                  <p className="text-sm text-gray-500 dark:text-gray-400 line-clamp-3 leading-relaxed mt-1">
                     {map.desc}
                   </p>
 
                   <div className="flex items-center justify-left gap-2 mt-3">
-                    <p className="text-xs border rounded-sm p-1 px-2 font-light capitalize">
+                    <p className="text-xs border rounded-sm p-1 px-2 font-light capitalize text-gray-500 dark:text-gray-400 border-gray-200 dark:border-gray-700">
                       {map.topic}
                     </p>
                   </div>

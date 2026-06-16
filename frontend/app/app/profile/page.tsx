@@ -180,22 +180,22 @@ export default function ProfilePage() {
             <div className="px-4 py-6 sm:px-6 md:py-10 max-w-5xl mx-auto w-full space-y-6">
             {/* Cabeçalho */}
             <div>
-                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">O Meu Perfil</h1>
-                <p className="text-sm text-slate-500 mt-1">Gere as tuas informações pessoais.</p>
+                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 dark:text-neutral-100">O Meu Perfil</h1>
+                <p className="text-sm text-slate-500 dark:text-neutral-400 mt-1">Gere as tuas informações pessoais.</p>
             </div>
 
             {/* Informações de Perfil */}
-            <Card className="shadow-sm border-slate-200">
+            <Card className="shadow-sm border-slate-200 dark:border-neutral-700">
                     <CardHeader className="pb-4">
-                        <CardTitle className="text-xl font-bold text-slate-900">Resumo do Perfil</CardTitle>
+                        <CardTitle className="text-xl font-bold text-slate-900 dark:text-neutral-100">Resumo do Perfil</CardTitle>
                         <CardDescription>Visualiza e edita as suas informações pessoais.</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-6">
-                        <div className="flex flex-col items-center space-y-4 sm:flex-row sm:space-y-0 sm:space-x-6 pb-6 border-b border-slate-100">
+                        <div className="flex flex-col items-center space-y-4 sm:flex-row sm:space-y-0 sm:space-x-6 pb-6 border-b border-slate-100 dark:border-neutral-800">
                             <div className="relative">
                                 <Avatar className="h-28 w-28 sm:h-32 sm:w-32 border-2 border-cyan-500/20 shadow-sm">
                                     <AvatarImage src={avatarSrc} />
-                                    <AvatarFallback className="text-2xl font-semibold bg-slate-100 text-slate-600">
+                                    <AvatarFallback className="text-2xl font-semibold bg-slate-100 dark:bg-neutral-800 text-slate-600 dark:text-neutral-400">
                                         {(freshUser?.first_name || freshUser?.email || "U").slice(0, 2).toUpperCase()}
                                     </AvatarFallback>
                                 </Avatar>
@@ -208,17 +208,12 @@ export default function ProfilePage() {
                                 </label>
                             </div>
                             <div className="text-center sm:text-left space-y-1">
-                                <h3 className="text-xl sm:text-2xl font-bold text-slate-900">
+                                <h3 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-neutral-100">
                                     {freshUser?.first_name
                                         ? `${freshUser.first_name} ${freshUser.last_name}`
                                         : freshUser?.email}
                                 </h3>
-                                <p className="text-sm text-slate-500">{freshUser?.email}</p>
-                                {(!freshUser?.first_name || !freshUser?.last_name || !freshUser?.avatar) && (
-                                    <p className="text-xs text-orange-500 font-medium animate-pulse">
-                                        Por favor, complete o seu perfil (nome e foto) para continuar.
-                                    </p>
-                                )}
+                                <p className="text-sm text-slate-500 dark:text-neutral-400">{freshUser?.email}</p>
                             </div>
                         </div>
 

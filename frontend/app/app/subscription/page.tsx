@@ -259,23 +259,23 @@ export default function SubscriptionPage() {
   return (
     <div className="px-4 py-6 sm:px-6 md:py-10 max-w-5xl mx-auto w-full space-y-6">
       <div>
-        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">A Minha Subscrição</h1>
-        <p className="text-sm text-slate-500 mt-1">Gerir o teu plano e histórico de subscrições.</p>
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 dark:text-neutral-100">A Minha Subscrição</h1>
+        <p className="text-sm text-slate-500 dark:text-neutral-400 mt-1">Gerir o teu plano e histórico de subscrições.</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-        <Card className="border-slate-200 shadow-sm overflow-hidden relative lg:col-span-2">
+        <Card className="border-slate-200 dark:border-neutral-700 shadow-sm overflow-hidden relative lg:col-span-2">
           <div className="absolute top-0 right-0 w-48 h-48 bg-purple-500/5 blur-3xl -mr-24 -mt-24 pointer-events-none" />
           <CardHeader className="pb-1">
-            <CardTitle className="text-xl font-bold text-slate-900 flex items-center gap-2">
+            <CardTitle className="text-xl font-bold text-slate-900 dark:text-neutral-100 flex items-center gap-2">
               Plano Atual
             </CardTitle>
             <CardDescription>Detalhes do teu plano de subscrição atual.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex flex-col p-4 rounded-xl border border-slate-200 bg-white/50">
+            <div className="flex flex-col p-4 rounded-xl border border-slate-200 dark:border-neutral-700 bg-white/50 dark:bg-neutral-900/50">
               <div>
-                <p className="text-lg flex items-center font-bold text-slate-900">
+                <p className="text-lg flex items-center font-bold text-slate-900 dark:text-neutral-100">
                   Plano {plan?.name || "Free"}
                   <span
                     className={`bg-transparent! gap-1.5 px-3 py-1.5 text-sm font-semibold whitespace-nowrap 
@@ -287,47 +287,47 @@ export default function SubscriptionPage() {
                     ({statusInfo.label})
                   </span>
                 </p>
-                <p className="text-sm text-slate-500">{plan?.description || "Plano gratuito com funcionalidades limitadas."}</p>
+                <p className="text-sm text-slate-500 dark:text-neutral-400">{plan?.description || "Plano gratuito com funcionalidades limitadas."}</p>
               </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="p-3 rounded-lg bg-slate-50 border border-slate-100 space-y-1">
-                <div className="flex items-center gap-1.5 text-xs text-slate-500">
+              <div className="p-3 rounded-lg bg-slate-50 dark:bg-neutral-800/50 border border-slate-100 dark:border-neutral-700 space-y-1">
+                <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-neutral-400">
                   <Calendar className="w-3.5 h-3.5" />
                   <span>Início do período</span>
                 </div>
-                <p className="text-sm font-semibold text-slate-800">{formatDateTime(subscription?.current_period_start || null)}</p>
+                <p className="text-sm font-semibold text-slate-800 dark:text-neutral-200">{formatDateTime(subscription?.current_period_start || null)}</p>
               </div>
-              <div className="p-3 rounded-lg bg-slate-50 border border-slate-100 space-y-1">
-                <div className="flex items-center gap-1.5 text-xs text-slate-500">
+              <div className="p-3 rounded-lg bg-slate-50 dark:bg-neutral-800/50 border border-slate-100 dark:border-neutral-700 space-y-1">
+                <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-neutral-400">
                   <Calendar className="w-3.5 h-3.5" />
                   <span>Fim do período</span>
                 </div>
-                <p className="text-sm font-semibold text-slate-800">{formatDateTime(subscription?.current_period_end || null)}</p>
+                <p className="text-sm font-semibold text-slate-800 dark:text-neutral-200">{formatDateTime(subscription?.current_period_end || null)}</p>
               </div>
-              <div className="p-3 rounded-lg bg-slate-50 border border-slate-100 space-y-1">
-                <div className="flex items-center gap-1.5 text-xs text-slate-500">
+              <div className="p-3 rounded-lg bg-slate-50 dark:bg-neutral-800/50 border border-slate-100 dark:border-neutral-700 space-y-1">
+                <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-neutral-400">
                   <CreditCard className="w-3.5 h-3.5" />
                   <span>Método de pagamento</span>
                 </div>
-                <p className="text-sm font-semibold text-slate-800 capitalize">{subscription?.payment_gateway || "Nenhum"}</p>
+                <p className="text-sm font-semibold text-slate-800 dark:text-neutral-200 capitalize">{subscription?.payment_gateway || "Nenhum"}</p>
               </div>
-              <div className="p-3 rounded-lg bg-slate-50 border border-slate-100 space-y-1">
-                <div className="flex items-center gap-1.5 text-xs text-slate-500">
+              <div className="p-3 rounded-lg bg-slate-50 dark:bg-neutral-800/50 border border-slate-100 dark:border-neutral-700 space-y-1">
+                <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-neutral-400">
                   <DollarSign className="w-3.5 h-3.5" />
                   <span>Preço</span>
                 </div>
-                <p className="text-sm font-semibold text-slate-800">
+                <p className="text-sm font-semibold text-slate-800 dark:text-neutral-200">
                   {plan?.price && plan.price > 0 ? `${plan.price.toLocaleString("pt-PT")} Kz/mês` : "Grátis"}
                 </p>
               </div>
             </div>
 
             {subscription?.canceled_at && (
-              <div className="p-3 rounded-lg bg-red-50 border border-red-200 flex items-center gap-2">
+              <div className="p-3 rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 flex items-center gap-2">
                 <AlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0" />
-                <p className="text-sm text-red-700">
+                <p className="text-sm text-red-700 dark:text-red-400">
                   Subscrição cancelada em {formatDate(subscription.canceled_at)}.
                 </p>
               </div>
@@ -354,7 +354,7 @@ export default function SubscriptionPage() {
               )}
               <Button
                 variant="outline"
-                className="flex-1 border-slate-300 gap-1.5"
+                className="flex-1 border-slate-300 dark:border-neutral-600 gap-1.5"
                 onClick={() => { setShowPricing(!showPricing); }}
               >
                 <Crown className="w-4 h-4" />
@@ -364,29 +364,29 @@ export default function SubscriptionPage() {
           </CardContent>
         </Card>
 
-        <Card className="border-slate-200 shadow-sm">
+        <Card className="border-slate-200 dark:border-neutral-700 shadow-sm">
           <CardHeader className="pb-3">
-            <CardTitle className="text-lg font-bold text-slate-900 flex items-center gap-2">
+            <CardTitle className="text-lg font-bold text-slate-900 dark:text-neutral-100 flex items-center gap-2">
               Utilização
             </CardTitle>
             <CardDescription>Teu consumo atual de funcionalidades neste período.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {usage.length === 0 ? (
-              <p className="text-sm text-slate-500">Nenhuma utilização registada.</p>
+              <p className="text-sm text-slate-500 dark:text-neutral-400">Nenhuma utilização registada.</p>
             ) : (
               usage.map((m) => {
                 const pct = m.limit && m.limit > 0 ? Math.round((m.used / m.limit) * 100) : 0;
                 return (
                   <div key={m.metric} className="space-y-1.5">
                     <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium text-slate-700">{metricLabels[m.metric] || m.metric}</span>
-                      <span className="text-sm font-semibold text-slate-900">
+                      <span className="text-sm font-medium text-slate-700 dark:text-neutral-300">{metricLabels[m.metric] || m.metric}</span>
+                      <span className="text-sm font-semibold text-slate-900 dark:text-neutral-100">
                         {m.limit === null ? `${m.used}` : `${m.used} / ${m.limit}`}
                       </span>
                     </div>
                     {m.limit !== null && (
-                      <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                      <div className="w-full h-2 bg-slate-100 dark:bg-neutral-800 rounded-full overflow-hidden">
                         <div
                           className={`h-full rounded-full transition-all ${pct >= 80 ? "bg-red-400" : pct >= 50 ? "bg-amber-400" : "bg-cyan-400"
                             }`}
@@ -395,7 +395,7 @@ export default function SubscriptionPage() {
                       </div>
                     )}
                     {m.remaining !== null && (
-                      <p className="text-xs text-slate-500">{m.remaining} restantes</p>
+                      <p className="text-xs text-slate-500 dark:text-neutral-400">{m.remaining} restantes</p>
                     )}
                   </div>
                 );
@@ -406,9 +406,9 @@ export default function SubscriptionPage() {
       </div>
 
       {showPricing && plans.length > 0 && (
-        <Card className="border-slate-200 shadow-sm overflow-hidden">
+        <Card className="border-slate-200 dark:border-neutral-700 shadow-sm overflow-hidden">
           <CardHeader className="text-center flex flex-col items-center justify-center">
-            <CardTitle className="text-xl text-center font-bold text-slate-900 flex items-center gap-2">
+            <CardTitle className="text-xl text-center font-bold text-slate-900 dark:text-neutral-100 flex items-center gap-2">
               Escolhe o teu plano
             </CardTitle>
             <CardDescription>
@@ -427,8 +427,8 @@ export default function SubscriptionPage() {
                     className={`relative flex flex-col border-2 transition-all hover:shadow-md ${isCurrent
                         ? "border-cyan-400 shadow-sm"
                         : p.slug === "pro"
-                          ? "border-cyan-200 hover:border-cyan-300"
-                          : "border-slate-200 hover:border-slate-300"
+                          ? "border-cyan-200 dark:border-cyan-800 hover:border-cyan-300 dark:hover:border-cyan-600"
+                          : "border-slate-200 dark:border-neutral-700 hover:border-slate-300 dark:hover:border-neutral-600"
                       }`}
                   >
                     {p.slug === "pro" && !isCurrent && (
@@ -441,7 +441,7 @@ export default function SubscriptionPage() {
 
                     <CardHeader className="text-center pb-3">
                       <CardTitle className="text-lg font-bold">{p.name}</CardTitle>
-                      <CardDescription className="text-sm text-slate-500 min-h-[36px]">
+                      <CardDescription className="text-sm text-slate-500 dark:text-neutral-400 min-h-[36px]">
                         {p.description}
                       </CardDescription>
                       <div className="mt-2">
@@ -453,7 +453,7 @@ export default function SubscriptionPage() {
                           })}`}
                         </span>
                         {!isFree && (
-                          <span className="text-sm text-slate-500 ml-1">/mês</span>
+                          <span className="text-sm text-slate-500 dark:text-neutral-400 ml-1">/mês</span>
                         )}
                       </div>
                     </CardHeader>
@@ -464,8 +464,8 @@ export default function SubscriptionPage() {
                         if (value === 0 && cfg.hideWhenZero) return null;
                         return (
                           <div key={key} className="flex items-center justify-between text-sm">
-                            <span className="text-slate-600">{cfg.label}</span>
-                            <span className="font-medium text-slate-800">
+                            <span className="text-slate-600 dark:text-neutral-400">{cfg.label}</span>
+                            <span className="font-medium text-slate-800 dark:text-neutral-200">
                               {formatLimit(value, p.monthly_limits, cfg.structural)}
                             </span>
                           </div>
@@ -512,34 +512,34 @@ export default function SubscriptionPage() {
           className="w-full flex items-center justify-between px-4 sm:px-6 text-left transition-colors rounded-lg"
         >
           <div className="flex flex-row justify-center items-center gap-2">
-            <Clock className="w-5 h-5 text-slate-500" />
-            <span className="font-semibold text-slate-800">
+            <Clock className="w-5 h-5 text-slate-500 dark:text-neutral-400" />
+            <span className="font-semibold text-slate-800 dark:text-neutral-200">
               Histórico de Subscrições
             </span>
           </div>
 
           {!historyOpen && (
-            <ChevronDown className="cursor-pointer w-5 h-5 text-slate-400" onClick={loadHistory} />
+            <ChevronDown className="cursor-pointer w-5 h-5 text-slate-400 dark:text-neutral-500" onClick={loadHistory} />
           )}
         </button>
 
         {historyOpen && (
-          <CardContent className="border-t border-slate-100 pt-4">
+          <CardContent className="border-t border-slate-100 dark:border-neutral-800 pt-4">
             {historyLoading ? (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="w-6 h-6 animate-spin text-primary mr-2" />
-                <span className="text-sm text-slate-500">Carregando histórico...</span>
+                <span className="text-sm text-slate-500 dark:text-neutral-400">Carregando histórico...</span>
               </div>
             ) : history.length === 0 ? (
               <div className="py-8 text-center">
-                <Clock className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-                <p className="text-sm text-slate-500">Nenhum histórico encontrado.</p>
+                <Clock className="w-8 h-8 text-slate-300 dark:text-neutral-600 mx-auto mb-2" />
+                <p className="text-sm text-slate-500 dark:text-neutral-400">Nenhum histórico encontrado.</p>
               </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse">
                   <thead>
-                    <tr className="border-b border-slate-200 text-left text-sm font-semibold text-slate-500">
+                    <tr className="border-b border-slate-200 dark:border-neutral-700 text-left text-sm font-semibold text-slate-500 dark:text-neutral-400">
                       <th className="pb-3 pr-4">Plano</th>
                       <th className="pb-3 pr-4">Estado</th>
                       <th className="pb-3 pr-4">Início</th>
@@ -553,10 +553,10 @@ export default function SubscriptionPage() {
                       const statusInfo = statusConfig[entry.status] || statusConfig.expired;
                       const color = entry.plan ? planColors[entry.plan.slug] || "text-slate-500" : "text-slate-500";
                       return (
-                        <tr key={entry.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors text-sm">
+                        <tr key={entry.id} className="border-b border-slate-100 dark:border-neutral-800 hover:bg-slate-50 dark:hover:bg-neutral-800/50 transition-colors text-sm">
                           <td className="py-3 pr-4">
                             <div className="flex items-center gap-2">
-                              <span className="font-medium text-slate-800">{entry.plan?.name || "Nenhum"}</span>
+                              <span className="font-medium text-slate-800 dark:text-neutral-200">{entry.plan?.name || "Nenhum"}</span>
                             </div>
                           </td>
                           <td className="py-3 pr-4">
@@ -564,10 +564,10 @@ export default function SubscriptionPage() {
                               {statusInfo.label}
                             </p>
                           </td>
-                          <td className="py-3 pr-4 text-slate-600">{formatDate(entry.period_start)}</td>
-                          <td className="py-3 pr-4 text-slate-600">{formatDate(entry.period_end)}</td>
-                          <td className="py-3 pr-4 text-slate-600 capitalize">{entry.payment_gateway || "—"}</td>
-                          <td className="py-3 text-right text-slate-500 text-xs">{formatDateTime(entry.created_at)}</td>
+                          <td className="py-3 pr-4 text-slate-600 dark:text-neutral-400">{formatDate(entry.period_start)}</td>
+                          <td className="py-3 pr-4 text-slate-600 dark:text-neutral-400">{formatDate(entry.period_end)}</td>
+                          <td className="py-3 pr-4 text-slate-600 dark:text-neutral-400 capitalize">{entry.payment_gateway || "—"}</td>
+                          <td className="py-3 text-right text-slate-500 dark:text-neutral-400 text-xs">{formatDateTime(entry.created_at)}</td>
                         </tr>
                       );
                     })}

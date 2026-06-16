@@ -6,17 +6,15 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { User, Lock, Loader2, ArrowRight, AlertCircle, Home, MailCheck } from "lucide-react";
+import { User, Lock, Loader2, ArrowRight, AlertCircle, ChevronLeft, MailCheck } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import Image from "next/image";
 import { motion } from "framer-motion";
 import { Turnstile } from "next-turnstile";
 import { clearPendingExplicadorRoom, getPendingExplicadorRoom } from "@/lib/pending-explicador-room";
-import { useTheme } from "next-themes";
 
 export default function LoginPage() {
-  const { resolvedTheme: theme } = useTheme()
   const { data: session } = useSession();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -198,8 +196,8 @@ export default function LoginPage() {
               href="/"
               className="flex flex-row items-center gap-2 mb-8"
             >
-              <Image alt="Bookar Logo" src={theme === "dark" ? "/logo-white.png" : "/logo.png"} className="text-white" width={55} height={55} />
-              <p className={`font-bold text-5xl text-${theme === "dark" ? "white" : "black"} text-left`}>Bookar</p>
+              <Image alt="Bookar Logo" src="/logo-white.png" className="text-white" width={55} height={55} />
+              <p className={`font-bold text-5xl text-white text-left`}>Bookar</p>
             </Link>
             <h1 className="text-5xl font-bold mb-6">Bem-vindo de volta, estudante.</h1>
             <p className="text-xl text-gray-300">
@@ -218,7 +216,7 @@ export default function LoginPage() {
         >
           <div className="text-center lg:text-left">
             <Link href="/" className="lg:hidden inline-flex items-center gap-2 mb-8">
-              <Image src={theme === "dark" ? "/logo-white.png" : "/logo.png"} width={40} height={40} alt="Bookar Logo" />
+              <Image src="/logo.svg" width={40} height={40} alt="Bookar Logo" className="dark:invert" />
               <span className="text-2xl font-bold">Bookar</span>
             </Link>
             <h2 className="text-3xl font-bold tracking-tight">Login</h2>

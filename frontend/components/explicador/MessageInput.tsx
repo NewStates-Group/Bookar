@@ -215,7 +215,7 @@ export default function MessageInput(
         )}
 
         {/* ── Container principal ── */}
-        <div className="relative rounded-xl border border-slate-200/60 bg-white shadow-sm transition-all duration-200 focus-within:ring-0 max-w-3xl mx-auto w-full p-3">
+        <div className="relative rounded-xl border border-slate-200/60 dark:border-neutral-700 bg-white dark:bg-neutral-900 shadow-sm transition-all duration-200 focus-within:ring-0 max-w-3xl mx-auto w-full p-3">
           <Textarea
             ref={chatInputRef}
             placeholder={
@@ -245,7 +245,7 @@ export default function MessageInput(
                   size="icon-sm"
                   variant="ghost"
                   disabled={isGenerating}
-                  className="rounded-md text-slate-400 hover:text-cyan-600"
+                  className="rounded-md text-slate-400 dark:text-neutral-500 hover:text-cyan-600"
                   aria-label="Mais opções"
                 >
                   <Plus size={16} />
@@ -287,11 +287,11 @@ export default function MessageInput(
                     align="end"
                     side="top"
                   >
-                    <div className="text-sm text-slate-600 mb-3 leading-relaxed">
+                    <div className="text-sm text-slate-600 dark:text-neutral-400 mb-3 leading-relaxed">
                       {isLockHolder ? (
                         "Tens o lápis! Podes falar diretamente com o explicador."
                       ) : currentLock ? (
-                        <>O lápis está com <strong className="text-slate-800">{currentLock.name}</strong></>
+                        <>O lápis está com <strong className="text-slate-800 dark:text-neutral-200">{currentLock.name}</strong></>
                       ) : (
                         "O lápis está disponível. Pega-o para falar com o explicador."
                       )}
@@ -392,9 +392,9 @@ export default function MessageInput(
                   "rounded-md",
                   isGenerating
                     ? (isMultiUserRoom && !isLockHolder
-                      ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                      ? "bg-slate-200 dark:bg-neutral-700 text-slate-400 dark:text-neutral-500 cursor-not-allowed"
                       : "bg-red-500 hover:bg-red-600 text-white")
-                    : "bg-cyan-500 hover:bg-cyan-600 text-white disabled:bg-slate-200 disabled:text-slate-400"
+                    : "bg-cyan-500 hover:bg-cyan-600 text-white disabled:bg-slate-200 dark:disabled:bg-neutral-700 disabled:text-slate-400 dark:disabled:text-neutral-500"
                 )}
                 aria-label={isGenerating ? "Parar" : "Enviar"}
               >
@@ -414,7 +414,7 @@ export default function MessageInput(
           {/* ── Drop zone overlay ── */}
           <div
             className={cn(
-              "absolute inset-0 z-20 flex items-center justify-center rounded-xl border-2 border-dashed border-slate-300 bg-slate-50/90 text-slate-600 text-sm font-medium transition-opacity duration-200 pointer-events-none",
+              "absolute inset-0 z-20 flex items-center justify-center rounded-xl border-2 border-dashed border-slate-300 dark:border-neutral-600 bg-slate-50/90 dark:bg-neutral-800/90 text-slate-600 dark:text-neutral-400 text-sm font-medium transition-opacity duration-200 pointer-events-none",
               isDragOver ? "opacity-100" : "opacity-0"
             )}
           >

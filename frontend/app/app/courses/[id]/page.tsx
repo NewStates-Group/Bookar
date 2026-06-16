@@ -4,7 +4,7 @@ import { useSession } from "next-auth/react";
 import { useRouter, useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Loader2, Play, ArrowLeft, Plus, ImageOff, PlayCircle, Trash } from "lucide-react";
+import { Loader2, Play, ArrowLeft, Plus, ImageOff, PlayCircle, Trash, MoreVertical } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState, useRef } from "react";
 import { toast } from "sonner";
@@ -14,6 +14,12 @@ import { DeleteCourseDialog } from "@/components/DeleteCourseDialog";
 import { useWebSocket } from "@/context/WebSocketContext";
 import useSWR from 'swr';
 import { authenticatedFetcher, apiRequest } from "@/lib/api";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu";
 
 interface Course {
   id: string;
@@ -243,7 +249,7 @@ export default function CoursePage() {
 
 
   if (status === "loading" || isLoadingCourse) return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-white to-slate-50">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-white to-slate-50 dark:from-neutral-950 dark:via-neutral-950 dark:to-neutral-900">
       <div className="text-center space-y-4">
         <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto" />
         <p className="text-muted-foreground font-medium">Carregando as informações do curso...</p>
@@ -251,7 +257,7 @@ export default function CoursePage() {
     </div>
   )
   if (!course) return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-white to-slate-50">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-white to-slate-50 dark:from-neutral-950 dark:via-neutral-950 dark:to-neutral-900">
       <div className="text-center space-y-4">
         <p className="text-muted-foreground font-medium">Não foi possível encontrar o curso.</p>
         <Button asChild className="bg-cyan-500 hover:bg-cyan-600 text-white rounded-full px-8" variant="default" size="lg">
@@ -274,41 +280,101 @@ export default function CoursePage() {
           {course.thumb ? (
             <img src={course.thumb} alt={course.title} className="object-cover w-full h-full" />
           ) : (
-            <div className="flex flex-col items-center justify-center h-full border rounded-lg">
-              <ImageOff className="w-12 h-12 text-slate-400" />
-              <span className="text-gray-500">
+            <div className="flex flex-col items-center justify-center h-full border rounded-lg dark:border-neutral-700">
+              <ImageOff className="w-12 h-12 text-slate-400 dark:text-neutral-500" />
+              <span className="text-gray-500 dark:text-neutral-400">
                 Capa Indisponível
               </span>
             </div>
           )}
-          <div className="md:absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex flex-col justify-end p-8 text-white ">
+          <div className="md:absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex flex-col justify-end p-8 text-white">
             <h1 className="text-4xl font-bold mb-2 capitalize">{course.title}</h1>
-            <p className="text-white/80 l">{course.desc}</p>
-            <div className="mt-1">
-              <span className="inline-flex items-center rounded-md bg-cyan-300/10 px-2 py-1 text-sm font-semibold text-cyan-400 inset-ring inset-ring-cyan-300/30">
-                {course.level === 'B' ? 'Iniciante' : course.level === 'IT' ? 'Intermediário' : 'Avançado'}
-              </span>
-            </div>
+            <p className="text-white/80">{course.desc}</p>
           </div>
         </div>
-        <div className="md:hidden">
-          <h1 className="text-2xl font-bold mb-2 capitalize">{course.title}</h1>
-          <p className="text-black/80 text-base">{course.desc}</p>
-          <div className="mt-2">
-            <span className="inline-flex items-center rounded-md bg-cyan-300/10 px-2 py-1 text-sm font-medium text-cyan-600 inset-ring inset-ring-cyan-300/30">
+
+        <div className="md:hidden space-y-2">
+          <h1 className="text-2xl font-bold capitalize">{course.title}</h1>
+          <p className="text-black/80 dark:text-white/80 text-base">{course.desc}</p>
+          <div className="flex flex-wrap items-center gap-3 pt-1">
+            <span className="inline-flex items-center rounded-md bg-cyan-300/10 px-2 py-1 text-sm font-semibold text-cyan-600 dark:text-cyan-400 inset-ring inset-ring-cyan-300/30">
               {course.level === 'B' ? 'Iniciante' : course.level === 'IT' ? 'Intermediário' : 'Avançado'}
             </span>
+            {course.max_modules && (
+              <span className="text-sm text-muted-foreground">
+                {course.modules.length} / {course.max_modules} módulos
+              </span>
+            )}
           </div>
-          <div className="w-full border mt-2"></div>
+        </div>
+
+        <div className="hidden md:flex flex-wrap items-center gap-3">
+          <span className="inline-flex items-center rounded-md bg-cyan-300/10 px-2 py-1 text-sm font-semibold text-cyan-600 dark:text-cyan-400 inset-ring inset-ring-cyan-300/30">
+            {course.level === 'B' ? 'Iniciante' : course.level === 'IT' ? 'Intermediário' : 'Avançado'}
+          </span>
+          {course.max_modules && (
+            <span className="text-sm text-muted-foreground">
+              {course.modules.length} / {course.max_modules} módulos
+            </span>
+          )}
         </div>
 
         <div className="space-y-6">
           <div className="flex items-center justify-between">
             <h2 className="text-2xl font-bold">Conteúdo do Curso</h2>
-            <div className="flex flex-wrap items-center gap-2">
-              <Button variant="outline" size="lg" className="rounded-full px-8 relative" onClick={handleShare}>
+            <div className="flex items-center gap-2">
+              {/* Mobile: dropdown */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="icon" className="md:hidden rounded-full w-10 h-10">
+                    <MoreVertical className="w-4 h-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuItem onClick={handleShare}>
+                    <Share2 className="w-4 h-4 text-cyan-500 mr-2" />
+                    Partilhar
+                    {course?.is_owner && claims.length > 0 && (
+                      <span className="ml-auto bg-cyan-600 text-white text-[10px] w-5 h-5 rounded-full flex items-center justify-center font-bold">
+                        {claims.length}
+                      </span>
+                    )}
+                  </DropdownMenuItem>
+                  {(!course.max_modules || course.modules.length < course.max_modules) && (
+                    <DropdownMenuItem onClick={handleGenerateModule} disabled={isGeneratingModule}>
+                      {isGeneratingModule ? (
+                        <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                      ) : (
+                        <Plus className="w-4 h-4 mr-2" />
+                      )}
+                      Novo Módulo
+                    </DropdownMenuItem>
+                  )}
+                  {course.status === 'PROCESSING' && (
+                    <DropdownMenuItem onClick={handleCancel} disabled={isCancelling}>
+                      {isCancelling ? (
+                        <Loader2 className="w-4 h-4 animate-spin text-red-500 mr-2" />
+                      ) : (
+                        <X className="w-4 h-4 text-red-500 mr-2" />
+                      )}
+                      <span className="text-red-500">Cancelar Geração</span>
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuItem onClick={() => setDeleteDialogOpen(true)} disabled={isDeletingCourse}>
+                    {isDeletingCourse ? (
+                      <Loader2 className="w-4 h-4 animate-spin text-red-500 mr-2" />
+                    ) : (
+                      <Trash className="w-4 h-4 text-red-500 mr-2" />
+                    )}
+                    <span className="text-red-500">Eliminar Curso</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              {/* Desktop: visible buttons */}
+              <Button variant="outline" size="lg" className="rounded-full px-8 relative hidden md:inline-flex" onClick={handleShare}>
                 <Share2 className="w-4 h-4 text-cyan-500" />
-                <span className="text-cyan-500 hidden md:block">
+                <span className="text-cyan-500 ml-2">
                   Partilhar
                 </span>
                 {course?.is_owner && claims.length > 0 && (
@@ -320,7 +386,7 @@ export default function CoursePage() {
               <Button
                 variant="outline"
                 size="lg"
-                className="rounded-full px-8 border-red-100 hover:bg-red-50"
+                className="rounded-full px-8 border-red-100 dark:border-red-900/50 hover:bg-red-50 dark:hover:bg-red-950/30 hidden md:inline-flex"
                 onClick={() => setDeleteDialogOpen(true)}
                 disabled={isDeletingCourse}
               >
@@ -329,20 +395,20 @@ export default function CoursePage() {
                 ) : (
                   <Trash className="w-4 h-4 text-red-500" />
                 )}
-                <span className="text-red-500 hidden md:block">Eliminar Curso</span>
+                <span className="text-red-500 ml-2">Eliminar Curso</span>
               </Button>
               {(!course.max_modules || course.modules.length < course.max_modules) && (
-                <Button variant="outline" size="lg" className="rounded-full px-8" onClick={handleGenerateModule} disabled={isGeneratingModule}>
+                <Button variant="outline" size="lg" className="rounded-full px-8 hidden md:inline-flex" onClick={handleGenerateModule} disabled={isGeneratingModule}>
                   {isGeneratingModule ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-                  <span className="hidden md:block">
+                  <span className="ml-2">
                     Novo Módulo
                   </span>
                 </Button>
               )}
               {course.status === 'PROCESSING' && (
-                <Button variant="outline" size="lg" className="rounded-full px-8 border-red-200 hover:bg-red-50" onClick={handleCancel} disabled={isCancelling}>
+                <Button variant="outline" size="lg" className="rounded-full px-8 border-red-200 dark:border-red-900/50 hover:bg-red-50 dark:hover:bg-red-950/30 hidden md:inline-flex" onClick={handleCancel} disabled={isCancelling}>
                   {isCancelling ? <Loader2 className="w-4 h-4 animate-spin text-red-500" /> : <X className="w-4 h-4 text-red-500" />}
-                  <span className="text-red-500 hidden md:block ml-2">
+                  <span className="text-red-500 ml-2">
                     Cancelar Geração
                   </span>
                 </Button>
@@ -374,7 +440,7 @@ export default function CoursePage() {
                   ) : (
                     <Award className="w-5 h-5" />
                   )}
-                  <span className="ml-2 hidden md:block">
+                  <span className="ml-2">
                     {course?.certificate_status === "READY" ? "Ver Certificado" :
                       course?.certificate_status === "PROCESSING" ? "Gerando..." : "Emitir Certificado"}
                   </span>
@@ -382,18 +448,13 @@ export default function CoursePage() {
               )}
             </div>
           </div>
-          {course.max_modules && (
-            <p className="text-sm text-muted-foreground">
-              {course.modules.length} / {course.max_modules} módulos
-            </p>
-          )}
           <div className="space-y-4">
             {course.modules.length === 0 && (
               <p className="text-muted-foreground">Nenhum módulo encontrado.</p>
             )}
             {course.modules.map((module, i) => (
               <Card key={module.id} className="p-0 gap-0 overflow-hidden">
-                <div className="bg-muted/50 p-4 border-b">
+                <div className="bg-muted/50 p-4 border-b dark:border-neutral-700">
                   <h3 className="font-semibold text-lg flex items-center justify-between w-full pr-4">
                     <div className="flex items-center">
                       <span className="bg-primary/10 text-primary w-8 h-8 rounded-full flex items-center justify-center mr-3 text-sm">
@@ -403,11 +464,11 @@ export default function CoursePage() {
                     </div>
                   </h3>
                 </div>
-                <div className="divide-y">
+                <div className="divide-y dark:divide-neutral-700">
                   {module.lessons.map((lesson, j) => (
                     <div key={lesson.id} className="p-4 flex items-center justify-between hover:bg-muted/30 transition-colors">
                       <div className="flex items-center gap-3">
-                        <div className={`w-2 h-2 rounded-full ${lesson.watched ? 'bg-green-500' : 'bg-gray-300'}`}></div>
+                        <div className={`w-2 h-2 rounded-full ${lesson.watched ? 'bg-green-500' : 'bg-gray-300 dark:bg-neutral-600'}`}></div>
                         <div>
                           <p className="font-medium text-sm">{lesson.title}</p>
                           <p className="text-xs text-muted-foreground">{Math.floor(lesson.duration / 60)} min</p>
@@ -416,17 +477,17 @@ export default function CoursePage() {
                       <div className="text-xs">
                         {lesson.status === 'READY' ? (
                           <Link href={`/app/courses/watch?l=${lesson.id}&c=${course.id}`}>
-                            <PlayCircle className="w-5 h-5 text-gray-600" />
+                            <PlayCircle className="w-5 h-5 text-gray-600 dark:text-neutral-300" />
                           </Link>
                         ) : lesson.status === 'PROCESSING' ? (
                           <Link href={`/app/courses/watch?l=${lesson.id}&c=${course.id}`}>
-                            <span className="text-blue-600 bg-blue-100 px-2 py-1 rounded-full flex items-center gap-1">
+                            <span className="text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-950 px-2 py-1 rounded-full flex items-center gap-1">
                               <Loader2 className="w-3 h-3 animate-spin" /> Gerando
                             </span>
                           </Link>
                         ) : (
                           <Link href={`/app/courses/watch?l=${lesson.id}&c=${course.id}`}>
-                            <span className="text-gray-500 bg-gray-100 px-2 py-1 rounded-full cursor-pointer">Aguardando</span>
+                            <span className="text-gray-500 dark:text-neutral-400 bg-gray-100 dark:bg-neutral-800 px-2 py-1 rounded-full cursor-pointer">Aguardando</span>
                           </Link>
                         )}
                       </div>
@@ -473,7 +534,7 @@ export default function CoursePage() {
                             ) : module.last_quiz_score !== undefined && module.last_quiz_score !== null && allWatched ? (
                               <span className="text-red-600 flex items-center gap-1 font-medium"><XCircle className="w-4 h-4" /> Repetir</span>
                             ) : (
-                              <span className={`${allWatched ? 'text-cyan-600' : 'text-gray-400'} flex items-center gap-1 font-medium`}><PlayCircle className="w-4 h-4" /> Iniciar</span>
+                              <span className={`${allWatched ? 'text-cyan-600 dark:text-cyan-400' : 'text-gray-400 dark:text-neutral-500'} flex items-center gap-1 font-medium`}><PlayCircle className="w-4 h-4" /> Iniciar</span>
                             )}
                           </Button>
                         </Link>
@@ -486,7 +547,7 @@ export default function CoursePage() {
           </div>
 
           {course?.is_owner && (
-            <div className="mt-12 pt-8 border-t border-dashed">
+            <div className="mt-12 pt-8 border-t border-dashed dark:border-neutral-700">
               <div className="flex items-center justify-between mb-6">
                 <div className="space-y-1">
                   <h3 className="text-2xl font-black flex items-center gap-2">

@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card } from "@/components/ui/card";
 import Image from "next/image";
 import { User, Mail, Lock, Loader2, ArrowRight, AlertCircle, ShieldCheck, Home } from "lucide-react";
 import Link from "next/link";
@@ -221,8 +220,8 @@ export default function SignupPage() {
               href="/"
               className="flex flex-row items-center gap-2 mb-8"
             >
-              <Image alt="Bookar Logo" src={theme === "dark" ? "/logo-white.png" : "/logo.png"} className="text-white" width={55} height={55} />
-              <p className={`font-bold text-5xl text-${theme === "dark" ? "white" : "black"} text-left`}>Bookar</p>
+              <Image alt="Bookar Logo" src="/logo-white.png" className="text-white" width={55} height={55} />
+              <p className={`font-bold text-5xl text-white text-left`}>Bookar</p>
             </Link>
             <h1 className="text-5xl font-bold mb-6">Junte-se à nós, estudante.</h1>
             <p className="text-xl text-gray-300">
@@ -241,7 +240,7 @@ export default function SignupPage() {
         >
           <div className="text-center lg:text-left">
             <Link href="/" className="lg:hidden inline-flex items-center gap-2 mb-8">
-              <Image src={theme === "dark" ? "/logo-white.png" : "/logo.png"} width={40} height={40} alt="Bookar Logo" />
+              <Image src="/logo.png" width={40} height={40} alt="Bookar Logo" className="dark:invert"/>
               <span className="text-2xl font-bold">Bookar</span>
             </Link>
             <h2 className="text-3xl font-bold tracking-tight">Criar Conta</h2>
@@ -431,7 +430,7 @@ export default function SignupPage() {
               <Turnstile
                 siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY!}
                 onVerify={(token) => setTurnstileToken(token)}
-                theme={theme === "light" ? "light" : "dark"}
+                theme={theme}
               />
             </div>
 
