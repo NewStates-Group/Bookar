@@ -14,13 +14,19 @@ import {
   Loader2,
   Plus,
   Bot,
+  Crown,
+  BarChart3,
+  Sun,
+  Moon,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
+import { useTheme } from "next-themes";
 import useSWR from "swr";
 import { authenticatedFetcher, apiRequest } from "@/lib/api";
+import { NotificationPanel } from "@/components/NotificationPanel";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -68,9 +74,11 @@ export function PlatformSidebar({
   closeMobile,
 }: PlatformSidebarProps) {
   const { data: session } = useSession();
+  const { theme, setTheme, resolvedTheme } = useTheme();
   const pathname = usePathname();
   const router = useRouter();
   const user = session?.user as any;
+  const dark = resolvedTheme === "dark";
 
   const isExplicadorActive = pathname.startsWith("/app/explicador");
 
@@ -128,7 +136,6 @@ export function PlatformSidebar({
       const nextLocal = localRooms.filter((r) => r.id !== id);
       setLocalRooms(nextLocal);
       localStorage.setItem("bookar-explicador-history", JSON.stringify(nextLocal));
-      toast.success("Sala removida do histórico local.");
     }
 
     if (inApi) {
@@ -156,12 +163,11 @@ export function PlatformSidebar({
 
   // Render the core sidebar content. We support both expanded and collapsed responsive states.
   const renderContent = (isExpanded: boolean) => (
-    <div className="flex flex-col h-full bg-slate-50 text-slate-700 select-none overflow-hidden border-r border-slate-200/60">
+    <div className="flex flex-col h-full bg-slate-50 dark:bg-neutral-950 text-slate-700 dark:text-neutral-300 select-none overflow-hidden border-r border-slate-200/60 dark:border-neutral-800">
 
       {/* ── Header Logo & Toggle ── */}
-      <div className={`flex items-center justify-between px-4 py-4 border-b border-slate-200/60 ${!isExpanded ? "flex-col gap-4" : ""}`}>
-        <Link
-          href="/app/courses"
+      <div className={`flex items-center justify-between px-4 py-4 border-b border-slate-200/60 dark:border-neutral-800 ${!isExpanded ? "flex-col gap-4" : ""}`}>
+        <div
           onClick={closeMobile}
           className="flex items-center gap-3 group flex-shrink-0"
         >
@@ -171,21 +177,21 @@ export function PlatformSidebar({
               alt="Bookar Logo"
               width={30}
               height={30}
-              className="object-contain"
+              className="object-contain dark:invert"
             />
           </div>
           {isExpanded && (
-            <span className="text-xl font-bold text-slate-800 tracking-tight transition-all duration-200">
+            <span className="text-xl font-bold text-slate-800 dark:text-neutral-100 tracking-tight transition-all duration-200">
               Bookar
             </span>
           )}
-        </Link>
+        </div>
 
         {/* Mobile close button (only relevant inside drawer) */}
         {isExpanded && (
           <button
             onClick={closeMobile}
-            className="md:hidden flex items-center justify-center p-1.5 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-200/60 transition-all duration-200 cursor-pointer flex-shrink-0"
+            className="md:hidden flex items-center justify-center p-1.5 rounded-lg text-slate-500 dark:text-neutral-400 hover:text-slate-800 dark:hover:text-neutral-100 hover:bg-slate-200/60 dark:hover:bg-neutral-800 transition-all duration-200 cursor-pointer flex-shrink-0"
           >
             <X className="w-4.5 h-4.5" />
           </button>
@@ -193,7 +199,7 @@ export function PlatformSidebar({
       </div>
 
       {/* ── Navigation Links ── */}
-      <nav className="flex-1 px-3 py-3 overflow-y-auto space-y-0.5 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
+      <nav className="flex-1 px-3 py-3 overflow-y-auto space-y-0.5 scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-neutral-700 scrollbar-track-transparent">
         {menuItems.map((item) => {
           const isActive = pathname.startsWith(item.href);
           return (
@@ -204,12 +210,12 @@ export function PlatformSidebar({
               title={!isExpanded ? item.title : undefined}
               className={`flex items-center rounded-xl text-sm font-medium transition-all duration-200 ${isExpanded ? "px-3 py-2.5 gap-3" : "p-2.5 justify-center"
                 } ${isActive
-                  ? "bg-white text-slate-900 border border-slate-200/80 shadow-sm font-semibold"
-                  : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/40 border border-transparent"
+                  ? "bg-white dark:bg-neutral-800 text-slate-900 dark:text-neutral-100 border border-slate-200/80 dark:border-neutral-700 shadow-sm font-semibold"
+                  : "text-slate-600 dark:text-neutral-400 hover:text-slate-900 dark:hover:text-neutral-100 hover:bg-slate-200/40 dark:hover:bg-neutral-800 border border-transparent"
                 }`}
             >
               <item.icon
-                className={`w-[20px] h-[20px] flex-shrink-0 transition-colors duration-200 ${isActive ? "text-cyan-600" : "text-slate-500"
+                className={`w-[20px] h-[20px] flex-shrink-0 transition-colors duration-200 ${isActive ? "text-cyan-600 dark:text-cyan-400" : "text-slate-500 dark:text-neutral-400"
                   }`}
               />
               {isExpanded && <span className="truncate">{item.title}</span>}
@@ -222,31 +228,31 @@ export function PlatformSidebar({
           <DialogTrigger asChild>
             <button
               title={!isExpanded ? "Tutor (Em Breve)" : undefined}
-              className={`w-full flex items-center rounded-xl text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-200/40 border border-transparent transition-all duration-200 cursor-pointer ${isExpanded ? "px-3 py-2.5 gap-3" : "p-2.5 justify-center"
+              className={`w-full flex items-center rounded-xl text-sm font-medium text-slate-600 dark:text-neutral-400 hover:text-slate-900 dark:hover:text-neutral-100 hover:bg-slate-200/40 dark:hover:bg-neutral-800 border border-transparent transition-all duration-200 cursor-pointer ${isExpanded ? "px-3 py-2.5 gap-3" : "p-2.5 justify-center"
                 }`}
             >
-              <GraduationCap className="w-[18px] h-[18px] flex-shrink-0 text-slate-500" />
+              <GraduationCap className="w-[18px] h-[18px] flex-shrink-0 text-slate-500 dark:text-neutral-400" />
               {isExpanded && (
                 <>
                   <span className="truncate flex-1 text-left">Tutor</span>
-                  <Badge className="bg-slate-200 text-slate-600 text-[9px] px-1.5 py-0.5 leading-none border border-slate-300/40 hover:bg-slate-200 rounded-md font-semibold">
+                  <Badge className="bg-slate-200 dark:bg-neutral-700 text-slate-600 dark:text-neutral-300 text-[9px] px-1.5 py-0.5 leading-none border border-slate-300/40 dark:border-neutral-600 hover:bg-slate-200 dark:hover:bg-neutral-700 rounded-md font-semibold">
                     Breve
                   </Badge>
                 </>
               )}
             </button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[400px] border-slate-200 bg-white text-slate-700 shadow-2xl">
+          <DialogContent className="sm:max-w-[400px] border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-950 text-slate-700 dark:text-neutral-300 shadow-2xl">
             <DialogHeader className="space-y-4">
-              <div className="flex items-center justify-center w-16 h-16 mx-auto rounded-2xl bg-cyan-50 border border-cyan-100">
-                <GraduationCap className="w-8 h-8 text-cyan-600 animate-pulse" />
+              <div className="flex items-center justify-center w-16 h-16 mx-auto rounded-2xl bg-cyan-50 dark:bg-cyan-950 border border-cyan-100 dark:border-cyan-900">
+                <GraduationCap className="w-8 h-8 text-cyan-600 dark:text-cyan-400 animate-pulse" />
               </div>
-              <DialogTitle className="text-center text-2xl font-bold text-slate-800">
+              <DialogTitle className="text-center text-2xl font-bold text-slate-800 dark:text-neutral-100">
                 Tutor em Breve!
               </DialogTitle>
-              <DialogDescription className="text-center text-slate-500 leading-relaxed">
+              <DialogDescription className="text-center text-slate-500 dark:text-neutral-400 leading-relaxed">
                 Estamos a trabalhar arduamente para trazer o seu assistente pessoal de aprendizagem.
-                <span className="block mt-2 font-semibold text-cyan-600">
+                <span className="block mt-2 font-semibold text-cyan-600 dark:text-cyan-400">
                   A sua jornada está prestes a ficar mais inteligente.
                 </span>
               </DialogDescription>
@@ -254,18 +260,23 @@ export function PlatformSidebar({
           </DialogContent>
         </Dialog>
 
+        {/* ── Notificações ── */}
+        <div className="pt-1">
+          <NotificationPanel isCollapsed={!isExpanded} />
+        </div>
+
         {/* ── Explicador Rooms History (shown only when Explicador is active) ── */}
         {isExpanded && isExplicadorActive && displayedRooms && displayedRooms.length > 0 && (
           <div className="pt-3">
             <div className="flex items-center justify-between px-3 pb-1.5">
-              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">
+              <span className="text-[10px] font-semibold text-slate-400 dark:text-neutral-500 uppercase tracking-widest">
                 Salas Anteriores
               </span>
               <Link
                 href="/app/explicador"
                 onClick={closeMobile}
                 title="Nova Sala"
-                className="w-5 h-5 flex items-center justify-center rounded text-slate-400 hover:text-cyan-600 hover:bg-slate-200/60 transition-colors cursor-pointer"
+                className="w-5 h-5 flex items-center justify-center rounded text-slate-400 dark:text-neutral-500 hover:text-cyan-600 dark:hover:text-cyan-400 hover:bg-slate-200/60 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
               >
                 <Plus className="w-3 h-3" />
               </Link>
@@ -278,7 +289,7 @@ export function PlatformSidebar({
                       href={`/app/explicador/${room.id}`}
                       onClick={closeMobile}
                       className={`flex-1 min-w-0 flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium transition-all duration-200 pr-8
-                        text-slate-500 hover:text-slate-800 hover:bg-slate-200/40 border border-transparent
+                        text-slate-500 dark:text-neutral-400 hover:text-slate-800 dark:hover:text-neutral-100 hover:bg-slate-200/40 dark:hover:bg-neutral-800 border border-transparent
                       }`}
                     >
                       <span className="truncate">{room.title}</span>
@@ -286,7 +297,7 @@ export function PlatformSidebar({
                     <button
                       onClick={(e) => handleDeleteRoom(room.id, e)}
                       disabled={deletingId === room.id}
-                      className="absolute right-1.5 opacity-0 group-hover:opacity-100 w-6 h-6 flex items-center justify-center rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all duration-200 cursor-pointer"
+                      className="absolute right-1.5 opacity-0 group-hover:opacity-100 w-6 h-6 flex items-center justify-center rounded-lg text-slate-400 dark:text-neutral-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950 transition-all duration-200 cursor-pointer"
                       title="Remover sala"
                     >
                       {deletingId === room.id ? (
@@ -303,12 +314,25 @@ export function PlatformSidebar({
         )}
       </nav>
 
-      {/* Desktop collapse toggle (bottom, right above the profile avatar) */}
+      {/* Theme toggle */}
+      <div className={`px-3 pb-1 flex-shrink-0 hidden md:block ${!isExpanded ? "flex justify-center" : ""}`}>
+        <button
+          onClick={() => setTheme(dark ? "light" : "dark")}
+          title={dark ? "Modo claro" : "Modo escuro"}
+          className={`flex items-center rounded-xl text-sm font-medium text-slate-500 dark:text-neutral-400 hover:text-slate-800 dark:hover:text-neutral-100 hover:bg-slate-200/40 dark:hover:bg-neutral-800 border border-transparent transition-all duration-200 cursor-pointer ${isExpanded ? "px-3 py-2 gap-3 w-full" : "p-2.5 justify-center"
+            }`}
+        >
+          {dark ? <Sun className="w-4.5 h-4.5" /> : <Moon className="w-4.5 h-4.5" />}
+          {isExpanded && <span>{dark ? "Modo claro" : "Modo escuro"}</span>}
+        </button>
+      </div>
+
+      {/* Desktop collapse toggle */}
       <div className={`px-3 pb-2 flex-shrink-0 hidden md:block ${!isExpanded ? "flex justify-center" : ""}`}>
         <button
           onClick={toggleSidebar}
           title={isExpanded ? "Ocultar barra lateral" : "Mostrar barra lateral"}
-          className={`flex items-center rounded-xl text-sm font-medium text-slate-500 hover:text-slate-800 hover:bg-slate-200/40 border border-transparent transition-all duration-200 cursor-pointer ${isExpanded ? "px-3 py-2 gap-3 w-full" : "p-2.5 justify-center"
+          className={`flex items-center rounded-xl text-sm font-medium text-slate-500 dark:text-neutral-400 hover:text-slate-800 dark:hover:text-neutral-100 hover:bg-slate-200/40 dark:hover:bg-neutral-800 border border-transparent transition-all duration-200 cursor-pointer ${isExpanded ? "px-3 py-2 gap-3 w-full" : "p-2.5 justify-center"
             }`}
         >
           <PanelLeftClose className={`w-4.5 h-4.5 transition-transform duration-300 ${!isExpanded ? "rotate-180" : ""}`} />
@@ -317,16 +341,16 @@ export function PlatformSidebar({
       </div>
 
       {/* ── Footer / Profile ── */}
-      <div className="p-3 border-t border-slate-200/60 bg-white/50">
+      <div className="p-3 border-t border-slate-200/60 dark:border-neutral-800 bg-white/50 dark:bg-neutral-950/50">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
               title={!isExpanded ? (user?.first_name || user?.email || "Minha Conta") : undefined}
-              className={`flex items-center w-full rounded-xl hover:bg-slate-200/40 border border-transparent hover:border-slate-200/40 transition-all duration-200 cursor-pointer text-left focus:outline-none group ${isExpanded ? "p-2.5 gap-3" : "p-1.5 justify-center"
+              className={`flex items-center w-full rounded-xl hover:bg-slate-200/40 dark:hover:bg-neutral-800 border border-transparent hover:border-slate-200/40 dark:hover:border-neutral-700 transition-all duration-200 cursor-pointer text-left focus:outline-none group ${isExpanded ? "p-2.5 gap-3" : "p-1.5 justify-center"
                 }`}
             >
               {/* Avatar */}
-              <div className="flex-shrink-0 w-9 h-9 rounded-xl border border-slate-200 overflow-hidden bg-slate-100">
+              <div className="flex-shrink-0 w-9 h-9 rounded-xl border border-slate-200 dark:border-neutral-700 overflow-hidden bg-slate-100 dark:bg-neutral-800">
                 {user?.avatar ? (
                   <Avatar className="w-9 h-9 rounded-none">
                     <AvatarImage
@@ -337,13 +361,13 @@ export function PlatformSidebar({
                       }
                       alt={user.first_name || user.email}
                     />
-                    <AvatarFallback className="rounded-none bg-slate-200 text-slate-750 text-sm font-bold">
+                    <AvatarFallback className="rounded-none bg-slate-200 dark:bg-neutral-700 text-slate-750 dark:text-neutral-300 text-sm font-bold">
                       {(user.first_name || user.email || "U")[0]?.toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
                 ) : (
                   <div className="w-full h-full flex items-center justify-center">
-                    <User className="w-4 h-4 text-slate-500" />
+                    <User className="w-4 h-4 text-slate-500 dark:text-neutral-400" />
                   </div>
                 )}
               </div>
@@ -352,17 +376,17 @@ export function PlatformSidebar({
                 <>
                   {/* Name & email */}
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-slate-800 truncate leading-tight">
+                    <p className="text-sm font-semibold text-slate-800 dark:text-neutral-100 truncate leading-tight">
                       {user?.first_name
                         ? `${user.first_name} ${user.last_name || ""}`.trim()
                         : user?.email}
                     </p>
-                    <p className="text-[11px] text-slate-500 truncate leading-tight">
+                    <p className="text-[11px] text-slate-500 dark:text-neutral-400 truncate leading-tight">
                       {user?.email}
                     </p>
                   </div>
 
-                  <ChevronRight className="w-4 h-4 text-slate-400 flex-shrink-0 group-hover:text-slate-600 transition-colors" />
+                  <ChevronRight className="w-4 h-4 text-slate-400 dark:text-neutral-500 flex-shrink-0 group-hover:text-slate-600 dark:group-hover:text-neutral-300 transition-colors" />
                 </>
               )}
             </button>
@@ -372,65 +396,47 @@ export function PlatformSidebar({
             align={isExpanded ? "end" : "start"}
             side="top"
             sideOffset={10}
-            className="w-60 bg-white border border-slate-200 text-slate-700 shadow-2xl rounded-xl py-1.5"
+            className="w-60 bg-white dark:bg-neutral-950 border border-slate-200 dark:border-neutral-700 text-slate-700 dark:text-neutral-300 shadow-2xl rounded-xl py-1.5"
           >
-            {/* Profile label */}
-            <DropdownMenuLabel className="pb-2">
-              <div className="flex items-center gap-2.5 px-1">
-                <div className="w-8 h-8 rounded-lg border border-slate-200 overflow-hidden bg-slate-100 flex-shrink-0">
-                  {user?.avatar ? (
-                    <Avatar className="w-8 h-8 rounded-none">
-                      <AvatarImage
-                        src={
-                          user.avatar.startsWith("http")
-                            ? user.avatar
-                            : `${process.env.NEXT_PUBLIC_API_URL}${user.avatar}`
-                        }
-                        alt={user.first_name || user.email}
-                      />
-                      <AvatarFallback className="rounded-none bg-slate-200 text-slate-750 text-xs font-bold">
-                        {(user.first_name || user.email || "U")[0]?.toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <User className="w-3.5 h-3.5 text-slate-500" />
-                    </div>
-                  )}
-                </div>
-                <div className="min-w-0">
-                  <p className="font-semibold text-slate-800 text-sm truncate">
-                    {user?.first_name
-                      ? `${user.first_name} ${user.last_name || ""}`.trim()
-                      : "Minha Conta"}
-                  </p>
-                  <p className="text-[11px] text-slate-500 truncate">{user?.email}</p>
-                </div>
-              </div>
-            </DropdownMenuLabel>
-
-            <DropdownMenuSeparator className="bg-slate-100 my-1" />
-
-            {/* Profile link */}
             <DropdownMenuItem asChild>
               <Link
                 href="/app/profile"
                 onClick={closeMobile}
-                className="flex items-center gap-2.5 px-3 py-2 text-sm cursor-pointer hover:bg-slate-50 focus:bg-slate-50 text-slate-700 hover:text-slate-900 focus:text-slate-900 rounded-lg mx-1"
+                className="flex items-center gap-2.5 px-3 py-2 text-sm cursor-pointer hover:bg-slate-50 dark:hover:bg-neutral-800 focus:bg-slate-50 dark:focus:bg-neutral-800 text-slate-700 dark:text-neutral-300 hover:text-slate-900 dark:hover:text-neutral-100 focus:text-slate-900 dark:focus:text-neutral-100 rounded-lg mx-1"
               >
                 <User className="w-4 h-4 text-slate-400" />
                 <span>Perfil</span>
               </Link>
             </DropdownMenuItem>
 
-            <DropdownMenuSeparator className="bg-slate-100 my-1" />
+            <DropdownMenuItem asChild>
+              <Link
+                href="/app/subscription"
+                onClick={closeMobile}
+                className="flex items-center gap-2.5 px-3 py-2 text-sm cursor-pointer hover:bg-slate-50 dark:hover:bg-neutral-800 focus:bg-slate-50 dark:focus:bg-neutral-800 text-slate-700 dark:text-neutral-300 hover:text-slate-900 dark:hover:text-neutral-100 focus:text-slate-900 dark:focus:text-neutral-100 rounded-lg mx-1"
+              >
+                <Crown className="w-4 h-4 text-muted-foreground" />
+                <span>Subscrição</span>
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link
+                href="/app/stats"
+                onClick={closeMobile}
+                className="flex items-center gap-2.5 px-3 py-2 text-sm cursor-pointer hover:bg-slate-50 dark:hover:bg-neutral-800 focus:bg-slate-50 dark:focus:bg-neutral-800 text-slate-700 dark:text-neutral-300 hover:text-slate-900 dark:hover:text-neutral-100 focus:text-slate-900 dark:focus:text-neutral-100 rounded-lg mx-1"
+              >
+                <BarChart3 className="w-4 h-4 text-slate-400" />
+                <span>Estatísticas</span>
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator className="bg-slate-100 dark:bg-neutral-800 my-1" />
 
             {/* Sign out */}
             <DropdownMenuItem
               onClick={() => signOut({ callbackUrl: "/login" })}
-              className="flex items-center gap-2.5 px-3 py-2 text-sm cursor-pointer text-red-600 hover:text-red-500 hover:bg-red-50 focus:text-red-500 focus:bg-red-50 rounded-lg mx-1 mb-0.5"
+              className="flex items-center gap-2.5 px-3 py-2 text-sm cursor-pointer text-red-600 dark:text-red-400 hover:text-red-500 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-950 focus:text-red-500 focus:bg-red-50 dark:focus:bg-red-950 rounded-lg mx-1 mb-0.5"
             >
-              <LogOut className="w-4 h-4" />
+              <LogOut className="w-4 h-4 text-red-500 dark:text-red-400" />
               <span>Sair</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
@@ -458,7 +464,7 @@ export function PlatformSidebar({
       >
         {/* Backdrop */}
         <div
-          className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+          className="absolute inset-0 bg-black/40 dark:bg-black/60 backdrop-blur-sm"
           onClick={closeMobile}
         />
 

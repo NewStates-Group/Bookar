@@ -6,26 +6,23 @@ import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { toast } from "sonner";
-import { Loader2, Upload, BookOpen, CheckCircle, GraduationCap } from "lucide-react";
+import { Loader2, Upload } from "lucide-react";
 import { apiRequest } from "@/lib/api";
+import { ConfirmUpgradeModal } from "@/components/ConfirmUpgradeModal";
+import { useRouter } from "next/navigation";
 
 interface Profile {
     email: string;
     first_name: string;
     last_name: string;
     avatar: string | null;
-    stats: {
-      ongoing_courses: number;
-      finished_courses: number;
-      certificates_issued: number;
-    } | null;
   }
 
 export default function ProfilePage() {
+    const router = useRouter();
     const { data: session, update } = useSession();
     const [isLoading, setIsLoading] = useState(false);
     const [isPageLoading, setIsPageLoading] = useState<Boolean>(true);
@@ -38,14 +35,45 @@ export default function ProfilePage() {
         last_name: "",
     });
     const [freshUser, setFreshUser] = useState<Profile | null>(null);
+    const [confirmStatus, setConfirmStatus] = useState<"idle" | "pending" | "success" | "error">("idle");
+    const [confirmError, setConfirmError] = useState<string>("");
 
-    // Fetch fresh profile data directly from API — do NOT call update() here
-    // as it would cause session churn and remount the page component in a loop.
+    // Confirm pending checkout after redirect — runs before data fetch
+    useEffect(() => {
+        if (!session?.accessToken) return;
+        const params = new URLSearchParams(window.location.search);
+        const sessionId = params.get("session_id");
+        const gateway = params.get("gateway") || "stripe";
+        if (!sessionId) return;
+
+        setConfirmStatus("pending");
+        apiRequest(`${process.env.NEXT_PUBLIC_API_URL}/subscriptions/confirm`, {
+            method: "POST",
+            body: JSON.stringify({ session_id: sessionId, gateway }),
+        })
+            .then(() => {
+                setConfirmStatus("success");
+                setTimeout(() => {
+                    router.push("/app/subscription");
+                }, 1000);
+            })
+            .catch((err: Error) => {
+                setConfirmError(err.message || "Erro ao confirmar pagamento");
+                setConfirmStatus("error");
+                setTimeout(() => {
+                    setConfirmStatus("idle");
+                }, 3000);
+            });
+    }, [session?.accessToken]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // Fetch fresh profile data directly from API
     useEffect(() => {
         if (!session?.accessToken || hasFetched.current) return;
+        const hasSessionId = new URLSearchParams(window.location.search).has("session_id");
+        if (hasSessionId && (confirmStatus === "idle" || confirmStatus === "pending" || confirmStatus === "success")) return;
         hasFetched.current = true;
 
-        apiRequest(`${process.env.NEXT_PUBLIC_API_URL}/auth/me?stats=1`)
+        apiRequest(`${process.env.NEXT_PUBLIC_API_URL}/auth/me`)
             .then((profile: any) => {
                 setFreshUser(profile as Profile);
                 setFormData({
@@ -60,7 +88,7 @@ export default function ProfilePage() {
             .finally(() => {
                 setIsPageLoading(false);
             });
-    }, [session?.accessToken]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [session?.accessToken, confirmStatus]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const handleUpdateProfile = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -134,7 +162,7 @@ export default function ProfilePage() {
         : "";
 
     if (isPageLoading) return (
-        <div className="flex items-center justify-center py-20">
+        <div className="min-h-screen flex items-center justify-center py-20">
           <div className="text-center space-y-4">
             <Loader2 className="w-10 h-10 animate-spin text-primary mx-auto" />
             <p className="text-muted-foreground">Carregando seus dados...</p>
@@ -143,26 +171,31 @@ export default function ProfilePage() {
     );
 
     return (
-        <div className="px-4 py-6 sm:px-6 md:py-10 max-w-5xl mx-auto w-full space-y-6">
+        <>
+            <ConfirmUpgradeModal
+                open={confirmStatus !== "idle"}
+                status={confirmStatus}
+                errorMessage={confirmError}
+            />
+            <div className="px-4 py-6 sm:px-6 md:py-10 max-w-5xl mx-auto w-full space-y-6">
             {/* Cabeçalho */}
             <div>
-                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">O Meu Perfil</h1>
-                <p className="text-sm text-slate-500 mt-1">Gere as tuas informações e acompanha o teu progresso de aprendizagem.</p>
+                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 dark:text-neutral-100">O Meu Perfil</h1>
+                <p className="text-sm text-slate-500 dark:text-neutral-400 mt-1">Gere as tuas informações pessoais.</p>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-                {/* Informações de Perfil */}
-                <Card className="lg:col-span-2 shadow-sm border-slate-200">
+            {/* Informações de Perfil */}
+            <Card className="shadow-sm border-slate-200 dark:border-neutral-700">
                     <CardHeader className="pb-4">
-                        <CardTitle className="text-xl font-bold text-slate-900">Resumo do Perfil</CardTitle>
+                        <CardTitle className="text-xl font-bold text-slate-900 dark:text-neutral-100">Resumo do Perfil</CardTitle>
                         <CardDescription>Visualiza e edita as suas informações pessoais.</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-6">
-                        <div className="flex flex-col items-center space-y-4 sm:flex-row sm:space-y-0 sm:space-x-6 pb-6 border-b border-slate-100">
+                        <div className="flex flex-col items-center space-y-4 sm:flex-row sm:space-y-0 sm:space-x-6 pb-6 border-b border-slate-100 dark:border-neutral-800">
                             <div className="relative">
                                 <Avatar className="h-28 w-28 sm:h-32 sm:w-32 border-2 border-cyan-500/20 shadow-sm">
                                     <AvatarImage src={avatarSrc} />
-                                    <AvatarFallback className="text-2xl font-semibold bg-slate-100 text-slate-600">
+                                    <AvatarFallback className="text-2xl font-semibold bg-slate-100 dark:bg-neutral-800 text-slate-600 dark:text-neutral-400">
                                         {(freshUser?.first_name || freshUser?.email || "U").slice(0, 2).toUpperCase()}
                                     </AvatarFallback>
                                 </Avatar>
@@ -175,17 +208,12 @@ export default function ProfilePage() {
                                 </label>
                             </div>
                             <div className="text-center sm:text-left space-y-1">
-                                <h3 className="text-xl sm:text-2xl font-bold text-slate-900">
+                                <h3 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-neutral-100">
                                     {freshUser?.first_name
                                         ? `${freshUser.first_name} ${freshUser.last_name}`
                                         : freshUser?.email}
                                 </h3>
-                                <p className="text-sm text-slate-500">{freshUser?.email}</p>
-                                {(!freshUser?.first_name || !freshUser?.last_name || !freshUser?.avatar) && (
-                                    <p className="text-xs text-orange-500 font-medium animate-pulse">
-                                        Por favor, complete o seu perfil (nome e foto) para continuar.
-                                    </p>
-                                )}
+                                <p className="text-sm text-slate-500 dark:text-neutral-400">{freshUser?.email}</p>
                             </div>
                         </div>
 
@@ -231,46 +259,7 @@ export default function ProfilePage() {
                         </form>
                     </CardContent>
                 </Card>
-
-                {/* Estatísticas */}
-                <div className="w-full space-y-6">
-                    <Card className="bg-card border-slate-200 overflow-hidden relative shadow-sm">
-                        <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/5 blur-3xl -mr-16 -mt-16 pointer-events-none" />
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-lg font-bold text-slate-900">As Suas Estatísticas</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-3">
-                            <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border border-slate-100">
-                                <div className="flex items-center gap-3">
-                                    <div className="p-2 bg-cyan-500/10 rounded-md">
-                                        <BookOpen className="h-5 w-5 text-cyan-500" />
-                                    </div>
-                                    <span className="text-sm font-medium text-slate-700">Em Curso</span>
-                                </div>
-                                <span className="text-xl font-bold text-slate-900">{freshUser?.stats?.ongoing_courses ?? 0}</span>
-                            </div>
-                            <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border border-slate-100">
-                                <div className="flex items-center gap-3">
-                                    <div className="p-2 bg-green-500/10 rounded-md">
-                                        <CheckCircle className="h-5 w-5 text-green-500" />
-                                    </div>
-                                    <span className="text-sm font-medium text-slate-700">Concluídos</span>
-                                </div>
-                                <span className="text-xl font-bold text-slate-900">{freshUser?.stats?.finished_courses ?? 0}</span>
-                            </div>
-                            <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border border-slate-100">
-                                <div className="flex items-center gap-3">
-                                    <div className="p-2 bg-yellow-500/10 rounded-md">
-                                        <GraduationCap className="h-5 w-5 text-yellow-500" />
-                                    </div>
-                                    <span className="text-sm font-medium text-slate-700">Certificados</span>
-                                </div>
-                                <span className="text-xl font-bold text-slate-900">{freshUser?.stats?.certificates_issued ?? 0}</span>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
             </div>
-        </div>
+        </>
     );
 }

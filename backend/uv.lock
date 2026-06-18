@@ -151,6 +151,7 @@ dependencies = [
     { name = "replicate" },
     { name = "reportlab" },
     { name = "shortuuid" },
+    { name = "stripe" },
     { name = "tenacity" },
     { name = "uvicorn", extra = ["standard"] },
     { name = "watchdog", extra = ["watchmedo"] },
@@ -194,6 +195,7 @@ requires-dist = [
     { name = "replicate", specifier = ">=1.0.7" },
     { name = "reportlab", specifier = ">=4.4.10" },
     { name = "shortuuid", specifier = ">=1.0.13" },
+    { name = "stripe", specifier = ">=15.2.1" },
     { name = "tenacity", specifier = "==9.1.2" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.41.0" },
     { name = "watchdog", extras = ["watchmedo"], specifier = ">=6.0.0" },
@@ -1860,6 +1862,19 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/e5/40/edede8dd6977b0d3da179a342c198ed100dd2aba4be081861ee5911e4da4/sqlparse-0.5.3.tar.gz", hash = "sha256:09f67787f56a0b16ecdbde1bfc7f5d9c3371ca683cfeaa8e6ff60b4807ec9272", size = 84999, upload-time = "2024-12-10T12:05:30.728Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/a9/5c/bfd6bd0bf979426d405cc6e71eceb8701b148b16c21d2dc3c261efc61c7b/sqlparse-0.5.3-py3-none-any.whl", hash = "sha256:cf2196ed3418f3ba5de6af7e82c694a9fbdbfecccdfc72e281548517081f16ca", size = 44415, upload-time = "2024-12-10T12:05:27.824Z" },
+]
+
+[[package]]
+name = "stripe"
+version = "15.2.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "requests" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/bb/04/a41c498352317d0c3d52dfb265f3c3c3e50f1468fcacef5b6794dd57c967/stripe-15.2.1.tar.gz", hash = "sha256:5821a802abf70be900d7b1b6bb609697cc25c9aa521eb86430e68b994dac9f78", size = 1520402, upload-time = "2026-06-12T22:44:12.519Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b4/be/b16d1222b8b47b5c1bf188523df679f28a9ff9662ad8276a02a56101463c/stripe-15.2.1-py3-none-any.whl", hash = "sha256:49571ffbfd7944daae4000e33d3b42705012ee7aae003b7b67868c1e59d442f5", size = 2168627, upload-time = "2026-06-12T22:44:10.458Z" },
 ]
 
 [[package]]

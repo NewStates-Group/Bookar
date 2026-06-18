@@ -1,0 +1,146 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block extrahead %}
+{{ block.super }}
+<style>
+    #bookar-toast-container {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        z-index: 10000;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        max-width: 380px;
+    }
+    .bookar-toast {
+        background: #1e293b;
+        color: #fff;
+        padding: 14px 18px;
+        border-radius: 12px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+        font-size: 13px;
+        line-height: 1.4;
+        animation: slideIn 0.3s ease-out;
+        cursor: pointer;
+        border-left: 4px solid #06b6d4;
+    }
+    .bookar-toast:hover {
+        background: #0f172a;
+    }
+    .bookar-toast strong {
+        display: block;
+        margin-bottom: 2px;
+        font-size: 14px;
+    }
+    .bookar-toast .time {
+        display: block;
+        font-size: 11px;
+        color: #94a3b8;
+        margin-top: 4px;
+    }
+    @keyframes slideIn {
+        from { transform: translateX(100%); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
+    }
+</style>
+{% endblock %}
+
+{% block footer %}
+{{ block.super }}
+<div id="bookar-toast-container"></div>
+<script>
+(function() {
+    if (typeof WebSocket === 'undefined') return;
+
+    var protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    var wsUrl = protocol + '//' + window.location.host + '/ws/admin/updates/';
+    var socket = null;
+    var reconnectTimer = null;
+    var reconnectAttempts = 0;
+    var maxReconnect = 5;
+
+    function connect() {
+        if (socket && socket.readyState === WebSocket.OPEN) return;
+        socket = new WebSocket(wsUrl);
+
+        socket.onopen = function() {
+            reconnectAttempts = 0;
+            console.log('[Bookar Admin] WebSocket conectado');
+        };
+
+        socket.onmessage = function(event) {
+            try {
+                var data = JSON.parse(event.data);
+                handleAdminEvent(data);
+            } catch(e) {}
+        };
+
+        socket.onclose = function() {
+            if (reconnectAttempts < maxReconnect) {
+                reconnectAttempts++;
+                var delay = Math.min(1000 * Math.pow(2, reconnectAttempts - 1), 10000);
+                reconnectTimer = setTimeout(connect, delay);
+            }
+        };
+
+        socket.onerror = function() {
+            socket.close();
+        };
+    }
+
+    function handleAdminEvent(data) {
+        if (data.event === 'receipt_new') {
+            showToast(
+                'Novo comprovativo',
+                (data.user_name || 'Alguém') + ' enviou um comprovativo para ' + (data.plan_name || 'um plano') + '.',
+                data.receipt_id
+            );
+        }
+    }
+
+    function showToast(title, message, receiptId) {
+        var container = document.getElementById('bookar-toast-container');
+        if (!container) return;
+
+        var toast = document.createElement('div');
+        toast.className = 'bookar-toast';
+        toast.innerHTML = '<strong>' + escapeHtml(title) + '</strong>' +
+                          escapeHtml(message) +
+                          '<span class="time">Clique para ver no admin</span>';
+
+        toast.addEventListener('click', function() {
+            var url = '/admin/accounts/paymentreceipt/';
+            if (receiptId) url += receiptId + '/change/';
+            window.location.href = url;
+        });
+
+        container.appendChild(toast);
+
+        setTimeout(function() {
+            if (toast.parentNode) {
+                toast.style.opacity = '0';
+                toast.style.transition = 'opacity 0.3s';
+                setTimeout(function() {
+                    if (toast.parentNode) toast.parentNode.removeChild(toast);
+                }, 300);
+            }
+        }, 8000);
+    }
+
+    function escapeHtml(text) {
+        var div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    connect();
+
+    window.addEventListener('beforeunload', function() {
+        if (socket) socket.close();
+        if (reconnectTimer) clearTimeout(reconnectTimer);
+    });
+})();
+</script>
+{% endblock %}

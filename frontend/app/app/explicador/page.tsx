@@ -93,24 +93,24 @@ export default function ExplicadorPage() {
 
   return (
     /* ChatGPT-style: vertically centered, content pinned to mid-screen */
-    <div className="flex flex-col items-center justify-center min-h-[80vh] px-4 md:px-8 bg-background">
+    <div className="flex flex-col items-center justify-center min-h-screen px-4 md:px-8">
       <div className="w-full max-w-2xl">
 
         {/* Rotating Greeting */}
-        <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-slate-800 text-center mb-8">
+        <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-slate-800 dark:text-neutral-100 text-center mb-8">
           {greeting}
         </h1>
 
         {/* Pill Input */}
         <form onSubmit={(e) => handleSubmitPrompt(e)} className="mb-6">
-          <div className="flex items-center gap-2 bg-white border border-slate-200 focus-within:border-cyan-400 focus-within:ring-4 focus-within:ring-cyan-500/10 rounded-full px-4 py-2 shadow-md shadow-slate-100/80 transition-all duration-300">
+          <div className="flex items-center gap-2 bg-white dark:bg-neutral-900 border border-slate-200 dark:border-slate-700 focus-within:border-cyan-400 focus-within:ring-4 focus-within:ring-cyan-500/10 rounded-full px-4 py-2 shadow-md shadow-slate-100/80 dark:shadow-none transition-all duration-300">
             <input
               ref={inputRef}
               placeholder="Escreve o assunto que queres dominar..."
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
               disabled={isCreating}
-              className="flex-1 h-11 bg-transparent text-slate-800 placeholder:text-slate-400 text-sm px-2 outline-none border-0 focus:ring-0"
+              className="flex-1 h-11 bg-transparent text-slate-800 dark:text-neutral-100 placeholder:text-slate-400 dark:placeholder:text-neutral-500 text-sm px-2 outline-none border-0 focus:ring-0"
             />
 
             {/* Mic button */}
@@ -119,7 +119,7 @@ export default function ExplicadorPage() {
               onClick={handleMic}
               disabled={isCreating}
               title="Falar"
-              className="w-9 h-9 flex items-center justify-center rounded-full text-slate-400 hover:text-cyan-600 hover:bg-cyan-50 transition-all duration-200 flex-shrink-0 cursor-pointer"
+              className="w-9 h-9 flex items-center justify-center rounded-full text-slate-400 dark:text-neutral-500 hover:text-cyan-600 hover:bg-cyan-50 dark:hover:bg-cyan-950/30 transition-all duration-200 flex-shrink-0 cursor-pointer"
             >
               <Mic className="w-4 h-4" />
             </button>
@@ -128,7 +128,7 @@ export default function ExplicadorPage() {
             <Button
               type="submit"
               disabled={isCreating || !prompt.trim()}
-              className="w-9 h-9 p-0 bg-cyan-500 hover:bg-cyan-600 disabled:bg-slate-200 disabled:text-slate-400 text-white rounded-full flex items-center justify-center shadow-sm shadow-cyan-500/20 transition-all duration-200 flex-shrink-0"
+              className="w-9 h-9 p-0 bg-cyan-500 hover:bg-cyan-600 disabled:bg-slate-200 dark:disabled:bg-neutral-700 disabled:text-slate-400 dark:disabled:text-neutral-500 text-white rounded-full flex items-center justify-center shadow-sm shadow-cyan-500/20 transition-all duration-200 flex-shrink-0"
             >
               {isCreating ? (
                 <Loader2 className="w-4 h-4 animate-spin" />

@@ -232,20 +232,19 @@ export default function ResetPasswordPage() {
                 className="hidden lg:flex w-1/2 bg-black items-center justify-center relative overflow-hidden"
             >
                 <div className="absolute inset-0 bg-gradient-to-bl from-cyan-500/20 to-black/40 z-10" />
-                <Image
-                    src="/login.jpg"
-                    alt="Reset Password Background"
-                    fill
-                    className="object-cover opacity-50"
-                    priority
-                />
                 <div className="relative z-20 text-white p-12 max-w-lg">
                     <motion.div
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.2, duration: 0.5 }}
                     >
-                        <Image src="/logo-white.png" width={60} height={60} alt="Bookar Logo" className="mb-8" />
+                        <Link
+                            href="/"
+                            className="flex flex-row items-center gap-2 mb-8"
+                        >
+                            <Image alt="Bookar Logo" src="/logo-white.png" className="text-white" width={55} height={55} />
+                            <p className={`font-bold text-5xl text-white text-left`}>Bookar</p>
+                        </Link>
                         <h1 className="text-5xl font-bold mb-6">Segurança em primeiro lugar.</h1>
                         <p className="text-xl text-gray-300">
                             Escolha uma senha que você não usou antes para garantir que sua conta permaneça protegida.

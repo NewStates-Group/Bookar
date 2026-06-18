@@ -7,15 +7,15 @@ export default function PencilRequests({ activePencilRequests }: { activePencilR
             {activePencilRequests.map((req) => (
                 <Card
                     key={req.connectionId}
-                    className="p-4 border border-amber-100 bg-white shadow-2xl animate-in slide-in-from-top duration-300 text-slate-800"
+                    className="p-4 border border-amber-100 dark:border-amber-900/50 bg-white dark:bg-neutral-900 shadow-2xl animate-in slide-in-from-top duration-300 text-slate-800 dark:text-neutral-100"
                 >
                     <div className="flex gap-2.5">
                         <div className="w-9 h-9 rounded-full bg-amber-500/10 flex items-center justify-center text-amber-600 mt-0.5">
                             <Pencil className="w-5 h-5" />
                         </div>
                         <div>
-                            <h4 className="font-bold text-slate-850 text-sm">Pedido de lápis</h4>
-                            <p className="text-xs text-slate-500 mt-0.5">
+                            <h4 className="font-bold text-slate-800 dark:text-neutral-200 text-sm">Pedido de lápis</h4>
+                            <p className="text-xs text-slate-500 dark:text-neutral-400 mt-0.5">
                                 <strong>{req.name}</strong> pediu o lápis.
                             </p>
                         </div>

@@ -261,7 +261,7 @@ export default function CoursesPage() {
         setShowNameModal(true);
       }
     }
-  }, [session]);
+  }, [session?.accessToken]);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -524,7 +524,7 @@ export default function CoursesPage() {
       <Dialog open={showImportModal} onOpenChange={setShowImportModal}>
         <DialogContent className="sm:max-w-[450px]">
           <div className="text-center space-y-4 pt-4">
-            <div className="w-16 h-16 bg-cyan-500/10 rounded-full flex items-center justify-center mx-auto">
+            <div className="w-16 h-16 bg-cyan-500/10 dark:bg-cyan-500/20 rounded-full flex items-center justify-center mx-auto">
               <Share2 className="w-8 h-8 text-cyan-500" />
             </div>
             <DialogTitle className="text-2xl font-bold text-balance">Novo Curso Disponível!</DialogTitle>
@@ -575,7 +575,7 @@ export default function CoursesPage() {
       <div className="flex justify-between items-center mb-8">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold">Os Meus Cursos</h1>
-          <span className="text-sm text-gray-700">Crie cursos com IA e aprenda com eles!</span>
+          <span className="text-sm text-gray-700 dark:text-neutral-400">Crie cursos com IA e aprenda com eles!</span>
         </div>
         <div>
           <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -587,24 +587,24 @@ export default function CoursesPage() {
                 </span>
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[480px] p-6 overflow-hidden border border-slate-100 rounded-3xl shadow-2xl bg-white">
+            <DialogContent className="sm:max-w-[480px] p-6 overflow-hidden border border-slate-100 dark:border-neutral-700 rounded-3xl shadow-2xl bg-white dark:bg-neutral-950">
               <div className="text-center space-y-5 pt-4">
-                <div className="w-16 h-16 bg-rose-500/10 rounded-2xl flex items-center justify-center mx-auto border border-rose-500/10 animate-pulse">
+                <div className="w-16 h-16 bg-rose-500/10 dark:bg-rose-500/20 rounded-2xl flex items-center justify-center mx-auto border border-rose-500/10 dark:border-rose-500/30 animate-pulse">
                   <Heart className="w-8 h-8 text-rose-500 fill-rose-500/20" />
                 </div>
 
-                <DialogTitle className="text-xl font-extrabold text-slate-800 leading-tight">
+                <DialogTitle className="text-xl font-extrabold text-slate-800 dark:text-neutral-100 leading-tight">
                   Serviço Indisponível
                 </DialogTitle>
 
-                <DialogDescription className="text-base text-slate-500 leading-relaxed max-w-sm mx-auto text-center">
+                <DialogDescription className="text-base text-slate-500 dark:text-neutral-400 leading-relaxed max-w-sm mx-auto text-center">
                   Devido aos custos operacionais das APIs de IAs a funcionalidade de criação de novos cursos está temporariamente suspensa.
                 </DialogDescription>
               </div>
 
-              <div className="p-4 rounded-2xl bg-gradient-to-r from-rose-50/50 via-slate-50 to-slate-50 border border-slate-100 my-5 text-left space-y-2">
-                <h4 className="text-base font-bold text-slate-700">Como posso ajudar?</h4>
-                <p className="text-base text-slate-500 leading-relaxed">
+              <div className="p-4 rounded-2xl bg-gradient-to-r from-rose-50/50 via-slate-50 to-slate-50 dark:from-rose-950/20 dark:via-neutral-900 dark:to-neutral-900 border border-slate-100 dark:border-neutral-700 my-5 text-left space-y-2">
+                <h4 className="text-base font-bold text-slate-700 dark:text-neutral-200">Como posso ajudar?</h4>
+                <p className="text-base text-slate-500 dark:text-neutral-400 leading-relaxed">
                   Se valoriza o Bookar, considere contribuir para ajudar na retomada da funcionalidade!
                 </p>
               </div>
@@ -637,7 +637,7 @@ export default function CoursesPage() {
           <div className="mb-4">
             <BookOpen className="w-10 h-10 text-primary/60" />
           </div>
-          <h3 className="text-xl font-semibold mb-2">Nenhum curso</h3>
+          <h3 className="text-xl font-semibold mb-2 dark:text-neutral-100">Nenhum curso</h3>
           <p className="text-muted-foreground text-center max-w-md mb-6">
             Comece sua jornada, crie um curso personalizado.
           </p>
@@ -647,14 +647,14 @@ export default function CoursesPage() {
           {courses.map((course) => (
             <Card
               key={`${course.id}`}
-              className="group md:max-w-sm p-4 bg-white border border-slate-200/70 rounded-2xl shadow-sm hover:shadow-md hover:border-slate-300 transition-all duration-300 flex flex-col gap-0 overflow-hidden"
+              className="group md:max-w-sm p-4 bg-white dark:bg-neutral-900 border border-slate-200/70 dark:border-neutral-700 rounded-2xl shadow-sm hover:shadow-md hover:border-slate-300 dark:hover:border-neutral-600 transition-all duration-300 flex flex-col gap-0 overflow-hidden"
             >
               {course.status === "PROCESSING" && !course.title && !course.thumb ? (
                 <div className="flex flex-col items-center justify-center h-full rounded-lg py-8 relative">
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="absolute top-0 right-0 text-gray-400 hover:text-red-500 hover:bg-red-50"
+                    className="absolute top-0 right-0 text-gray-400 dark:text-neutral-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950"
                     onClick={() =>
                       setCourseToDelete({ id: course.id, title: course.title })
                     }
@@ -666,22 +666,22 @@ export default function CoursesPage() {
                       <X className="w-4 h-4" />
                     )}
                   </Button>
-                  <Loader2 className="w-12 h-12 text-slate-600 animate-spin" />
-                  <span className="text-gray-500 mt-2">Gerando curso...</span>
+                  <Loader2 className="w-12 h-12 text-slate-600 dark:text-neutral-400 animate-spin" />
+                  <span className="text-gray-500 dark:text-neutral-400 mt-2">Gerando curso...</span>
                 </div>
               ) : course.status === "FAILED" || course.status === "ERROR" ? (
                 <div className="flex flex-col items-center justify-center h-full rounded-lg py-8 gap-3">
-                  <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center">
-                    <X className="w-6 h-6 text-red-500" />
-                  </div>
-                  <div className="text-center">
-                    <p className="font-semibold text-red-600">Geração Falhou</p>
-                    <p className="text-sm text-gray-400 mt-1">{course.title || "Curso sem título"}</p>
-                  </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="border-red-200 text-red-500 hover:bg-red-50 gap-2"
+                <div className="w-12 h-12 rounded-full bg-red-100 dark:bg-red-900 flex items-center justify-center">
+                  <X className="w-6 h-6 text-red-500 dark:text-red-400" />
+                </div>
+                <div className="text-center">
+                  <p className="font-semibold text-red-600 dark:text-red-400">Geração Falhou</p>
+                  <p className="text-sm text-gray-400 dark:text-neutral-500 mt-1">{course.title || "Curso sem título"}</p>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="border-red-200 dark:border-red-800 text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950 gap-2"
                     onClick={() =>
                       setCourseToDelete({ id: course.id, title: course.title })
                     }
@@ -708,9 +708,9 @@ export default function CoursesPage() {
                         className="rounded-xl object-cover w-full h-full"
                       />
                     ) : (
-                      <div className="flex flex-col items-center justify-center h-full border rounded-lg">
-                        <ImageOff className="w-12 h-12 text-slate-400" />
-                        <span className="text-gray-500">
+                    <div className="flex flex-col items-center justify-center h-full border rounded-lg dark:border-neutral-700">
+                      <ImageOff className="w-12 h-12 text-slate-400 dark:text-neutral-500" />
+                      <span className="text-gray-500 dark:text-neutral-400">
                           Capa Indisponível
                         </span>
                       </div>
@@ -719,11 +719,11 @@ export default function CoursesPage() {
                   <div className="flex items-center justify-between mb-1">
                     <h1 className="text-lg">{course.title}</h1>
                   </div>
-                  <p className="line-clamp-2 text-gray-600 text-base">{course.desc}</p>
-                  <Link href={'/app/courses/' + course.id} className="text-blue-600 mt-2 mb-4">Veja mais</Link>
+                  <p className="line-clamp-2 text-gray-600 dark:text-neutral-400 text-base">{course.desc}</p>
+                  <Link href={'/app/courses/' + course.id} className="text-blue-600 dark:text-blue-400 mt-2 mb-4">Veja mais</Link>
                   <div className="flex items-center justify-between mt-auto">
                     <div className="flex items-center gap-2">
-                      <span className="inline-flex items-center rounded-md bg-cyan-300/10 px-2 py-1 text-xs font-medium text-blue-400 inset-ring inset-ring-blue-300/30">
+                      <span className="inline-flex items-center rounded-md bg-cyan-300/10 dark:bg-cyan-900/30 px-2 py-1 text-xs font-medium text-blue-400 dark:text-cyan-300 inset-ring inset-ring-blue-300/30 dark:inset-ring-cyan-700/30">
                         {course.level === 'B' ? 'Iniciante' : course.level === 'IT' ? 'Intermediário' : 'Avançado'}
                       </span>
                     </div>
@@ -750,25 +750,25 @@ export default function CoursesPage() {
         </div>
       )}
 
-      <div className="pt-10 border-t border-slate-200/80 mt-10">
+      <div className="pt-10 border-t border-slate-200/80 dark:border-neutral-800 mt-10">
         <div className="flex flex-col gap-4 flex-col md:flex-row items-end md:items-center justify-between mb-6">
           <div>
-            <h2 className="text-xl md:text-2xl font-bold text-slate-900 tracking-tight">
+            <h2 className="text-xl md:text-2xl font-bold text-slate-900 dark:text-neutral-100 tracking-tight">
               Explore Cursos da Comunidade
             </h2>
-            <p className="text-sm text-slate-500 mt-0.5">
+            <p className="text-sm text-slate-500 dark:text-neutral-400 mt-0.5">
               Aprenda com cursos criados por outros estudantes e adicione-os à sua conta
             </p>
           </div>
 
           <div className="relative w-full sm:max-w-xs">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-neutral-500 pointer-events-none" />
             <Input
               type="search"
               placeholder="Pesquisar por curso…"
               value={communitySearchInput}
               onChange={(e) => setCommunitySearchInput(e.target.value)}
-              className="pl-9 h-10 rounded-xl border-slate-200/80 bg-white"
+              className="pl-9 h-10 rounded-xl border-slate-200/80 dark:border-neutral-700 bg-white dark:bg-neutral-900"
             />
           </div>
         </div>
@@ -778,9 +778,9 @@ export default function CoursesPage() {
             <Loader2 className="w-8 h-8 animate-spin text-cyan-500" />
           </div>
         ) : featuredCourses.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-center rounded-2xl border border-dashed border-slate-200 bg-slate-50/50">
-            <Compass className="w-10 h-10 text-slate-300 mb-3" />
-            <p className="font-medium text-slate-600">
+          <div className="flex flex-col items-center justify-center py-16 text-center rounded-2xl border border-dashed border-slate-200 dark:border-neutral-700 bg-slate-50/50 dark:bg-neutral-900/50">
+            <Compass className="w-10 h-10 text-slate-300 dark:text-neutral-600 mb-3" />
+            <p className="font-medium text-slate-600 dark:text-neutral-400">
               {communitySearch
                 ? "Nenhum curso encontrado para esta pesquisa."
                 : "Ainda não há cursos da comunidade."}
@@ -805,9 +805,9 @@ export default function CoursesPage() {
                 <div
                   key={fc.id}
                   onClick={() => handleOpenPreview(fc.id)}
-                  className="bg-white border border-slate-200/70 rounded-xl p-3 group cursor-pointer flex flex-col hover:border-cyan-200/80 hover:shadow-md transition-all duration-300"
+                  className="bg-white dark:bg-neutral-900 border border-slate-200/70 dark:border-neutral-700 rounded-xl p-3 group cursor-pointer flex flex-col hover:border-cyan-200/80 dark:hover:border-cyan-800 hover:shadow-md transition-all duration-300"
                 >
-                  <div className="aspect-[16/9] w-full rounded-lg overflow-hidden mb-3 relative bg-slate-50 border border-slate-200/60">
+                  <div className="aspect-[16/9] w-full rounded-lg overflow-hidden mb-3 relative bg-slate-50 dark:bg-neutral-800 border border-slate-200/60 dark:border-neutral-700">
                     {fc.thumb ? (
                       <img
                         src={
@@ -819,21 +819,21 @@ export default function CoursesPage() {
                         className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                       />
                     ) : (
-                      <div className="flex flex-col items-center justify-center h-full text-slate-400 bg-slate-50">
-                        <ImageOff className="w-7 h-7 text-slate-300" />
-                        <span className="text-[9px] mt-1 text-slate-400">Sem capa</span>
+                      <div className="flex flex-col items-center justify-center h-full text-slate-400 dark:text-neutral-500 bg-slate-50 dark:bg-neutral-800">
+                        <ImageOff className="w-7 h-7 text-slate-300 dark:text-neutral-600" />
+                        <span className="text-[9px] mt-1 text-slate-400 dark:text-neutral-500">Sem capa</span>
                       </div>
                     )}
                   </div>
 
-                  <h3 className="font-semibold text-base text-slate-800 line-clamp-2 group-hover:text-cyan-600 transition-colors leading-tight mb-1 capitalize">
+                  <h3 className="font-semibold text-base text-slate-800 dark:text-neutral-100 line-clamp-2 group-hover:text-cyan-600 dark:group-hover:text-cyan-400 transition-colors leading-tight mb-1 capitalize">
                     {fc.title}
                   </h3>
 
-                  <p className="text-sm text-slate-500 line-clamp-2">{fc.desc}</p>
+                  <p className="text-sm text-slate-500 dark:text-neutral-400 line-clamp-2">{fc.desc}</p>
 
                   <div className="flex flex-wrap items-center gap-2 mt-3">
-                    <span className="text-xs text-cyan-700 font-bold bg-cyan-100 px-2 py-0.5 rounded-sm">
+                    <span className="text-xs text-cyan-700 dark:text-cyan-300 font-bold bg-cyan-100 dark:bg-cyan-900 px-2 py-0.5 rounded-sm">
                       {fc.level === "B"
                         ? "Iniciante"
                         : fc.level === "IT"
@@ -852,15 +852,15 @@ export default function CoursesPage() {
 
       {/* ── MODAL: PREVIEW DO CURSO DA COMUNIDADE ── */}
       <Dialog open={showPreviewModal} onOpenChange={setShowPreviewModal}>
-        <DialogContent className="sm:max-w-[520px] p-6 max-h-[85vh] overflow-y-auto border border-slate-100 rounded-md shadow-2xl bg-white scrollbar-thin">
+        <DialogContent className="sm:max-w-[520px] p-6 max-h-[85vh] overflow-y-auto border border-slate-100 dark:border-neutral-700 rounded-md shadow-2xl bg-white dark:bg-neutral-950 scrollbar-thin">
           {previewLoading ? (
             <div className="flex flex-col items-center justify-center py-20 gap-4">
               <Loader2 className="w-10 h-10 animate-spin text-cyan-500" />
-              <p className="text-xs font-bold text-slate-500 animate-pulse">Obtendo detalhes do curso...</p>
+              <p className="text-xs font-bold text-slate-500 dark:text-neutral-400 animate-pulse">Obtendo detalhes do curso...</p>
             </div>
           ) : previewData ? (
             <div className="space-y-6">
-              <div className="aspect-video w-full rounded-2xl overflow-hidden relative bg-slate-50 border border-slate-100">
+              <div className="aspect-video w-full rounded-2xl overflow-hidden relative bg-slate-50 dark:bg-neutral-800 border border-slate-100 dark:border-neutral-700">
                 {previewData.thumb ? (
                   <img
                     src={previewData.thumb.startsWith('http') ? previewData.thumb : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/media/${previewData.thumb}`}
@@ -868,57 +868,57 @@ export default function CoursesPage() {
                     className="w-full h-full object-cover"
                   />
                 ) : (
-                  <div className="flex flex-col items-center justify-center h-full text-slate-400">
+                  <div className="flex flex-col items-center justify-center h-full text-slate-400 dark:text-neutral-500">
                     <ImageOff className="w-12 h-12 text-slate-350" />
                   </div>
                 )}
               </div>
 
               <div className="space-y-2">
-                <DialogTitle className="text-xl md:text-2xl font-black text-slate-800 leading-snug capitalize">
+                <DialogTitle className="text-xl md:text-2xl font-black text-slate-800 dark:text-neutral-100 leading-snug capitalize">
                   {previewData.title}
                 </DialogTitle>
                 {previewData.owner_name && (
                   <div className="flex gap-3">
-                    <p className="text-xs text-slate-400 font-medium">
-                      Criado por <span className="text-slate-600 font-bold">{previewData.owner_name}</span>
+                    <p className="text-xs text-slate-400 dark:text-neutral-500 font-medium">
+                      Criado por <span className="text-slate-600 dark:text-neutral-200 font-bold">{previewData.owner_name}</span>
                     </p>
-                    <p className="text-xs text-slate-400 font-medium">
-                      Nível <span className="text-slate-600 font-bold">
+                    <p className="text-xs text-slate-400 dark:text-neutral-500 font-medium">
+                      Nível <span className="text-slate-600 dark:text-neutral-200 font-bold">
                         {previewData.level === 'B' ? 'Iniciante' : previewData.level === 'IT' ? 'Intermediário' : 'Avançado'}
                       </span>
                     </p>
                   </div>
                 )}
-                <DialogDescription className="text-sm md:text-sm text-slate-500 leading-relaxed">
+                <DialogDescription className="text-sm md:text-sm text-slate-500 dark:text-neutral-400 leading-relaxed">
                   {previewData.desc || "Sem descrição disponível para este curso."}
                 </DialogDescription>
               </div>
 
               {/* Modules list preview */}
               <div className="space-y-3">
-                <h4 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                  <Layers className="w-3.5 h-3.5 text-cyan-500" />
+                <h4 className="text-xs font-extrabold text-slate-800 dark:text-neutral-100 uppercase tracking-wider flex items-center gap-1.5">
+                  <Layers className="w-3.5 h-3.5 text-cyan-500 dark:text-cyan-400" />
                   Grade Curricular ({previewData.module_count} {previewData.module_count > 1 ? 'Módulos' : 'Módulo'})
                 </h4>
 
                 <div className="space-y-2.5 max-h-[220px] overflow-y-auto pr-1.5 scrollbar-thin">
                   {previewData.modules.map((mod, idx) => (
-                    <div key={mod.id} className="p-3 rounded-2xl bg-slate-50 border border-slate-100 space-y-1.5">
+                    <div key={mod.id} className="p-3 rounded-2xl bg-slate-50 dark:bg-neutral-800 border border-slate-100 dark:border-neutral-700 space-y-1.5">
                       <div className="flex items-center justify-between">
-                        <span className="text-sm font-extrabold text-slate-700 capitalize">
+                        <span className="text-sm font-extrabold text-slate-700 dark:text-neutral-200 capitalize">
                           Módulo {idx + 1}: {mod.name} ({mod.lesson_count} Aulas)
                         </span>
                       </div>
-                      {mod.desc && <p className="text-sm text-slate-400 line-clamp-1">{mod.desc}</p>}
+                      {mod.desc && <p className="text-sm text-slate-400 dark:text-neutral-500 line-clamp-1">{mod.desc}</p>}
 
                       {/* Lesson title listing */}
                       {mod.lessons && mod.lessons.length > 0 && (
-                        <div className="pl-3 border-l-2 border-slate-200 pt-1 space-y-1">
+                        <div className="pl-3 border-l-2 border-slate-200 dark:border-neutral-700 pt-1 space-y-1">
                           {mod.lessons.map((lesson, lIdx) => (
-                            <div key={lIdx} className="text-xs text-slate-500 flex items-center gap-1">
+                            <div key={lIdx} className="text-xs text-slate-500 dark:text-neutral-400 flex items-center gap-1">
                               <span className="w-1 h-1 rounded-full bg-cyan-400 flex-shrink-0" />
-                              <span className="font-semibold line-clamp-1">{lesson.title}</span>
+                              <span className="font-semibold line-clamp-1 dark:text-neutral-300">{lesson.title}</span>
                             </div>
                           ))}
                         </div>
@@ -950,14 +950,14 @@ export default function CoursesPage() {
                 <Button
                   variant="ghost"
                   onClick={() => setShowPreviewModal(false)}
-                  className="py-2 border rounded-lg text-xs font-bold text-slate-450 hover:bg-slate-50 hover:text-slate-700 transition-colors"
+                  className="py-2 border rounded-lg text-xs font-bold text-slate-450 dark:text-neutral-400 hover:bg-slate-50 dark:hover:bg-neutral-800 hover:text-slate-700 dark:hover:text-neutral-200 transition-colors"
                 >
                   Fechar
                 </Button>
               </div>
             </div>
           ) : (
-            <div className="text-center py-8 text-slate-400">
+            <div className="text-center py-8 text-slate-400 dark:text-neutral-500">
               Erro ao carregar pré-visualização.
             </div>
           )}

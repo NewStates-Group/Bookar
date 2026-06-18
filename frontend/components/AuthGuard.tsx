@@ -59,13 +59,12 @@ export function AuthGuard({
     }
   }, [isAppRoute, update]);
 
-  /**
-   * Navigation rules
-   */
+  const sessionError = session?.error;
+
   useEffect(() => {
     if (status === "loading") return;
 
-    if (session?.error === "RefreshAccessTokenError") {
+    if (sessionError === "RefreshAccessTokenError") {
       if (typeof window !== "undefined" && isExplicadorRoomPath(pathname)) {
         savePendingExplicadorRoom(pathname + window.location.search);
       }
@@ -92,7 +91,7 @@ export function AuthGuard({
       }
       return;
     }
-  }, [pathname, router, session, status, isAppRoute, isPublicRoute]);
+  }, [pathname, router, sessionError, status, isAppRoute, isPublicRoute]);
 
   /**
    * Show loader ONLY on the very first load before the session is known.

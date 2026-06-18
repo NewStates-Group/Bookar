@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { AlertCircle, RefreshCw } from "lucide-react";
@@ -13,11 +12,6 @@ export default function Error({
     error: Error & { digest?: string };
     reset: () => void;
 }) {
-    useEffect(() => {
-        // Log the error to an error reporting service
-        // console.error(error);
-    }, [error]);
-
     return (
         <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4 text-center text-foreground">
             <motion.div
@@ -33,7 +27,7 @@ export default function Error({
                 <div className="space-y-3">
                     <h1 className="text-4xl font-black tracking-tight">Ops! Algo correu mal.</h1>
                     <p className="text-muted-foreground">
-                        Encontramos um erro inesperado. Já fomos notificados e estamos a trabalhar para o resolver.
+                        Encontramos um erro inesperado, lamentamos imenso e pedimos que clique em uma das opções abaixo.
                     </p>
                     {process.env.NODE_ENV === "development" && (
                         <div className="mt-4 rounded-lg bg-muted p-4 text-left font-mono text-xs overflow-auto max-h-32 border border-border">
@@ -50,7 +44,7 @@ export default function Error({
                         className="rounded-full px-8 gap-2 w-full sm:w-auto"
                     >
                         <RefreshCw className="h-4 w-4" />
-                        Tentar Novamente
+                        Recarregar
                     </Button>
                     <Button asChild variant="outline" size="lg" className="rounded-full px-8 w-full sm:w-auto">
                         <Link href="/">Voltar ao Início</Link>

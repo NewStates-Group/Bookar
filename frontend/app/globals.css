@@ -121,18 +121,41 @@
 }
 
 @keyframes shimmer {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(100%); }
+  0% {
+    transform: translateX(-100%);
+  }
+
+  100% {
+    transform: translateX(100%);
+  }
 }
 
 @keyframes pulse-slow {
-  0%, 100% { opacity: 0.15; transform: scale(1); }
-  50% { opacity: 0.3; transform: scale(1.1); }
+
+  0%,
+  100% {
+    opacity: 0.15;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.3;
+    transform: scale(1.1);
+  }
 }
 
 @keyframes pulse-slower {
-  0%, 100% { opacity: 0.1; transform: scale(1); }
-  50% { opacity: 0.25; transform: scale(1.15); }
+
+  0%,
+  100% {
+    opacity: 0.1;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.25;
+    transform: scale(1.15);
+  }
 }
 
 @layer base {
@@ -142,5 +165,29 @@
 
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+@keyframes slide {
+  0% {
+    transform: translateX(-100%);
+  }
+
+  50% {
+    transform: translateX(200%);
+  }
+
+  100% {
+    transform: translateX(-100%);
+  }
+}
+
+@keyframes shine {
+  0% {
+    transform: translateX(-100%);
+  }
+
+  100% {
+    transform: translateX(100%);
   }
 }

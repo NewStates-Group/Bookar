@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { BookOpen, GraduationCap, User, LogOut, Settings, Network, Bot } from 'lucide-react'
+import { BookOpen, GraduationCap, User, LogOut, Settings, Network, Bot, Crown, BarChart3 } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useSession, signOut } from 'next-auth/react'
@@ -43,7 +43,7 @@ export function FloatingNavbar() {
                         alt="Logo"
                         width={25}
                         height={25}
-                        className="w-9 h-9 md:w-10 md:h-10 object-contain"
+                        className="w-9 h-9 md:w-10 md:h-10 object-contain dark:invert"
                         priority
                     />
                     <span className="hidden md:block text-3xl font-bold ml-2">Bookar</span>
@@ -160,18 +160,30 @@ export function FloatingNavbar() {
                                 <span>Perfil</span>
                             </Link>
                         </DropdownMenuItem>
+                        <DropdownMenuItem asChild>
+                            <Link href="/app/stats" className="cursor-pointer flex items-center gap-2">
+                                <BarChart3 className="w-4 h-4 text-muted-foreground" />
+                                <span>Estatísticas</span>
+                            </Link>
+                        </DropdownMenuItem>
                         {/* <DropdownMenuItem asChild>
                             <Link href="/app/settings" className="cursor-pointer flex items-center gap-2">
                                 <Settings className="w-4 h-4" />
                                 <span>Configurações</span>
                             </Link>
                         </DropdownMenuItem> */}
+                        <DropdownMenuItem asChild>
+                            <Link href="/app/subscription" className="cursor-pointer flex items-center gap-2">
+                                <Crown className="w-4 h-4 text-muted-foreground" />
+                                <span>Subscrição</span>
+                            </Link>
+                        </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
                             onClick={() => signOut({ callbackUrl: "/login" })}
                             className="cursor-pointer text-red-500 focus:text-red-500 flex items-center gap-2"
                         >
-                            <LogOut className="w-4 h-4" />
+                            <LogOut className="w-4 h-4 text-red-500 focus:text-red-500" />
                             <span>Sair</span>
                         </DropdownMenuItem>
                     </DropdownMenuContent>

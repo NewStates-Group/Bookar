@@ -13,13 +13,22 @@ const _geistMono = Geist_Mono({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: 'Bookar',
-  description: 'Aprenda utilizando IA e impulsione sua carreira',
+  description: 'Aprenda mais rápido utilizando IA',
   icons: {
-    icon: "/logo-white.png",
+    icon: [
+      {
+        "url": "/logo-white.png",
+        "media": "(prefers-color-scheme: light)"
+      },
+      {
+        "url": "/logo.png",
+        "media": "(prefers-color-scheme: dark)"
+      }
+    ],
   },
   openGraph: {
     title: 'Bookar',
-    description: 'Aprenda utilizando IA e impulsione sua carreira',
+    description: 'Aprenda mais rápido utilizando IA',
     url: 'https://bookar.study',
     siteName: 'Bookar',
     images: [
@@ -28,16 +37,16 @@ export const metadata: Metadata = {
         width: 800,
         height: 600,
       },
+      {
+        url: 'https://bookar.study/logo.png',
+        width: 800,
+        height: 600,
+      },
     ],
     locale: 'pt-PT',
     type: 'website',
-  },
-  // twitter: {
-  //   card: 'summary_large_image',
-  //   title: 'Bookar',
-  //   description: 'Aprenda utilizando IA e impulsione sua carreira',
-  //   images: ['https://bookar.study/logo.png'],
-  // },
+  }
+  
 }
 
 export default function RootLayout({
@@ -72,7 +81,6 @@ export default function RootLayout({
           </Providers>
         </ThemeProvider>
         <Toaster position='top-right' />
-        {/* <script defer src='https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516' integrity='sha512-z4PhNX7vuL3xVChQ1m2AB9Yg5AULVxXcg/SpIdNs6c5H0NE8XYXysP+DGNKHfuwvY7kxvUdBeoGlODJ6+SfaPg==' crossOrigin='anonymous'></script> */}
       </body>
       <GoogleAnalytics gaId={process.env.NEXT_PUBLIC_GA_ID ?? ""} />
     </html>

@@ -1,0 +1,1098 @@
+import concurrent.futures
+import logging
+import shutil
+import subprocess
+import tempfile
+import uuid
+from io import BytesIO
+from pathlib import Path
+
+from celery import shared_task
+from utils.mail import send_certificate_email
+from utils.websocket import send_user_update
+from django.conf import settings
+from django.contrib.auth import get_user_model
+from django.core.files.base import ContentFile
+from django.db import transaction
+from google.genai import types
+from PIL import Image
+
+from .exceptions import LessonDoesNotExist, ThumbnailCreationError
+from .models import (
+    Choice,
+    Course,
+    CourseGenerationContext,
+    Lesson,
+    Module,
+    Question,
+    Quiz,
+)
+from .providers import AllProvidersFailed, get_audio_chain, get_image_chain
+from .utils import (
+    extract_json,
+    generate_text_with_fallback,
+    get_genai_client,
+    invalidate_course_cache,
+    safe_gemini_call,
+)
+
+logger = logging.getLogger(__name__)
+
+
+def _normalize_audio(input_path, output_path):
+    cmd = [
+        "ffmpeg",
+        "-y",
+        "-i",
+        str(input_path),
+        "-ac",
+        "2",
+        "-ar",
+        "44100",
+        "-c:a",
+        "pcm_s16le",
+        str(output_path),
+    ]
+    try:
+        subprocess.run(
+            cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+        )
+        return True
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Audio normalization failed for {input_path}: {e}")
+        return False
+
+
+def _generate_audio(client, text, output_path):
+    """Generate audio using Chain of Responsibility."""
+    try:
+        chain = get_audio_chain()
+        chain.handle(text=text, output_path=output_path, client=client)
+        return True
+    except AllProvidersFailed as e:
+        logger.error(f"All audio providers failed: {e}")
+        return False
+
+
+def _generate_image(client, prompt, output_path, timeout=30, context=None):
+    """Generate image using Chain of Responsibility."""
+    img_prompt = f"Hand-drawn whiteboard animation style, minimalist black marker on white board: {prompt}. Any visible text MUST be in Portuguese."
+    try:
+        chain = get_image_chain()
+        chain.handle(
+            prompt=img_prompt, output_path=output_path, client=client, timeout=timeout
+        )
+        return True
+    except AllProvidersFailed as e:
+        logger.error(f"All image providers failed: {e}")
+        return False
+
+
+def _stitch_video(image, audio, output):
+    cmd = [
+        "ffmpeg",
+        "-y",
+        "-loop",
+        "1",
+        "-framerate",
+        "25",
+        "-i",
+        str(image),
+        "-i",
+        str(audio),
+        "-c:v",
+        "libx264",
+        "-tune",
+        "stillimage",
+        "-preset",
+        "ultrafast",
+        "-r",
+        "25",
+        "-pix_fmt",
+        "yuv420p",
+        "-shortest",
+        "-c:a",
+        "aac",
+        str(output),
+    ]
+    try:
+        subprocess.run(
+            cmd,
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=15 * 60,
+        )
+        return True
+    except Exception as e:
+        logger.error(f"FFmpeg failed: {e}")
+        return False
+
+
+def _process_segment(i, segment, client, temp_dir, context=None):
+    narration = segment.get("narration")
+    visual = segment.get("visual_prompt")
+
+    if not narration:
+        return None
+
+    audio = temp_dir / f"s{i}.wav"
+    image = temp_dir / f"s{i}.png"
+    video = temp_dir / f"s{i}.mp4"
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+        audio_future = pool.submit(_generate_audio, client, narration, audio)
+        image_future = pool.submit(_generate_image, client, visual, image, 30, context)
+
+        if not audio_future.result():
+            return None
+        if not image_future.result():
+            return None
+
+    if not _stitch_video(image, audio, video):
+        return None
+    return video
+
+
+@shared_task(
+    bind=True,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_kwargs={"max_retries": 3},
+    default_retry_delay=40,
+)
+def generate_lesson_plan(self, user_id, lesson_id: int):
+    lesson = Lesson.objects.filter(id=lesson_id).first()
+    if not lesson:
+        raise LessonDoesNotExist()
+
+    if lesson.status == "READY" and bool(lesson.lesson_file):
+        logger.info(
+            f"Lesson {lesson_id} already READY and file exists, skipping generation."
+        )
+        return lesson.lesson_file.url
+
+    lesson.status = "PLANNING"
+    lesson.save(update_fields=["status"])
+    send_user_update(
+        user_id,
+        {"type": "lesson_update", "id": lesson.short_id, "status": "PLANNING"},
+    )
+
+    lesson.refresh_from_db()
+    if lesson.status == "CANCELLED" or lesson.module.course.status == "CANCELLED":
+        logger.info(f"Lesson {lesson_id} generation cancelled early.")
+        return None
+
+    if lesson.segments_data:
+        logger.info(
+            f"Lesson {lesson_id} already has segments_data, jumping to media generation."
+        )
+        generate_lesson_media.delay(user_id, lesson_id)
+        return
+
+    try:
+        num_segments = max(1, int(lesson.duration / 30))
+        if num_segments > 30:
+            num_segments = 30
+        words_per_segment = int((lesson.duration / num_segments) * 2.5)
+
+        plan_prompt = f"""
+        Title: {lesson.title}
+        Description: {lesson.desc}
+        Context: {lesson.narration}
+        Target Duration: {lesson.duration} seconds
+        **USE PORTUGUESE ON THE JSON VALUES**
+        **KEYS MUST KEEP THE ORIGINAL ENGLISH NAMES**
+        
+        Task:
+        Generate EXACTLY {num_segments} segments.
+        The total content MUST correspond to {lesson.duration} seconds (~150 words per minute).
+        Each segment should have approximately {int(lesson.duration / num_segments)} seconds of audio.
+        This means each of the {num_segments} segments should have a narration text of roughly {words_per_segment} words.
+        Ensure each 'visual_prompt' is visually unique and describes a DIFFERENT scene progression.
+        
+        Generate a JSON list of {num_segments} segments:
+        [
+        {{
+            "narration": "Detailed and engaging narration for this segment (approx {words_per_segment} words)...",
+            "visual_prompt": "A simple and UNIQUE image scene description for this part..."
+        }},
+        ...
+        ]
+        Make sure the list has EXACTLY {num_segments} objects.
+        """
+
+        response = generate_text_with_fallback(
+            [{"role": "user", "content": plan_prompt}]
+        )
+        segments = (extract_json(response, isList=True) or [])[:num_segments]
+
+        if not segments:
+            raise ValueError("No segments generated")
+
+        lesson.segments_data = segments
+        lesson.save(update_fields=["segments_data"])
+
+        generate_lesson_media.delay(user_id, lesson_id)
+        return
+
+    except Exception as e:
+        with transaction.atomic():
+            lesson.status = "ERROR"
+            lesson.save(update_fields=["status"])
+
+            def _on_error():
+                send_user_update(
+                    user_id,
+                    {"type": "lesson_update", "id": lesson.short_id, "status": "ERROR"},
+                )
+
+            transaction.on_commit(_on_error)
+        raise e
+
+
+@shared_task(
+    bind=True,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_kwargs={"max_retries": 3},
+    default_retry_delay=40,
+)
+def generate_lesson_media(self, user_id, lesson_id: int):
+    lesson = Lesson.objects.filter(id=lesson_id).first()
+    if not lesson:
+        raise LessonDoesNotExist()
+
+    if lesson.status == "READY" and bool(lesson.lesson_file):
+        logger.info(
+            f"Lesson {lesson_id} already READY and file exists, skipping generation."
+        )
+        return lesson.lesson_file.url
+
+    lesson.status = "GENERATING_MEDIA"
+    lesson.save(update_fields=["status"])
+    send_user_update(
+        user_id,
+        {"type": "lesson_update", "id": lesson.short_id, "status": "GENERATING_MEDIA"},
+    )
+
+    lesson.refresh_from_db()
+    if lesson.status == "CANCELLED" or lesson.module.course.status == "CANCELLED":
+        logger.info(f"Lesson {lesson_id} media generation cancelled early.")
+        return None
+
+    segments = lesson.segments_data
+    if not segments:
+        raise ValueError("Cannot generate media: segments_data is empty.")
+
+    temp_dir = Path(tempfile.mkdtemp())
+    client = get_genai_client()
+    try:
+        # --- RESTORED LOGIC WITH INITIAL SEQUENTIAL CHECK ---
+        videos = []
+        context = {"working_provider": None}
+
+        if segments:
+            logger.info(
+                "Processing first segment sequentially to determine functional image provider"
+            )
+            first_video = _process_segment(0, segments[0], client, temp_dir, context)
+            if first_video:
+                videos.append(first_video)
+
+        # Process the rest concurrently, now benefiting from the established functional provider in `context`
+        remaining_segments = segments[1:]
+        if remaining_segments:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+                futures = [
+                    executor.submit(_process_segment, i, seg, client, temp_dir, context)
+                    for i, seg in enumerate(remaining_segments, start=1)
+                ]
+                for future in concurrent.futures.as_completed(futures):
+                    try:
+                        video_path = future.result()
+                        if video_path:
+                            videos.append(video_path)
+                    except Exception as e:
+                        logger.error(f"Segment processing failed: {e}")
+
+        # Sort videos by segment index (s0.mp4, s1.mp4, etc.)
+        videos.sort(key=lambda x: int(x.stem[1:]) if x.stem.startswith("s") else 999)
+
+        if not videos:
+            raise RuntimeError("No video segments created")
+
+        logo_path = settings.BASE_DIR / "static" / "logo.png"
+
+        list_file = temp_dir / "list.txt"
+        list_file.write_text("\n".join(f"file '{v}'" for v in videos))
+
+        # Keep everything in temp_dir to avoid polluting MEDIA_ROOT/Cloudinary
+        concat_output = temp_dir / "concat_output.mp4"
+        final_temp_output = temp_dir / "final_output.mp4"
+
+        # Step 1: Concatenate segments
+        subprocess.run(
+            [
+                "ffmpeg",
+                "-y",
+                "-f",
+                "concat",
+                "-safe",
+                "0",
+                "-i",
+                str(list_file),
+                "-c",
+                "copy",
+                str(concat_output),
+            ],
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=15 * 60,
+        )
+
+        # Step 2: Add logo overlay
+        subprocess.run(
+            [
+                "ffmpeg",
+                "-y",
+                "-i",
+                str(concat_output),
+                "-i",
+                str(logo_path),
+                "-filter_complex",
+                "[1:v]scale=iw*0.08:-1[logo];[logo]format=rgba[logo];[0:v][logo]overlay=20:20",
+                "-c:v",
+                "libx264",
+                "-preset",
+                "veryfast",
+                "-pix_fmt",
+                "yuv420p",
+                "-c:a",
+                "aac",
+                "-b:a",
+                "128k",
+                str(final_temp_output),
+            ],
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=15 * 60,
+        )
+
+        final_filename = f"{uuid.uuid4()}.mp4"
+        with transaction.atomic():
+            with final_temp_output.open("rb") as f:
+                lesson.lesson_file.save(
+                    final_filename,
+                    ContentFile(f.read(), name=final_filename),
+                    save=False,
+                )
+            lesson.status = "READY"
+            lesson.save(update_fields=["lesson_file", "status"])
+
+            def _on_success():
+                invalidate_course_cache(lesson.module.course.uuid, user_id)
+                send_user_update(
+                    user_id,
+                    {
+                        "type": "lesson_update",
+                        "id": lesson.short_id,
+                        "status": "READY",
+                        "lesson_file": lesson.lesson_file.url
+                        if lesson.lesson_file
+                        else "",
+                    },
+                )
+
+            transaction.on_commit(_on_success)
+
+        return lesson.lesson_file.url if lesson.lesson_file else None
+    except Exception as e:
+        with transaction.atomic():
+            lesson.status = "ERROR"
+            lesson.save(update_fields=["status"])
+
+            def _on_error():
+                send_user_update(
+                    user_id,
+                    {"type": "lesson_update", "id": lesson.short_id, "status": "ERROR"},
+                )
+
+            transaction.on_commit(_on_error)
+        raise e
+    finally:
+        shutil.rmtree(temp_dir, ignore_errors=True)
+
+
+@shared_task(
+    bind=True,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_kwargs={"max_retries": 3},
+    default_retry_delay=40,
+)
+def generate_next_module(self, user_pk: int, course_pk: int, module_pk: int = None):
+    try:
+        course = Course.objects.get(pk=course_pk)
+        if course.status == "CANCELLED":
+            logger.info(f"Course {course_pk} next module generation cancelled.")
+            return
+    except Course.DoesNotExist:
+        logger.error(f"Course {course_pk} not found for module generation")
+        return
+
+    existing_modules = course.modules.all().order_by("created_at")
+    modules_context = "\n".join([f"- {m.name}: {m.desc}" for m in existing_modules])
+    prompt = (
+        "You are an expert educational content creator. "
+        "Create the NEXT module for this course in JSON format. "
+        "Don't enumerate the lesson like this 1.1 -, don't enumerate nothing. "
+        "NUNCA use prefixos como 'Módulo 1:', 'Aula 1:', ou qualquer tipo de numeração. Use apenas o NOME DIRECTO do conteúdo."
+        "Generate the JSON values in portugues, keep the keys in english. "
+        "Cada módulo deve ter apenas 8-15 aulas. "
+        "Gera módulos seguindo uma progressão lógica: Comece SEMPRE com História, Definição, Conceitos Teóricos e Contexto. "
+        "NÃO comece com prática imediata ou tópicos avançados. "
+        "Exemplo: Se for um curso de HTML, 1. História da Web, 2. O que é HTML, 3. Estrutura Básica, e então Prática. "
+        "Mantenha essa estrutura progressiva para todo o curso. "
+        "Cada aula deve ter conteúdo para 5 a 12 minutos (300 a 720 segundos). "
+        "Strictly follow this JSON schema:"
+        "{"
+        '  "title": "Título do módulo (NUNCA inclua numeração ou a palavra Módulo, apenas o título)",'
+        '  "desc": "Descrição do módulo",'
+        '  "lessons": ['
+        "    {"
+        '      "title": "Título da lição (NUNCA inclua numeração ou a palavra Aula, apenas o título)",'
+        '      "desc": "Descrição da lição",'
+        '      "duration": 480, '
+        '      "narration": "Summary narration text (approx 200 words) that will be expanded later...",'
+        '      "key_points": "Key takeaway 1, Key takeaway 2",'
+        '      "scene_suggestion": "Visual description for whiteboard animation"'
+        "    }\n"
+        "  ]\n"
+        "}\n\n"
+        f"Course Title: {course.title}\n"
+        f"Course Level: {course.level}\n"
+        f"Context (Existing Modules):\n{modules_context}\n\n"
+        "Generate ONLY the ONE next module. Ensure flow and continuity."
+    )
+    module_object = None
+    try:
+        response = generate_text_with_fallback([{"role": "user", "content": prompt}])
+        module_data = extract_json(response)
+
+        if not module_data:
+            raise ValueError("Failed to extract JSON for module")
+
+        if module_pk:
+            module_object = Module.objects.get(pk=module_pk)
+            module_object.name = module_data.get("title")[:80]
+            module_object.desc = module_data.get("desc", "")
+            module_object.status = "READY"
+            module_object.save()
+        else:
+            module_object = Module.objects.create(
+                course=course,
+                name=module_data.get("title")[:80],
+                desc=module_data.get("desc", ""),
+                status="READY",
+            )
+
+        lessons_data = module_data.get("lessons", [])
+        lessons_to_create = []
+        for lesson in lessons_data:
+            lessons_to_create.append(
+                Lesson(
+                    module=module_object,
+                    title=lesson.get("title", "")[:150],
+                    desc=lesson.get("desc", ""),
+                    narration=lesson.get("narration", ""),
+                    key_points=lesson.get("key_points", "")[:150],
+                    scene_suggestion=lesson.get("scene_suggestion", ""),
+                    duration=lesson.get("duration", 300),
+                    status="PENDING",
+                )
+            )
+        Lesson.objects.bulk_create(lessons_to_create)
+
+        # Invalidate course cache as new lessons were added
+        invalidate_course_cache(course.uuid, user_pk)
+
+        # Generate only the first lesson of the module; others will be triggered sequentially
+        first_lesson = (
+            Lesson.objects.filter(module=module_object, status="PENDING")
+            .order_by("id")
+            .first()
+        )
+        if first_lesson:
+            generate_lesson_plan.delay(user_pk, first_lesson.id)
+
+        # For the first module, mark course as READY to show in dashboard
+        if course.modules.count() == 1:
+            Course.objects.filter(pk=course_pk).update(status="READY")
+
+        # --- TRIGGER FOLLOW-UP TASKS INDEPENDENTLY ---
+        try:
+            # Generate module quiz
+            generate_module_quiz.delay(module_object.id, user_pk)
+        except Exception as q_err:
+            logger.error(f"Failed to trigger quiz generation: {q_err}")
+
+        try:
+            # Generate module study material PDF
+            generate_module_material.delay(module_object.id)
+        except Exception as m_err:
+            logger.error(f"Failed to trigger material generation: {m_err}")
+
+    except Exception as e:
+        if module_pk:
+            Module.objects.filter(pk=module_pk).update(status="FAILED")
+        elif module_object:
+            # Only delete if it was just created AND we haven't successfully queued lessons yet
+            # Actually, to be safe, if we reach here, something went wrong during generation.
+            # But if lessons were created, maybe we should keep it in FAILED status instead of deleting.
+            module_object.status = "FAILED"
+            module_object.save(update_fields=["status"])
+            logger.error(f"Module generation failed, status set to FAILED: {e}")
+
+        logger.error(f"Failed to generate next module: {e}")
+        # Only set course to READY if it was processing the very first module
+        if course.modules.count() <= 1:
+            Course.objects.filter(pk=course_pk).update(status="READY")
+
+
+@shared_task(
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_kwargs={"max_retries": 3},
+    default_retry_delay=40,
+)
+def generate_module_quiz(module_id: int, user_id: int = None):
+    module_object = Module.objects.filter(pk=module_id).first()
+    if not module_object:
+        logger.error(f"Module {module_id} not found")
+        return
+
+    try:
+        # Aggregate content from all lessons in the module
+        lessons_content = []
+        for lesson in module_object.lessons.all():
+            lessons_content.append(
+                f"Lesson: {lesson.title}\nContent: {lesson.key_points}\n"
+            )
+
+        full_text = "\n".join(lessons_content)
+
+        prompt = f"""
+        Baseado no conteúdo abaixo, crie um quiz com 5 perguntas de múltipla escolha para testar o conhecimento do aluno sobre este módulo.
+        
+        Conteúdo do Módulo:
+        {full_text}
+
+        Retorne APENAS um JSON válido com a seguinte estrutura:
+        {{
+            "title": "Título do Quiz",
+            "questions": [
+                {{
+                    "text": "Pergunta 1",
+                    "explanation": "Explicação da resposta correta",
+                    "choices": [
+                        {{"text": "Opção A", "is_correct": false}},
+                        {{"text": "Opção B", "is_correct": true}},
+                        {{"text": "Opção C", "is_correct": false}}
+                    ]
+                }}
+            ]
+        }}
+        """
+
+        response = generate_text_with_fallback([{"role": "user", "content": prompt}])
+        quiz_data = extract_json(response)
+
+        if not quiz_data:
+            logger.error("Failed to parse quiz JSON")
+            return
+
+        # Create Quiz linked to Module
+        quiz = Quiz.objects.create(
+            module=module_object,
+            course=module_object.course,
+            title=quiz_data.get("title", f"{module_object.name}"),
+        )
+
+        for q in quiz_data.get("questions", []):
+            question = Question.objects.create(
+                quiz=quiz,
+                text=q.get("text"),
+                explanation=q.get("explanation", ""),
+            )
+            for c in q.get("choices", []):
+                Choice.objects.create(
+                    question=question,
+                    text=c.get("text"),
+                    is_correct=c.get("is_correct", False),
+                )
+
+        # Invalidate course cache
+        invalidate_course_cache(module_object.course.uuid)
+        if user_id:
+            send_user_update(
+                user_id,
+                {
+                    "type": "course_update",
+                    "id": str(module_object.course.uuid),
+                    "status": "READY",
+                },
+            )
+
+        logger.info(f"Quiz generated for module {module_id}")
+
+    except Exception as e:
+        logger.error(f"Module quiz generation failed: {e}")
+
+
+@shared_task(
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_kwargs={"max_retries": 3},
+    default_retry_delay=40,
+)
+def generate_module_material(module_id: int):
+    import json
+
+    from .models import Module, ModuleMaterial
+    from .utils import generate_text_with_fallback
+
+    module = Module.objects.filter(pk=module_id).first()
+    if not module:
+        logger.error(f"Module {module_id} not found for material generation")
+        return
+
+    # Create or get ModuleMaterial record
+    material, created = ModuleMaterial.objects.get_or_create(module=module)
+    material.status = "PROCESSING"
+    material.save(update_fields=["status"])
+
+    user_id = module.course.owner_id
+    send_user_update(
+        user_id,
+        {
+            "type": "material_update",
+            "module_id": str(module.uuid),
+            "status": "PROCESSING",
+        },
+    )
+
+    try:
+        # Aggregate content from all lessons
+        lessons_data = []
+        for lesson in module.lessons.all().order_by("id"):
+            lessons_data.append(
+                {
+                    "title": lesson.title,
+                    "description": lesson.desc,
+                    "key_points": lesson.key_points or "",
+                    "narration_summary": (lesson.narration[:1000] + "...")
+                    if lesson.narration and len(lesson.narration) > 1000
+                    else (lesson.narration or ""),
+                }
+            )
+
+        course_title = module.course.title
+        module_name = module.name
+
+        prompt = f"""
+        Você é um especialista em educação e design instrucional.
+        Sua tarefa é criar um **Guia de Estudo Completo e Profissional** em formato Markdown para o módulo "{module_name}" do curso "{course_title}".
+
+        Aqui estão os detalhes das aulas deste módulo:
+        {json.dumps(lessons_data, ensure_ascii=False, indent=2)}
+
+        **Instruções para o conteúdo:**
+        1. Use formatação Markdown rica (Headers, Listas, Negrito, Itálico, Blockquotes).
+        2. O material deve ser coeso, transformando os pontos das aulas em um texto fluido e educativo.
+        3. Adicione uma introdução motivadora para o módulo.
+        4. Para cada aula, expanda os conceitos principais, explicando-os de forma clara.
+        5. Inclua uma seção de "Resumo Executivo" ou "Conclusão" ao final.
+        6. O tom deve ser profissional, encorajador e fácil de ler.
+        7. NÃO use placeholders. Gere conteúdo real baseado nos títulos e descrições fornecidos.
+        8. O resultado deve ser APENAS o texto em Markdown, pronto para ser renderizado.
+
+        Escreva em Português do Brasil.
+        """
+
+        # Generate content using AI
+        markdown_content = generate_text_with_fallback(
+            [{"role": "user", "content": prompt}]
+        )
+
+        if not markdown_content:
+            raise Exception("AI failed to generate markdown content")
+
+        # Save the markdown content
+        material.content = markdown_content
+        material.status = "READY"
+        material.save()
+
+        send_user_update(
+            user_id,
+            {
+                "type": "material_update",
+                "module_id": str(module.uuid),
+                "status": "READY",
+            },
+        )
+
+        logger.info(f"Markdown material generated for module {module_id}")
+
+    except Exception as e:
+        material.status = "FAILED"
+        material.save(update_fields=["status"])
+
+        send_user_update(
+            user_id,
+            {
+                "type": "material_update",
+                "module_id": str(module.uuid),
+                "status": "FAILED",
+            },
+        )
+
+        logger.error(f"Failed to generate material for module {module_id}: {e}")
+        raise e
+
+
+@shared_task(
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_kwargs={"max_retries": 3},
+    default_retry_delay=40,
+)
+def create_course_details(user_id: int, course_pk: int, prompt: str, level: str):
+    ai_prompt = f"""
+    You are an AI that outputs STRICT JSON.
+
+    Rules:
+    - Output ONLY valid JSON
+    - No comments
+    - No markdown
+    - No extra text
+    - Follow the schema exactly
+    - Do not add or remove fields
+    - Use double quotes only
+    - **GENERATE ALL THE VALUES IN PORTUGUESE;THE KEYS REMAIN IN ENGLISH**
+
+    Schema:
+    {{
+        "title": string, 
+        "desc": string,
+        "max_modules": integer (between 3 and 5)
+    }}
+
+    Context:
+    Course prompt: {prompt}
+    Course level: {level}
+
+    Task:
+    Generate a title, description, and an estimated number of modules (max_modules) to cover this topic comprehensively.
+    """
+
+    course_outline = None
+    try:
+        course = Course.objects.get(pk=course_pk)
+        if course.status == "CANCELLED":
+            logger.info(f"Course {course_pk} generation cancelled.")
+            return
+
+        response = generate_text_with_fallback([{"role": "user", "content": ai_prompt}])
+        course_outline = extract_json(response)
+    except Exception as e:
+        logger.error(f"Outline generation failed: {e}")
+        Course.objects.filter(pk=course_pk).update(status="FAILED")
+        return
+
+    course_title = course_outline.get("title", "Sem título")
+    course_desc = course_outline.get("desc", course_title)
+    max_modules = course_outline.get("max_modules", 5)
+
+    # Validate max_modules range
+    if not isinstance(max_modules, int) or max_modules < 3:
+        max_modules = 3
+    if max_modules > 5:
+        max_modules = 5
+
+    Course.objects.filter(pk=course_pk).update(
+        desc=course_desc,
+        title=course_title,
+        max_modules=max_modules,
+        status="PROCESSING",
+    )
+    # Invalidate course cache
+    invalidate_course_cache(course.uuid, user_id)
+    send_user_update(
+        user_id,
+        {
+            "type": "course_update",
+            "id": str(course.uuid),
+            "status": "PROCESSING",
+            "title": course_title,
+            "desc": course_desc,
+        },
+    )
+
+    # Save generation context for future reuse
+    CourseGenerationContext.objects.update_or_create(
+        course=course,
+        defaults={"prompt": prompt, "system_prompt": ai_prompt, "response": response},
+    )
+
+    # Trigger thumbnail and module generation in parallel
+    create_course_thumb.delay(course_pk, prompt, user_id=user_id)
+    generate_next_module.delay(user_id, course_pk)
+
+
+@shared_task(
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_kwargs={"max_retries": 3},
+    default_retry_delay=40,
+)
+def create_course_thumb(course_pk: str, prompt: str, user_id=None):
+    client = get_genai_client()
+    ai_prompt = f"""
+    Cria uma capa profissional de curso educacional.
+    Tema do curso: "{prompt}"
+
+    Estilo visual:
+    - Design moderno e limpo
+    - Cores adequadas ao tema
+    - Gradientes suaves se necessário
+    - Logos ou ilustrações no centro (não realistas)
+    - Faz uma thumb retângular, não quadrada
+
+    Regras:
+    - Todo o texto deve estar em português
+    - Não adicionar textos desnecessários, é apenas uma capa
+    - Não usar marcas d\'água
+    - Não coloca nenhum texto ou figura nos cantos
+    - Não coloca elementos aleatórios tipo logos que não estão relacionadas com o curso pedido
+    """
+
+    try:
+        course = Course.objects.get(pk=course_pk)
+        if course.status == "CANCELLED":
+            logger.info(f"Course {course_pk} thumbnail generation cancelled.")
+            return
+
+        import tempfile
+
+        with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp_file:
+            tmp_path = Path(tmp_file.name)
+
+        try:
+            try:
+                chain = get_image_chain()
+                chain.handle(
+                    prompt=ai_prompt, output_path=tmp_path, client=client, timeout=45
+                )
+            except AllProvidersFailed:
+                raise ThumbnailCreationError("Todos os provedores de imagem falharam")
+
+            image_data = tmp_path.read_bytes()
+            try:
+                image = Image.open(BytesIO(image_data))
+                image.verify()
+                image = Image.open(BytesIO(image_data)).convert("RGBA")
+            except Exception as e:
+                logger.error(f"Image processing error: {e}")
+                raise ThumbnailCreationError(
+                    "Conteúdo retornado não é uma imagem válida"
+                )
+        finally:
+            tmp_path.unlink(missing_ok=True)
+
+        logo_path = settings.BASE_DIR / "static" / "logo.png"
+        if logo_path.exists():
+            logo = Image.open(logo_path).convert("RGBA")
+            img_width, img_height = image.size
+            logo_width = int(img_width * 0.08)
+            logo_ratio = logo_width / logo.width
+            logo_height = int(logo.height * logo_ratio)
+
+            logo = logo.resize((logo_width, logo_height), Image.Resampling.LANCZOS)
+
+            margin = int(img_width * 0.03)
+            position = (margin, margin)
+
+            image.paste(logo, position, logo)
+        else:
+            logger.warning(f"Logo not found at {logo_path}, skipping overlay")
+        image = image.convert("RGB")
+
+        buffer = BytesIO()
+        image.save(buffer, format="JPEG", quality=90)
+        buffer.seek(0)
+
+        thumb_filename = f"{uuid.uuid4()}.jpg"
+        # Passing name to ContentFile is good practice for some storage backends
+        course.thumb.save(
+            thumb_filename,
+            ContentFile(buffer.getvalue(), name=thumb_filename),
+            save=True,
+        )
+        course.status = "READY"
+        course.save()
+        # Invalidate course cache
+        invalidate_course_cache(course.uuid, user_id)
+        send_user_update(
+            course.owner.id if course.owner else None,
+            {
+                "type": "course_update",
+                "id": str(course.uuid),
+                "status": "READY",
+                "thumb": course.thumb.url if course.thumb else "",
+            },
+        )
+        # Thumbnail generation is now independent of module generation
+        # generate_next_module.delay(course.user.pk, course_pk)
+    except Exception as e:
+        logger.error(f"Thumbnail creation failed: {e}")
+        Course.objects.filter(pk=course_pk).update(status="FAILED")
+        raise ThumbnailCreationError(f"Erro ao criar thumbnail: {str(e)}")
+
+
+@shared_task(
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_kwargs={"max_retries": 3},
+    default_retry_delay=40,
+)
+def generate_certificate_task(user_id: int, course_id: int, full_name: str):
+    import uuid
+
+    from django.core.files.base import ContentFile
+    from PIL import Image
+
+    from .models import Course, CourseEnrollment
+
+    User = get_user_model()
+    try:
+        user = User.objects.get(pk=user_id)
+        course = Course.objects.get(pk=course_id)
+        client = get_genai_client()
+        # 1. Calculate real duration
+        from django.db.models import Sum
+
+        total_seconds = (
+            course.modules.aggregate(total=Sum("lessons__duration"))["total"] or 0
+        )
+        total_hours = max(1, round(total_seconds / 3600))
+        duration_str = f"{total_hours} horas" if total_hours > 1 else "1 hora"
+
+        # 2. Get current date in DD/MM/YYYY
+        from datetime import datetime
+
+        data_actual = datetime.now().strftime("%d/%m/%Y")
+
+        # 3. Load base image
+        base_path = settings.BASE_DIR / "static" / "certificate_base.png"
+        if not base_path.exists():
+            raise FileNotFoundError(f"Base certificate image not found at {base_path}")
+
+        base_img = Image.open(base_path)
+
+        # 4. Prepare multimodal prompt
+        prompt = f"""
+        Utilize a imagem fornecida como REFERÊNCIA DE ESTILO para criar um certificado de conclusão NOVO, MODERNO e PROFISSIONAL.
+        
+        O certificado gerado deve conter OBRIGATORIAMENTE os seguintes elementos de texto (você tem liberdade para ajustar o layout, fontes e espaçamentos para que tudo fique perfeitamente alinhado e legível):
+        
+        1. **Cabeçalho**: Logo da "BOOKAR" e o título "CERTIFICADO DE CONCLUSÃO".
+        2. **Chamada**: O texto "CERTIFICAMOS QUE".
+        3. **Nome do Aluno**: "{full_name.upper()}" (deve estar em grande destaque, no centro, com uma fonte elegante).
+        4. **Corpo do Texto**: "Concluiu o curso de **{course.title}** ministrado pela plataforma **Bookar**, com carga de **{duration_str}**." (O nome do curso e a carga horária devem estar em negrito/destaque).
+        5. **Rodapé**: Inclua o texto "Bookar.study - ENSINO BASEADO EM IA" no canto inferior esquerdo e "EMITIDO EM {data_actual}" no canto inferior direito.
+        
+        Instruções de Estilo:
+        - Mantenha a paleta de cores e o "feeling" da imagem de referência.
+        - Você pode modificar levemente a posição dos elementos para garantir que o nome do curso e o nome do aluno caibam perfeitamente sem sobreposições.
+        - O design deve ser limpo, minimalista e premium.
+        - A imagem final deve ter alta qualidade (1600x1000).
+        """
+
+        model_name = settings.AI.get("GENAI_MODEL_IMAGE", "gemini-2.0-flash")
+
+        response = safe_gemini_call(
+            client.models.generate_content,
+            model=model_name,
+            contents=[base_img, prompt],
+            config=types.GenerateContentConfig(
+                image_config=types.ImageConfig(aspect_ratio="16:9")
+            ),
+        )
+
+        image_data = None
+        if hasattr(response, "parts"):
+            for part in response.parts:
+                if part.inline_data:
+                    image_data = part.inline_data.data
+                    break
+                if hasattr(part, "image"):
+                    image_data = (
+                        part.image
+                        if isinstance(part.image, bytes)
+                        else getattr(part.image, "data", None)
+                    )
+                    if image_data:
+                        break
+
+        if not image_data:
+            # Fallback to the text-based drawing if image generation modality is not supported by the model
+            # or returned nothing. But given the user's frustration, we must try to get an image.
+            # If response has text but no image, maybe the model didn't support image generation.
+            raise ValueError(
+                f"IA não retornou uma imagem para o certificado. Resposta: {getattr(response, 'text', 'Sem texto')}"
+            )
+
+        # 3. Save to Database/Cloudinary
+        enrollment = CourseEnrollment.objects.get(course=course, user=user)
+        cert_filename = f"cert_{course.id}_{user.id}_{uuid.uuid4().hex[:8]}.png"
+        enrollment.certificate_file.save(
+            cert_filename, ContentFile(image_data, name=cert_filename), save=False
+        )
+        enrollment.certificate_status = "READY"
+        enrollment.save()
+        send_user_update(
+            user_id,
+            {
+                "type": "certificate_update",
+                "course_id": str(course.uuid),
+                "status": "READY",
+                "certificate_url": enrollment.certificate_file.url,
+            },
+        )
+
+        send_certificate_email(user, course, enrollment.certificate_file.url)
+        return enrollment.certificate_file.url
+
+    except Exception as e:
+        logger.error(f"Certificate generation failed: {e}")
+        try:
+            CourseEnrollment.objects.filter(
+                course_id=course_id, user_id=user_id
+            ).update(certificate_status="FAILED")
+        except:
+            pass
+        raise e
+
+    except Exception as e:
+        logger.error(f"Certificate generation failed: {e}")
+        try:
+            CourseEnrollment.objects.filter(
+                course_id=course_id, user_id=user_id
+            ).update(certificate_status="FAILED")
+        except:
+            pass
+        raise e

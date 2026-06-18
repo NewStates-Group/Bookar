@@ -57,7 +57,7 @@ export default function MessageList(
         chatEndRef
     }: MessageListProps) {
     return (
-        <div className="flex-1 overflow-y-auto p-4 min-h-0 bg-slate-50/30 scrollbar-thin message-list-scroll">
+        <div className="flex-1 overflow-y-auto p-4 min-h-0 bg-slate-50/30 dark:bg-neutral-900/30 scrollbar-thin message-list-scroll">
             <div className="max-w-3xl mx-auto w-full space-y-4">
                 {chatHistory.map((msg, i) => (
                     <div
@@ -70,7 +70,7 @@ export default function MessageList(
                         <div
                             className={`p-3.5 rounded-2xl text-base leading-relaxed ${msg.role === "user"
                                 ? "bg-cyan-500 text-white rounded-tr-none shadow-sm shadow-cyan-500/10 px-4 py-1"
-                                : "text-slate-700"
+                                : "text-slate-700 dark:text-neutral-300"
                                 }`}
                         >
                             <div className="prose prose-slate max-w-none text-sm leading-relaxed break-words">
@@ -135,17 +135,17 @@ export default function MessageList(
                     <div className="flex flex-col items-start w-full message-bubble-animate">
                         <div className="flex items-center gap-1.5 mb-1 px-1">
                             <Bot className="w-4 h-4 text-cyan-600" />
-                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">
+                            <span className="text-[10px] font-bold text-slate-500 dark:text-neutral-400 uppercase tracking-wide">
                                 Explicador
                             </span>
                         </div>
-                        <div className="p-3.5 rounded-2xl bg-white border border-slate-200/80 rounded-tl-sm flex items-center gap-3 shadow-sm">
+                        <div className="p-3.5 rounded-2xl bg-white dark:bg-neutral-800 border border-slate-200/80 dark:border-neutral-700 rounded-tl-sm flex items-center gap-3 shadow-sm">
                             <div className="flex gap-1">
                                 <span className="w-2 h-2 rounded-full bg-cyan-500 animate-bounce" style={{ animationDelay: "0ms" }} />
                                 <span className="w-2 h-2 rounded-full bg-cyan-400 animate-bounce" style={{ animationDelay: "120ms" }} />
                                 <span className="w-2 h-2 rounded-full bg-cyan-300 animate-bounce" style={{ animationDelay: "240ms" }} />
                             </div>
-                            <span className="text-sm text-slate-600 font-medium">A pensar...</span>
+                            <span className="text-sm text-slate-600 dark:text-neutral-400 font-medium">A pensar...</span>
                         </div>
                     </div>
                 )}

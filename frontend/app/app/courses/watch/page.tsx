@@ -3,11 +3,9 @@
 import { useSession } from "next-auth/react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Loader2, ArrowRight, ChevronLeft, ChevronRight, HelpCircle, X, Menu, ArrowLeft, Award, FileDown, FileText, ExternalLink, BookOpen, GripVertical } from "lucide-react";
+import { Loader2, ChevronLeft, ChevronRight, X, Menu, ArrowLeft, Award, FileDown, FileText, ExternalLink, BookOpen, GripVertical } from "lucide-react";
 import { useEffect, useState, useRef, useCallback, useMemo } from "react";
-import { ExplicadorPromptDialog } from "@/components/ExplicadorPromptDialog";
 import { buildExplicadorCourseContext } from "@/lib/explicador-course-context";
-import { toast } from "sonner";
 import { CourseWatchSidebar } from "@/components/course-sidebar";
 import Link from "next/link";
 import { BuildingBlocksLoader } from "@/components/ui/building-blocks-loader";
@@ -18,6 +16,7 @@ import { authenticatedFetcher, apiRequest } from "@/lib/api";
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeSlug from 'rehype-slug';
+import { BookarLoader } from "@/components/BookarLoader";
 
 export interface Module {
     id: string;
@@ -80,8 +79,7 @@ export default function WatchPage() {
     const [viewMode, setViewMode] = useState<"video" | "quiz">("video");
     const [played, setPlayed] = useState(false);
     const [ended, setEnded] = useState(false);
-    const [sidebarOpen, setSidebarOpen] = useState(false);
-    const [explicadorOpen, setExplicadorOpen] = useState(false);
+    const [sidebarOpen, setSidebarOpen] = useState(true);
     const [previousLesson, setPreviousLesson] = useState<Lesson | null>(null)
     const [nextLesson, setNextLesson] = useState<Lesson | null>(null)
     const [nextQuiz, setNextQuiz] = useState<{ id: string, moduleId: string } | null>(null)
@@ -356,14 +354,7 @@ export default function WatchPage() {
     })();
 
     if (status === "loading" || isLoadingCourse || isLoadingLesson) {
-        return (
-            <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-white to-slate-50">
-                <div className="text-center space-y-4">
-                    <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto" />
-                    <p className="text-muted-foreground font-medium">Carregando as informações da aula...</p>
-                </div>
-            </div>
-        );
+        return <BookarLoader />
     }
 
     if (!course) return null;
@@ -387,7 +378,7 @@ export default function WatchPage() {
             </div>
 
             <div className="flex-1 flex flex-col overflow-hidden bg-background">
-                <div className="h-16 grid grid-cols-5 border-b border-border">
+                <div className="h-16 grid grid-cols-4 border-b border-border">
                     <Link
                         href={`/app/courses/${courseID}`}
                         className="flex gap-1 items-center justify-center border-r cursor-pointer hover:bg-muted transition-colors px-4"
@@ -465,13 +456,6 @@ export default function WatchPage() {
                             );
                         })()}
                     </button>
-
-                    <button className="flex gap-2 items-center cursor-pointer justify-center border-r hover:bg-muted transition-colors" onClick={() => setExplicadorOpen(true)}>
-                        <HelpCircle className="w-5 h-5" />
-                        <span className="hidden md:block">
-                            Dúvidas
-                        </span>
-                    </button>
                 </div>
 
                 <div className="flex-1 flex overflow-hidden">
@@ -487,12 +471,7 @@ export default function WatchPage() {
                                 />
                             ) : (
                                 <div className="flex flex-col items-center justify-center p-4">
-                                    <div className="w-full max-w-5xl pb-2 border-b mb-4">
-                                        <h1 className="text-wrap font-semibold text-xl md:text-2xl lg:text-3xl truncate text-foreground" title={lesson?.title}>{lesson?.title}</h1>
-                                        <p className="text-foreground/70 leading-relaxed text-base md:text-lg">
-                                            {lesson?.desc}
-                                        </p>
-                                    </div>
+
                                     {(lesson?.status === "PROCESSING" || lesson?.status === "PENDING") && (
                                         <div className="text-center max-w-lg z-10 py-10">
                                             <BuildingBlocksLoader />
@@ -518,6 +497,13 @@ export default function WatchPage() {
                                         </div>
                                     )}
 
+                                    <div className="w-full mt-4 max-w-5xl pb-2 border-b mb-4">
+                                        <h1 className="text-wrap font-semibold text-xl md:text-2xl lg:text-3xl truncate text-foreground" title={lesson?.title}>{lesson?.title}</h1>
+                                        <p className="text-foreground/70 leading-relaxed text-base md:text-lg">
+                                            {lesson?.desc}
+                                        </p>
+                                    </div>
+
                                     {/* Materials Section */}
                                     {viewMode === "video" && (() => {
                                         const currentModule = course?.modules.find(m =>
@@ -525,15 +511,12 @@ export default function WatchPage() {
                                         );
                                         if (!currentModule) return null;
                                         return (
-                                            <div className="w-full max-w-5xl mt-6">
+                                            <div className="w-full max-w-5xl">
                                                 <div className="flex items-center gap-2 mb-3">
                                                     <BookOpen className="w-5 h-5 text-primary" />
                                                     <h3 className="text-base font-semibold text-foreground">Material de Estudo</h3>
                                                 </div>
-                                                <div className="flex items-center gap-3 p-4 rounded-xl border border-border bg-card hover:bg-muted/50 transition-colors">
-                                                    <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                                                        <BookOpen className="w-5 h-5 text-primary" />
-                                                    </div>
+                                                <div className="flex items-center gap-3 p-4 rounded-xl border border-border bg-card transition-colors">
                                                     <div className="flex-1 min-w-0">
                                                         <p className="font-medium text-foreground text-sm truncate">{currentModule.name}</p>
                                                         <p className="text-xs text-foreground/50 mt-0.5">
@@ -549,10 +532,9 @@ export default function WatchPage() {
                                                                 setActiveMaterialContent(currentModule.material_content!);
                                                                 setMaterialSidebarOpen(true);
                                                             }}
-                                                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors flex-shrink-0"
+                                                            className="cursor-pointer flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors flex-shrink-0"
                                                         >
-                                                            <BookOpen className="w-3.5 h-3.5" />
-                                                            Estudar Agora
+                                                            Ler
                                                         </button>
                                                     ) : currentModule.material_status === "PROCESSING" || !currentModule.material_status ? (
                                                         <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-muted text-foreground/50 text-xs font-medium flex-shrink-0">
@@ -660,14 +642,6 @@ export default function WatchPage() {
                     </div>
                 </div>
             )}
-
-            <ExplicadorPromptDialog
-                open={explicadorOpen}
-                onOpenChange={setExplicadorOpen}
-                courseContext={explicadorCourseContext}
-                title="Dúvidas sobre a aula"
-                placeholder="O que não percebeste nesta aula?"
-            />
         </div>
     );
 }

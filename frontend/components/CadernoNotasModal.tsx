@@ -82,7 +82,6 @@ export function CadernoNotasModal({
         method: "DELETE",
       });
       await mutate();
-      toast.success("Folha removida.");
     } catch (err: any) {
       toast.error(err.message || "Erro ao remover folha.");
     } finally {

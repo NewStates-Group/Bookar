@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { AlertTriangle, Home } from "lucide-react";
@@ -13,10 +12,6 @@ export default function GlobalError({
     error: Error & { digest?: string };
     reset: () => void;
 }) {
-    // useEffect(() => {
-    //     console.error(error);
-    // }, [error]);
-
     return (
         <html lang="pt-PT">
             <body className="font-sans antialiased">
@@ -42,7 +37,7 @@ export default function GlobalError({
                                 onClick={() => reset()}
                                 className="rounded-full h-12 text-lg font-semibold"
                             >
-                                Tentar Recuperar Aplicação
+                                Recarregar
                             </Button>
                             <Button
                                 variant="ghost"

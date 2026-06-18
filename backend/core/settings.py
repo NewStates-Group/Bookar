@@ -14,6 +14,7 @@ env = environ.Env(
     CLOUDINARY_CLOUD_NAME=(str, ""),
     CLOUDINARY_API_KEY=(str, ""),
     CLOUDINARY_API_SECRET=(str, ""),
+    ADMIN_EMAILS=(list, []),
 )
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -37,13 +38,13 @@ INSTALLED_APPS = [
     "cloudinary_storage",
     "cloudinary",
     "gmailapi_backend",
-    "courses",
-    "accounts",
-    "channels",
-    "mind_maps",
-    "explicador",
-    "folhas",
-    "feedback",
+    "apps.courses",
+    "apps.accounts",
+    "apps.subscriptions",
+    "apps.mind_maps",
+    "apps.explicador",
+    "apps.folhas",
+    "apps.feedback",
 ]
 
 MIDDLEWARE = [
@@ -53,7 +54,7 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
-ROOT_URLCONF = "core.urls"
+ROOT_URLCONF = "core.api"
 
 TEMPLATES = [
     {
@@ -95,10 +96,7 @@ PROD_REDIS_URL = REDIS_URL + env.str(
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR.joinpath("staticfiles")
 
-CACHES = {
-    # "default": env.cache_url_config(PROD_REDIS_URL if ENV == "prod" else REDIS_URL)
-    "default": env.cache_url_config(REDIS_URL)
-}
+CACHES = {"default": env.cache_url_config(REDIS_URL)}
 
 CHANNEL_LAYERS = {
     "default": {
@@ -213,6 +211,12 @@ NINJA_EXTRA = {
 
 CLOUDFLARE_TURNSTILE_SECRET_KEY = env("TURNSTILE_SECRET_KEY")
 CLOUDFLARE_TURNSTILE_SITE_KEY = env("NEXT_PUBLIC_TURNSTILE_SITE_KEY")
+
+STRIPE_SECRET_KEY = env("STRIPE_SECRET_KEY", default="")
+STRIPE_WEBHOOK_SECRET = env("STRIPE_WEBHOOK_SECRET", default="")
+STRIPE_PUBLISHABLE_KEY = env("NEXT_PUBLIC_STRIPE_KEY", default="")
+
+ADMIN_EMAILS = env("ADMIN_EMAILS", default=[])
 
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_REFERRER_POLICY = "same-origin"

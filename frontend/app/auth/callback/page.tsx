@@ -6,6 +6,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { clearPendingExplicadorRoom, getPendingExplicadorRoom } from "@/lib/pending-explicador-room";
+import { BookarLoader } from "@/components/BookarLoader";
 
 function AuthCallbackContent() {
     const searchParams = useSearchParams();
@@ -62,13 +63,8 @@ function AuthCallbackContent() {
 
         handleCallback();
     }, [searchParams, router]);
-
-    return (
-        <div className="min-h-screen flex flex-col items-center justify-center space-y-4">
-            <Loader2 className="w-10 h-10 animate-spin text-cyan-500" />
-            <p className="text-muted-foreground animate-pulse">Autenticando...</p>
-        </div>
-    );
+    
+    return <BookarLoader />
 }
 
 export default function AuthCallbackPage() {
