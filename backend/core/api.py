@@ -1,9 +1,13 @@
-from accounts.controllers import AuthController, SubscriptionController
-from courses.controllers import CourseController, LessonController
-from explicador.controllers import ExplicadorController
-from feedback.controllers import FeedbackController
-from folhas.controllers import FolhaController
-from mind_maps.controllers import MindMapController
+from apps.accounts.controllers import AuthController
+from apps.courses.controllers import CourseController, LessonController
+from apps.explicador.controllers import ExplicadorController
+from apps.feedback.controllers import FeedbackController
+from apps.folhas.controllers import FolhaController
+from apps.mind_maps.controllers import MindMapController
+from apps.subscriptions.controllers import SubscriptionController
+from django.conf import settings
+from django.http import HttpResponse
+from django.urls import path
 from ninja.errors import ValidationError as NinjaValidationError
 from ninja_extra import NinjaExtraAPI
 from pydantic import ValidationError as PydanticValidationError
@@ -30,38 +34,28 @@ api.register_controllers(
 @api.exception_handler(NinjaValidationError)
 @api.exception_handler(PydanticValidationError)
 def validation_exception_handler(request, exc):
-    errors = []
-    # Handle both callable errors() (Pydantic v2) and list errors (Django Ninja)
-    exc_errors = (
-        exc.errors()
-        if callable(getattr(exc, "errors", None))
-        else getattr(exc, "errors", [])
+    errors = (
+        [
+            {
+                "loc": error.get("loc", ""),
+                "msg": error.get("msg", ""),
+            }
+            for error in exc.errors()
+        ]
+        if hasattr(exc, "errors")
+        else []
     )
-
-    for error in exc_errors:
-        msg = error.get("msg", "")
-        if msg.startswith("Value error, "):
-            msg = msg.replace("Value error, ", "")
-
-        lower_msg = msg.lower()
-        if "value is not a valid email address" in lower_msg:
-            msg = "invalid_email"
-
-        error["msg"] = msg.upper()
-        errors.append(error)
 
     return api.create_response(
         request,
-        {"message": "Validation Error", "errors": errors},
+        {"errors": errors},
         status=422,
     )
 
 
 @api.exception_handler(Exception)
 def service_exception_handler(request, exc):
-    from django.conf import settings
-
-    response_data = {"message": "Erro interno no servidor"}
+    response_data = {"error": "INTERNAL_ERROR"}
     if settings.DEBUG:
         response_data["detail"] = str(exc)
 
@@ -70,3 +64,13 @@ def service_exception_handler(request, exc):
         response_data,
         status=500,
     )
+
+
+@api.get("healthcheck/")
+def healthcheck(request):
+    return HttpResponse("ok", content_type="text/plain")  # type: ignore
+
+
+urlpatterns = [
+    path("api/", api.urls),
+]

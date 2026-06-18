@@ -124,11 +124,11 @@ export default function MindMapsPage() {
 
   if (status === "loading" || (session?.accessToken && isLoading)) {
     return (
-      <div className="flex items-center justify-center min-h-[70vh]">
+      <div className="min-h-screen flex items-center justify-center dark:invert">
         <div className="text-center space-y-4">
-          <Loader2 className="w-10 h-10 animate-spin text-cyan-500 mx-auto" />
-          <p className="text-muted-foreground font-medium">
-            Carregando seus mapas mentais...
+          <Loader2 className="w-10 h-10 animate-spin text-white dark:invert mx-auto" />
+          <p className="text-muted-foreground dark:invert font-medium">
+            Carregando seus mapas...
           </p>
         </div>
       </div>

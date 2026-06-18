@@ -26,6 +26,7 @@ import { useSession, signOut } from "next-auth/react";
 import { useTheme } from "next-themes";
 import useSWR from "swr";
 import { authenticatedFetcher, apiRequest } from "@/lib/api";
+import { NotificationPanel } from "@/components/NotificationPanel";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -258,6 +259,11 @@ export function PlatformSidebar({
             </DialogHeader>
           </DialogContent>
         </Dialog>
+
+        {/* ── Notificações ── */}
+        <div className="pt-1">
+          <NotificationPanel isCollapsed={!isExpanded} />
+        </div>
 
         {/* ── Explicador Rooms History (shown only when Explicador is active) ── */}
         {isExpanded && isExplicadorActive && displayedRooms && displayedRooms.length > 0 && (

@@ -68,10 +68,10 @@ export default function StatsPage() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-20">
+      <div className="min-h-screen flex items-center justify-center py-20 dark:invert">
         <div className="text-center space-y-4">
-          <Loader2 className="w-10 h-10 animate-spin text-primary mx-auto" />
-          <p className="text-muted-foreground">Carregando estatísticas...</p>
+          <Loader2 className="w-10 h-10 animate-spin text-primary mx-auto dark:invert" />
+          <p className="text-muted-foreground dark:invert">Carregando estatísticas...</p>
         </div>
       </div>
     );

@@ -519,9 +519,9 @@ export default function MindMapDetailPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center space-y-4">
-          <Loader2 className="w-12 h-12 animate-spin text-cyan-500 mx-auto" />
+          <Loader2 className="w-12 h-12 animate-spin text-white dark:invert mx-auto" />
           <p className="text-muted-foreground font-medium">
-            Carregando mapa mental...
+            Carregando dados...
           </p>
         </div>
       </div>

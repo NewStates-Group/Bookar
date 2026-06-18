@@ -9,7 +9,7 @@ import { apiRequest } from "@/lib/api";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { GatewaySelectModal } from "@/components/GatewaySelectModal";
+import { ManualPaymentModal } from "@/components/ManualPaymentModal";
 
 
 interface Plan {
@@ -17,7 +17,7 @@ interface Plan {
   slug: string;
   name: string;
   description: string;
-  price: string;
+  price: number;
   monthly_limits: boolean;
   max_explicador_messages: number | null;
   max_explicador_participants: number | null;
@@ -26,6 +26,8 @@ interface Plan {
   max_mindmap_modules: number | null;
   max_mindmap_quizzes: number | null;
   max_mindmap_materials: number | null;
+  manual_payment_iban?: string;
+  manual_payment_account_name?: string;
 }
 
 interface UserSub {
@@ -62,7 +64,7 @@ function PlanCard({
   onSelect: () => void;
 }) {
   const isFree = plan.slug === "free";
-  const priceNum = parseFloat(plan.price);
+  const priceNum = plan.price;
 
   return (
     <Card
@@ -151,7 +153,8 @@ export default function PricingPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isUpgrading, setIsUpgrading] = useState<string | null>(null);
   const [selectedPlanSlug, setSelectedPlanSlug] = useState<string | null>(null);
-  const [gatewayModalOpen, setGatewayModalOpen] = useState(false);
+  const [manualModalOpen, setManualModalOpen] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
 
   useEffect(() => {
     async function fetchData() {
@@ -178,45 +181,20 @@ export default function PricingPage() {
     fetchData();
   }, [session]);
 
-  const handleUpgrade = async (planSlug: string, gateway: string) => {
+  const handleUpgrade = async (planSlug: string) => {
     if (!session) {
       localStorage.setItem("redirectTo", "/pricing");
       router.push("/login");
       return;
     }
-    setIsUpgrading(planSlug);
 
-    if (planSlug === "free") {
-      setIsUpgrading(null);
-      return;
-    }
+    if (planSlug === "free") return;
 
-    const successUrl = `${window.location.origin}/app/profile?upgraded=true&gateway=${gateway}&session_id={CHECKOUT_SESSION_ID}`;
-    const cancelUrl = window.location.href;
-
-    try {
-      const result = await apiRequest(
-        `${process.env.NEXT_PUBLIC_API_URL}/subscriptions/checkout`,
-        {
-          method: "POST",
-          body: JSON.stringify({
-            plan_slug: planSlug,
-            success_url: successUrl,
-            cancel_url: cancelUrl,
-            gateway,
-          }),
-        }
-      );
-      const { url } = result as { url: string };
-      if (url) {
-        window.location.href = url;
-      } else {
-        window.location.reload();
-      }
-    } catch (err) {
-      console.error("Upgrade failed", err);
-    } finally {
-      setIsUpgrading(null);
+    const plan = plans.find((p) => p.slug === planSlug);
+    if (plan) {
+      setSelectedPlan(plan);
+      setSelectedPlanSlug(planSlug);
+      setManualModalOpen(true);
     }
   };
 
@@ -226,19 +204,7 @@ export default function PricingPage() {
       router.push("/login");
       return;
     }
-    if (planSlug === "free") {
-      handleUpgrade(planSlug, "");
-      return;
-    }
-    setSelectedPlanSlug(planSlug);
-    setGatewayModalOpen(true);
-  };
-
-  const handleGatewaySelect = (gateway: "stripe" | "kambafy") => {
-    setGatewayModalOpen(false);
-    if (selectedPlanSlug) {
-      handleUpgrade(selectedPlanSlug, gateway);
-    }
+    handleUpgrade(planSlug);
   };
 
   if (isLoading) {
@@ -286,17 +252,26 @@ export default function PricingPage() {
 
         <div className="text-center py-6 text-sm md:text-base text-slate-400">
           <p>
-            Todos os planos incluem acesso às funcionalidades da plataforma. Pagamento seguro via Stripe ou Kambafy.
+            Todos os planos incluem acesso às funcionalidades da plataforma. Paga por transferência bancária e envia o comprovativo.
           </p>
         </div>
       </div>
 
-      <GatewaySelectModal
-        open={gatewayModalOpen}
-        onOpenChange={setGatewayModalOpen}
-        planName={plans.find((p) => p.slug === selectedPlanSlug)?.name || ""}
-        onSelect={handleGatewaySelect}
-        isLoading={isUpgrading === selectedPlanSlug}
+      <ManualPaymentModal
+        open={manualModalOpen}
+        onOpenChange={setManualModalOpen}
+        planName={selectedPlan?.name || ""}
+        planSlug={selectedPlanSlug || ""}
+        price={selectedPlan?.price || 0}
+        iban={selectedPlan?.manual_payment_iban}
+        accountName={selectedPlan?.manual_payment_account_name}
+        phone={selectedPlan?.manual_payment_phone}
+        onSuccess={() => {
+          setTimeout(() => {
+            setManualModalOpen(false);
+            router.push("/app/subscription");
+          }, 1500);
+        }}
       />
     </div>
   );

@@ -9,14 +9,14 @@ import { toast } from "sonner";
 import { Loader2, Crown, Sparkles, CheckCircle2, XCircle, CreditCard, Calendar, AlertTriangle, Clock, ChevronDown, ChevronUp, RotateCw, DollarSign, ArrowLeftRight, X } from "lucide-react";
 import { apiRequest } from "@/lib/api";
 import { useRouter } from "next/navigation";
-import { GatewaySelectModal } from "@/components/GatewaySelectModal";
+import { ManualPaymentModal } from "@/components/ManualPaymentModal";
 
 interface Plan {
   id: number;
   slug: string;
   name: string;
   description: string;
-  price: string;
+  price: number;
   monthly_limits: boolean;
   max_explicador_messages: number | null;
   max_explicador_participants: number | null;
@@ -25,6 +25,8 @@ interface Plan {
   max_mindmap_modules: number | null;
   max_mindmap_quizzes: number | null;
   max_mindmap_materials: number | null;
+  manual_payment_iban?: string;
+  manual_payment_account_name?: string;
 }
 
 interface SubscriptionPlan {
@@ -146,8 +148,10 @@ export default function SubscriptionPage() {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [showPricing, setShowPricing] = useState(false);
   const [isUpgrading, setIsUpgrading] = useState<string | null>(null);
-  const [gatewayPlanSlug, setGatewayPlanSlug] = useState<string | null>(null);
-  const [gatewayModalOpen, setGatewayModalOpen] = useState(false);
+  const [manualModalOpen, setManualModalOpen] = useState(false);
+  const [manualPlan, setManualPlan] = useState<Plan | null>(null);
+  const [pendingReceipts, setPendingReceipts] = useState<any[]>([]);
+  const [receiptsLoading, setReceiptsLoading] = useState(false);
 
   useEffect(() => {
     if (!session?.accessToken) return;
@@ -156,11 +160,13 @@ export default function SubscriptionPage() {
       apiRequest(`${process.env.NEXT_PUBLIC_API_URL}/subscriptions/my`),
       apiRequest(`${process.env.NEXT_PUBLIC_API_URL}/subscriptions/usage`),
       apiRequest(`${process.env.NEXT_PUBLIC_API_URL}/subscriptions/plans`),
+      apiRequest(`${process.env.NEXT_PUBLIC_API_URL}/subscriptions/manual/receipts`).catch(() => []),
     ])
-      .then(([sub, usageData, plansData]: any) => {
+      .then(([sub, usageData, plansData, receipts]: any) => {
         setSubscription(sub as UserSubscription);
         setUsage((usageData?.metrics || []) as UsageMetric[]);
         setPlans(plansData as Plan[]);
+        setPendingReceipts((receipts || []) as any[]);
       })
       .catch(() => {
         toast.error("Erro ao carregar dados da subscrição");
@@ -170,63 +176,29 @@ export default function SubscriptionPage() {
       });
   }, [session?.accessToken]);
 
-  const handleUpgrade = async (planSlug: string, gateway: string) => {
+  const handleUpgrade = async (planSlug: string) => {
     if (!session) {
       localStorage.setItem("redirectTo", "/app/subscription");
       router.push("/login");
       return;
     }
-    setIsUpgrading(planSlug);
 
     if (planSlug === "free") {
-      setIsUpgrading(null);
       return;
     }
 
-    const successUrl = `${window.location.origin}/app/profile?upgraded=true&gateway=${gateway}&session_id={CHECKOUT_SESSION_ID}`;
-    const cancelUrl = window.location.href;
-
-    try {
-      const result = await apiRequest(
-        `${process.env.NEXT_PUBLIC_API_URL}/subscriptions/checkout`,
-        {
-          method: "POST",
-          body: JSON.stringify({
-            plan_slug: planSlug,
-            success_url: successUrl,
-            cancel_url: cancelUrl,
-            gateway,
-          }),
-        }
-      );
-      const { url } = result as { url: string };
-      if (url) {
-        window.location.href = url;
-      } else {
-        window.location.reload();
-      }
-    } catch (err) {
-      console.error("Upgrade failed", err);
-      toast.error("Erro ao iniciar upgrade. Tenta novamente.");
-    } finally {
-      setIsUpgrading(null);
+    const plan = plans.find((p) => p.slug === planSlug);
+    if (plan) {
+      setManualPlan(plan);
+      setManualModalOpen(true);
     }
   };
 
   const handlePlanSelect = (planSlug: string) => {
     if (planSlug === "free") {
-      handleUpgrade(planSlug, "");
       return;
     }
-    setGatewayPlanSlug(planSlug);
-    setGatewayModalOpen(true);
-  };
-
-  const handleGatewaySelect = (gateway: "stripe" | "kambafy") => {
-    setGatewayModalOpen(false);
-    if (gatewayPlanSlug) {
-      handleUpgrade(gatewayPlanSlug, gateway);
-    }
+    handleUpgrade(planSlug);
   };
 
   function loadHistory() {
@@ -405,6 +377,38 @@ export default function SubscriptionPage() {
         </Card>
       </div>
 
+      {pendingReceipts.filter((r: any) => r.status === "pending").length > 0 && (
+        <Card className="border-amber-200 bg-amber-50/50 shadow-sm">
+          <CardContent className="flex items-center gap-3 py-4">
+            <Clock className="w-5 h-5 text-amber-600 flex-shrink-0" />
+            <div>
+              <p className="text-sm font-semibold text-amber-800">
+                Pagamento pendente de verificação
+              </p>
+              <p className="text-sm text-amber-700">
+                Encontraste um comprovativo de pagamento. A aguardar aprovação do administrador.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {pendingReceipts.filter((r: any) => r.status === "rejected").length > 0 && (
+        <Card className="border-red-200 bg-red-50/50 shadow-sm">
+          <CardContent className="flex items-center gap-3 py-4">
+            <XCircle className="w-5 h-5 text-red-600 flex-shrink-0" />
+            <div>
+              <p className="text-sm font-semibold text-red-800">
+                Comprovativo recusado
+              </p>
+              <p className="text-sm text-red-700">
+                O teu comprovativo foi recusado. Tenta enviar um novo ou contacta o suporte.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {showPricing && plans.length > 0 && (
         <Card className="border-slate-200 dark:border-neutral-700 shadow-sm overflow-hidden">
           <CardHeader className="text-center flex flex-col items-center justify-center">
@@ -579,12 +583,21 @@ export default function SubscriptionPage() {
         )}
       </Card>
 
-      <GatewaySelectModal
-        open={gatewayModalOpen}
-        onOpenChange={setGatewayModalOpen}
-        planName={plans.find((p) => p.slug === gatewayPlanSlug)?.name || ""}
-        onSelect={handleGatewaySelect}
-        isLoading={isUpgrading === gatewayPlanSlug}
+      <ManualPaymentModal
+        open={manualModalOpen}
+        onOpenChange={setManualModalOpen}
+        planName={manualPlan?.name || ""}
+        planSlug={manualPlan?.slug || ""}
+        price={manualPlan?.price || 0}
+        iban={manualPlan?.manual_payment_iban}
+        accountName={manualPlan?.manual_payment_account_name}
+        phone={manualPlan?.manual_payment_phone}
+        onSuccess={() => {
+          setTimeout(() => {
+            setManualModalOpen(false);
+            window.location.reload();
+          }, 1500);
+        }}
       />
     </div>
   );

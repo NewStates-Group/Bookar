@@ -1,16 +1,17 @@
 #!/bin/sh
 
-if [ "$WORKER" != "True" ]; then
-    echo "Applying migrations"
-    python manage.py migrate --noinput
-fi
-
 if [ "$WORKER" = "True" ]; then
     echo "Starting Celery worker"
 
     exec newrelic-admin run-program \
         celery -A core worker --loglevel=info
 fi
+
+echo "Applying migrations"
+python manage.py migrate --noinput
+
+echo "Seeding plans"
+python manage.py seed_plans
 
 echo "Starting Gunicorn (DEBUG=$DEBUG)"
 

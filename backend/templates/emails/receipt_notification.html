@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            margin: 0;
+            padding: 0;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            border: 1px solid #eee;
+            border-radius: 10px;
+        }
+
+        .header {
+            text-align: center;
+            padding: 20px 0;
+            border-bottom: 2px solid #06b6d4;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .info-box {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .info-row:last-child {
+            border-bottom: none;
+        }
+
+        .label {
+            color: #64748b;
+            font-weight: 500;
+        }
+
+        .value {
+            font-weight: 600;
+            color: #1e293b;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 12px 24px;
+            background-color: #06b6d4;
+            color: #fff;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+            margin-top: 20px;
+        }
+
+        .btn:hover {
+            background-color: #0891b2;
+        }
+
+        .footer {
+            text-align: center;
+            font-size: 12px;
+            color: #777;
+            padding: 20px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 style="color: #06b6d4; margin: 0;">Novo Comprovativo</h1>
+        </div>
+        <div class="content">
+            <p>Olá,</p>
+            <p>Um utilizador enviou um novo comprovativo de pagamento.</p>
+
+            <div class="info-box">
+                <div class="info-row">
+                    <span class="label">Utilizador</span>
+                    <span class="value">{{ user_name }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="label">Email</span>
+                    <span class="value">{{ user_email }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="label">Plano</span>
+                    <span class="value">{{ plan_name }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="label">Valor</span>
+                    <span class="value">{{ amount }}</span>
+                </div>
+            </div>
+
+            <p>
+                <a href="{{ receipt_url }}" class="btn" target="_blank">Ver Comprovativo</a>
+            </p>
+
+            <div style="text-align: center; margin: 30px 0;">
+                <a href="{{ approve_url }}"
+                   style="display: inline-block; padding: 14px 32px; margin: 0 8px 12px 0;
+                          background-color: #16a34a; color: #fff; text-decoration: none;
+                          border-radius: 8px; font-weight: 700; font-size: 15px;">
+                    ✓ Aprovar Pagamento
+                </a>
+                <a href="{{ reject_url }}"
+                   style="display: inline-block; padding: 14px 32px; margin: 0 8px 12px 0;
+                          background-color: #dc2626; color: #fff; text-decoration: none;
+                          border-radius: 8px; font-weight: 700; font-size: 15px;">
+                    ✗ Recusar Pagamento
+                </a>
+            </div>
+            <p style="text-align: center; font-size: 12px; color: #94a3b8;">
+                Este link é único e confidencial. Não o partilhes.
+            </p>
+        </div>
+        <div class="footer">
+            &copy; 2026 Bookar Platform. Todos os direitos reservados.
+        </div>
+    </div>
+</body>
+
+</html>
