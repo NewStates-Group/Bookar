@@ -126,7 +126,7 @@ export default function MindMapsPage() {
     return (
       <div className="min-h-screen flex items-center justify-center dark:invert">
         <div className="text-center space-y-4">
-          <Loader2 className="w-10 h-10 animate-spin text-white dark:invert mx-auto" />
+          <Loader2 className="w-10 h-10 animate-spin text-white mx-auto dark:invert" />
           <p className="text-muted-foreground dark:invert font-medium">
             Carregando seus mapas...
           </p>

@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { FileQuestion } from "lucide-react";
 
 export default function NotFound() {
     return (
