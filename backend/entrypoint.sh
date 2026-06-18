@@ -4,7 +4,7 @@ if [ "$WORKER" = "True" ]; then
     echo "Starting Celery worker"
 
     exec newrelic-admin run-program \
-        celery -A core worker --loglevel=info
+        celery -A core worker --loglevel=info --concurrency=4
 fi
 
 echo "Applying migrations"
