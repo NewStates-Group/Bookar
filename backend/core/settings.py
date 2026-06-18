@@ -224,6 +224,18 @@ STRIPE_PUBLISHABLE_KEY = env("NEXT_PUBLIC_STRIPE_KEY", default="")
 
 ADMIN_EMAILS = env("ADMIN_EMAILS", default=[])
 
+_csrf_defaults = [SITE_URL]
+if SITE_URL.startswith("https://"):
+    _api_origin = SITE_URL.replace("https://", "https://api.", 1)
+    if _api_origin != SITE_URL:
+        _csrf_defaults.append(_api_origin)
+CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=_csrf_defaults)
+CSRF_COOKIE_SECURE = ENV == "prod"
+CSRF_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SECURE = ENV == "prod"
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = "Lax"
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https") if ENV == "prod" else None
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_REFERRER_POLICY = "same-origin"
 X_FRAME_OPTIONS = "DENY"
