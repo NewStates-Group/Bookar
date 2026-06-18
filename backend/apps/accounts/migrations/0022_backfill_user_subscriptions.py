@@ -23,7 +23,7 @@ def backfill_subscriptions(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("accounts", "0021_remove_waitlist"),
+        ("accounts", "0001_squashed_0022_backfill_user_subscriptions"),
         ("subscriptions", "0001_initial_state"),
     ]
 
