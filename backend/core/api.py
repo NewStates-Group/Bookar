@@ -6,6 +6,7 @@ from apps.folhas.controllers import FolhaController
 from apps.mind_maps.controllers import MindMapController
 from apps.subscriptions.controllers import SubscriptionController
 from django.conf import settings
+from django.contrib import admin
 from django.http import HttpResponse
 from django.urls import path
 from ninja.errors import ValidationError as NinjaValidationError
@@ -73,4 +74,5 @@ def healthcheck(request):
 
 urlpatterns = [
     path("api/", api.urls),
+    path("admin/", admin.site.urls),
 ]
