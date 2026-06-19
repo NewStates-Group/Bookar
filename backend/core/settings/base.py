@@ -6,9 +6,9 @@ from environ import Env as load_envs
 
 env = load_envs()
 
-BASE_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
-IMAGES_DIR = BASE_DIR / "images"
+IMAGES_DIR = BASE_DIR / "templates" / "images"
 
 ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=["*"])  # type: ignore
 SECRET_KEY = env("SECRET_KEY", default="django-example-secret-key")  # type: ignore

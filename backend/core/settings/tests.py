@@ -2,7 +2,7 @@ import os
 
 os.environ["NINJA_SKIP_REGISTRY"] = "1"
 
-from .settings import *  # noqa
+from .base import *  # noqa
 
 NINJA_EXTRA = {
     "THROTTLE_RATES": {
@@ -14,3 +14,15 @@ NINJA_EXTRA = {
         "password_reset_confirm": "1000/m",
     }
 }
+
+EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
+
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.InMemoryStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+    },
+}
+
