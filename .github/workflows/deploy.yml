@@ -2,7 +2,7 @@ name: Build and Push Backend
 
 on:
   push:
-    branches: [ main ]
+    branches: [ add/async-support ]
     paths:
       - 'backend/**'
     
