@@ -6,9 +6,12 @@ from environ import Env as load_envs
 
 env = load_envs()
 
-BASE_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
-IMAGES_DIR = BASE_DIR / "images"
+if (BASE_DIR / ".env").exists():
+    env.read_env(str(BASE_DIR / ".env"))
+
+IMAGES_DIR = BASE_DIR / "templates" / "images"
 
 ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=["*"])  # type: ignore
 SECRET_KEY = env("SECRET_KEY", default="django-example-secret-key")  # type: ignore
@@ -38,6 +41,7 @@ APPLICATION_APPS = [
     "apps.explicador",
     "apps.folhas",
     "apps.feedback",
+    "apps.notifications",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + APPLICATION_APPS
@@ -61,8 +65,8 @@ TEMPLATES = [
 
 ASGI_APPLICATION = "core.asgi.application"
 
-SITE_URL = env("SITE_URL")
-API_URL = env("API_URL")
+SITE_URL = env("SITE_URL", default="http://localhost:8000")
+API_URL = env("API_URL", default="http://localhost:8000/api")
 
 DATABASES = {
     "default": env.db(default="sqlite:///:memory:"),  # type: ignore
@@ -136,9 +140,9 @@ STORAGES = {
 DEFAULT_FILE_STORAGE = "cloudinary_storage.storage.MediaCloudinaryStorage"
 
 CLOUDINARY_STORAGE = {
-    "CLOUD_NAME": env("CLOUDINARY_CLOUD_NAME"),
-    "API_KEY": env("CLOUDINARY_API_KEY"),
-    "API_SECRET": env("CLOUDINARY_API_SECRET"),
+    "CLOUD_NAME": env("CLOUDINARY_CLOUD_NAME", default="dummy"),
+    "API_KEY": env("CLOUDINARY_API_KEY", default="dummy"),
+    "API_SECRET": env("CLOUDINARY_API_SECRET", default="dummy"),
 }
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
@@ -159,28 +163,28 @@ CORS_EXPOSE_HEADERS = [
 
 AI = {
     "AI_ENVIRONMENT": env("AI_ENVIRONMENT", default="production"),  # type:ignore
-    "OLLAMA_KEY": env("OLLAMA_KEY"),
-    "GENAI_KEY": env("GENAI_KEY"),
-    "OLLAMA_MODEL_TEXT": env("OLLAMA_MODEL_TEXT"),
-    "GENAI_MODEL_IMAGE": env("GENAI_MODEL_IMAGE"),
-    "GENAI_MODEL_AUDIO": env("GENAI_MODEL_AUDIO"),
-    "GENAI_MODEL_TEXT": env("GENAI_MODEL_TEXT"),
-    "REPLICATE_API_TOKEN": env("REPLICATE_API_TOKEN"),
-    "HF_API_KEY": env("HF_API_KEY"),
-    "ELEVENLABS_KEY": env("ELEVENLABS_KEY"),
-    "NVIDIA_AUDIO_API_KEY": env("NVIDIA_AUDIO_API_KEY"),
+    "OLLAMA_KEY": env("OLLAMA_KEY", default=""),
+    "GENAI_KEY": env("GENAI_KEY", default=""),
+    "OLLAMA_MODEL_TEXT": env("OLLAMA_MODEL_TEXT", default=""),
+    "GENAI_MODEL_IMAGE": env("GENAI_MODEL_IMAGE", default=""),
+    "GENAI_MODEL_AUDIO": env("GENAI_MODEL_AUDIO", default=""),
+    "GENAI_MODEL_TEXT": env("GENAI_MODEL_TEXT", default=""),
+    "REPLICATE_API_TOKEN": env("REPLICATE_API_TOKEN", default=""),
+    "HF_API_KEY": env("HF_API_KEY", default=""),
+    "ELEVENLABS_KEY": env("ELEVENLABS_KEY", default=""),
+    "NVIDIA_AUDIO_API_KEY": env("NVIDIA_AUDIO_API_KEY", default=""),
 }
 
-GOOGLE_CLIENT_ID = env("GOOGLE_CLIENT_ID")
-GOOGLE_CLIENT_SECRET = env("GOOGLE_CLIENT_SECRET")
+GOOGLE_CLIENT_ID = env("GOOGLE_CLIENT_ID", default="dummy")
+GOOGLE_CLIENT_SECRET = env("GOOGLE_CLIENT_SECRET", default="dummy")
 
 EMAIL_BACKEND = "gmailapi_backend.mail.GmailBackend"
 EMAIL_HOST_USER = env("EMAIL_HOST_USER", default="newstates.bookar@gmail.com")  # type: ignore
 DEFAULT_FROM_EMAIL = f"Bookar <{EMAIL_HOST_USER}>"
 
-GMAIL_API_CLIENT_ID = env("GMAIL_API_CLIENT_ID")
-GMAIL_API_CLIENT_SECRET = env("GMAIL_API_CLIENT_SECRET")
-GMAIL_API_REFRESH_TOKEN = env("GMAIL_API_REFRESH_TOKEN")
+GMAIL_API_CLIENT_ID = env("GMAIL_API_CLIENT_ID", default="dummy")
+GMAIL_API_CLIENT_SECRET = env("GMAIL_API_CLIENT_SECRET", default="dummy")
+GMAIL_API_REFRESH_TOKEN = env("GMAIL_API_REFRESH_TOKEN", default="dummy")
 
 NINJA_EXTRA = {
     "THROTTLE_RATES": {
@@ -193,8 +197,8 @@ NINJA_EXTRA = {
     }
 }
 
-CLOUDFLARE_TURNSTILE_SECRET_KEY = env("TURNSTILE_SECRET_KEY")
-CLOUDFLARE_TURNSTILE_SITE_KEY = env("NEXT_PUBLIC_TURNSTILE_SITE_KEY")
+CLOUDFLARE_TURNSTILE_SECRET_KEY = env("TURNSTILE_SECRET_KEY", default="XXXX.DUMMY.TOKEN.XXXX")
+CLOUDFLARE_TURNSTILE_SITE_KEY = env("NEXT_PUBLIC_TURNSTILE_SITE_KEY", default="dummy")
 
 STRIPE_SECRET_KEY = env("STRIPE_SECRET_KEY", default="")  # type: ignore
 STRIPE_WEBHOOK_SECRET = env("STRIPE_WEBHOOK_SECRET", default="")  # type: ignore

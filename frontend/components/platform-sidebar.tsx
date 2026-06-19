@@ -90,7 +90,7 @@ export function PlatformSidebar({
   React.useEffect(() => {
     if (!session?.accessToken) return;
     apiRequest(
-      `${process.env.NEXT_PUBLIC_API_URL}/subscriptions/notifications/unread-count`
+      `${process.env.NEXT_PUBLIC_API_URL}/notifications/unread-count`
     ).then((d: any) => setUnreadCount(d.count)).catch(() => {});
   }, [session?.accessToken]);
 

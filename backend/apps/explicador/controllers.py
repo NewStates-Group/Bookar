@@ -6,10 +6,10 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser
 from django.http import StreamingHttpResponse
 from injector import inject
-from ninja_extra import api_controller, route
-from ninja_jwt.authentication import JWTAuth
-from ninja_jwt.tokens import AccessToken
 from ninja import Query
+from ninja_extra import api_controller, route
+from ninja_jwt.authentication import AsyncJWTAuth
+from ninja_jwt.tokens import AccessToken
 
 from apps.courses.providers import AllProvidersFailed, get_text_chain
 from .schemas import (
@@ -29,27 +29,23 @@ class ExplicadorController:
     def __init__(self, explicador_service: ExplicadorService):
         self.explicador_service = explicador_service
 
-    @route.get("", response=List[ExplicadorRoomOut], auth=JWTAuth())
-    def list_rooms(self, request, q: Optional[str] = Query(None)):
-        """List explanation rooms owned by the logged-in user. Optionally filter by title."""
-        return self.explicador_service.list_rooms(request.user, q=q or "")
+    @route.get("", response=List[ExplicadorRoomOut], auth=AsyncJWTAuth())
+    async def list_rooms(self, request, q: Optional[str] = Query(None)):
+        return await self.explicador_service.list_rooms(request.user, q=q or "")
 
-    @route.post("", response=ExplicadorRoomOut, auth=JWTAuth())
-    def create_room(self, request, data: ExplicadorRoomCreateIn):
-        """Create a new explanation room."""
+    @route.post("", response=ExplicadorRoomOut, auth=AsyncJWTAuth())
+    async def create_room(self, request, data: ExplicadorRoomCreateIn):
         course_context = (
             data.course_context.model_dump(exclude_none=True)
             if data.course_context
             else None
         )
-        return self.explicador_service.create_room(
+        return await self.explicador_service.create_room(
             request.user, data.title, course_context=course_context
         )
 
-    @route.post("ask", auth=JWTAuth())
-    def ask_question(self, request, payload: ExplicadorAskIn):
-        """Stream an AI answer via SSE — no room created."""
-
+    @route.post("ask", auth=AsyncJWTAuth())
+    async def ask_question(self, request, payload: ExplicadorAskIn):
         async def event_stream():
             ctx = payload.context
             system_content = (
@@ -83,23 +79,10 @@ class ExplicadorController:
             queue: asyncio.Queue[str | None] = asyncio.Queue()
 
             async def producer():
-                loop = asyncio.get_event_loop()
                 try:
-
-                    def sync_stream():
-                        for token in chain.stream(messages=messages):
-                            if token:
-                                yield token
-
-                    _SENTINEL = object()
-                    it = iter(sync_stream())
-                    while True:
-                        result = await loop.run_in_executor(
-                            None, lambda: next(it, _SENTINEL)
-                        )
-                        if result is _SENTINEL:
-                            break
-                        await queue.put(result)
+                    async for token in chain.stream_async(messages=messages):
+                        if token:
+                            await queue.put(token)
                 except AllProvidersFailed as e:
                     await queue.put(f"__error__:{e}")
                 finally:
@@ -112,7 +95,7 @@ class ExplicadorController:
                 if item is None:
                     break
                 if isinstance(item, str) and item.startswith("__error__:"):
-                    yield f"data: {json.dumps({'error': item[len('__error__:') :]})}\n\n"
+                    yield f"data: {json.dumps({'error': item[len('__error__'):]})}\n\n"
                     break
                 yield f"data: {json.dumps({'token': item})}\n\n"
 
@@ -123,18 +106,12 @@ class ExplicadorController:
             event_stream(),
             content_type="text/event-stream",
         )
-
         response["Cache-Control"] = "no-cache"
         response["X-Accel-Buffering"] = "no"
-
         return response
 
     @route.get("{room_uuid}", response=ExplicadorRoomDetailOut)
-    def get_room(self, request, room_uuid: str):
-        """
-        Get details of an explanation room (public/guest endpoint).
-        Resolves the user from JWT header manually if present.
-        """
+    async def get_room(self, request, room_uuid: str):
         user = AnonymousUser()
         auth_header = request.headers.get("Authorization", "")
         if auth_header.startswith("Bearer "):
@@ -142,13 +119,12 @@ class ExplicadorController:
             try:
                 token = AccessToken(token_str)
                 user_id = token.payload.get("user_id")
-                user = User.objects.get(pk=user_id)
+                user = await User.objects.aget(pk=user_id)
             except Exception:
                 pass
 
-        return self.explicador_service.get_room(room_uuid, user)
+        return await self.explicador_service.get_room(room_uuid, user)
 
-    @route.delete("{room_uuid}", auth=JWTAuth())
-    def delete_room(self, request, room_uuid: str):
-        """Delete an explanation room (restricted to owner)."""
-        return self.explicador_service.delete_room(room_uuid, request.user)
+    @route.delete("{room_uuid}", auth=AsyncJWTAuth())
+    async def delete_room(self, request, room_uuid: str):
+        return await self.explicador_service.delete_room(room_uuid, request.user)

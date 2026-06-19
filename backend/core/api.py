@@ -4,6 +4,7 @@ from apps.explicador.controllers import ExplicadorController
 from apps.feedback.controllers import FeedbackController
 from apps.folhas.controllers import FolhaController
 from apps.mind_maps.controllers import MindMapController
+from apps.notifications.controllers import NotificationController
 from apps.subscriptions.controllers import SubscriptionController
 from django.conf import settings
 from django.http import HttpResponse
@@ -28,6 +29,7 @@ api.register_controllers(
     ExplicadorController,
     FolhaController,
     FeedbackController,
+    NotificationController,
 )
 
 
@@ -67,7 +69,7 @@ def service_exception_handler(request, exc):
 
 
 @api.get("healthcheck/")
-def healthcheck(request):
+async def healthcheck(request):
     return HttpResponse("ok", content_type="text/plain")  # type: ignore
 
 
@@ -75,7 +77,7 @@ urlpatterns = [
     path("api/", api.urls),
 ]
 
-handler400 = "core.errors.handler400"
-handler403 = "core.errors.handler403"
-handler404 = "core.errors.handler404"
-handler500 = "core.errors.handler500"
+handler400 = "utils.errors.handler400"
+handler403 = "utils.errors.handler403"
+handler404 = "utils.errors.handler404"
+handler500 = "utils.errors.handler500"

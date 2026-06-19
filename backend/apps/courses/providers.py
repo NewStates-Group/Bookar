@@ -17,21 +17,23 @@ Usage:
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
-import subprocess
 import urllib.parse
 import uuid
 import wave
 from abc import ABC, abstractmethod
+from collections.abc import AsyncGenerator
 from typing import Any, Optional
 
 import httpx
 from django.conf import settings
 from google.genai import types
-
+from ollama import AsyncClient as OllamaAsyncClient
 from ollama import Client as OllamaClient
-from .utils import get_genai_client, safe_gemini_call
+
+from .utils import get_genai_client, safe_gemini_call, safe_gemini_call_async
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +55,8 @@ class BaseProvider(ABC):
         self._next = provider
         return provider
 
+    # --- Sync entry points (for Celery tasks) ---
+
     def handle(self, **kwargs) -> Any:
         try:
             result = self._execute(**kwargs)
@@ -73,11 +77,44 @@ class BaseProvider(ABC):
                     f"All providers failed. ({self.name}): {e}"
                 ) from e
 
+    # --- Async entry points (for async views/services) ---
+
+    async def handle_async(self, **kwargs) -> Any:
+        try:
+            return await self._execute_async(**kwargs)
+        except Exception as e:
+            if self._next:
+                return await self._next.handle_async(**kwargs)
+            raise AllProvidersFailed(f"All providers failed. ({self.name}): {e}") from e
+
+    async def stream_async(self, **kwargs) -> AsyncGenerator[Any, None]:
+        try:
+            async for chunk in self._stream_async(**kwargs):
+                yield chunk
+        except Exception as e:
+            if self._next:
+                async for chunk in self._next.stream_async(**kwargs):
+                    yield chunk
+            else:
+                raise AllProvidersFailed(
+                    f"All providers failed. ({self.name}): {e}"
+                ) from e
+
+    # --- Sync abstract methods ---
+
     @abstractmethod
     def _execute(self, **kwargs) -> Any: ...
 
     @abstractmethod
     def _stream(self, **kwargs) -> Any: ...
+
+    # --- Async abstract methods ---
+
+    @abstractmethod
+    async def _execute_async(self, **kwargs) -> Any: ...
+
+    @abstractmethod
+    async def _stream_async(self, **kwargs) -> AsyncGenerator[Any, None]: ...
 
 
 class GeminiTextProvider(BaseProvider):
@@ -142,6 +179,64 @@ class GeminiTextProvider(BaseProvider):
         )
         return response.text
 
+    async def _stream_async(self, *, messages, model=None, **_kw) -> AsyncGenerator[str, None]:
+        client = get_genai_client()
+        if model is None:
+            model = self.DEFAULT_MODEL
+
+        attachment = None
+        if isinstance(messages, list) and messages and isinstance(messages[-1], dict):
+            prompt = messages[-1].get("content", "")
+            attachment = messages[-1].get("attachment")
+        else:
+            prompt = str(messages)
+
+        contents = [prompt]
+        if attachment and isinstance(attachment, dict) and attachment.get("data"):
+            contents.append(
+                types.Part.from_bytes(
+                    data=attachment["data"],
+                    mime_type=attachment.get("mime_type", "application/octet-stream"),
+                )
+            )
+
+        stream = await client.aio.models.generate_content_stream(
+            model=model,
+            contents=contents,
+        )
+
+        async for chunk in stream:
+            if chunk.text:
+                yield chunk.text
+
+    async def _execute_async(self, *, messages, model=None, **_kw) -> str:
+        client = get_genai_client()
+        if model is None:
+            model = settings.AI.get("GENAI_MODEL_TEXT", "gemini-2.5-flash-lite")
+
+        attachment = None
+        if isinstance(messages, list) and messages and isinstance(messages[-1], dict):
+            prompt = messages[-1].get("content", "")
+            attachment = messages[-1].get("attachment")
+        else:
+            prompt = str(messages)
+
+        contents = [prompt]
+        if attachment and isinstance(attachment, dict) and attachment.get("data"):
+            contents.append(
+                types.Part.from_bytes(
+                    data=attachment["data"],
+                    mime_type=attachment.get("mime_type", "application/octet-stream"),
+                )
+            )
+
+        response = await safe_gemini_call_async(
+            client.aio.models.generate_content,
+            model=model,
+            contents=contents,
+        )
+        return response.text
+
 
 class OllamaTextProvider(BaseProvider):
     name = "Ollama"
@@ -180,6 +275,41 @@ class OllamaTextProvider(BaseProvider):
             msgs = [{"role": "user", "content": str(messages)}]
 
         return client.chat(self.DEFAULT_MODEL, messages=msgs)["message"]["content"]
+
+    async def _stream_async(self, *, messages, **_kw) -> AsyncGenerator[str, None]:
+        client = OllamaAsyncClient(
+            host="https://ollama.com",
+            headers={"Authorization": "Bearer " + settings.AI["OLLAMA_KEY"]},
+        )
+        if isinstance(messages, list):
+            msgs = []
+            for m in messages:
+                m_copy = dict(m)
+                m_copy.pop("attachment", None)
+                msgs.append(m_copy)
+        else:
+            msgs = [{"role": "user", "content": str(messages)}]
+
+        stream = await client.chat(model=self.DEFAULT_MODEL, messages=msgs, stream=True)
+        async for chunk in stream:
+            yield chunk["message"]["content"]
+
+    async def _execute_async(self, *, messages, **_kw) -> str:
+        client = OllamaAsyncClient(
+            host="https://ollama.com",
+            headers={"Authorization": "Bearer " + settings.AI["OLLAMA_KEY"]},
+        )
+        if isinstance(messages, list):
+            msgs = []
+            for m in messages:
+                m_copy = dict(m)
+                m_copy.pop("attachment", None)
+                msgs.append(m_copy)
+        else:
+            msgs = [{"role": "user", "content": str(messages)}]
+
+        response = await client.chat(model=self.DEFAULT_MODEL, messages=msgs)
+        return response["message"]["content"]
 
 
 class GeminiImageProvider(BaseProvider):
@@ -234,6 +364,57 @@ class GeminiImageProvider(BaseProvider):
 
         raise ValueError("No image part in response")
 
+    async def _stream_async(self, **kwargs) -> AsyncGenerator[Any, None]:
+        return
+        yield
+
+    async def _execute_async(self, *, prompt, output_path, client, timeout=30, **_kw) -> bool:
+        model_name = settings.AI.get("GENAI_MODEL_IMAGE", "gemini-2.5-flash-lite")
+
+        if "imagen" in model_name.lower() or "generate" in model_name.lower():
+            response = await safe_gemini_call_async(
+                client.aio.models.generate_images,
+                model=model_name,
+                prompt=prompt,
+                config=types.GenerateImagesConfig(
+                    number_of_images=1,
+                    aspect_ratio="16:9",
+                    output_mime_type="image/jpeg",
+                ),
+            )
+            if not response or not response.generated_images:
+                raise ValueError("Empty response from Gemini Images")
+            for img in response.generated_images:
+                output_path.write_bytes(img.image.image_bytes)
+                return True
+        else:
+            response = await safe_gemini_call_async(
+                client.aio.models.generate_content,
+                model=model_name,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    image_config=types.ImageConfig(aspect_ratio="16:9")
+                ),
+            )
+            if not response or not response.parts:
+                raise ValueError("Empty response from Gemini Content")
+
+            for part in response.parts:
+                if part.inline_data:
+                    output_path.write_bytes(part.inline_data.data)
+                    return True
+                if hasattr(part, "image"):
+                    data = (
+                        part.image
+                        if isinstance(part.image, bytes)
+                        else getattr(part.image, "data", None)
+                    )
+                    if data:
+                        output_path.write_bytes(data)
+                        return True
+
+        raise ValueError("No image part in response")
+
 
 class ReplicateImageProvider(BaseProvider):
     name = "Replicate"
@@ -258,6 +439,29 @@ class ReplicateImageProvider(BaseProvider):
             output_path.write_bytes(res.content)
         return True
 
+    async def _stream_async(self, **kwargs) -> AsyncGenerator[Any, None]:
+        return
+        yield
+
+    async def _execute_async(self, *, prompt, output_path, timeout=30, **_kw) -> bool:
+        import replicate
+
+        os.environ["REPLICATE_API_TOKEN"] = settings.AI.get("REPLICATE_API_TOKEN", "")
+        output = await asyncio.to_thread(
+            replicate.run,
+            "black-forest-labs/flux-schnell",
+            input={"prompt": prompt, "aspect_ratio": "16:9"},
+        )
+        if not output:
+            raise ValueError("No output from Replicate")
+
+        url = output[0] if isinstance(output, list) else output
+        async with httpx.AsyncClient() as c:
+            res = await c.get(str(url), timeout=timeout)
+            res.raise_for_status()
+            output_path.write_bytes(res.content)
+        return True
+
 
 class PollinationsImageProvider(BaseProvider):
     name = "Pollinations"
@@ -271,6 +475,21 @@ class PollinationsImageProvider(BaseProvider):
 
         with httpx.Client() as c:
             res = c.get(url, timeout=timeout)
+            res.raise_for_status()
+            output_path.write_bytes(res.content)
+        return True
+
+    async def _stream_async(self, **kwargs) -> AsyncGenerator[Any, None]:
+        return
+        yield
+
+    async def _execute_async(self, *, prompt, output_path, timeout=30, **_kw) -> bool:
+        encoded = urllib.parse.quote(prompt)
+        seed = uuid.uuid4().int % 100000000
+        url = f"https://image.pollinations.ai/prompt/{encoded}?width=1920&height=1080&nologo=true&seed={seed}"
+
+        async with httpx.AsyncClient() as c:
+            res = await c.get(url, timeout=timeout)
             res.raise_for_status()
             output_path.write_bytes(res.content)
         return True
@@ -291,6 +510,26 @@ class HuggingFaceImageProvider(BaseProvider):
 
         with httpx.Client() as c:
             res = c.post(
+                api_url, headers=headers, json={"inputs": prompt}, timeout=timeout
+            )
+            res.raise_for_status()
+            output_path.write_bytes(res.content)
+        return True
+
+    async def _stream_async(self, **kwargs) -> AsyncGenerator[Any, None]:
+        return
+        yield
+
+    async def _execute_async(self, *, prompt, output_path, timeout=30, **_kw) -> bool:
+        token = settings.AI.get("HF_API_KEY", "")
+        if not token:
+            raise ValueError("HF_API_KEY not set")
+
+        api_url = "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0"
+        headers = {"Authorization": f"Bearer {token}"}
+
+        async with httpx.AsyncClient() as c:
+            res = await c.post(
                 api_url, headers=headers, json={"inputs": prompt}, timeout=timeout
             )
             res.raise_for_status()
@@ -320,6 +559,34 @@ class GeminiAudioProvider(BaseProvider):
 
         response = safe_gemini_call(
             client.models.generate_content,
+            model=settings.AI.get("GENAI_MODEL_AUDIO", "gemini-2.5-flash-preview-tts"),
+            contents=text,
+            config=types.GenerateContentConfig(
+                response_modalities=["AUDIO"],
+                speech_config=types.SpeechConfig(
+                    voice_config=types.VoiceConfig(
+                        prebuilt_voice_config=types.PrebuiltVoiceConfig(
+                            voice_name="Puck"
+                        )
+                    )
+                ),
+            ),
+        )
+
+        if hasattr(response, "parts"):
+            for part in response.parts:
+                if part.inline_data:
+                    return _save_pcm_as_wav(output_path, part.inline_data.data)
+
+        raise ValueError("No audio data received from Gemini TTS")
+
+    async def _stream_async(self, **kwargs) -> AsyncGenerator[Any, None]:
+        return
+        yield
+
+    async def _execute_async(self, *, text, output_path, client, **_kw) -> bool:
+        response = await safe_gemini_call_async(
+            client.aio.models.generate_content,
             model=settings.AI.get("GENAI_MODEL_AUDIO", "gemini-2.5-flash-preview-tts"),
             contents=text,
             config=types.GenerateContentConfig(
@@ -371,7 +638,6 @@ class ElevenLabsAudioProvider(BaseProvider):
             mp3_path = output_path.with_suffix(".mp3")
             mp3_path.write_bytes(res.content)
 
-        # Convert MP3 → WAV for pipeline consistency
         subprocess.run(
             [
                 "ffmpeg",
@@ -391,6 +657,53 @@ class ElevenLabsAudioProvider(BaseProvider):
             stderr=subprocess.DEVNULL,
             timeout=30,
         )
+        mp3_path.unlink(missing_ok=True)
+        return True
+
+    async def _stream_async(self, **kwargs) -> AsyncGenerator[Any, None]:
+        return
+        yield
+
+    async def _execute_async(self, *, text, output_path, **_kw) -> bool:
+        api_key = settings.AI.get("ELEVENLABS_KEY", "")
+        if not api_key:
+            raise ValueError("ELEVENLABS_KEY not configured")
+
+        voice_id = "onyx"
+        url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
+        headers = {
+            "xi-api-key": api_key,
+            "Content-Type": "application/json",
+            "Accept": "audio/mpeg",
+        }
+        payload = {
+            "text": text,
+            "model_id": "eleven_multilingual_v2",
+            "voice_settings": {"stability": 0.5, "similarity_boost": 0.75},
+        }
+
+        async with httpx.AsyncClient() as c:
+            res = await c.post(url, headers=headers, json=payload, timeout=60)
+            res.raise_for_status()
+            mp3_path = output_path.with_suffix(".mp3")
+            mp3_path.write_bytes(res.content)
+
+        process = await asyncio.create_subprocess_exec(
+            "ffmpeg",
+            "-y",
+            "-i",
+            str(mp3_path),
+            "-ac",
+            "1",
+            "-ar",
+            "24000",
+            "-c:a",
+            "pcm_s16le",
+            str(output_path),
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.DEVNULL,
+        )
+        await asyncio.wait_for(process.wait(), timeout=30)
         mp3_path.unlink(missing_ok=True)
         return True
 
@@ -434,6 +747,41 @@ class NvidiaAudioProvider(BaseProvider):
             encoding=AudioEncoding.LINEAR_PCM,
         )
 
+        return _save_pcm_as_wav(output_path, resp.audio)
+
+    async def _stream_async(self, **kwargs) -> AsyncGenerator[Any, None]:
+        return
+        yield
+
+    async def _execute_async(self, *, text, output_path, **_kw) -> bool:
+        api_key = settings.AI.get("NVIDIA_AUDIO_API_KEY", "")
+
+        if not api_key:
+            raise ValueError("NVIDIA_AUDIO_API_KEY not configured")
+
+        import riva.client
+        from riva.client.proto.riva_audio_pb2 import AudioEncoding
+
+        def _sync_synthesize():
+            auth = riva.client.Auth(
+                uri="grpc.nvcf.nvidia.com:443",
+                use_ssl=True,
+                options=[("grpc.max_receive_message_length", -1)],
+                metadata_args=[
+                    ["function-id", "ddacc747-1269-4fab-bfd9-8f593dead106"],
+                    ["authorization", f"Bearer {api_key}"],
+                ],
+            )
+            service = riva.client.SpeechSynthesisService(auth)
+            return service.synthesize(
+                text=text[:2000],
+                voice_name="Chatterbox-Multilingual.en-US.Male",
+                language_code="pt-BR",
+                sample_rate_hz=24000,
+                encoding=AudioEncoding.LINEAR_PCM,
+            )
+
+        resp = await asyncio.to_thread(_sync_synthesize)
         return _save_pcm_as_wav(output_path, resp.audio)
 
 

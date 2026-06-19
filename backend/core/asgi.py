@@ -11,7 +11,7 @@ from apps.explicador.consumers import ExplicadorConsumer  # NOQA
 from channels.routing import ProtocolTypeRouter, URLRouter  # NOQA
 from django.urls import path  # NOQA
 
-from .middlewares import AuthMiddleware  # NOQA
+from utils.middlewares import AuthMiddleware  # NOQA
 
 application = ProtocolTypeRouter(
     {

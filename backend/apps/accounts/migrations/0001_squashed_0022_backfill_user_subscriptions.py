@@ -25,8 +25,12 @@ def populate_secret_tokens(apps, schema_editor):
 
 
 
+    try:
+        SubscriptionPlan = apps.get_model("subscriptions", "SubscriptionPlan")
+    except LookupError:
+        return  # subscriptions app not migrated yet
+
     User = apps.get_model("accounts", "User")
-    SubscriptionPlan = apps.get_model("subscriptions", "SubscriptionPlan")
     UserSubscription = apps.get_model("subscriptions", "UserSubscription")
 
     free_plan = SubscriptionPlan.objects.filter(slug="free").first()

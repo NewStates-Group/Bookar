@@ -4,7 +4,7 @@ import urllib.parse
 
 import httpx
 from celery import shared_task
-from utils.websocket import send_user_update
+from utils.websocket import send_user_update_sync as send_user_update
 from apps.courses.utils import extract_json, generate_text_with_fallback
 from django.db import transaction
 

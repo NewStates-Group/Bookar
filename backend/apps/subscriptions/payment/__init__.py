@@ -22,8 +22,8 @@ def get_provider(gateway: str) -> BasePaymentProvider:
 
 
 # Import and register providers
-from .manual import ManualPaymentProvider
-from .stripe import StripePaymentProvider
+from .manual import ManualPaymentProvider  # NOQA
+from .stripe import StripePaymentProvider  # NOQA
 
 register_provider(ManualPaymentProvider)
 register_provider(StripePaymentProvider)
