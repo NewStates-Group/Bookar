@@ -13,29 +13,36 @@ env:
   NEWRELIC_IMAGE: ${{ secrets.DOCKER_USERNAME }}/bookar-new-relic
 
 jobs:
-  # test:
-  #   runs-on: ubuntu-latest
+  test:
+    runs-on: ubuntu-latest
 
-  #   steps:
-  #     - name: Checkout codeACKEND
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-  #     - name: Setup Python
-  #       uses: actions/setup-python@v5
-  #       with:
-  #         python-version: "3.11"
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
 
-  #     - name: Install backend dependencies
-  #       run: |
-  #         cd backend
-  #         pip install -r requirements.txt
+      - name: Install backend dependencies
+        run: |
+          cd backend
+          pip install -r requirements.txt
 
-  #     - name: Run Django tests
-  #       run: |
-  #         cd backend
-  #         python manage.py test || echo "Failed"
+      - name: Create .env file
+        env:
+          ENV_FILE_CONTENT: ${{ secrets.ENV_FILE }}
+        run: |
+          echo "$ENV_FILE_CONTENT" > backend/.env
+
+      - name: Run Django tests
+        run: |
+          cd backend
+          python manage.py test --settings=core.settings.tests
 
   build-and-push-backend:
-    # needs: build-and-push-new-relic
+    needs: test
     runs-on: ubuntu-latest
 
     steps:
