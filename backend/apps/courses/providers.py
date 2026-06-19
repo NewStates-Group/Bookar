@@ -101,7 +101,7 @@ class GeminiTextProvider(BaseProvider):
             contents.append(
                 types.Part.from_bytes(
                     data=attachment["data"],
-                    mime_type=attachment.get("mime_type", "application/octet-stream")
+                    mime_type=attachment.get("mime_type", "application/octet-stream"),
                 )
             )
 
@@ -131,7 +131,7 @@ class GeminiTextProvider(BaseProvider):
             contents.append(
                 types.Part.from_bytes(
                     data=attachment["data"],
-                    mime_type=attachment.get("mime_type", "application/octet-stream")
+                    mime_type=attachment.get("mime_type", "application/octet-stream"),
                 )
             )
 
@@ -408,7 +408,7 @@ class NvidiaAudioProvider(BaseProvider):
 
     def _execute(self, *, text, output_path, **_kw) -> bool:
         api_key = settings.AI.get("NVIDIA_AUDIO_API_KEY", "")
-        
+
         if not api_key:
             raise ValueError("NVIDIA_AUDIO_API_KEY not configured")
 

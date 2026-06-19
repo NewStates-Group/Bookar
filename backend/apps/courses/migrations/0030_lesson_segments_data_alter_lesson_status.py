@@ -4,20 +4,33 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('courses', '0029_modulematerial_content'),
+        ("courses", "0029_modulematerial_content"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='lesson',
-            name='segments_data',
-            field=models.JSONField(blank=True, help_text='Cache do guião gerado pela Task 1', null=True),
+            model_name="lesson",
+            name="segments_data",
+            field=models.JSONField(
+                blank=True, help_text="Cache do guião gerado pela Task 1", null=True
+            ),
         ),
         migrations.AlterField(
-            model_name='lesson',
-            name='status',
-            field=models.CharField(choices=[('PENDING', 'Pendente'), ('PLANNING', 'Planeando Conteúdo'), ('GENERATING_MEDIA', 'Gerando Vídeo'), ('PROCESSING', 'Processando'), ('READY', 'Pronto'), ('ERROR', 'Erro'), ('CANCELLED', 'Cancelado')], default='PENDING', max_length=20),
+            model_name="lesson",
+            name="status",
+            field=models.CharField(
+                choices=[
+                    ("PENDING", "Pendente"),
+                    ("PLANNING", "Planeando Conteúdo"),
+                    ("GENERATING_MEDIA", "Gerando Vídeo"),
+                    ("PROCESSING", "Processando"),
+                    ("READY", "Pronto"),
+                    ("ERROR", "Erro"),
+                    ("CANCELLED", "Cancelado"),
+                ],
+                default="PENDING",
+                max_length=20,
+            ),
         ),
     ]

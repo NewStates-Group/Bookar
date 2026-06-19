@@ -5,15 +5,19 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('courses', '0017_alter_course_certificate_file_alter_course_status_and_more'),
+        ("courses", "0017_alter_course_certificate_file_alter_course_status_and_more"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='course',
-            name='thumb',
-            field=models.ImageField(blank=True, null=True, storage=cloudinary_storage.storage.MediaCloudinaryStorage(), upload_to='courses/thumbs/'),
+            model_name="course",
+            name="thumb",
+            field=models.ImageField(
+                blank=True,
+                null=True,
+                storage=cloudinary_storage.storage.MediaCloudinaryStorage(),
+                upload_to="courses/thumbs/",
+            ),
         ),
     ]

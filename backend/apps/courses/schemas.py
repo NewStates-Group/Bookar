@@ -72,7 +72,9 @@ class CourseOut(ModelSchema):
         if hasattr(obj, "_precomputed_certificate_status"):
             return obj._precomputed_certificate_status
         user = context.get("request").user
-        enrollment = obj.enrollments.filter(user=user).only("certificate_status").first()
+        enrollment = (
+            obj.enrollments.filter(user=user).only("certificate_status").first()
+        )
         return enrollment.certificate_status if enrollment else "NOT_GENERATED"
 
     @staticmethod
@@ -80,7 +82,11 @@ class CourseOut(ModelSchema):
         if hasattr(obj, "_precomputed_certificate_url"):
             return obj._precomputed_certificate_url
         user = context.get("request").user
-        enrollment = obj.enrollments.filter(user=user).only("certificate_status", "certificate_file").first()
+        enrollment = (
+            obj.enrollments.filter(user=user)
+            .only("certificate_status", "certificate_file")
+            .first()
+        )
         if (
             enrollment
             and enrollment.certificate_status == "READY"
@@ -340,8 +346,6 @@ class CourseFeaturedOut(Schema):
     level: Optional[str] = None
     thumb: Optional[str] = None
     desc: Optional[str] = None
-
-
 
 
 class CoursePreviewLessonOut(Schema):

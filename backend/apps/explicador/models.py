@@ -16,7 +16,10 @@ class ExplicadorRoom(models.Model):
 
     class Meta:
         indexes = [
-            models.Index(fields=["owner", "is_active", "-created_at"], name="idx_explic_owner_active"),
+            models.Index(
+                fields=["owner", "is_active", "-created_at"],
+                name="idx_explic_owner_active",
+            ),
         ]
 
     # Stores the whiteboard configuration, like:

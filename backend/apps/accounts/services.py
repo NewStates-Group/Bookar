@@ -4,13 +4,16 @@ import random
 import string
 import urllib.parse
 import uuid
+from datetime import timedelta
 
 import httpx
+from asgiref.sync import sync_to_async
 from django.conf import settings
-from django.contrib.auth import authenticate, get_user_model
+from django.contrib.auth import get_user_model
 from django.core.files.base import ContentFile
 from django.core.signing import BadSignature, SignatureExpired, TimestampSigner
 from django.db import transaction
+from django.utils import timezone
 from google.auth.transport import requests
 from google.oauth2 import id_token
 from ninja.errors import HttpError
@@ -30,32 +33,29 @@ logger = logging.getLogger(__name__)
 
 
 class AuthService:
-    def create_user(self, first_name, last_name, email, password, code, token):
-        if not self.verify_verification_code(email, code):
-            raise HttpError(400, "Código de verificação inválido.")
+    async def create_user(self, first_name, last_name, email, password, code, token):
+        if not await self.averify_verification_code(email, code):
+            raise HttpError(400, "CODE_VERIFICATION_FAILED")
 
-        if not self.verify_turnstile(token):
-            raise HttpError(400, "Cadastro falhou. Tente novamente.")
+        if not await self.averify_turnstile(token):
+            raise HttpError(400, "SIGNUP_FAILED")
 
         user = User.objects.create_user(
             email=email,
             password=password,
-            username=email.split("@")[0],  # Default username from email
+            username=email.split("@")[0],
             first_name=first_name,
             last_name=last_name,
         )
-        try:
-            send_welcome_email_task.delay(user.id)
-        except Exception as e:
-            print(f"Failed to queue welcome email: {e}")
 
-        # Success, clear code
-        EmailVerificationCode.objects.filter(email=email).delete()
+        send_welcome_email_task.delay(user.id)  # type: ignore
+        await sync_to_async(EmailVerificationCode.objects.filter(email=email).delete)()  # type: ignore
 
-        # Create free subscription
-        free_plan = SubscriptionPlan.objects.filter(slug="free").first()
+        free_plan = await sync_to_async(
+            SubscriptionPlan.objects.filter(slug="free").first  # type: ignore
+        )()  # type: ignore
         if free_plan:
-            UserSubscription.objects.get_or_create(
+            await sync_to_async(UserSubscription.objects.get_or_create)(  # type: ignore
                 user=user,
                 defaults={
                     "plan": free_plan,
@@ -65,116 +65,38 @@ class AuthService:
 
         return user
 
-    def generate_verification_code(self, email):
+    async def generate_verification_code(self, email):
         code = "".join(random.choices(string.digits, k=6))
-        EmailVerificationCode.objects.update_or_create(
+        await sync_to_async(EmailVerificationCode.objects.update_or_create)(  # type: ignore
             email=email, defaults={"code": code}
         )
-        send_verification_email_task.delay(email, code)
+        send_verification_email_task.delay(email, code)  # type: ignore
         return True
 
-    def authenticate_user(self, email, password, token):
-        if not self.verify_turnstile(token):
-            raise HttpError(400, "Verificação anti-bot falhou.")
-
-        user = authenticate(email=email, password=password)
-        if not user:
-            raise HttpError(401, "E-mail ou senha incorretos.")
-
-        refresh = RefreshToken.for_user(user)
-        return {
-            "access": str(refresh.access_token),
-            "refresh": str(refresh),
-        }
-
-    def verify_verification_code(self, email, code):
-        from datetime import timedelta
-
-        from django.utils import timezone
-
+    async def averify_verification_code(self, email, code):
         ten_minutes_ago = timezone.now() - timedelta(minutes=10)
-        return EmailVerificationCode.objects.filter(
-            email=email, code=code, updated_at__gte=ten_minutes_ago
-        ).exists()
+        return await sync_to_async(
+            EmailVerificationCode.objects.filter(  # type: ignore
+                email=email, code=code, updated_at__gte=ten_minutes_ago
+            ).exists
+        )()
 
-    def user_exists(self, email):
-        return User.objects.filter(email=email).exists()
+    async def user_exists(self, email):
+        return await sync_to_async(User.objects.filter(email=email).exists)()
 
-    def update_profile(self, user, data: dict, avatar=None):
+    async def update_profile(self, user, data: dict, avatar=None):
+        update_fields = []
         for attr, value in data.items():
-            if value is not None:
+            if value is not None and getattr(user, attr) != data[attr]:
+                update_fields.append(attr)
                 setattr(user, attr, value)
 
         if avatar:
+            update_fields.append("avatar")
             user.avatar = avatar
-
-        user.save()
+        if update_fields:
+            await user.asave(update_fields=update_fields)
         return user
-
-    def get_user_stats(self, user):
-        from apps.courses.models import CourseEnrollment
-        from apps.courses.services import CourseService
-
-        enrollments = list(
-            CourseEnrollment.objects.filter(user=user, deleted=False)
-            .select_related("course")
-            .only("course_id")
-        )
-        course_ids = [e.course_id for e in enrollments]
-        total_count = len(course_ids)
-
-        finished_count = 0
-        if course_ids:
-            completion = CourseService()._batch_compute_completions(user, course_ids)
-            finished_count = sum(
-                1 for cid in course_ids if completion.get(cid, {}).get("is_fully_completed", False)
-            )
-
-        return {
-            "ongoing_courses": total_count - finished_count,
-            "finished_courses": finished_count,
-            "certificates_issued": finished_count,
-        }
-
-    def get_full_stats(self, user):
-        from apps.courses.models import CourseEnrollment
-        from apps.courses.services import CourseService
-        from apps.mind_maps.models import MindMap
-        from apps.explicador.models import ExplicadorRoom
-
-        enrollments = list(
-            CourseEnrollment.objects.filter(user=user, deleted=False)
-            .select_related("course")
-            .only("course_id")
-        )
-        course_ids = [e.course_id for e in enrollments]
-        total_courses = len(course_ids)
-
-        finished_courses = 0
-        if course_ids:
-            completion = CourseService()._batch_compute_completions(user, course_ids)
-            finished_courses = sum(
-                1 for cid in course_ids if completion.get(cid, {}).get("is_fully_completed", False)
-            )
-
-        mindmaps = MindMap.objects.filter(user=user)
-        total_mindmaps = mindmaps.count()
-
-        rooms = list(ExplicadorRoom.objects.filter(owner=user).only("chat_history", "is_active"))
-        total_rooms = len(rooms)
-        active_rooms = sum(1 for r in rooms if r.is_active)
-        total_messages = sum(len(r.chat_history or []) for r in rooms)
-
-        return {
-            "total_courses": total_courses,
-            "ongoing_courses": total_courses - finished_courses,
-            "finished_courses": finished_courses,
-            "certificates_issued": finished_courses,
-            "total_mindmaps": total_mindmaps,
-            "total_rooms": total_rooms,
-            "total_messages": total_messages,
-            "active_rooms": active_rooms,
-        }
 
     def get_google_auth_url(self):
         params = {
@@ -447,3 +369,20 @@ class AuthService:
             logger.error(f"Turnstile verification error: {e}")
         return False
 
+    async def averify_turnstile(self, token: str):
+        if settings.DEBUG and token == "XXXX.DUMMY.TOKEN.XXXX":
+            return True
+
+        url = "https://challenges.cloudflare.com/turnstile/v0/siteverify"
+        data = {
+            "secret": settings.CLOUDFLARE_TURNSTILE_SECRET_KEY,
+            "response": token,
+        }
+        try:
+            async with httpx.AsyncClient() as client:
+                res = await client.post(url, data=data)
+                if res.is_success:
+                    return res.json().get("success", False)
+        except Exception as e:
+            logger.error(f"Turnstile verification error: {e}")
+        return False

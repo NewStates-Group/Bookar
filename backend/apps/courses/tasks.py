@@ -323,7 +323,7 @@ def generate_lesson_media(self, user_id, lesson_id: int):
         if not videos:
             raise RuntimeError("No video segments created")
 
-        logo_path = settings.BASE_DIR / "static" / "logo.png"
+        logo_path = settings.IMAGES_DIR / "logo.png"
 
         list_file = temp_dir / "list.txt"
         list_file.write_text("\n".join(f"file '{v}'" for v in videos))
@@ -913,7 +913,7 @@ def create_course_thumb(course_pk: str, prompt: str, user_id=None):
         finally:
             tmp_path.unlink(missing_ok=True)
 
-        logo_path = settings.BASE_DIR / "static" / "logo.png"
+        logo_path = settings.IMAGES_DIR / "logo.png"
         if logo_path.exists():
             logo = Image.open(logo_path).convert("RGBA")
             img_width, img_height = image.size
@@ -997,7 +997,7 @@ def generate_certificate_task(user_id: int, course_id: int, full_name: str):
         data_actual = datetime.now().strftime("%d/%m/%Y")
 
         # 3. Load base image
-        base_path = settings.BASE_DIR / "static" / "certificate_base.png"
+        base_path = settings.IMAGES_DIR / "certificate_base.png"
         if not base_path.exists():
             raise FileNotFoundError(f"Base certificate image not found at {base_path}")
 

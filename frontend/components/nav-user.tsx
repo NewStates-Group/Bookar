@@ -83,12 +83,6 @@ export function NavUser() {
                                     Subscrição
                                 </Link>
                             </DropdownMenuItem>
-                            <DropdownMenuItem asChild>
-                                <Link href="/app/stats" className="cursor-pointer">
-                                    <BarChart3 className="w-4 h-4 text-muted-foreground mr-2" />
-                                    Estatísticas
-                                </Link>
-                            </DropdownMenuItem>
                             <DropdownMenuItem>
                                 Notificações
                             </DropdownMenuItem>

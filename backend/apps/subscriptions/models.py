@@ -18,7 +18,9 @@ class SubscriptionPlan(models.Model):
         help_text="True = limites mensais (Pro/Pro+), False = limites totais/vitalícios (Free)",
     )
 
-    max_explicador_messages = models.IntegerField(null=True, blank=True, help_text="None = ilimitado")
+    max_explicador_messages = models.IntegerField(
+        null=True, blank=True, help_text="None = ilimitado"
+    )
     max_explicador_participants = models.IntegerField(null=True, blank=True)
     max_courses_generated = models.IntegerField(null=True, blank=True)
     max_mindmaps_generated = models.IntegerField(null=True, blank=True)
@@ -28,7 +30,9 @@ class SubscriptionPlan(models.Model):
 
     gateway_price_id = models.CharField(max_length=255, blank=True, default="")
     manual_payment_iban = models.CharField(max_length=50, blank=True, default="")
-    manual_payment_account_name = models.CharField(max_length=200, blank=True, default="")
+    manual_payment_account_name = models.CharField(
+        max_length=200, blank=True, default=""
+    )
     manual_payment_phone = models.CharField(max_length=50, blank=True, default="")
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -54,7 +58,10 @@ class UserSubscription(models.Model):
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="subscription"
     )
     plan = models.ForeignKey(
-        SubscriptionPlan, on_delete=models.SET_NULL, null=True, related_name="subscriptions"
+        SubscriptionPlan,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="subscriptions",
     )
     status = models.CharField(
         max_length=20, choices=Status.choices, default=Status.ACTIVE
@@ -80,11 +87,11 @@ class UserSubscription(models.Model):
 
 class SubscriptionHistory(models.Model):
     user = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="subscription_history"
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="subscription_history",
     )
-    plan = models.ForeignKey(
-        SubscriptionPlan, on_delete=models.SET_NULL, null=True
-    )
+    plan = models.ForeignKey(SubscriptionPlan, on_delete=models.SET_NULL, null=True)
     status = models.CharField(max_length=20)
     payment_gateway = models.CharField(max_length=20, blank=True, default="")
     period_start = models.DateTimeField()
@@ -150,7 +157,9 @@ class PaymentReceipt(models.Model):
         REJECTED = "rejected", "Recusado"
 
     user = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="payment_receipts"
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="payment_receipts",
     )
     plan = models.ForeignKey(
         SubscriptionPlan, on_delete=models.SET_NULL, null=True, related_name="receipts"
@@ -166,7 +175,11 @@ class PaymentReceipt(models.Model):
     secret_token = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     admin_notes = models.TextField(blank=True, default="")
     reviewed_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="reviewed_receipts"
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="reviewed_receipts",
     )
     reviewed_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)

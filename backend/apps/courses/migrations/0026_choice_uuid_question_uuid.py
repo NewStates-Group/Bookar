@@ -5,20 +5,19 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('courses', '0025_quiz_uuid'),
+        ("courses", "0025_quiz_uuid"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='choice',
-            name='uuid',
+            model_name="choice",
+            name="uuid",
             field=models.UUIDField(default=uuid.uuid4, editable=False, unique=True),
         ),
         migrations.AddField(
-            model_name='question',
-            name='uuid',
+            model_name="question",
+            name="uuid",
             field=models.UUIDField(default=uuid.uuid4, editable=False, unique=True),
         ),
     ]

@@ -85,6 +85,7 @@ class ExplicadorController:
             async def producer():
                 loop = asyncio.get_event_loop()
                 try:
+
                     def sync_stream():
                         for token in chain.stream(messages=messages):
                             if token:
@@ -111,7 +112,7 @@ class ExplicadorController:
                 if item is None:
                     break
                 if isinstance(item, str) and item.startswith("__error__:"):
-                    yield f"data: {json.dumps({'error': item[len('__error__:'):]})}\n\n"
+                    yield f"data: {json.dumps({'error': item[len('__error__:') :]})}\n\n"
                     break
                 yield f"data: {json.dumps({'token': item})}\n\n"
 

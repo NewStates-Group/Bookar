@@ -79,7 +79,7 @@ def generate_mind_map_task(self, user_id: int, mind_map_id: int):
         stripped_topic = (mind_map.topic or "").strip()
         if not stripped_topic or len(stripped_topic) < 3:
             raise ValueError("O assunto deve ter pelo menos 3 caracteres.")
-            
+
         if len(stripped_topic) > 100:
             raise ValueError("O assunto é demasiado longo (máximo 100 caracteres).")
 
@@ -95,9 +95,11 @@ def generate_mind_map_task(self, user_id: int, mind_map_id: int):
             "reason": "Breve explicação da invalidade em Português (apenas se is_valid for false, senão string vazia)"
         }}
         """
-        val_res = generate_text_with_fallback([{"role": "user", "content": validation_prompt}])
+        val_res = generate_text_with_fallback(
+            [{"role": "user", "content": validation_prompt}]
+        )
         val_data = extract_json(val_res)
-        
+
         if val_data and not val_data.get("is_valid", True):
             reason = val_data.get("reason", "Assunto inválido ou não educativo.")
             raise ValueError(reason)
@@ -250,6 +252,7 @@ def generate_mind_map_task(self, user_id: int, mind_map_id: int):
 
             def _on_success():
                 from .services import invalidate_mind_map_cache
+
                 invalidate_mind_map_cache(str(mind_map.uuid), user_id)
                 send_user_update(
                     user_id,
@@ -274,6 +277,7 @@ def generate_mind_map_task(self, user_id: int, mind_map_id: int):
 
             def _on_val_error():
                 from .services import invalidate_mind_map_cache
+
                 invalidate_mind_map_cache(str(mind_map.uuid), user_id)
                 send_user_update(
                     user_id,
@@ -296,6 +300,7 @@ def generate_mind_map_task(self, user_id: int, mind_map_id: int):
 
             def _on_error():
                 from .services import invalidate_mind_map_cache
+
                 invalidate_mind_map_cache(str(mind_map.uuid), user_id)
                 send_user_update(
                     user_id,

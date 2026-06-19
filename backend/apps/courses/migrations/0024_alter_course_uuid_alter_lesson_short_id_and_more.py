@@ -6,25 +6,28 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('courses', '0023_course_uuid_lesson_short_id_module_uuid'),
+        ("courses", "0023_course_uuid_lesson_short_id_module_uuid"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='course',
-            name='uuid',
+            model_name="course",
+            name="uuid",
             field=models.UUIDField(default=uuid.uuid4, editable=False, unique=True),
         ),
         migrations.AlterField(
-            model_name='lesson',
-            name='short_id',
-            field=models.CharField(default=apps.courses.models.generate_short_id, max_length=12, unique=True),
+            model_name="lesson",
+            name="short_id",
+            field=models.CharField(
+                default=apps.courses.models.generate_short_id,
+                max_length=12,
+                unique=True,
+            ),
         ),
         migrations.AlterField(
-            model_name='module',
-            name='uuid',
+            model_name="module",
+            name="uuid",
             field=models.UUIDField(default=uuid.uuid4, editable=False, unique=True),
         ),
     ]

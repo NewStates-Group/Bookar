@@ -43,7 +43,7 @@ def validation_exception_handler(request, exc):
             "loc": error.get("loc", ""),
             "msg": error.get("msg", ""),
         }
-        for error in _errors # type: ignore
+        for error in _errors  # type: ignore
     ]
 
     return api.create_response(
@@ -74,3 +74,8 @@ def healthcheck(request):
 urlpatterns = [
     path("api/", api.urls),
 ]
+
+handler400 = "core.errors.handler400"
+handler403 = "core.errors.handler403"
+handler404 = "core.errors.handler404"
+handler500 = "core.errors.handler500"

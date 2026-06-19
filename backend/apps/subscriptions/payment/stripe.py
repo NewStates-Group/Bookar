@@ -16,9 +16,13 @@ stripe.api_key = os.getenv("STRIPE_SECRET_KEY", "")
 class StripePaymentProvider(BasePaymentProvider):
     gateway = "stripe"
 
-    def create_checkout_session(self, plan, user, success_url: str, cancel_url: str) -> dict:
+    def create_checkout_session(
+        self, plan, user, success_url: str, cancel_url: str
+    ) -> dict:
         if not plan.gateway_price_id:
-            raise ValueError(f"Plano {plan.slug} não tem price_id configurado no Stripe.")
+            raise ValueError(
+                f"Plano {plan.slug} não tem price_id configurado no Stripe."
+            )
 
         session = stripe.checkout.Session.create(
             mode="subscription",
@@ -69,7 +73,9 @@ class StripePaymentProvider(BasePaymentProvider):
 
         if endpoint_secret:
             try:
-                event = stripe.Webhook.construct_event(payload, sig_header, endpoint_secret)
+                event = stripe.Webhook.construct_event(
+                    payload, sig_header, endpoint_secret
+                )
             except (ValueError, stripe.error.SignatureVerificationError) as e:
                 logger.warning(f"Stripe webhook signature invalid: {e}")
                 return None
@@ -109,6 +115,7 @@ class StripePaymentProvider(BasePaymentProvider):
 
     def _sync_stripe_sub(self, sub_id, user_id, plan_slug):
         from ..models import UserSubscription
+
         try:
             user_sub = UserSubscription.objects.get(user_id=user_id)
             plan = SubscriptionPlan.objects.get(slug=plan_slug)
@@ -126,15 +133,20 @@ class StripePaymentProvider(BasePaymentProvider):
                         period_end, tz=timezone.utc
                     )
                 else:
-                    user_sub.current_period_end = now + timedelta(days=30) if plan.monthly_limits else None
+                    user_sub.current_period_end = (
+                        now + timedelta(days=30) if plan.monthly_limits else None
+                    )
             except stripe.error.StripeError:
-                user_sub.current_period_end = now + timedelta(days=30) if plan.monthly_limits else None
+                user_sub.current_period_end = (
+                    now + timedelta(days=30) if plan.monthly_limits else None
+                )
             user_sub.save()
         except (UserSubscription.DoesNotExist, SubscriptionPlan.DoesNotExist) as e:
             logger.warning(f"Stripe sync failed: {e}")
 
     def _update_status(self, sub_id, status):
         from ..models import UserSubscription
+
         try:
             user_sub = UserSubscription.objects.get(gateway_subscription_id=sub_id)
             user_sub.status = status
@@ -144,6 +156,7 @@ class StripePaymentProvider(BasePaymentProvider):
 
     def _sync_status_from_stripe(self, sub_data):
         from ..models import UserSubscription
+
         sub_id = sub_data.get("id")
         stripe_status = sub_data.get("status", "")
         status_map = {
@@ -154,7 +167,9 @@ class StripePaymentProvider(BasePaymentProvider):
             "incomplete": UserSubscription.Status.PAST_DUE,
             "incomplete_expired": UserSubscription.Status.EXPIRED,
             "trialing": UserSubscription.Status.TRIALING,
-            "paused": UserSubscription.Status.PAUSED if hasattr(UserSubscription.Status, 'PAUSED') else UserSubscription.Status.ACTIVE,
+            "paused": UserSubscription.Status.PAUSED
+            if hasattr(UserSubscription.Status, "PAUSED")
+            else UserSubscription.Status.ACTIVE,
         }
         new_status = status_map.get(stripe_status)
         if new_status:
@@ -169,7 +184,9 @@ class StripePaymentProvider(BasePaymentProvider):
         if not subscription.gateway_subscription_id:
             return subscription.status
         try:
-            stripe_sub = stripe.Subscription.retrieve(subscription.gateway_subscription_id)
+            stripe_sub = stripe.Subscription.retrieve(
+                subscription.gateway_subscription_id
+            )
             status_map = {
                 "active": UserSubscription.Status.ACTIVE,
                 "past_due": UserSubscription.Status.PAST_DUE,

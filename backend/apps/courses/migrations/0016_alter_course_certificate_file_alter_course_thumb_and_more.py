@@ -4,25 +4,26 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('courses', '0015_course_certificate_file_course_certificate_status'),
+        ("courses", "0015_course_certificate_file_course_certificate_status"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='course',
-            name='certificate_file',
-            field=models.FileField(blank=True, null=True, upload_to='courses/certificates/'),
+            model_name="course",
+            name="certificate_file",
+            field=models.FileField(
+                blank=True, null=True, upload_to="courses/certificates/"
+            ),
         ),
         migrations.AlterField(
-            model_name='course',
-            name='thumb',
-            field=models.ImageField(blank=True, null=True, upload_to='courses/thumbs/'),
+            model_name="course",
+            name="thumb",
+            field=models.ImageField(blank=True, null=True, upload_to="courses/thumbs/"),
         ),
         migrations.AlterField(
-            model_name='lesson',
-            name='lesson_file',
-            field=models.FileField(blank=True, null=True, upload_to='courses/lessons/'),
+            model_name="lesson",
+            name="lesson_file",
+            field=models.FileField(blank=True, null=True, upload_to="courses/lessons/"),
         ),
     ]

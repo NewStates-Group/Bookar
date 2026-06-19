@@ -6,25 +6,29 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('courses', '0022_alter_courseenrollment_certificate_file_courseshare_and_more'),
+        (
+            "courses",
+            "0022_alter_courseenrollment_certificate_file_courseshare_and_more",
+        ),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='course',
-            name='uuid',
+            model_name="course",
+            name="uuid",
             field=models.UUIDField(default=uuid.uuid4, editable=False, null=True),
         ),
         migrations.AddField(
-            model_name='lesson',
-            name='short_id',
-            field=models.CharField(default=apps.courses.models.generate_short_id, max_length=12, null=True),
+            model_name="lesson",
+            name="short_id",
+            field=models.CharField(
+                default=apps.courses.models.generate_short_id, max_length=12, null=True
+            ),
         ),
         migrations.AddField(
-            model_name='module',
-            name='uuid',
+            model_name="module",
+            name="uuid",
             field=models.UUIDField(default=uuid.uuid4, editable=False, null=True),
         ),
     ]

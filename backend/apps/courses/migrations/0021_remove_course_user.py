@@ -4,14 +4,13 @@ from django.db import migrations
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('courses', '0020_remove_course_certificate_file_and_more'),
+        ("courses", "0020_remove_course_certificate_file_and_more"),
     ]
 
     operations = [
         migrations.RemoveField(
-            model_name='course',
-            name='user',
+            model_name="course",
+            name="user",
         ),
     ]

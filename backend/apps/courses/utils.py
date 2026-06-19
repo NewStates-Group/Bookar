@@ -273,6 +273,7 @@ def get_lesson_detail_cache_key(lesson_short_id):
 
 def invalidate_featured_courses_cache():
     from django.core.cache import cache
+
     try:
         cache.incr("featured_courses_version")
     except (ValueError, TypeError):

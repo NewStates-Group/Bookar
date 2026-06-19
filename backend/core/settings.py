@@ -1,60 +1,51 @@
 from datetime import timedelta
 from pathlib import Path
 
-import environ
 from corsheaders.defaults import default_headers
+from environ import Env as load_envs
 
-env = environ.Env(
-    SECRET_KEY=(str, "django-example-secret-key"),
-    DEBUG=(bool, False),
-    SITE_URL=(str, "http://localhost:3000"),
-    API_URL=(str, ""),
-    DATABASE_URL=(str, "sqlite:///:memory:"),
-    REDIS_URL=(str, "redis://redis:6379/0"),
-    ALLOWED_HOSTS=(list, ["*"]),
-    CLOUDINARY_CLOUD_NAME=(str, ""),
-    CLOUDINARY_API_KEY=(str, ""),
-    CLOUDINARY_API_SECRET=(str, ""),
-    ADMIN_EMAILS=(list, []),
-)
+env = load_envs()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = env("SECRET_KEY")
+IMAGES_DIR = BASE_DIR / "images"
 
-DEBUG = env("DEBUG")
+ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=["*"])  # type: ignore
+SECRET_KEY = env("SECRET_KEY", default="django-example-secret-key")  # type: ignore
+DEBUG = env.bool("DEBUG", default=False)  # type: ignore
+ENV = env("ENV", default="prod")  # type: ignore
 
-ENV = env.str("ENV", default="prod")
+DJANGO_APPS = [
+    "django.contrib.auth",
+    "django.contrib.contenttypes",
+]
 
-ALLOWED_HOSTS = env.list("ALLOWED_HOSTS")
-
-INSTALLED_APPS = [
+THIRD_PARTY_APPS = [
     "ninja_extra",
     "ninja_jwt",
     "ninja_jwt.token_blacklist",
     "corsheaders",
-    "django.contrib.auth",
-    "django.contrib.contenttypes",
-    "django.contrib.sessions",
-    "django.contrib.staticfiles",
     "cloudinary_storage",
     "cloudinary",
     "gmailapi_backend",
-    "apps.courses",
+]
+
+APPLICATION_APPS = [
     "apps.accounts",
     "apps.subscriptions",
+    "apps.courses",
     "apps.mind_maps",
     "apps.explicador",
     "apps.folhas",
     "apps.feedback",
 ]
 
+INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + APPLICATION_APPS
+
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "corsheaders.middleware.CorsMiddleware",
-    "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
-    "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
@@ -64,27 +55,17 @@ TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
         "DIRS": [BASE_DIR / "templates"],
-        "APP_DIRS": True,
-        "OPTIONS": {
-            "context_processors": [
-                "django.template.context_processors.request",
-            ],
-        },
+        "APP_DIRS": False,
     },
 ]
 
 ASGI_APPLICATION = "core.asgi.application"
 
 SITE_URL = env("SITE_URL")
-API_URL = env("API_URL") or SITE_URL
+API_URL = env("API_URL")
 
 DATABASES = {
-    "default": env.db(),
-}
-DATABASES["default"]["CONN_MAX_AGE"] = env.int("CONN_MAX_AGE", default=300)
-DATABASES["default"]["OPTIONS"] = {
-    **DATABASES["default"].get("OPTIONS", {}),
-    "connect_timeout": 5,
+    "default": env.db(default="sqlite:///:memory:"),  # type: ignore
 }
 
 AUTH_USER_MODEL = "accounts.User"
@@ -96,13 +77,11 @@ NINJA_JWT = {
     "BLACKLIST_AFTER_ROTATION": False,
 }
 
-REDIS_URL = env.str("REDIS_URL")
-PROD_REDIS_URL = REDIS_URL + env.str(
-    "REDIS_URL_PARAMS", default="/?ssl_cert_reqs=CERT_NONE"
+REDIS_URL = env("REDIS_URL", default="redis://redis:6379/0")  # type: ignore
+PROD_REDIS_URL = REDIS_URL + env(
+    "REDIS_URL_PARAMS",
+    default="/?ssl_cert_reqs=CERT_NONE",  # type: ignore
 )
-
-STATIC_URL = "/static/"
-STATIC_ROOT = BASE_DIR.joinpath("staticfiles")
 
 CACHES = {"default": env.cache_url_config(REDIS_URL)}
 
@@ -152,9 +131,6 @@ STORAGES = {
     "default": {
         "BACKEND": "cloudinary_storage.storage.MediaCloudinaryStorage",
     },
-    "staticfiles": {
-        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
-    },
 }
 
 DEFAULT_FILE_STORAGE = "cloudinary_storage.storage.MediaCloudinaryStorage"
@@ -182,24 +158,24 @@ CORS_EXPOSE_HEADERS = [
 ]
 
 AI = {
-    "OLLAMA_KEY": env("OLLAMA_KEY", default=""),
-    "GENAI_KEY": env("GENAI_KEY", default=""),
-    "OLLAMA_MODEL_TEXT": env("OLLAMA_MODEL_TEXT", default=""),
-    "GENAI_MODEL_IMAGE": env("GENAI_MODEL_IMAGE", default=""),
-    "GENAI_MODEL_AUDIO": env("GENAI_MODEL_AUDIO", default=""),
-    "GENAI_MODEL_TEXT": env("GENAI_MODEL_TEXT", default=""),
-    "AI_ENVIRONMENT": env("AI_ENVIRONMENT", default="production"),
-    "REPLICATE_API_TOKEN": env("REPLICATE_API_TOKEN", default=""),
-    "HF_API_KEY": env("HF_API_KEY", default=""),
-    "ELEVENLABS_KEY": env("ELEVENLABS_KEY", default=""),
-    "NVIDIA_AUDIO_API_KEY": env("NVIDIA_AUDIO_API_KEY", default=""),
+    "AI_ENVIRONMENT": env("AI_ENVIRONMENT", default="production"),  # type:ignore
+    "OLLAMA_KEY": env("OLLAMA_KEY"),
+    "GENAI_KEY": env("GENAI_KEY"),
+    "OLLAMA_MODEL_TEXT": env("OLLAMA_MODEL_TEXT"),
+    "GENAI_MODEL_IMAGE": env("GENAI_MODEL_IMAGE"),
+    "GENAI_MODEL_AUDIO": env("GENAI_MODEL_AUDIO"),
+    "GENAI_MODEL_TEXT": env("GENAI_MODEL_TEXT"),
+    "REPLICATE_API_TOKEN": env("REPLICATE_API_TOKEN"),
+    "HF_API_KEY": env("HF_API_KEY"),
+    "ELEVENLABS_KEY": env("ELEVENLABS_KEY"),
+    "NVIDIA_AUDIO_API_KEY": env("NVIDIA_AUDIO_API_KEY"),
 }
 
 GOOGLE_CLIENT_ID = env("GOOGLE_CLIENT_ID")
 GOOGLE_CLIENT_SECRET = env("GOOGLE_CLIENT_SECRET")
 
 EMAIL_BACKEND = "gmailapi_backend.mail.GmailBackend"
-EMAIL_HOST_USER = "newstates.bookar@gmail.com"
+EMAIL_HOST_USER = env("EMAIL_HOST_USER", default="newstates.bookar@gmail.com")  # type: ignore
 DEFAULT_FROM_EMAIL = f"Bookar <{EMAIL_HOST_USER}>"
 
 GMAIL_API_CLIENT_ID = env("GMAIL_API_CLIENT_ID")
@@ -220,24 +196,12 @@ NINJA_EXTRA = {
 CLOUDFLARE_TURNSTILE_SECRET_KEY = env("TURNSTILE_SECRET_KEY")
 CLOUDFLARE_TURNSTILE_SITE_KEY = env("NEXT_PUBLIC_TURNSTILE_SITE_KEY")
 
-STRIPE_SECRET_KEY = env("STRIPE_SECRET_KEY", default="")
-STRIPE_WEBHOOK_SECRET = env("STRIPE_WEBHOOK_SECRET", default="")
-STRIPE_PUBLISHABLE_KEY = env("NEXT_PUBLIC_STRIPE_KEY", default="")
+STRIPE_SECRET_KEY = env("STRIPE_SECRET_KEY", default="")  # type: ignore
+STRIPE_WEBHOOK_SECRET = env("STRIPE_WEBHOOK_SECRET", default="")  # type: ignore
+STRIPE_PUBLISHABLE_KEY = env("NEXT_PUBLIC_STRIPE_KEY", default="")  # type: ignore
 
-ADMIN_EMAILS = env("ADMIN_EMAILS", default=[])
+ADMIN_EMAILS = env.list("ADMIN_EMAILS", default=[])  # type: ignore
 
-_csrf_defaults = [SITE_URL]
-if SITE_URL.startswith("https://"):
-    _api_origin = SITE_URL.replace("https://", "https://api.", 1)
-    if _api_origin != SITE_URL:
-        _csrf_defaults.append(_api_origin)
-CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=_csrf_defaults)
-CSRF_COOKIE_SECURE = ENV == "prod"
-CSRF_COOKIE_HTTPONLY = True
-SESSION_COOKIE_SECURE = ENV == "prod"
-SESSION_COOKIE_HTTPONLY = True
-SESSION_COOKIE_SAMESITE = "Lax"
-SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https") if ENV == "prod" else None
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_REFERRER_POLICY = "same-origin"
 X_FRAME_OPTIONS = "DENY"

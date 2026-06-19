@@ -5,37 +5,49 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('courses', '0019_remove_lesson_watched_courseenrollment_and_more'),
+        ("courses", "0019_remove_lesson_watched_courseenrollment_and_more"),
     ]
 
     operations = [
         migrations.RemoveField(
-            model_name='course',
-            name='certificate_file',
+            model_name="course",
+            name="certificate_file",
         ),
         migrations.RemoveField(
-            model_name='course',
-            name='certificate_status',
+            model_name="course",
+            name="certificate_status",
         ),
         migrations.RemoveField(
-            model_name='course',
-            name='deleted',
+            model_name="course",
+            name="deleted",
         ),
         migrations.AddField(
-            model_name='courseenrollment',
-            name='certificate_file',
-            field=models.FileField(blank=True, null=True, storage=cloudinary_storage.storage.RawMediaCloudinaryStorage(), upload_to='courses/certificates/'),
+            model_name="courseenrollment",
+            name="certificate_file",
+            field=models.FileField(
+                blank=True,
+                null=True,
+                storage=cloudinary_storage.storage.RawMediaCloudinaryStorage(),
+                upload_to="courses/certificates/",
+            ),
         ),
         migrations.AddField(
-            model_name='courseenrollment',
-            name='certificate_status',
-            field=models.CharField(choices=[('NOT_GENERATED', 'Não Gerado'), ('PROCESSING', 'Processando'), ('READY', 'Pronto')], default='NOT_GENERATED', max_length=20),
+            model_name="courseenrollment",
+            name="certificate_status",
+            field=models.CharField(
+                choices=[
+                    ("NOT_GENERATED", "Não Gerado"),
+                    ("PROCESSING", "Processando"),
+                    ("READY", "Pronto"),
+                ],
+                default="NOT_GENERATED",
+                max_length=20,
+            ),
         ),
         migrations.AddField(
-            model_name='courseenrollment',
-            name='deleted',
+            model_name="courseenrollment",
+            name="deleted",
             field=models.BooleanField(default=False),
         ),
     ]

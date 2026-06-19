@@ -6,59 +6,25 @@ import tempfile
 import uuid
 from pathlib import Path
 
-import httpx
 from asgiref.sync import sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
+from django.conf import settings
+from django.contrib.auth import get_user_model
+from google.genai import types
+from utils.auth import get_user
+
 from apps.courses.providers import AllProvidersFailed, get_audio_chain, get_text_chain
 from apps.courses.utils import get_genai_client
-from django.conf import settings
-from google.genai import types
-from django.contrib.auth import get_user_model
-from ninja_jwt.tokens import AccessToken
-from elevenlabs import ElevenLabs
+
 from . import presence as room_presence
 from .models import ExplicadorRoom
 
-from apps.courses.providers import NvidiaAudioProvider
-
 logger = logging.getLogger(__name__)
 
+User = get_user_model()
 
-# async def generate_elevenlabs_audio(text: str) -> str:
-#     api_key = settings.AI.get("ELEVENLABS_KEY", "")
-#     if not api_key:
-#         logger.warning("ELEVENLABS_KEY not configured, skipping audio generation.")
-#         return ""
+EXPLICADOR_MENTION = "@explicador"
 
-#     voice_id = "onyx"
-#     url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
-#     headers = {
-#         "xi-api-key": api_key,
-#         "Content-Type": "application/json",
-#         "Accept": "audio/mpeg",
-#     }
-#     # Clean text to remove markdown markers for cleaner speech
-#     clean_text = re.sub(r"\*\*.*?\*\*|#+ |`.*?`|\[.*?\]\(.*?\)", "", text)
-#     clean_text = clean_text.replace("\n", " ").strip()
-
-#     payload = {
-#         "text": clean_text[:1000],  # Limit to 1000 chars to avoid huge costs/timeouts
-#         "model_id": "eleven_multilingual_v2",
-#         "voice_settings": {"stability": 0.5, "similarity_boost": 0.75},
-#     }
-
-#     try:
-#         async with httpx.AsyncClient() as client:
-#             response = await client.post(url, headers=headers, json=payload, timeout=30.0)
-#             if response.status_code == 200:
-#                 audio_base64 = base64.b64encode(response.content).decode("utf-8")
-#                 return f"data:audio/mp3;base64,{audio_base64}"
-#             else:
-#                 logger.error(f"ElevenLabs TTS failed: {response.status_code} - {response.text}")
-#     except Exception as e:
-#         logger.error(f"Error calling ElevenLabs: {e}")
-
-#     return ""
 
 def _audio_to_data_uri(audio_bytes: bytes, mime: str = "audio/mpeg") -> str:
     return f"data:{mime};base64," + base64.b64encode(audio_bytes).decode()
@@ -98,10 +64,6 @@ def generate_elevenlabs_audio(text: str) -> str:
     except AllProvidersFailed as e:
         logger.error("All TTS providers failed: %s", e)
         return ""
-
-User = get_user_model()
-
-EXPLICADOR_MENTION = "@explicador"
 
 
 def message_mentions_explicador(text: str) -> bool:
@@ -166,12 +128,7 @@ class ExplicadorConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         self.room_uuid = self.scope["url_route"]["kwargs"]["room_uuid"]
 
-        # Authenticate using token from query string
-        query_string = self.scope.get("query_string", b"").decode("utf-8")
-        params = dict(x.split("=") for x in query_string.split("&") if "=" in x)
-        token_str = params.get("token")
-
-        self.user = await self.get_user(token_str)
+        self.user = self.scope["user"]
         self.room = await self.get_room(self.room_uuid)
 
         if not self.room:
@@ -208,10 +165,14 @@ class ExplicadorConsumer(AsyncWebsocketConsumer):
 
         # Check participants limit before joining
         if self.user.is_authenticated and not self.is_owner:
-            current_members = await sync_to_async(room_presence.list_members)(self.room_uuid)
+            current_members = await sync_to_async(room_presence.list_members)(
+                self.room_uuid
+            )
             if current_members:
-                from apps.subscriptions.services import SubscriptionService
                 from ninja.errors import HttpError as NinjaHttpError
+
+                from apps.subscriptions.services import SubscriptionService
+
                 owner_id = self.room.owner_id
                 try:
                     await sync_to_async(
@@ -353,7 +314,7 @@ class ExplicadorConsumer(AsyncWebsocketConsumer):
         lock = self.room.whiteboard_data.get("lock")
         if not lock:
             user_name = (
-                f"{self.user.first_name} {self.user.last_name}".strip() # type: ignore
+                f"{self.user.first_name} {self.user.last_name}".strip()  # type: ignore
                 or self.user.username
                 if self.user.is_authenticated
                 else "Visitante"
@@ -567,9 +528,7 @@ class ExplicadorConsumer(AsyncWebsocketConsumer):
             except Exception:
                 return
 
-        solo_room = await self._is_solo_room() or bool(
-            data.get("direct_to_explicador")
-        )
+        solo_room = await self._is_solo_room() or bool(data.get("direct_to_explicador"))
 
         attachment_obj = None
         if attachment_data and isinstance(attachment_data, dict):
@@ -595,9 +554,11 @@ class ExplicadorConsumer(AsyncWebsocketConsumer):
                     file_bytes = base64.b64decode(base64_data)
                     attachment_obj = {
                         "data": file_bytes,
-                        "mime_type": attachment_data.get("mime_type", "application/octet-stream"),
+                        "mime_type": attachment_data.get(
+                            "mime_type", "application/octet-stream"
+                        ),
                         "name": attachment_data.get("name", "ficheiro"),
-                        "url": base64_str
+                        "url": base64_str,
                     }
                 except Exception as e:
                     logger.error(f"Failed to decode attachment: {e}")
@@ -612,9 +573,7 @@ class ExplicadorConsumer(AsyncWebsocketConsumer):
             if not attachment_obj:
                 mentions_tutor = True
             user_name = self.user_name
-            prompt_for_ai = (
-                strip_explicador_mention(message_content) or message_content
-            )
+            prompt_for_ai = strip_explicador_mention(message_content) or message_content
         else:
             if not attachment_obj:
                 mentions_tutor = message_mentions_explicador(message_content)
@@ -648,7 +607,7 @@ class ExplicadorConsumer(AsyncWebsocketConsumer):
             user_msg["attachment"] = {
                 "name": attachment_obj["name"],
                 "mime_type": attachment_obj["mime_type"],
-                "url": attachment_obj["url"]
+                "url": attachment_obj["url"],
             }
 
         self.room.chat_history.append(user_msg)
@@ -680,7 +639,9 @@ class ExplicadorConsumer(AsyncWebsocketConsumer):
 
         # 2. Call AI only when @explicador is mentioned or attachment is present
         try:
-            ai_response = await self.generate_ai_explanation(prompt_for_ai, attachment_obj)
+            ai_response = await self.generate_ai_explanation(
+                prompt_for_ai, attachment_obj
+            )
 
             # Check if interrupted while AI was generating
             if self.is_interrupted:
@@ -710,14 +671,20 @@ class ExplicadorConsumer(AsyncWebsocketConsumer):
                 prompt_for_ai, board_summary, previous_summary, ai_wants_open
             )
 
-            persisted_wb = {**current_wb, "summary": board_summary, "lock": current_lock}
+            persisted_wb = {
+                **current_wb,
+                "summary": board_summary,
+                "lock": current_lock,
+            }
             self.room.whiteboard_data = persisted_wb
             await self.save_room()
 
             # 4. Generate audio if this is a voice interaction
             audio_data_uri = ""
             if data.get("is_voice"):
-                audio_data_uri = await sync_to_async(generate_elevenlabs_audio)(parsed_data["chat_response"])
+                audio_data_uri = await sync_to_async(generate_elevenlabs_audio)(
+                    parsed_data["chat_response"]
+                )
 
             # 5. Broadcast results to group
             await self.channel_layer.group_send(
@@ -975,7 +942,7 @@ class ExplicadorConsumer(AsyncWebsocketConsumer):
     async def handle_ping(self, data):
         token_str = data.get("token")
         if token_str:
-            user = await self.get_user(token_str)
+            user = await get_user(token_str)
             if not user.is_authenticated:
                 await self.send(
                     text_data=json.dumps(
@@ -998,7 +965,7 @@ class ExplicadorConsumer(AsyncWebsocketConsumer):
             )
             return
 
-        user = await self.get_user(token_str)
+        user = await get_user(token_str)
         if not user.is_authenticated:
             await self.send(
                 text_data=json.dumps(
@@ -1080,22 +1047,6 @@ class ExplicadorConsumer(AsyncWebsocketConsumer):
         cache.set(key, timestamps, window)
         return True, 0
 
-    # Async Database Helpers
-    @sync_to_async
-    def get_user(self, token_str):
-        if not token_str:
-            from django.contrib.auth.models import AnonymousUser
-
-            return AnonymousUser()
-        try:
-            token = AccessToken(token_str)
-            user_id = token.payload.get("user_id")
-            return User.objects.get(pk=user_id)
-        except Exception:
-            from django.contrib.auth.models import AnonymousUser
-
-            return AnonymousUser()
-
     @sync_to_async
     def get_room(self, room_uuid):
         try:
@@ -1126,7 +1077,9 @@ class ExplicadorConsumer(AsyncWebsocketConsumer):
         if ctx.get("lesson_description"):
             lines.append(f"- Descrição da aula: {ctx['lesson_description']}")
         if ctx.get("narration"):
-            lines.append(f"- Conteúdo da aula (transcrição/resumo):\n{ctx['narration']}")
+            lines.append(
+                f"- Conteúdo da aula (transcrição/resumo):\n{ctx['narration']}"
+            )
 
         if len(lines) <= 1:
             return ""
@@ -1135,17 +1088,21 @@ class ExplicadorConsumer(AsyncWebsocketConsumer):
         )
         return "\n".join(lines) + "\n\n"
 
-    async def generate_ai_explanation(self, message_content: str, attachment: dict | None = None) -> str:
+    async def generate_ai_explanation(
+        self, message_content: str, attachment: dict | None = None
+    ) -> str:
         """Call get_text_chain() to prompt AI to explain and generate a beautifully structured classroom whiteboard summary."""
         context_block = self._format_course_context_block()
         if attachment:
             file_ref = f"O utilizador enviou um ficheiro ({attachment['name']})"
             if message_content:
-                file_ref += f" e fez a seguinte pergunta sobre ele:\n\"{message_content}\""
+                file_ref += (
+                    f' e fez a seguinte pergunta sobre ele:\n"{message_content}"'
+                )
             else:
                 file_ref += " para analisar."
         else:
-            file_ref = f"O utilizador deseja aprender sobre o seguinte assunto ou fez a seguinte pergunta:\n\"{message_content}\""
+            file_ref = f'O utilizador deseja aprender sobre o seguinte assunto ou fez a seguinte pergunta:\n"{message_content}"'
         prompt = f"""Você é um explicador didático especialista e professor particular premium.
 {context_block}{file_ref}
 
@@ -1181,7 +1138,7 @@ Regras para "whiteboard_summary" (quando open_whiteboard for true):
             if attachment:
                 msg["attachment"] = {
                     "data": attachment["data"],
-                    "mime_type": attachment["mime_type"]
+                    "mime_type": attachment["mime_type"],
                 }
             return chain.handle(messages=[msg])
 
@@ -1210,10 +1167,14 @@ Regras para "whiteboard_summary" (quando open_whiteboard for true):
             pattern = re.compile(r"(?<!\\)\\(?![\"\\/nrb]|u[0-9a-fA-F]{4})")
             repaired = pattern.sub(r"\\\\", raw_str)
             try:
-                return json.loads(f"\"{repaired}\"")
+                return json.loads(f'"{repaired}"')
             except Exception:
                 # Fallback: manual replacements
-                return raw_str.replace("\\\"", "\"").replace("\\n", "\n").replace("\\\\", "\\")
+                return (
+                    raw_str.replace('\\"', '"')
+                    .replace("\\n", "\n")
+                    .replace("\\\\", "\\")
+                )
 
         # 1. Try parsing the whole clean_text directly with json.loads
         try:
@@ -1231,7 +1192,7 @@ Regras para "whiteboard_summary" (quando open_whiteboard for true):
         first_brace = clean_text.find("{")
         last_brace = clean_text.rfind("}")
         if first_brace != -1 and last_brace != -1 and last_brace > first_brace:
-            candidate = clean_text[first_brace:last_brace+1]
+            candidate = clean_text[first_brace : last_brace + 1]
             pattern = re.compile(r"(?<!\\)\\(?![\"\\/nrb]|u[0-9a-fA-F]{4})")
             repaired = pattern.sub(r"\\\\", candidate)
             try:
@@ -1250,17 +1211,27 @@ Regras para "whiteboard_summary" (quando open_whiteboard for true):
         whiteboard_sum = ""
         open_wb = False
 
-        chat_match = re.search(r"\"chat_response\"\s*:\s*\"([^\"\\]*(?:\\.[^\"\\]*)*)\"", clean_text, re.DOTALL)
+        chat_match = re.search(
+            r"\"chat_response\"\s*:\s*\"([^\"\\]*(?:\\.[^\"\\]*)*)\"",
+            clean_text,
+            re.DOTALL,
+        )
         if chat_match:
             chat_resp = decode_json_string(chat_match.group(1))
         else:
             chat_resp = text
 
-        wb_match = re.search(r"\"whiteboard_summary\"\s*:\s*\"([^\"\\]*(?:\\.[^\"\\]*)*)\"", clean_text, re.DOTALL)
+        wb_match = re.search(
+            r"\"whiteboard_summary\"\s*:\s*\"([^\"\\]*(?:\\.[^\"\\]*)*)\"",
+            clean_text,
+            re.DOTALL,
+        )
         if wb_match:
             whiteboard_sum = decode_json_string(wb_match.group(1))
 
-        open_match = re.search(r"\"open_whiteboard\"\s*:\s*(true|false)", clean_text, re.IGNORECASE)
+        open_match = re.search(
+            r"\"open_whiteboard\"\s*:\s*(true|false)", clean_text, re.IGNORECASE
+        )
         if open_match:
             open_wb = open_match.group(1).lower() == "true"
 

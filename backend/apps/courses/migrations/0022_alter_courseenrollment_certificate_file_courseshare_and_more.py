@@ -7,38 +7,86 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('courses', '0021_remove_course_user'),
+        ("courses", "0021_remove_course_user"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='courseenrollment',
-            name='certificate_file',
-            field=models.FileField(blank=True, null=True, storage=cloudinary_storage.storage.MediaCloudinaryStorage(), upload_to='courses/certificates/'),
+            model_name="courseenrollment",
+            name="certificate_file",
+            field=models.FileField(
+                blank=True,
+                null=True,
+                storage=cloudinary_storage.storage.MediaCloudinaryStorage(),
+                upload_to="courses/certificates/",
+            ),
         ),
         migrations.CreateModel(
-            name='CourseShare',
+            name="CourseShare",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('token', models.CharField(max_length=100, unique=True)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('course', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='shares', to='courses.course')),
-                ('sharer', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='shared_courses', to=settings.AUTH_USER_MODEL)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("token", models.CharField(max_length=100, unique=True)),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                (
+                    "course",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="shares",
+                        to="courses.course",
+                    ),
+                ),
+                (
+                    "sharer",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="shared_courses",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
             ],
         ),
         migrations.CreateModel(
-            name='CourseShareClaim',
+            name="CourseShareClaim",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('claimed_at', models.DateTimeField(auto_now_add=True)),
-                ('recipient', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='claimed_shares', to=settings.AUTH_USER_MODEL)),
-                ('share', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='claims', to='courses.courseshare')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("claimed_at", models.DateTimeField(auto_now_add=True)),
+                (
+                    "recipient",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="claimed_shares",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "share",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="claims",
+                        to="courses.courseshare",
+                    ),
+                ),
             ],
             options={
-                'unique_together': {('share', 'recipient')},
+                "unique_together": {("share", "recipient")},
             },
         ),
     ]

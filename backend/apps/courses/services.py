@@ -1,18 +1,16 @@
 import logging
-from time import perf_counter
 import uuid
+from collections import defaultdict
 
-from apps.subscriptions.services import SubscriptionService
-from utils.websocket import send_user_update
 from django.core.cache import cache
-from django.db.models import Prefetch
-
-from django.db import connection
+from django.db.models import Count, Prefetch
 from django.utils import timezone
 from ninja.errors import HttpError
+from utils.websocket import send_user_update
+
+from apps.subscriptions.services import SubscriptionService
 
 from .models import (
-    Choice,
     Course,
     CourseEnrollment,
     CourseShare,
@@ -20,7 +18,6 @@ from .models import (
     Lesson,
     LessonProgress,
     Module,
-    Question,
     Quiz,
     QuizAttempt,
 )
@@ -44,13 +41,8 @@ class CourseService:
     def _batch_compute_completions(
         self, user, course_ids: list[int]
     ) -> dict[int, dict]:
-        """Compute is_completed and is_fully_completed for many courses in ~7 queries total."""
-        from collections import defaultdict
-        from django.db.models import Count
-
         course_ids = [cid for cid in course_ids if cid]
 
-        # 1. Total lessons per course
         lesson_counts = dict(
             Lesson.objects.filter(module__course_id__in=course_ids)
             .values("module__course_id")
@@ -58,7 +50,6 @@ class CourseService:
             .values_list("module__course_id", "count")
         )
 
-        # 2. Watched lessons per course (no status filter — for is_completed)
         watched_counts = dict(
             LessonProgress.objects.filter(
                 user=user, lesson__module__course_id__in=course_ids, watched=True
@@ -68,7 +59,6 @@ class CourseService:
             .values_list("lesson__module__course_id", "count")
         )
 
-        # 3. READY lesson counts per course (for is_fully_completed)
         ready_lesson_counts = dict(
             Lesson.objects.filter(module__course_id__in=course_ids, status="READY")
             .values("module__course_id")
@@ -76,7 +66,6 @@ class CourseService:
             .values_list("module__course_id", "count")
         )
 
-        # 4. Watched READY lessons per course (for is_fully_completed)
         watched_ready = dict(
             LessonProgress.objects.filter(
                 user=user,
@@ -89,7 +78,6 @@ class CourseService:
             .values_list("lesson__module__course_id", "count")
         )
 
-        # 5. Module counts per course
         module_counts = dict(
             Module.objects.filter(course_id__in=course_ids)
             .values("course_id")
@@ -97,19 +85,16 @@ class CourseService:
             .values_list("course_id", "count")
         )
 
-        # 6. Max modules per course
         max_mod_map = dict(
             Course.objects.filter(id__in=course_ids).values_list("id", "max_modules")
         )
 
-        # 7. Quiz IDs grouped by course
         course_quiz_map: dict[int, list[int]] = defaultdict(list)
         for qid, cid in Quiz.objects.filter(
             module__course_id__in=course_ids
         ).values_list("id", "module__course_id"):
             course_quiz_map[cid].append(qid)
 
-        # 8. Passed quiz attempts across all relevant quizzes
         all_quiz_ids = [qid for ids in course_quiz_map.values() for qid in ids]
         passed_set: set[int] = set()
         if all_quiz_ids:
@@ -132,11 +117,9 @@ class CourseService:
 
             quizzes_ok = len(quiz_ids) == passed_quizzes
 
-            # is_completed: all lessons watched (any status), all quizzes passed
             lessons_ok = total_lessons > 0 and watched >= total_lessons
             is_completed = lessons_ok and quizzes_ok
 
-            # is_fully_completed: max_modules reached, all READY lessons watched, all quizzes passed
             ready_ok = (
                 (not max_mod or total_modules >= max_mod)
                 and ready_total > 0
@@ -282,19 +265,26 @@ class CourseService:
                             module._last_quiz_passed = attempt.passed
 
             # Precompute completion + certificate in batch
-            completion = self._batch_compute_completions(user, [course.id]).get(course.id, {})
+            completion = self._batch_compute_completions(user, [course.id]).get(
+                course.id, {}
+            )
             course._precomputed_is_completed = completion.get("is_completed", False)
-            course._precomputed_is_fully_completed = completion.get("is_fully_completed", False)
+            course._precomputed_is_fully_completed = completion.get(
+                "is_fully_completed", False
+            )
 
-            enrollment = CourseEnrollment.objects.filter(
-                course=course, user=user
-            ).only("certificate_status", "certificate_file").first()
+            enrollment = (
+                CourseEnrollment.objects.filter(course=course, user=user)
+                .only("certificate_status", "certificate_file")
+                .first()
+            )
             if enrollment:
                 course._precomputed_certificate_status = enrollment.certificate_status
                 try:
                     course._precomputed_certificate_url = (
                         enrollment.certificate_file.url
-                        if enrollment.certificate_status == "READY" and enrollment.certificate_file
+                        if enrollment.certificate_status == "READY"
+                        and enrollment.certificate_file
                         else None
                     )
                 except Exception:
@@ -411,7 +401,9 @@ class CourseService:
 
     def mark_lesson_watched(self, user, lesson_id: str):
         try:
-            lesson = Lesson.objects.select_related("module__course").get(short_id=lesson_id)
+            lesson = Lesson.objects.select_related("module__course").get(
+                short_id=lesson_id
+            )
             LessonProgress.objects.update_or_create(
                 user=user, lesson=lesson, defaults={"watched": True}
             )
@@ -699,7 +691,9 @@ class CourseService:
     def get_module_material(self, user, module_id: str) -> dict:
 
         try:
-            module = Module.objects.select_related("material", "course").get(uuid=module_id)
+            module = Module.objects.select_related("material", "course").get(
+                uuid=module_id
+            )
         except Module.DoesNotExist:
             raise HttpError(404, "Módulo não encontrado")
 
@@ -720,16 +714,14 @@ class CourseService:
         except Exception:
             return {"status": "PROCESSING", "pdf_url": None}
 
-
     def list_featured_courses(self, q: str = ""):
         result = cache.get("featured_courses")
 
         if result and not q:
             return result
 
-        queryset = (
-            Course.objects.filter(status="READY")
-            .only("uuid", "level", "thumb", "title", "desc")
+        queryset = Course.objects.filter(status="READY").only(
+            "uuid", "level", "thumb", "title", "desc"
         )
 
         if q:
@@ -859,7 +851,9 @@ class LessonService:
 
     def mark_watched(self, user, lesson_id: str):
         try:
-            lesson = Lesson.objects.select_related("module__course").get(short_id=lesson_id)
+            lesson = Lesson.objects.select_related("module__course").get(
+                short_id=lesson_id
+            )
             from .models import LessonProgress
 
             progress, created = LessonProgress.objects.update_or_create(
@@ -872,7 +866,9 @@ class LessonService:
 
     def mark_delivered(self, user, lesson_id: str):
         try:
-            lesson = Lesson.objects.select_related("module__course").get(short_id=lesson_id)
+            lesson = Lesson.objects.select_related("module__course").get(
+                short_id=lesson_id
+            )
             course = lesson.module.course
             if not CourseEnrollment.objects.filter(course=course, user=user).exists():
                 raise HttpError(403, "Sem permissão")

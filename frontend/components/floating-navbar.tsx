@@ -161,18 +161,6 @@ export function FloatingNavbar() {
                             </Link>
                         </DropdownMenuItem>
                         <DropdownMenuItem asChild>
-                            <Link href="/app/stats" className="cursor-pointer flex items-center gap-2">
-                                <BarChart3 className="w-4 h-4 text-muted-foreground" />
-                                <span>Estatísticas</span>
-                            </Link>
-                        </DropdownMenuItem>
-                        {/* <DropdownMenuItem asChild>
-                            <Link href="/app/settings" className="cursor-pointer flex items-center gap-2">
-                                <Settings className="w-4 h-4" />
-                                <span>Configurações</span>
-                            </Link>
-                        </DropdownMenuItem> */}
-                        <DropdownMenuItem asChild>
                             <Link href="/app/subscription" className="cursor-pointer flex items-center gap-2">
                                 <Crown className="w-4 h-4 text-muted-foreground" />
                                 <span>Subscrição</span>

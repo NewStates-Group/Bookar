@@ -5,70 +5,113 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('courses', '0030_lesson_segments_data_alter_lesson_status'),
+        ("courses", "0030_lesson_segments_data_alter_lesson_status"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='choice',
-            name='is_correct',
+            model_name="choice",
+            name="is_correct",
             field=models.BooleanField(db_index=True, default=False),
         ),
         migrations.AlterField(
-            model_name='course',
-            name='level',
-            field=models.CharField(blank=True, choices=[('B', 'Beginner'), ('IT', 'Intermediate'), ('A', 'Advance')], db_index=True, max_length=2, null=True),
+            model_name="course",
+            name="level",
+            field=models.CharField(
+                blank=True,
+                choices=[("B", "Beginner"), ("IT", "Intermediate"), ("A", "Advance")],
+                db_index=True,
+                max_length=2,
+                null=True,
+            ),
         ),
         migrations.AlterField(
-            model_name='course',
-            name='status',
-            field=models.CharField(choices=[('PROCESSING', 'Processando'), ('READY', 'Pronto'), ('FAILED', 'Falhou'), ('CANCELLED', 'Cancelado')], db_index=True, default='PROCESSING', max_length=20),
+            model_name="course",
+            name="status",
+            field=models.CharField(
+                choices=[
+                    ("PROCESSING", "Processando"),
+                    ("READY", "Pronto"),
+                    ("FAILED", "Falhou"),
+                    ("CANCELLED", "Cancelado"),
+                ],
+                db_index=True,
+                default="PROCESSING",
+                max_length=20,
+            ),
         ),
         migrations.AlterField(
-            model_name='courseenrollment',
-            name='deleted',
+            model_name="courseenrollment",
+            name="deleted",
             field=models.BooleanField(db_index=True, default=False),
         ),
         migrations.AlterField(
-            model_name='lesson',
-            name='delivered',
-            field=models.BooleanField(blank=True, db_index=True, default=False, null=True),
+            model_name="lesson",
+            name="delivered",
+            field=models.BooleanField(
+                blank=True, db_index=True, default=False, null=True
+            ),
         ),
         migrations.AlterField(
-            model_name='lesson',
-            name='status',
-            field=models.CharField(choices=[('PENDING', 'Pendente'), ('PLANNING', 'Planeando Conteúdo'), ('GENERATING_MEDIA', 'Gerando Vídeo'), ('PROCESSING', 'Processando'), ('READY', 'Pronto'), ('ERROR', 'Erro'), ('CANCELLED', 'Cancelado')], db_index=True, default='PENDING', max_length=20),
+            model_name="lesson",
+            name="status",
+            field=models.CharField(
+                choices=[
+                    ("PENDING", "Pendente"),
+                    ("PLANNING", "Planeando Conteúdo"),
+                    ("GENERATING_MEDIA", "Gerando Vídeo"),
+                    ("PROCESSING", "Processando"),
+                    ("READY", "Pronto"),
+                    ("ERROR", "Erro"),
+                    ("CANCELLED", "Cancelado"),
+                ],
+                db_index=True,
+                default="PENDING",
+                max_length=20,
+            ),
         ),
         migrations.AlterField(
-            model_name='quizattempt',
-            name='passed',
+            model_name="quizattempt",
+            name="passed",
             field=models.BooleanField(db_index=True, default=False),
         ),
         migrations.AddIndex(
-            model_name='courseenrollment',
-            index=models.Index(fields=['user', 'deleted'], name='idx_enrollment_user_deleted'),
+            model_name="courseenrollment",
+            index=models.Index(
+                fields=["user", "deleted"], name="idx_enrollment_user_deleted"
+            ),
         ),
         migrations.AddIndex(
-            model_name='courseenrollment',
-            index=models.Index(fields=['course', 'user', 'deleted'], name='idx_enrollment_course_user_del'),
+            model_name="courseenrollment",
+            index=models.Index(
+                fields=["course", "user", "deleted"],
+                name="idx_enrollment_course_user_del",
+            ),
         ),
         migrations.AddIndex(
-            model_name='courseshare',
-            index=models.Index(fields=['course', 'sharer'], name='idx_courseshare_course_sharer'),
+            model_name="courseshare",
+            index=models.Index(
+                fields=["course", "sharer"], name="idx_courseshare_course_sharer"
+            ),
         ),
         migrations.AddIndex(
-            model_name='module',
-            index=models.Index(fields=['course', 'created_at'], name='idx_module_course_created'),
+            model_name="module",
+            index=models.Index(
+                fields=["course", "created_at"], name="idx_module_course_created"
+            ),
         ),
         migrations.AddIndex(
-            model_name='quizattempt',
-            index=models.Index(fields=['quiz', 'user', 'passed'], name='idx_quizattempt_quiz_user_pass'),
+            model_name="quizattempt",
+            index=models.Index(
+                fields=["quiz", "user", "passed"], name="idx_quizattempt_quiz_user_pass"
+            ),
         ),
         migrations.AddIndex(
-            model_name='quizattempt',
-            index=models.Index(fields=['quiz', '-completed_at'], name='idx_quizattempt_quiz_completed'),
+            model_name="quizattempt",
+            index=models.Index(
+                fields=["quiz", "-completed_at"], name="idx_quizattempt_quiz_completed"
+            ),
         ),
     ]

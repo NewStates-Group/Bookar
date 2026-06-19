@@ -5,15 +5,14 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('courses', '0024_alter_course_uuid_alter_lesson_short_id_and_more'),
+        ("courses", "0024_alter_course_uuid_alter_lesson_short_id_and_more"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='quiz',
-            name='uuid',
+            model_name="quiz",
+            name="uuid",
             field=models.UUIDField(default=uuid.uuid4, editable=False, unique=True),
         ),
     ]

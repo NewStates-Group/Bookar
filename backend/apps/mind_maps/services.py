@@ -116,15 +116,11 @@ class MindMapService:
 
     def _check_mindmap_module_limit(self, mind_map):
         existing = self._count_nodes_with_content(mind_map)
-        SubscriptionService().check_limit(
-            mind_map.user, "mindmap_module", existing
-        )
+        SubscriptionService().check_limit(mind_map.user, "mindmap_module", existing)
 
     def _check_mindmap_quiz_limit(self, mind_map):
         existing = self._count_nodes_with_quiz(mind_map)
-        SubscriptionService().check_limit(
-            mind_map.user, "mindmap_quiz", existing
-        )
+        SubscriptionService().check_limit(mind_map.user, "mindmap_quiz", existing)
 
     def get_node_content(self, uuid_str: str, node_id: str, user):
         from apps.courses.utils import extract_json, generate_text_with_fallback

@@ -15,7 +15,9 @@ def register_provider(provider_cls):
 def get_provider(gateway: str) -> BasePaymentProvider:
     cls = providers.get(gateway)
     if not cls:
-        raise ValueError(f"Provider '{gateway}' not found. Available: {list(providers.keys())}")
+        raise ValueError(
+            f"Provider '{gateway}' not found. Available: {list(providers.keys())}"
+        )
     return cls()
 
 

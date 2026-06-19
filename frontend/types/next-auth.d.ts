@@ -10,11 +10,6 @@ declare module "next-auth" {
             email: string;
             bio?: string;
             avatar?: string;
-            stats?: {
-                ongoing_courses: number;
-                finished_courses: number;
-                certificates_issued: number;
-            };
         } & DefaultSession["user"]
     }
 
@@ -38,7 +33,6 @@ declare module "next-auth/jwt" {
             email: string;
             bio?: string;
             avatar?: string;
-            stats?: any;
         };
         error?: string;
     }

@@ -5,35 +5,72 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('courses', '0016_alter_course_certificate_file_alter_course_thumb_and_more'),
+        ("courses", "0016_alter_course_certificate_file_alter_course_thumb_and_more"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='course',
-            name='certificate_file',
-            field=models.FileField(blank=True, null=True, storage=cloudinary_storage.storage.RawMediaCloudinaryStorage(), upload_to='courses/certificates/'),
+            model_name="course",
+            name="certificate_file",
+            field=models.FileField(
+                blank=True,
+                null=True,
+                storage=cloudinary_storage.storage.RawMediaCloudinaryStorage(),
+                upload_to="courses/certificates/",
+            ),
         ),
         migrations.AlterField(
-            model_name='course',
-            name='status',
-            field=models.CharField(choices=[('PROCESSING', 'Processando'), ('READY', 'Pronto'), ('FAILED', 'Falhou'), ('CANCELLED', 'Cancelado')], default='PROCESSING', max_length=20),
+            model_name="course",
+            name="status",
+            field=models.CharField(
+                choices=[
+                    ("PROCESSING", "Processando"),
+                    ("READY", "Pronto"),
+                    ("FAILED", "Falhou"),
+                    ("CANCELLED", "Cancelado"),
+                ],
+                default="PROCESSING",
+                max_length=20,
+            ),
         ),
         migrations.AlterField(
-            model_name='lesson',
-            name='lesson_file',
-            field=models.FileField(blank=True, null=True, storage=cloudinary_storage.storage.VideoMediaCloudinaryStorage(), upload_to='courses/lessons/'),
+            model_name="lesson",
+            name="lesson_file",
+            field=models.FileField(
+                blank=True,
+                null=True,
+                storage=cloudinary_storage.storage.VideoMediaCloudinaryStorage(),
+                upload_to="courses/lessons/",
+            ),
         ),
         migrations.AlterField(
-            model_name='lesson',
-            name='status',
-            field=models.CharField(choices=[('PENDING', 'Pendente'), ('PROCESSING', 'Processando'), ('READY', 'Pronto'), ('ERROR', 'Erro'), ('CANCELLED', 'Cancelado')], default='PENDING', max_length=20),
+            model_name="lesson",
+            name="status",
+            field=models.CharField(
+                choices=[
+                    ("PENDING", "Pendente"),
+                    ("PROCESSING", "Processando"),
+                    ("READY", "Pronto"),
+                    ("ERROR", "Erro"),
+                    ("CANCELLED", "Cancelado"),
+                ],
+                default="PENDING",
+                max_length=20,
+            ),
         ),
         migrations.AlterField(
-            model_name='module',
-            name='status',
-            field=models.CharField(choices=[('PROCESSING', 'Processando'), ('READY', 'Pronto'), ('FAILED', 'Falhou'), ('CANCELLED', 'Cancelado')], default='READY', max_length=20),
+            model_name="module",
+            name="status",
+            field=models.CharField(
+                choices=[
+                    ("PROCESSING", "Processando"),
+                    ("READY", "Pronto"),
+                    ("FAILED", "Falhou"),
+                    ("CANCELLED", "Cancelado"),
+                ],
+                default="READY",
+                max_length=20,
+            ),
         ),
     ]

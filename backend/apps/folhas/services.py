@@ -78,10 +78,17 @@ class FolhaService:
             return cached
 
         queryset = (
-            Folha.objects
-            .filter(user=user)
+            Folha.objects.filter(user=user)
             .select_related("mind_map")
-            .only("uuid", "title", "content", "mind_map", "node_id", "created_at", "updated_at")
+            .only(
+                "uuid",
+                "title",
+                "content",
+                "mind_map",
+                "node_id",
+                "created_at",
+                "updated_at",
+            )
         )
         if mind_map_id:
             queryset = queryset.filter(mind_map__uuid=mind_map_id)

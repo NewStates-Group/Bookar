@@ -43,31 +43,11 @@ class RegisterIn(Schema):
         return value
 
 
-class UserStatsSchema(Schema):
-    ongoing_courses: int
-    finished_courses: int
-    certificates_issued: int
-
-
-class UserFullStatsSchema(Schema):
-    total_courses: int
-    ongoing_courses: int
-    finished_courses: int
-    certificates_issued: int
-    total_mindmaps: int
-    total_rooms: int
-    total_messages: int
-    active_rooms: int
-
-
 class RegisterOut(Schema):
-    id: int
     email: str
     first_name: str = ""
     last_name: str = ""
-    bio: str = ""
     avatar: str | None = None
-    stats: UserStatsSchema | None = None
 
     @staticmethod
     def resolve_avatar(obj):
@@ -77,10 +57,8 @@ class RegisterOut(Schema):
 
 
 class ProfileUpdateIn(Schema):
-    email: Optional[EmailStr] = None
     first_name: Optional[str] = None
     last_name: Optional[str] = None
-    bio: Optional[str] = None
 
 
 class GoogleLoginIn(Schema):
@@ -119,6 +97,3 @@ class PasswordResetConfirmIn(Schema):
 
 class SendVerificationIn(Schema):
     email: EmailStr
-
-
-

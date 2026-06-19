@@ -33,7 +33,9 @@ class ManualPaymentProvider(BasePaymentProvider):
             receipt = PaymentReceipt.objects.get(id=session_id)
             return {
                 "id": str(receipt.id),
-                "status": "complete" if receipt.status == PaymentReceipt.Status.APPROVED else "pending",
+                "status": "complete"
+                if receipt.status == PaymentReceipt.Status.APPROVED
+                else "pending",
                 "metadata": {
                     "plan_slug": receipt.plan.slug if receipt.plan else "",
                     "user_id": str(receipt.user.id),

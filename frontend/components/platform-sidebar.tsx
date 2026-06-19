@@ -438,16 +438,6 @@ export function PlatformSidebar({
                 <span>Subscrição</span>
               </Link>
             </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link
-                href="/app/stats"
-                onClick={closeMobile}
-                className="flex items-center gap-2.5 px-3 py-2 text-sm cursor-pointer hover:bg-slate-50 dark:hover:bg-neutral-800 focus:bg-slate-50 dark:focus:bg-neutral-800 text-slate-700 dark:text-neutral-300 hover:text-slate-900 dark:hover:text-neutral-100 focus:text-slate-900 dark:focus:text-neutral-100 rounded-lg mx-1"
-              >
-                <BarChart3 className="w-4 h-4 text-slate-400" />
-                <span>Estatísticas</span>
-              </Link>
-            </DropdownMenuItem>
             <DropdownMenuSeparator className="bg-slate-100 dark:bg-neutral-800 my-1" />
 
             {/* Sign out */}

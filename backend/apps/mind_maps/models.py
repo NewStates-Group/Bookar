@@ -49,7 +49,9 @@ class MindMap(models.Model):
 
     class Meta:
         indexes = [
-            models.Index(fields=["user", "-created_at"], name="idx_mindmap_user_created"),
+            models.Index(
+                fields=["user", "-created_at"], name="idx_mindmap_user_created"
+            ),
         ]
 
     def __str__(self):

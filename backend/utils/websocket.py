@@ -14,4 +14,3 @@ def send_user_update(user_id, data):
             "data": data,
         },
     )
-

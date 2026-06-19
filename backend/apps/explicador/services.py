@@ -19,8 +19,7 @@ class ExplicadorService:
             return cached
 
         qs = (
-            ExplicadorRoom.objects
-            .filter(owner=user, is_active=True)
+            ExplicadorRoom.objects.filter(owner=user, is_active=True)
             .order_by("-created_at")
             .only("uuid", "title", "is_active", "created_at")
         )
@@ -57,9 +56,16 @@ class ExplicadorService:
         """Retrieve details of a room by public UUID. Works for owner and guests."""
         try:
             room = (
-                ExplicadorRoom.objects
-                .select_related("owner")
-                .only("uuid", "title", "is_active", "created_at", "whiteboard_data", "chat_history", "owner_id")
+                ExplicadorRoom.objects.select_related("owner")
+                .only(
+                    "uuid",
+                    "title",
+                    "is_active",
+                    "created_at",
+                    "whiteboard_data",
+                    "chat_history",
+                    "owner_id",
+                )
                 .get(uuid=room_uuid)
             )
         except (ExplicadorRoom.DoesNotExist, ValueError):
@@ -75,11 +81,7 @@ class ExplicadorService:
     def delete_room(self, room_uuid: str, user):
         """Deactivate or delete a room (restricted to owner)."""
         try:
-            room = (
-                ExplicadorRoom.objects
-                .only("uuid", "owner_id")
-                .get(uuid=room_uuid)
-            )
+            room = ExplicadorRoom.objects.only("uuid", "owner_id").get(uuid=room_uuid)
         except (ExplicadorRoom.DoesNotExist, ValueError):
             raise HttpError(404, "Sala de explicação não encontrada.")
 

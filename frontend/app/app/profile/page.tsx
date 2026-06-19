@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { toast } from "sonner";
-import { Loader2, Upload } from "lucide-react";
+import { Loader2, Upload, X } from "lucide-react";
 import { apiRequest } from "@/lib/api";
 import { ConfirmUpgradeModal } from "@/components/ConfirmUpgradeModal";
 import { useRouter } from "next/navigation";
@@ -19,7 +19,7 @@ interface Profile {
     first_name: string;
     last_name: string;
     avatar: string | null;
-  }
+}
 
 export default function ProfilePage() {
     const router = useRouter();
@@ -27,6 +27,7 @@ export default function ProfilePage() {
     const [isLoading, setIsLoading] = useState(false);
     const [isPageLoading, setIsPageLoading] = useState<Boolean>(true);
     const [isUploading, setIsUploading] = useState(false);
+    const [cancelUploading, setCancelUploading] = useState<Boolean>(false);
     const hasFetched = useRef(false);
 
     const [formData, setFormData] = useState({
@@ -34,39 +35,12 @@ export default function ProfilePage() {
         first_name: "",
         last_name: "",
     });
+    const [uploadedAvatar, setUploadedAvatar] = useState<File | null>(null);
+    const [originalAvatar, setOriginalAvatar] = useState<string | null>(null)
     const [freshUser, setFreshUser] = useState<Profile | null>(null);
     const [confirmStatus, setConfirmStatus] = useState<"idle" | "pending" | "success" | "error">("idle");
     const [confirmError, setConfirmError] = useState<string>("");
 
-    // Confirm pending checkout after redirect — runs before data fetch
-    useEffect(() => {
-        if (!session?.accessToken) return;
-        const params = new URLSearchParams(window.location.search);
-        const sessionId = params.get("session_id");
-        const gateway = params.get("gateway") || "stripe";
-        if (!sessionId) return;
-
-        setConfirmStatus("pending");
-        apiRequest(`${process.env.NEXT_PUBLIC_API_URL}/subscriptions/confirm`, {
-            method: "POST",
-            body: JSON.stringify({ session_id: sessionId, gateway }),
-        })
-            .then(() => {
-                setConfirmStatus("success");
-                setTimeout(() => {
-                    router.push("/app/subscription");
-                }, 1000);
-            })
-            .catch((err: Error) => {
-                setConfirmError(err.message || "Erro ao confirmar pagamento");
-                setConfirmStatus("error");
-                setTimeout(() => {
-                    setConfirmStatus("idle");
-                }, 3000);
-            });
-    }, [session?.accessToken]); // eslint-disable-line react-hooks/exhaustive-deps
-
-    // Fetch fresh profile data directly from API
     useEffect(() => {
         if (!session?.accessToken || hasFetched.current) return;
         const hasSessionId = new URLSearchParams(window.location.search).has("session_id");
@@ -110,17 +84,25 @@ export default function ProfilePage() {
             return;
         }
 
+        const newFormData = new FormData();
+        newFormData.append("first_name", formData.first_name);
+        newFormData.append("last_name", formData.last_name);
+
+        if (uploadedAvatar) {
+            newFormData.append("avatar", uploadedAvatar);
+        }
+
         try {
             const updatedUser = await apiRequest(`${process.env.NEXT_PUBLIC_API_URL}/auth/profile`, {
-                method: "PUT",
-                body: JSON.stringify(formData),
+                method: "POST",
+                body: newFormData,
             });
 
-            // Update local display state immediately
             setFreshUser((prev: any) => ({ ...(prev || session?.user), ...updatedUser }));
-
-            // Sync to NextAuth session (no loop risk: this is an explicit user action)
-            update({ user: updatedUser }).catch(() => { /* non-critical */ });
+            update({ user: updatedUser }).catch(() => { });
+            setIsUploading(false)
+            setOriginalAvatar(null)
+            setCancelUploading(false)
         } catch (error: any) {
             toast.error(error.message || "Erro ao atualizar perfil");
         } finally {
@@ -128,45 +110,53 @@ export default function ProfilePage() {
         }
     };
 
-    const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-
+    const handleCancelUploading = async (e: any) => {
         setIsUploading(true);
-        const uploadData = new FormData();
-        uploadData.append("avatar", file);
-
-        try {
-            const updatedUser = await apiRequest(`${process.env.NEXT_PUBLIC_API_URL}/auth/avatar`, {
-                method: "POST",
-                headers: {}, // Do not set Content-Type for FormData
-                body: uploadData,
-            });
-
-            // Update local display state immediately
-            setFreshUser((prev: any) => ({ ...(prev || session?.user), avatar: updatedUser.avatar }));
-
-            // Sync to NextAuth session
-            update({ user: { avatar: updatedUser.avatar } }).catch(() => { /* non-critical */ });
-
-            toast.success("Foto de perfil atualizada!");
-        } catch (error: any) {
-            toast.error(error.message || "Erro ao carregar imagem");
-        } finally {
-            setIsUploading(false);
-        }
+        setFreshUser((prev: any) => ({
+            ...prev,
+            avatar: originalAvatar,
+        }))
+        setUploadedAvatar(null)
+        setCancelUploading(false)
+        setIsUploading(false);
     };
 
-    const avatarSrc = freshUser?.avatar
-        ? (freshUser.avatar.startsWith('http') ? freshUser.avatar : `${process.env.NEXT_PUBLIC_API_URL}${freshUser.avatar}`)
-        : "";
+    const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        setIsUploading(true);
+        const file = e.target.files?.[0];
+        if (file) {
+            setUploadedAvatar(file)
+            const reader = new FileReader()
+            reader.readAsDataURL(file)
+            reader.onload = () => {
+                if (!originalAvatar) {
+                    setOriginalAvatar(freshUser?.avatar)
+                }
+                setFreshUser((prev: any) => ({
+                    ...prev,
+                    avatar: reader.result,
+                }))
+            }
+            reader.onerror = () => {
+                setFreshUser((prev: any) => ({
+                    ...prev,
+                    avatar: originalAvatar,
+                }))
+                toast.error("Erro ao ler arquivo")
+            };
+        };
+        setCancelUploading(true)
+        setIsUploading(false);
+    };
+
+
 
     if (isPageLoading) return (
         <div className="min-h-screen flex items-center justify-center py-20">
-          <div className="text-center space-y-4">
-            <Loader2 className="w-10 h-10 animate-spin text-primary mx-auto" />
-            <p className="text-muted-foreground">Carregando seus dados...</p>
-          </div>
+            <div className="text-center space-y-4">
+                <Loader2 className="w-10 h-10 animate-spin text-primary mx-auto" />
+                <p className="text-muted-foreground">Carregando seus dados...</p>
+            </div>
         </div>
     );
 
@@ -178,14 +168,14 @@ export default function ProfilePage() {
                 errorMessage={confirmError}
             />
             <div className="px-4 py-6 sm:px-6 md:py-10 max-w-5xl mx-auto w-full space-y-6">
-            {/* Cabeçalho */}
-            <div>
-                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 dark:text-neutral-100">O Meu Perfil</h1>
-                <p className="text-sm text-slate-500 dark:text-neutral-400 mt-1">Gere as tuas informações pessoais.</p>
-            </div>
+                {/* Cabeçalho */}
+                <div>
+                    <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 dark:text-neutral-100">O Meu Perfil</h1>
+                    <p className="text-sm text-slate-500 dark:text-neutral-400 mt-1">Gere as tuas informações pessoais.</p>
+                </div>
 
-            {/* Informações de Perfil */}
-            <Card className="shadow-sm border-slate-200 dark:border-neutral-700">
+                {/* Informações de Perfil */}
+                <Card className="shadow-sm border-slate-200 dark:border-neutral-700">
                     <CardHeader className="pb-4">
                         <CardTitle className="text-xl font-bold text-slate-900 dark:text-neutral-100">Resumo do Perfil</CardTitle>
                         <CardDescription>Visualiza e edita as suas informações pessoais.</CardDescription>
@@ -194,7 +184,7 @@ export default function ProfilePage() {
                         <div className="flex flex-col items-center space-y-4 sm:flex-row sm:space-y-0 sm:space-x-6 pb-6 border-b border-slate-100 dark:border-neutral-800">
                             <div className="relative">
                                 <Avatar className="h-28 w-28 sm:h-32 sm:w-32 border-2 border-cyan-500/20 shadow-sm">
-                                    <AvatarImage src={avatarSrc} />
+                                    <AvatarImage src={freshUser?.avatar} />
                                     <AvatarFallback className="text-2xl font-semibold bg-slate-100 dark:bg-neutral-800 text-slate-600 dark:text-neutral-400">
                                         {(freshUser?.first_name || freshUser?.email || "U").slice(0, 2).toUpperCase()}
                                     </AvatarFallback>
@@ -204,7 +194,7 @@ export default function ProfilePage() {
                                     className="absolute bottom-0 right-0 p-2 bg-cyan-500 rounded-full text-white cursor-pointer hover:bg-cyan-600 transition-colors shadow-lg"
                                 >
                                     {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-                                    <input id="avatar-upload" type="file" className="hidden" onChange={handleAvatarUpload} accept="image/*" disabled={isUploading} />
+                                    <input id="avatar-upload" type="file" className="hidden" onChange={handleAvatarChange} accept="image/*" disabled={isUploading} />
                                 </label>
                             </div>
                             <div className="text-center sm:text-left space-y-1">
@@ -242,20 +232,17 @@ export default function ProfilePage() {
                                     />
                                 </div>
                             </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="email">E-mail</Label>
-                                <Input
-                                    id="email"
-                                    type="email"
-                                    value={formData.email}
-                                    className="bg-muted/10 opacity-70 cursor-not-allowed"
-                                    disabled
-                                />
+                            <div className="flex gap-2 flex-row">
+
+                                <Button type="submit" className="bg-cyan-500 hover:bg-cyan-600 text-white w-full sm:w-auto px-6" disabled={isLoading}>
+                                    {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                    Salvar Alterações
+                                </Button>
+                                <Button type="submit" className={`bg-red-500 hover:bg-red-600 text-white w-full sm:w-auto px-6 ${!cancelUploading ? 'hidden' : ''}`} disabled={!cancelUploading} onClick={handleCancelUploading}>
+                                    <X className="mr-1/2 h-4 w-4" />
+                                    Cancelar
+                                </Button>
                             </div>
-                            <Button type="submit" className="bg-cyan-500 hover:bg-cyan-600 text-white w-full sm:w-auto px-6" disabled={isLoading}>
-                                {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                Salvar Alterações
-                            </Button>
                         </form>
                     </CardContent>
                 </Card>
