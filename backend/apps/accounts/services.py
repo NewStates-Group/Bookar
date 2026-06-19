@@ -12,14 +12,11 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.files.base import ContentFile
 from django.core.signing import BadSignature, SignatureExpired, TimestampSigner
-from django.db import transaction
 from django.utils import timezone
 from google.auth.transport import requests
 from google.oauth2 import id_token
 from ninja.errors import HttpError
 from ninja_jwt.tokens import RefreshToken
-
-from apps.subscriptions.models import SubscriptionPlan, UserSubscription
 
 from .models import EmailVerificationCode
 from .tasks import (
@@ -40,7 +37,7 @@ class AuthService:
         if not await self.averify_turnstile(token):
             raise HttpError(400, "SIGNUP_FAILED")
 
-        user = User.objects.create_user(
+        user = await sync_to_async(User.objects.create_user)(
             email=email,
             password=password,
             username=email.split("@")[0],
@@ -48,14 +45,15 @@ class AuthService:
             last_name=last_name,
         )
 
-        send_welcome_email_task.delay(user.id)  # type: ignore
-        await sync_to_async(EmailVerificationCode.objects.filter(email=email).delete)()  # type: ignore
+        send_welcome_email_task.delay(user.id)
+        await sync_to_async(EmailVerificationCode.objects.filter(email=email).delete)()
 
+        from apps.subscriptions.models import SubscriptionPlan, UserSubscription
         free_plan = await sync_to_async(
-            SubscriptionPlan.objects.filter(slug="free").first  # type: ignore
-        )()  # type: ignore
+            SubscriptionPlan.objects.filter(slug="free").first
+        )()
         if free_plan:
-            await sync_to_async(UserSubscription.objects.get_or_create)(  # type: ignore
+            await sync_to_async(UserSubscription.objects.get_or_create)(
                 user=user,
                 defaults={
                     "plan": free_plan,
@@ -67,16 +65,16 @@ class AuthService:
 
     async def generate_verification_code(self, email):
         code = "".join(random.choices(string.digits, k=6))
-        await sync_to_async(EmailVerificationCode.objects.update_or_create)(  # type: ignore
+        await sync_to_async(EmailVerificationCode.objects.update_or_create)(
             email=email, defaults={"code": code}
         )
-        send_verification_email_task.delay(email, code)  # type: ignore
+        send_verification_email_task.delay(email, code)
         return True
 
     async def averify_verification_code(self, email, code):
         ten_minutes_ago = timezone.now() - timedelta(minutes=10)
         return await sync_to_async(
-            EmailVerificationCode.objects.filter(  # type: ignore
+            EmailVerificationCode.objects.filter(
                 email=email, code=code, updated_at__gte=ten_minutes_ago
             ).exists
         )()
@@ -98,7 +96,7 @@ class AuthService:
             await user.asave(update_fields=update_fields)
         return user
 
-    def get_google_auth_url(self):
+    async def get_google_auth_url(self):
         params = {
             "client_id": settings.GOOGLE_CLIENT_ID,
             "redirect_uri": f"{settings.SITE_URL}/auth/callback",
@@ -109,8 +107,7 @@ class AuthService:
         }
         return f"https://accounts.google.com/o/oauth2/v2/auth?{urllib.parse.urlencode(params)}"
 
-    def google_callback(self, code):
-        # 1. Exchange code for tokens
+    async def google_callback(self, code):
         token_url = "https://oauth2.googleapis.com/token"
         data = {
             "code": code,
@@ -120,11 +117,11 @@ class AuthService:
             "grant_type": "authorization_code",
         }
 
-        with httpx.Client() as client:
+        async with httpx.AsyncClient() as client:
             logger.info(
                 f"Exchanging code for tokens with redirect_uri: {data['redirect_uri']}"
             )
-            res = client.post(token_url, data=data)
+            res = await client.post(token_url, data=data)
             if not res.is_success:
                 logger.error(
                     f"Google Token Exchange Error: {res.text}. Redirect URI used: {data['redirect_uri']}"
@@ -136,7 +133,6 @@ class AuthService:
         if not id_token_str:
             raise HttpError(400, "No id_token returned from Google")
 
-        # 2. Verify token and get user
         try:
             id_info = id_token.verify_oauth2_token(
                 id_token_str, requests.Request(), settings.GOOGLE_CLIENT_ID
@@ -146,44 +142,22 @@ class AuthService:
             first_name = id_info.get("given_name", "")
             last_name = id_info.get("family_name", "")
 
-            print(
-                f">>> GOOGLE LOGIN DEBUG: email='{email}', first='{first_name}', last='{last_name}'"
-            )
-
-            # Normalize email for common providers if needed (e.g. Gmail dots)
             lookup_email = email.lower()
-
-            user = User.objects.filter(email__iexact=lookup_email).first()
-            if user:
-                print(
-                    f">>> DEBUG: Found user by email: ID={user.id}, Username='{user.username}'"
-                )
+            user = await sync_to_async(User.objects.filter(email__iexact=lookup_email).first)()
 
             if not user:
-                print(
-                    f">>> DEBUG: No user found for '{lookup_email}', checking all users..."
-                )
-                # Create or find
-                base_username = (
-                    email.split("@")[0].replace(".", "").replace("-", "_")
-                )  # Simple normalization
+                base_username = email.split("@")[0].replace(".", "").replace("-", "_")
                 username = base_username
 
-                # Check if username exists independently of email
-                existing_by_uname = User.objects.filter(
-                    username__iexact=username
-                ).first()
+                existing_by_uname = await sync_to_async(
+                    User.objects.filter(username__iexact=username).first
+                )()
                 if existing_by_uname:
-                    print(
-                        f">>> DEBUG: Username '{username}' taken by user with email '{existing_by_uname.email}'"
-                    )
-                    # Try to find again by that email to see if they match (paranoid)
                     if existing_by_uname.email.lower() == lookup_email:
                         user = existing_by_uname
                     else:
-                        # Collision: Generate new one
                         counter = 1
-                        while User.objects.filter(username=username).exists():
+                        while await sync_to_async(User.objects.filter(username=username).exists)():
                             username = f"{base_username}{''.join(random.choices(string.digits, k=4))}"
                             counter += 1
                             if counter > 5:
@@ -191,22 +165,22 @@ class AuthService:
                                 break
 
                 if not user:
-                    print(
-                        f">>> DEBUG: Proceeding to create user with username='{username}'"
-                    )
                     try:
+                        from django.db import transaction
                         with transaction.atomic():
-                            user = User.objects.create_user(
+                            user = await sync_to_async(User.objects.create_user)(
                                 email=email,
-                                username=email.split("@")[0],  # Default username
+                                username=email.split("@")[0],
                                 first_name=first_name,
                                 last_name=last_name,
                                 is_active=True,
                             )
-                        print(f">>> DEBUG: User created: ID={user.id}")
-                        free_plan = SubscriptionPlan.objects.filter(slug="free").first()
+                        from apps.subscriptions.models import SubscriptionPlan, UserSubscription
+                        free_plan = await sync_to_async(
+                            SubscriptionPlan.objects.filter(slug="free").first
+                        )()
                         if free_plan:
-                            UserSubscription.objects.get_or_create(
+                            await sync_to_async(UserSubscription.objects.get_or_create)(
                                 user=user,
                                 defaults={
                                     "plan": free_plan,
@@ -214,19 +188,12 @@ class AuthService:
                                 },
                             )
                     except Exception as e:
-                        print(f">>> DEBUG: Creation failed: {type(e).__name__}: {e}")
-                        # Final, final fallback
-                        user = User.objects.filter(email__iexact=lookup_email).first()
+                        user = await sync_to_async(User.objects.filter(email__iexact=lookup_email).first)()
                         if not user:
-                            user = User.objects.filter(username=username).first()
-
+                            user = await sync_to_async(User.objects.filter(username=username).first)()
                         if not user:
-                            print(
-                                ">>> DEBUG: CRITICAL FAILURE: Could not find or create user."
-                            )
                             raise e
             else:
-                # Update existing user profile if fields are empty
                 updated = False
                 if not user.first_name and first_name:
                     user.first_name = first_name
@@ -235,19 +202,16 @@ class AuthService:
                     user.last_name = last_name
                     updated = True
                 if updated:
-                    user.save()
+                    await sync_to_async(user.save)()
 
-            # 3. Save profile picture from Google if available and user doesn't have one
             picture_url = id_info.get("picture")
             if picture_url and not user.avatar:
                 try:
-                    with httpx.Client() as client:
-                        resp = client.get(picture_url)
+                    async with httpx.AsyncClient() as client:
+                        resp = await client.get(picture_url)
                         if resp.is_success:
-                            ext = (
-                                os.path.splitext(picture_url.split("?")[0])[1] or ".jpg"
-                            )
-                            user.avatar.save(
+                            ext = os.path.splitext(picture_url.split("?")[0])[1] or ".jpg"
+                            await sync_to_async(user.avatar.save)(
                                 f"{user.username}_google{ext}",
                                 ContentFile(resp.content),
                                 save=True,
@@ -267,8 +231,7 @@ class AuthService:
                 raise e
             raise HttpError(400, f"Erro na verificação do token Google: {str(e)}")
 
-    def google_login(self, id_token_str):
-        # Kept for backward compatibility if needed, but redesigned for better use
+    async def google_login(self, id_token_str):
         try:
             id_info = id_token.verify_oauth2_token(
                 id_token_str, requests.Request(), settings.GOOGLE_CLIENT_ID
@@ -282,27 +245,27 @@ class AuthService:
             if not email:
                 raise ValueError("Email not found in Google Token")
 
-            user = User.objects.filter(email__iexact=email).first()
+            user = await sync_to_async(User.objects.filter(email__iexact=email).first)()
             if not user:
                 base_username = email.split("@")[0]
                 username = base_username
-
                 counter = 1
-                while User.objects.filter(username=username).exists():
-                    username = (
-                        f"{base_username}{''.join(random.choices(string.digits, k=4))}"
-                    )
+                while await sync_to_async(User.objects.filter(username=username).exists)():
+                    username = f"{base_username}{''.join(random.choices(string.digits, k=4))}"
                     counter += 1
                     if counter > 10:
                         username = f"{base_username}_{uuid.uuid4().hex[:8]}"
                         break
 
-                user = User.objects.create_user(
+                user = await sync_to_async(User.objects.create_user)(
                     email=email, username=username, is_active=True
                 )
-                free_plan = SubscriptionPlan.objects.filter(slug="free").first()
+                from apps.subscriptions.models import SubscriptionPlan, UserSubscription
+                free_plan = await sync_to_async(
+                    SubscriptionPlan.objects.filter(slug="free").first
+                )()
                 if free_plan:
-                    UserSubscription.objects.get_or_create(
+                    await sync_to_async(UserSubscription.objects.get_or_create)(
                         user=user,
                         defaults={
                             "plan": free_plan,
@@ -318,33 +281,30 @@ class AuthService:
             }
 
         except Exception as e:
-            # Provide more detailed error message for easier debugging
             print(f"Google Token Verification Error: {str(e)}")
             if isinstance(e, HttpError):
                 raise e
             raise HttpError(400, f"Erro na verificação do token Google: {str(e)}")
 
-    def request_password_reset(self, email):
+    async def request_password_reset(self, email):
         try:
-            user = User.objects.get(email=email)
+            user = await sync_to_async(User.objects.get)(email=email)
             signer = TimestampSigner()
             token = signer.sign(user.email)
             send_password_reset_email_task.delay(user.id, token)
         except User.DoesNotExist:
-            # We don't reveal if user exists for security, but we don't send anything
             pass
         return {
             "message": "Se o e-mail existir no nosso sistema, você receberá um link de recuperação."
         }
 
-    def confirm_password_reset(self, token, new_password):
+    async def confirm_password_reset(self, token, new_password):
         signer = TimestampSigner()
         try:
-            # Token expires in 1 hour (3600 seconds)
             email = signer.unsign(token, max_age=3600)
-            user = User.objects.get(email=email)
+            user = await sync_to_async(User.objects.get)(email=email)
             user.set_password(new_password)
-            user.save()
+            await sync_to_async(user.save)()
             return {"message": "Senha redefinida com sucesso!"}
         except (BadSignature, SignatureExpired):
             raise HttpError(400, "Token inválido")
@@ -354,7 +314,6 @@ class AuthService:
     def verify_turnstile(self, token: str):
         if settings.DEBUG and token == "XXXX.DUMMY.TOKEN.XXXX":
             return True
-
         url = "https://challenges.cloudflare.com/turnstile/v0/siteverify"
         data = {
             "secret": settings.CLOUDFLARE_TURNSTILE_SECRET_KEY,
@@ -372,7 +331,6 @@ class AuthService:
     async def averify_turnstile(self, token: str):
         if settings.DEBUG and token == "XXXX.DUMMY.TOKEN.XXXX":
             return True
-
         url = "https://challenges.cloudflare.com/turnstile/v0/siteverify"
         data = {
             "secret": settings.CLOUDFLARE_TURNSTILE_SECRET_KEY,

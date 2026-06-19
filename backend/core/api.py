@@ -4,6 +4,7 @@ from apps.explicador.controllers import ExplicadorController
 from apps.feedback.controllers import FeedbackController
 from apps.folhas.controllers import FolhaController
 from apps.mind_maps.controllers import MindMapController
+from apps.notifications.controllers import NotificationController
 from apps.subscriptions.controllers import SubscriptionController
 from django.conf import settings
 from django.http import HttpResponse
@@ -28,6 +29,7 @@ api.register_controllers(
     ExplicadorController,
     FolhaController,
     FeedbackController,
+    NotificationController,
 )
 
 

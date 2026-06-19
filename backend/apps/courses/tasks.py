@@ -9,7 +9,7 @@ from pathlib import Path
 
 from celery import shared_task
 from utils.mail import send_certificate_email
-from utils.websocket import send_user_update
+from utils.websocket import send_user_update_sync as send_user_update
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.files.base import ContentFile

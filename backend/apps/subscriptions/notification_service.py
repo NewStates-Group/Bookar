@@ -1,22 +1,20 @@
 import logging
 
-from .models import Notification
+from asgiref.sync import sync_to_async
 
 logger = logging.getLogger(__name__)
 
 
-def create_notification(user, title, message="", type="info", link=""):
-    notification = Notification.objects.create(
-        user=user,
-        title=title,
-        message=message,
-        type=type,
-        link=link,
+async def create_notification(user, title, message="", type="info", link=""):
+    from .models import Notification
+
+    notification = await sync_to_async(Notification.objects.create)(
+        user=user, title=title, message=message, type=type, link=link,
     )
     try:
         from utils.websocket import send_user_update
 
-        send_user_update(
+        await send_user_update(
             user.id,
             {
                 "event": "notification",
@@ -36,23 +34,39 @@ def create_notification(user, title, message="", type="info", link=""):
     return notification
 
 
-def mark_notification_read(notification_id, user):
+async def mark_notification_read(notification_id, user):
+    from .models import Notification
+
     try:
-        notification = Notification.objects.get(id=notification_id, user=user)
+        notification = await sync_to_async(Notification.objects.get)(
+            id=notification_id, user=user
+        )
         notification.is_read = True
-        notification.save(update_fields=["is_read"])
+        await sync_to_async(notification.save)(update_fields=["is_read"])
         return notification
     except Notification.DoesNotExist:
         return None
 
 
-def mark_all_notifications_read(user):
-    return Notification.objects.filter(user=user, is_read=False).update(is_read=True)
+async def mark_all_notifications_read(user):
+    from .models import Notification
+
+    await sync_to_async(
+        lambda: Notification.objects.filter(user=user, is_read=False).update(is_read=True)
+    )()
 
 
-def get_unread_count(user):
-    return Notification.objects.filter(user=user, is_read=False).count()
+async def get_unread_count(user):
+    from .models import Notification
+
+    return await sync_to_async(
+        Notification.objects.filter(user=user, is_read=False).count
+    )()
 
 
-def get_notifications(user, limit=50):
-    return Notification.objects.filter(user=user)[:limit]
+async def get_notifications(user, limit=50):
+    from .models import Notification
+
+    return await sync_to_async(
+        lambda: list(Notification.objects.filter(user=user)[:limit])
+    )()

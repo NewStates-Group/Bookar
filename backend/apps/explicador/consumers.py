@@ -33,22 +33,6 @@ def _audio_to_data_uri(audio_bytes: bytes, mime: str = "audio/mpeg") -> str:
 def generate_elevenlabs_audio(text: str) -> str:
     text = text[:1000]
 
-    # 1. Try ElevenLabs directly
-    # api_key = settings.AI.get("ELEVENLABS_KEY", "")
-    # if api_key:
-    #     try:
-    #         client = ElevenLabs(api_key=api_key, timeout=30)
-    #         audio = client.text_to_speech.convert(
-    #             text=text,
-    #             voice_id="JBFqnCBsd6RMkjVDRZzb",
-    #             model_id="eleven_multilingual_v2",
-    #             output_format="mp3_44100_128",
-    #         )
-    #         return _audio_to_data_uri(b"".join(audio), "audio/mpeg")
-    #     except Exception as e:
-    #         logger.warning("ElevenLabs TTS failed, trying fallback: %s", e)
-
-    # 2. Fallback to audio chain (Gemini TTS → NVIDIA Riva)
     if not settings.AI.get("GENAI_KEY") and not settings.AI.get("NVIDIA_AUDIO_API_KEY"):
         logger.warning("No fallback TTS configured")
         return ""
@@ -58,6 +42,26 @@ def generate_elevenlabs_audio(text: str) -> str:
         with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
             tmp_path = Path(tmp.name)
         chain.handle(text=text, output_path=tmp_path)
+        wav_bytes = tmp_path.read_bytes()
+        tmp_path.unlink(missing_ok=True)
+        return _audio_to_data_uri(wav_bytes, "audio/wav")
+    except AllProvidersFailed as e:
+        logger.error("All TTS providers failed: %s", e)
+        return ""
+
+
+async def generate_elevenlabs_audio_async(text: str) -> str:
+    text = text[:1000]
+
+    if not settings.AI.get("GENAI_KEY") and not settings.AI.get("NVIDIA_AUDIO_API_KEY"):
+        logger.warning("No fallback TTS configured")
+        return ""
+
+    try:
+        chain = get_audio_chain()
+        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
+            tmp_path = Path(tmp.name)
+        await chain.handle_async(text=text, output_path=tmp_path)
         wav_bytes = tmp_path.read_bytes()
         tmp_path.unlink(missing_ok=True)
         return _audio_to_data_uri(wav_bytes, "audio/wav")
@@ -682,7 +686,7 @@ class ExplicadorConsumer(AsyncWebsocketConsumer):
             # 4. Generate audio if this is a voice interaction
             audio_data_uri = ""
             if data.get("is_voice"):
-                audio_data_uri = await sync_to_async(generate_elevenlabs_audio)(
+                audio_data_uri = await generate_elevenlabs_audio_async(
                     parsed_data["chat_response"]
                 )
 
@@ -772,7 +776,7 @@ class ExplicadorConsumer(AsyncWebsocketConsumer):
         try:
             client = get_genai_client()
             model_name = settings.AI.get("GENAI_MODEL_TEXT", "gemini-2.5-flash-lite")
-            response = await sync_to_async(client.models.generate_content)(
+            response = await client.aio.models.generate_content(
                 model=model_name,
                 contents=[
                     "Transcreve apenas e exatamente o que foi dito neste áudio, mantendo o idioma original. "
@@ -1131,18 +1135,14 @@ Regras para "whiteboard_summary" (quando open_whiteboard for true):
 3. Responda estritamente apenas com o JSON bruto, sem blocos ```json.
 """
 
-        # We wrap in sync_to_async since provider calls might be blocking requests
-        def run_chain():
-            chain = get_text_chain()
-            msg = {"role": "user", "content": prompt}
-            if attachment:
-                msg["attachment"] = {
-                    "data": attachment["data"],
-                    "mime_type": attachment["mime_type"],
-                }
-            return chain.handle(messages=[msg])
-
-        return await sync_to_async(run_chain)()
+        chain = get_text_chain()
+        msg = {"role": "user", "content": prompt}
+        if attachment:
+            msg["attachment"] = {
+                "data": attachment["data"],
+                "mime_type": attachment["mime_type"],
+            }
+        return await chain.handle_async(messages=[msg])
 
     def parse_ai_output(self, text: str) -> dict:
         """Parse raw AI output into a dictionary, extracting JSON and adding robust fallbacks."""

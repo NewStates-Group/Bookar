@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 
 @api_controller("auth/", tags=["Auth"])
-class AuthController(AsyncNinjaJWTDefaultController):  # type: ignore
+class AuthController(AsyncNinjaJWTDefaultController):
     @inject
     def __init__(self, auth_service: AuthService):
         self.auth_service = auth_service
@@ -82,24 +82,25 @@ class AuthController(AsyncNinjaJWTDefaultController):  # type: ignore
         return user
 
     @route.get("google/url")
-    def get_google_url(self, request):
-        return {"url": self.auth_service.get_google_auth_url()}
+    async def get_google_url(self, request):
+        url = await self.auth_service.get_google_auth_url()
+        return {"url": url}
 
     @route.post("google/callback")
-    def google_callback(self, data: GoogleLoginIn):
-        tokens = self.auth_service.google_callback(data.id_token)
+    async def google_callback(self, data: GoogleLoginIn):
+        tokens = await self.auth_service.google_callback(data.id_token)
         return tokens
 
     @route.post(
         "password-reset/request",
         throttle=DynamicRateThrottle(scope="password_reset_request"),
     )
-    def password_reset_request(self, data: PasswordResetRequestIn):
-        return self.auth_service.request_password_reset(data.email)
+    async def password_reset_request(self, data: PasswordResetRequestIn):
+        return await self.auth_service.request_password_reset(data.email)
 
     @route.post(
         "password-reset/confirm",
         throttle=DynamicRateThrottle(scope="password_reset_confirm"),
     )
-    def password_reset_confirm(self, data: PasswordResetConfirmIn):
-        return self.auth_service.confirm_password_reset(data.token, data.new_password)
+    async def password_reset_confirm(self, data: PasswordResetConfirmIn):
+        return await self.auth_service.confirm_password_reset(data.token, data.new_password)

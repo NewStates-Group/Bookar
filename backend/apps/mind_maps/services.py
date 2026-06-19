@@ -1,4 +1,4 @@
-from apps.subscriptions.services import SubscriptionService
+from asgiref.sync import sync_to_async
 from django.core.cache import cache
 from django.db import models
 from ninja.errors import HttpError
@@ -15,31 +15,33 @@ def invalidate_mind_map_cache(mind_map_uuid: str, user_id=None):
 
 
 class MindMapService:
-    def list_mind_maps(self, user):
+    async def list_mind_maps(self, user):
         cache_key = f"mind_maps_list_{user.id}"
         cached = cache.get(cache_key)
         if cached is not None:
             return cached
 
-        maps = list(
-            MindMap.objects.filter(user_id=user.id).values(
-                "uuid", "desc", "topic", "title", "status", "is_shared", "created_at"
-            )[:50]
-        )
-        cache.set(cache_key, maps, 300)  # 5 minutes
+        maps = await sync_to_async(
+            lambda: list(
+                MindMap.objects.filter(user_id=user.id).values(
+                    "uuid", "desc", "topic", "title", "status", "is_shared", "created_at"
+                )[:50]
+            )
+        )()
+        cache.set(cache_key, maps, 300)
         return maps
 
-    def create_mind_map(self, user, topic: str, language: str = "pt"):
-        SubscriptionService().check_and_increment(user, "mindmap_generated")
+    async def create_mind_map(self, user, topic: str, language: str = "pt"):
+        from apps.subscriptions.services import SubscriptionService
 
-        mind_map = MindMap.objects.create(
+        await SubscriptionService().check_and_increment(user, "mindmap_generated")
+
+        mind_map = await sync_to_async(MindMap.objects.create)(
             user=user,
             topic=topic,
             language=language,
             title="Gerando...",
-            desc=(
-                "Seu mapa mental está sendo gerado pela nossa inteligência artificial."
-            ),
+            desc="Seu mapa mental está sendo gerado pela nossa inteligência artificial.",
         )
 
         generate_mind_map_task.delay(user.pk, mind_map.pk)
@@ -47,7 +49,7 @@ class MindMapService:
         mind_map.is_owner = True
         return mind_map
 
-    def get_mind_map(self, uuid_str: str, user):
+    async def get_mind_map(self, uuid_str: str, user):
         cache_key = f"mind_map_detail_{uuid_str}"
         cached = cache.get(cache_key)
         if cached is not None:
@@ -55,34 +57,36 @@ class MindMapService:
             return cached
 
         try:
-            mind_map = MindMap.objects.get(uuid=uuid_str, user=user)
+            mind_map = await sync_to_async(MindMap.objects.get)(
+                uuid=uuid_str, user=user
+            )
             mind_map.is_owner = True
-            cache.set(cache_key, mind_map, 600)  # 10 minutes
+            cache.set(cache_key, mind_map, 600)
             return mind_map
         except MindMap.DoesNotExist:
             try:
-                mind_map = MindMap.objects.get(uuid=uuid_str, is_shared=True)
+                mind_map = await sync_to_async(MindMap.objects.get)(
+                    uuid=uuid_str, is_shared=True
+                )
                 mind_map.is_owner = False
                 cache.set(cache_key, mind_map, 600)
                 return mind_map
             except MindMap.DoesNotExist:
                 raise HttpError(
-                    404,
-                    "Mapa mental não encontrado ou você não tem acesso a ele.",
+                    404, "Mapa mental não encontrado ou você não tem acesso a ele.",
                 )
 
-    def delete_mind_map(self, uuid_str: str, user):
-        mind_map = self.get_mind_map(uuid_str, user)
+    async def delete_mind_map(self, uuid_str: str, user):
+        mind_map = await self.get_mind_map(uuid_str, user)
         if mind_map.user != user:
             raise HttpError(
                 403, "Você não tem permissão para eliminar este mapa mental."
             )
-        mind_map.delete()
+        await sync_to_async(mind_map.delete)()
         invalidate_mind_map_cache(uuid_str, user.id)
         return {"success": True, "message": "Mapa mental eliminado."}
 
     def _find_node(self, nodes, node_id):
-        """Recursively find a node by ID in the 3-level hierarchy."""
         for n1 in nodes:
             if str(n1.get("id")) == str(node_id):
                 return n1
@@ -95,7 +99,6 @@ class MindMapService:
         return None
 
     def _count_nodes_with_content(self, mind_map):
-        """Count how many nodes already have content generated."""
         count = 0
         for n1 in mind_map.nodes:
             if n1.get("text_content"):
@@ -109,23 +112,24 @@ class MindMapService:
         return count
 
     def _count_nodes_with_quiz(self, mind_map):
-        """Count how many nodes have quizzes generated."""
         if not mind_map.quizzes:
             return 0
         return len(mind_map.quizzes)
 
-    def _check_mindmap_module_limit(self, mind_map):
+    async def _check_mindmap_module_limit(self, mind_map):
         existing = self._count_nodes_with_content(mind_map)
-        SubscriptionService().check_limit(mind_map.user, "mindmap_module", existing)
+        from apps.subscriptions.services import SubscriptionService
+        await SubscriptionService().check_limit(mind_map.user, "mindmap_module", existing)
 
-    def _check_mindmap_quiz_limit(self, mind_map):
+    async def _check_mindmap_quiz_limit(self, mind_map):
         existing = self._count_nodes_with_quiz(mind_map)
-        SubscriptionService().check_limit(mind_map.user, "mindmap_quiz", existing)
+        from apps.subscriptions.services import SubscriptionService
+        await SubscriptionService().check_limit(mind_map.user, "mindmap_quiz", existing)
 
-    def get_node_content(self, uuid_str: str, node_id: str, user):
-        from apps.courses.utils import extract_json, generate_text_with_fallback
+    async def get_node_content(self, uuid_str: str, node_id: str, user):
+        from apps.courses.utils import extract_json, generate_text_with_fallback_async
 
-        mind_map = self.get_mind_map(uuid_str, user)
+        mind_map = await self.get_mind_map(uuid_str, user)
         if not mind_map.nodes:
             raise HttpError(
                 400, "O mapa mental ainda está sendo gerado ou não possui nós."
@@ -135,30 +139,21 @@ class MindMapService:
         if not node:
             raise HttpError(404, f"Nó {node_id} não encontrado no mapa mental.")
 
-        # If already generated, return from cache
         if "text_content" in node:
             return {
                 "text_content": node["text_content"],
                 "additional_resources": node.get("additional_resources", []),
             }
 
-        # Check subscription limit for generating new module content
-        self._check_mindmap_module_limit(mind_map)
+        await self._check_mindmap_module_limit(mind_map)
 
-        # Otherwise, generate dynamically on-demand using AI
         lang = getattr(mind_map, "language", "pt")
         if lang == "en":
-            lang_instruction = (
-                "Todos os valores de texto devem ser em Inglês (English)."
-            )
+            lang_instruction = "Todos os valores de texto devem ser em Inglês (English)."
         elif lang == "es":
-            lang_instruction = (
-                "Todos os valores de texto devem ser em Espanhol (Spanish)."
-            )
+            lang_instruction = "Todos os valores de texto devem ser em Espanhol (Spanish)."
         else:
-            lang_instruction = (
-                "Todos os valores de texto devem ser em Português do Brasil."
-            )
+            lang_instruction = "Todos os valores de texto devem ser em Português do Brasil."
 
         prompt = f"""
         Você é um educador especialista e autoridade máxima no assunto: "{mind_map.topic}".
@@ -199,9 +194,7 @@ class MindMapService:
         """
 
         try:
-            response = generate_text_with_fallback(
-                [{"role": "user", "content": prompt}]
-            )
+            response = await generate_text_with_fallback_async([{"role": "user", "content": prompt}])
             data = extract_json(response)
             if not data or "text_content" not in data:
                 raise ValueError("AI response did not return valid text_content JSON.")
@@ -209,11 +202,9 @@ class MindMapService:
             text_content = data.get("text_content", "")
             resources = data.get("additional_resources", [])
         except Exception:
-            # Fallback content if AI fails
             text_content = f"# {node.get('title')}\n\n{node.get('desc')}\n\n*Nota: Não foi possível gerar o conteúdo aprofundado no momento. Por favor, tente novamente mais tarde.*"
             resources = []
 
-        # Save back into the JSON structure
         def _update_node_in_list(nodes_list):
             for n1 in nodes_list:
                 if str(n1.get("id")) == str(node_id):
@@ -235,18 +226,15 @@ class MindMapService:
         updated_nodes = list(mind_map.nodes)
         if _update_node_in_list(updated_nodes):
             mind_map.nodes = updated_nodes
-            mind_map.save(update_fields=["nodes"])
+            await sync_to_async(mind_map.save)(update_fields=["nodes"])
             invalidate_mind_map_cache(uuid_str, user.id)
 
-        return {
-            "text_content": text_content,
-            "additional_resources": resources,
-        }
+        return {"text_content": text_content, "additional_resources": resources}
 
-    def get_or_create_node_quiz(self, uuid_str: str, node_id: str, user):
-        from apps.courses.utils import extract_json, generate_text_with_fallback
+    async def get_or_create_node_quiz(self, uuid_str: str, node_id: str, user):
+        from apps.courses.utils import extract_json, generate_text_with_fallback_async
 
-        mind_map = self.get_mind_map(uuid_str, user)
+        mind_map = await self.get_mind_map(uuid_str, user)
         if not mind_map.nodes:
             raise HttpError(
                 400, "O mapa mental ainda está sendo gerado ou não possui nós."
@@ -259,38 +247,27 @@ class MindMapService:
         if not mind_map.quizzes:
             mind_map.quizzes = {}
 
-        # Return cached quiz (excluding answers)
         if node_id in mind_map.quizzes:
             quiz_data = mind_map.quizzes[node_id]
             sanitized_questions = []
             for q in quiz_data.get("questions", []):
-                sanitized_questions.append(
-                    {
-                        "id": q["id"],
-                        "type": q["type"],
-                        "question": q["question"],
-                        "options": q.get("options"),
-                    }
-                )
+                sanitized_questions.append({
+                    "id": q["id"],
+                    "type": q["type"],
+                    "question": q["question"],
+                    "options": q.get("options"),
+                })
             return {"questions": sanitized_questions}
 
-        # Check subscription limit before generating new quiz
-        self._check_mindmap_quiz_limit(mind_map)
+        await self._check_mindmap_quiz_limit(mind_map)
 
-        # Generate dynamically on-demand using AI
         lang = getattr(mind_map, "language", "pt")
         if lang == "en":
-            lang_instruction = (
-                "Todos os valores de texto devem ser em Inglês (English)."
-            )
+            lang_instruction = "Todos os valores de texto devem ser em Inglês (English)."
         elif lang == "es":
-            lang_instruction = (
-                "Todos os valores de texto devem ser em Espanhol (Spanish)."
-            )
+            lang_instruction = "Todos os valores de texto devem ser em Espanhol (Spanish)."
         else:
-            lang_instruction = (
-                "Todos os valores de texto devem ser em Português do Brasil."
-            )
+            lang_instruction = "Todos os valores de texto devem ser em Português do Brasil."
 
         prompt = f"""
         Você é um educador especialista e sua tarefa é gerar um teste de avaliação (quiz) dinâmico e interativo sobre o assunto "{node.get("title")}" (contexto do curso: "{mind_map.topic}").
@@ -333,51 +310,40 @@ class MindMapService:
         """
 
         try:
-            response = generate_text_with_fallback(
-                [{"role": "user", "content": prompt}]
-            )
+            response = await generate_text_with_fallback_async([{"role": "user", "content": prompt}])
             data = extract_json(response)
             if not data or "questions" not in data:
                 raise ValueError("AI response did not return valid questions list.")
             quiz_data = data
         except Exception:
-            # Fallback quiz
             quiz_data = {
-                "questions": [
-                    {
-                        "id": 1,
-                        "type": "true_false",
-                        "question": f"O tópico '{node.get('title')}' é relevante para o aprendizado de '{mind_map.topic}'?",
-                        "options": ["Verdadeiro", "Falso"]
-                        if lang == "pt"
-                        else ["True", "False"],
-                        "correct_answer": "Verdadeiro" if lang == "pt" else "True",
-                    }
-                ]
+                "questions": [{
+                    "id": 1,
+                    "type": "true_false",
+                    "question": f"O tópico '{node.get('title')}' é relevante para o aprendizado de '{mind_map.topic}'?",
+                    "options": ["Verdadeiro", "Falso"] if lang == "pt" else ["True", "False"],
+                    "correct_answer": "Verdadeiro" if lang == "pt" else "True",
+                }]
             }
 
-        # Save to database
         updated_quizzes = dict(mind_map.quizzes)
         updated_quizzes[node_id] = quiz_data
         mind_map.quizzes = updated_quizzes
-        mind_map.save(update_fields=["quizzes"])
+        await sync_to_async(mind_map.save)(update_fields=["quizzes"])
         invalidate_mind_map_cache(uuid_str, user.id)
 
-        # Return sanitized quiz questions (without the answers!)
         sanitized_questions = []
         for q in quiz_data.get("questions", []):
-            sanitized_questions.append(
-                {
-                    "id": q["id"],
-                    "type": q["type"],
-                    "question": q["question"],
-                    "options": q.get("options"),
-                }
-            )
+            sanitized_questions.append({
+                "id": q["id"],
+                "type": q["type"],
+                "question": q["question"],
+                "options": q.get("options"),
+            })
         return {"questions": sanitized_questions}
 
-    def submit_node_quiz(self, uuid_str: str, node_id: str, answers: dict, user):
-        mind_map = self.get_mind_map(uuid_str, user)
+    async def submit_node_quiz(self, uuid_str: str, node_id: str, answers: dict, user):
+        mind_map = await self.get_mind_map(uuid_str, user)
         if mind_map.user != user:
             raise HttpError(
                 403,
@@ -392,7 +358,6 @@ class MindMapService:
         quiz_data = mind_map.quizzes[node_id]
         questions = quiz_data.get("questions", [])
         total_questions = len(questions)
-
         if total_questions == 0:
             raise HttpError(500, "Nenhuma pergunta encontrada neste quiz.")
 
@@ -405,17 +370,16 @@ class MindMapService:
                 correct_count += 1
 
         percentage = (correct_count / total_questions) * 100
-        passed = percentage >= 70.0  # 70% threshold to pass
+        passed = percentage >= 70.0
 
         if passed:
             if not mind_map.completed_nodes:
                 mind_map.completed_nodes = []
-
             updated_completed = list(mind_map.completed_nodes)
             if node_id not in updated_completed:
                 updated_completed.append(node_id)
                 mind_map.completed_nodes = updated_completed
-                mind_map.save(update_fields=["completed_nodes"])
+                await sync_to_async(mind_map.save)(update_fields=["completed_nodes"])
                 invalidate_mind_map_cache(uuid_str, user.id)
 
         return {
@@ -426,8 +390,8 @@ class MindMapService:
             "completed_nodes": mind_map.completed_nodes or [],
         }
 
-    def update_node_note(self, uuid_str: str, node_id: str, content: str, user):
-        mind_map = self.get_mind_map(uuid_str, user)
+    async def update_node_note(self, uuid_str: str, node_id: str, content: str, user):
+        mind_map = await self.get_mind_map(uuid_str, user)
         if mind_map.user != user:
             raise HttpError(
                 403, "Você precisa importar este mapa mental para salvar anotações."
@@ -435,31 +399,27 @@ class MindMapService:
 
         if not mind_map.notes:
             mind_map.notes = {}
-
         updated_notes = dict(mind_map.notes)
         updated_notes[node_id] = content
         mind_map.notes = updated_notes
-        mind_map.save(update_fields=["notes"])
+        await sync_to_async(mind_map.save)(update_fields=["notes"])
         invalidate_mind_map_cache(uuid_str, user.id)
-
         return {"success": True, "notes": mind_map.notes}
 
-    def toggle_share(self, uuid_str: str, user):
-        mind_map = self.get_mind_map(uuid_str, user)
+    async def toggle_share(self, uuid_str: str, user):
+        mind_map = await self.get_mind_map(uuid_str, user)
         if mind_map.user != user:
             raise HttpError(
                 403, "Apenas o proprietário pode partilhar este mapa mental."
             )
-
         mind_map.is_shared = not mind_map.is_shared
-        mind_map.save(update_fields=["is_shared"])
+        await sync_to_async(mind_map.save)(update_fields=["is_shared"])
         invalidate_mind_map_cache(uuid_str, user.id)
         return {"success": True, "is_shared": mind_map.is_shared}
 
-    def duplicate_mind_map(self, uuid_str: str, user):
+    async def duplicate_mind_map(self, uuid_str: str, user):
         try:
-            original = MindMap.objects.get(uuid=uuid_str)
-            # Ensure they own it or it's public
+            original = await sync_to_async(MindMap.objects.get)(uuid=uuid_str)
             if original.user != user and not original.is_shared:
                 raise HttpError(
                     403, "Você não tem permissão para duplicar este mapa mental."
@@ -467,12 +427,10 @@ class MindMapService:
         except MindMap.DoesNotExist:
             raise HttpError(404, "Mapa mental original não encontrado.")
 
-        copy_mind_map = MindMap.objects.create(
+        copy_mind_map = await sync_to_async(MindMap.objects.create)(
             user=user,
             topic=original.topic,
-            title=f"{original.title} (Cópia)"
-            if not original.title.endswith("(Cópia)")
-            else original.title,
+            title=f"{original.title} (Cópia)" if not original.title.endswith("(Cópia)") else original.title,
             desc=original.desc,
             status=original.status,
             language=original.language,
@@ -482,35 +440,27 @@ class MindMapService:
             quizzes=original.quizzes or {},
         )
 
-        # Atomically increment the import counter on the original map
-        MindMap.objects.filter(pk=original.pk).update(
-            import_count=models.F("import_count") + 1
-        )
+        await sync_to_async(
+            MindMap.objects.filter(pk=original.pk).update
+        )(import_count=models.F("import_count") + 1)
 
         invalidate_mind_map_cache(uuid_str)
         invalidate_mind_map_cache("", user.id)
-
         copy_mind_map.is_owner = True
         return copy_mind_map
 
-    def skip_node(self, uuid_str: str, node_id: str, user):
-        mind_map = self.get_mind_map(uuid_str, user)
+    async def skip_node(self, uuid_str: str, node_id: str, user):
+        mind_map = await self.get_mind_map(uuid_str, user)
         if mind_map.user != user:
             raise HttpError(
                 403, "Você precisa importar este mapa mental para alterar o progresso."
             )
-
         if not mind_map.completed_nodes:
             mind_map.completed_nodes = []
-
         updated_completed = list(mind_map.completed_nodes)
         if node_id not in updated_completed:
             updated_completed.append(node_id)
             mind_map.completed_nodes = updated_completed
-            mind_map.save(update_fields=["completed_nodes"])
+            await sync_to_async(mind_map.save)(update_fields=["completed_nodes"])
             invalidate_mind_map_cache(uuid_str, user.id)
-
-        return {
-            "success": True,
-            "completed_nodes": mind_map.completed_nodes,
-        }
+        return {"success": True, "completed_nodes": mind_map.completed_nodes}

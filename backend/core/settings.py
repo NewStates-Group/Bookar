@@ -38,6 +38,7 @@ APPLICATION_APPS = [
     "apps.explicador",
     "apps.folhas",
     "apps.feedback",
+    "apps.notifications",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + APPLICATION_APPS

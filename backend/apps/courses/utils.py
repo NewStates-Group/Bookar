@@ -1,8 +1,10 @@
+import asyncio
 import logging
 import threading
 import time
 
 import orjson
+from asgiref.sync import sync_to_async
 from django.conf import settings
 from google import genai
 from tenacity import (
@@ -22,6 +24,7 @@ class RateLimiter:
         self.min_interval = min_interval
         self.last_call = 0
         self._lock = threading.Lock()
+        self._async_lock = asyncio.Lock()
 
     def wait(self):
         with self._lock:
@@ -29,6 +32,14 @@ class RateLimiter:
             elapsed = now - self.last_call
             if elapsed < self.min_interval:
                 time.sleep(self.min_interval - elapsed)
+            self.last_call = time.time()
+
+    async def wait_async(self):
+        async with self._async_lock:
+            now = time.time()
+            elapsed = now - self.last_call
+            if elapsed < self.min_interval:
+                await asyncio.sleep(self.min_interval - elapsed)
             self.last_call = time.time()
 
 
@@ -54,6 +65,25 @@ def safe_gemini_call(method, *args, **kwargs):
     limiter.wait()
     try:
         return method(*args, **kwargs)
+    except Exception as e:
+        if is_retryable_error(e):
+            logger.warning(f"Gemini API rate limit hit, retrying: {e}")
+        raise e
+
+
+@retry(
+    retry=retry_if_exception(is_retryable_error),
+    wait=wait_exponential(multiplier=2, min=15, max=120),
+    stop=stop_after_attempt(5),
+    reraise=True,
+)
+async def safe_gemini_call_async(method, *args, **kwargs):
+    """
+    Async safe wrapper for Gemini API calls with rate limiting and exponential backoff.
+    """
+    await limiter.wait_async()
+    try:
+        return await method(*args, **kwargs)
     except Exception as e:
         if is_retryable_error(e):
             logger.warning(f"Gemini API rate limit hit, retrying: {e}")
@@ -233,7 +263,7 @@ def get_genai_client():
 
 def generate_text_with_fallback(messages, model=None):
     """
-    Text generation with Chain of Responsibility fallback.
+    Text generation with Chain of Responsibility fallback (sync, for Celery tasks).
     """
     from .providers import get_text_chain
 
@@ -241,9 +271,19 @@ def generate_text_with_fallback(messages, model=None):
     return chain.handle(messages=messages, model=model)
 
 
+async def generate_text_with_fallback_async(messages, model=None):
+    """
+    Text generation with Chain of Responsibility fallback (async, for async views/services).
+    """
+    from .providers import get_text_chain
+
+    chain = get_text_chain()
+    return await chain.handle_async(messages=messages, model=model)
+
+
 def cached_genai_call(prompt: str, ttl: int = 86400) -> str:
     """
-    Cache textual responses in Redis for 24h.
+    Cache textual responses in Redis for 24h (sync).
     """
     import hashlib
 
@@ -256,6 +296,24 @@ def cached_genai_call(prompt: str, ttl: int = 86400) -> str:
         return cached
     result = generate_text_with_fallback([{"role": "user", "content": prompt}])
     cache.set(key, result, ttl)
+    return result
+
+
+async def cached_genai_call_async(prompt: str, ttl: int = 86400) -> str:
+    """
+    Cache textual responses in Redis for 24h (async).
+    """
+    import hashlib
+
+    from django.core.cache import cache
+
+    key = "genai:" + hashlib.md5(prompt.encode()).hexdigest()
+    cached = await sync_to_async(cache.get)(key)
+    if cached:
+        logger.info("Cache HIT for text prompt")
+        return cached
+    result = await generate_text_with_fallback_async([{"role": "user", "content": prompt}])
+    await sync_to_async(cache.set)(key, result, ttl)
     return result
 
 
