@@ -1,6 +1,6 @@
 "use client";
 import React from "react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -153,28 +153,30 @@ export default function SubscriptionPage() {
   const [pendingReceipts, setPendingReceipts] = useState<any[]>([]);
   const [receiptsLoading, setReceiptsLoading] = useState(false);
 
-  useEffect(() => {
+  const fetchData = useCallback(async () => {
     if (!session?.accessToken) return;
-
-    Promise.all([
-      apiRequest(`${process.env.NEXT_PUBLIC_API_URL}/subscriptions/my`),
-      apiRequest(`${process.env.NEXT_PUBLIC_API_URL}/subscriptions/usage`),
-      apiRequest(`${process.env.NEXT_PUBLIC_API_URL}/subscriptions/plans`),
-      apiRequest(`${process.env.NEXT_PUBLIC_API_URL}/subscriptions/manual/receipts`).catch(() => []),
-    ])
-      .then(([sub, usageData, plansData, receipts]: any) => {
-        setSubscription(sub as UserSubscription);
-        setUsage((usageData?.metrics || []) as UsageMetric[]);
-        setPlans(plansData as Plan[]);
-        setPendingReceipts((receipts || []) as any[]);
-      })
-      .catch(() => {
-        toast.error("Erro ao carregar dados da subscrição");
-      })
-      .finally(() => {
-        setIsLoading(false);
-      });
+    setIsLoading(true);
+    try {
+      const [sub, usageData, plansData, receipts] = await Promise.all([
+        apiRequest(`${process.env.NEXT_PUBLIC_API_URL}/subscriptions/my`),
+        apiRequest(`${process.env.NEXT_PUBLIC_API_URL}/subscriptions/usage`),
+        apiRequest(`${process.env.NEXT_PUBLIC_API_URL}/subscriptions/plans`),
+        apiRequest(`${process.env.NEXT_PUBLIC_API_URL}/subscriptions/manual/receipts`).catch(() => []),
+      ]);
+      setSubscription(sub as UserSubscription);
+      setUsage((usageData?.metrics || []) as UsageMetric[]);
+      setPlans(plansData as Plan[]);
+      setPendingReceipts((receipts || []) as any[]);
+    } catch {
+      toast.error("Erro ao carregar dados da subscrição");
+    } finally {
+      setIsLoading(false);
+    }
   }, [session?.accessToken]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const handleUpgrade = async (planSlug: string) => {
     if (!session) {
@@ -378,14 +380,14 @@ export default function SubscriptionPage() {
       </div>
 
       {pendingReceipts.filter((r: any) => r.status === "pending").length > 0 && (
-        <Card className="border-amber-200 bg-amber-50/50 shadow-sm">
+        <Card className="border-amber-200 dark:border-amber-700 bg-amber-50/50 dark:bg-amber-950/20 shadow-sm">
           <CardContent className="flex items-center gap-3 py-4">
-            <Clock className="w-5 h-5 text-amber-600 flex-shrink-0" />
+            <Clock className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0" />
             <div>
-              <p className="text-sm font-semibold text-amber-800">
+              <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
                 Pagamento pendente de verificação
               </p>
-              <p className="text-sm text-amber-700">
+              <p className="text-sm text-amber-700 dark:text-amber-400">
                 Encontraste um comprovativo de pagamento. A aguardar aprovação do administrador.
               </p>
             </div>
@@ -394,14 +396,14 @@ export default function SubscriptionPage() {
       )}
 
       {pendingReceipts.filter((r: any) => r.status === "rejected").length > 0 && (
-        <Card className="border-red-200 bg-red-50/50 shadow-sm">
+        <Card className="border-red-200 dark:border-red-700 bg-red-50/50 dark:bg-red-950/20 shadow-sm">
           <CardContent className="flex items-center gap-3 py-4">
-            <XCircle className="w-5 h-5 text-red-600 flex-shrink-0" />
+            <XCircle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0" />
             <div>
-              <p className="text-sm font-semibold text-red-800">
+              <p className="text-sm font-semibold text-red-800 dark:text-red-300">
                 Comprovativo recusado
               </p>
-              <p className="text-sm text-red-700">
+              <p className="text-sm text-red-700 dark:text-red-400">
                 O teu comprovativo foi recusado. Tenta enviar um novo ou contacta o suporte.
               </p>
             </div>
@@ -593,10 +595,8 @@ export default function SubscriptionPage() {
         accountName={manualPlan?.manual_payment_account_name}
         phone={manualPlan?.manual_payment_phone}
         onSuccess={() => {
-          setTimeout(() => {
-            setManualModalOpen(false);
-            window.location.reload();
-          }, 1500);
+          setManualModalOpen(false);
+          fetchData();
         }}
       />
     </div>

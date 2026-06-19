@@ -113,17 +113,22 @@ class AuthService:
 
     def get_user_stats(self, user):
         from apps.courses.models import CourseEnrollment
+        from apps.courses.services import CourseService
 
-        active_enrollments = CourseEnrollment.objects.filter(user=user, deleted=False)
+        enrollments = list(
+            CourseEnrollment.objects.filter(user=user, deleted=False)
+            .select_related("course")
+            .only("course_id")
+        )
+        course_ids = [e.course_id for e in enrollments]
+        total_count = len(course_ids)
 
-        # This is a bit expensive if many courses, but okay for MVP
         finished_count = 0
-        for enrollment in active_enrollments:
-            # Check completion for this user
-            if enrollment.course.is_fully_completed(user):
-                finished_count += 1
-
-        total_count = active_enrollments.count()
+        if course_ids:
+            completion = CourseService()._batch_compute_completions(user, course_ids)
+            finished_count = sum(
+                1 for cid in course_ids if completion.get(cid, {}).get("is_fully_completed", False)
+            )
 
         return {
             "ongoing_courses": total_count - finished_count,
@@ -133,25 +138,32 @@ class AuthService:
 
     def get_full_stats(self, user):
         from apps.courses.models import CourseEnrollment
+        from apps.courses.services import CourseService
         from apps.mind_maps.models import MindMap
         from apps.explicador.models import ExplicadorRoom
 
-        course_enrollments = CourseEnrollment.objects.filter(user=user, deleted=False)
-        total_courses = course_enrollments.count()
+        enrollments = list(
+            CourseEnrollment.objects.filter(user=user, deleted=False)
+            .select_related("course")
+            .only("course_id")
+        )
+        course_ids = [e.course_id for e in enrollments]
+        total_courses = len(course_ids)
+
         finished_courses = 0
-        for enrollment in course_enrollments:
-            if enrollment.course.is_fully_completed(user):
-                finished_courses += 1
+        if course_ids:
+            completion = CourseService()._batch_compute_completions(user, course_ids)
+            finished_courses = sum(
+                1 for cid in course_ids if completion.get(cid, {}).get("is_fully_completed", False)
+            )
 
         mindmaps = MindMap.objects.filter(user=user)
         total_mindmaps = mindmaps.count()
 
-        rooms = ExplicadorRoom.objects.filter(owner=user)
-        total_rooms = rooms.count()
-        active_rooms = rooms.filter(is_active=True).count()
-        total_messages = 0
-        for room in rooms:
-            total_messages += len(room.chat_history or [])
+        rooms = list(ExplicadorRoom.objects.filter(owner=user).only("chat_history", "is_active"))
+        total_rooms = len(rooms)
+        active_rooms = sum(1 for r in rooms if r.is_active)
+        total_messages = sum(len(r.chat_history or []) for r in rooms)
 
         return {
             "total_courses": total_courses,

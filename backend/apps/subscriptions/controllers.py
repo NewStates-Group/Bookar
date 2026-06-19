@@ -68,21 +68,31 @@ class SubscriptionController:
 
     @route.post("confirm", response=ConfirmCheckoutOut)
     def confirm_checkout(self, request, data: ConfirmCheckoutIn):
-        return self.subscription_service.confirm_checkout(request.user, data.session_id, data.gateway)
+        return self.subscription_service.confirm_checkout(
+            request.user, data.session_id, data.gateway
+        )
 
     @route.post("manual/submit", auth=JWTAuth())
-    def submit_manual_receipt(self, request, plan_slug: str = Form(...), receipt: UploadedFile = File(...)):
+    def submit_manual_receipt(
+        self, request, plan_slug: Form[str], receipt: File[UploadedFile]
+    ):
         return self.subscription_service.submit_manual_receipt(
             request.user, plan_slug, receipt
         )
 
-    @route.get("manual/receipts", response=list[ManualPaymentReceiptOut], auth=JWTAuth())
+    @route.get(
+        "manual/receipts", response=list[ManualPaymentReceiptOut], auth=JWTAuth()
+    )
     def my_manual_receipts(self, request):
         return self.subscription_service.get_user_receipts(request.user)
 
-    @route.post("manual/receipts/{token}/approve", response=ReceiptActionOut, auth=None)
+    @route.get("manual/receipts/{token}/approve", response=ReceiptActionOut, auth=None)
     def approve_receipt_public(self, request, token: str):
         return self.subscription_service.approve_receipt_by_token(token)
+
+    @route.get("manual/receipts/{token}/reject", response=ReceiptActionOut, auth=None)
+    def reject_receipt_get(self, request, token: str):
+        return self.subscription_service.reject_receipt_by_token(token, "")
 
     @route.post("manual/receipts/{token}/reject", response=ReceiptActionOut, auth=None)
     def reject_receipt_public(self, request, token: str, data: ReceiptRejectIn = None):

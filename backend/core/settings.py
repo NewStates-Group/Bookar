@@ -8,6 +8,7 @@ env = environ.Env(
     SECRET_KEY=(str, "django-example-secret-key"),
     DEBUG=(bool, False),
     SITE_URL=(str, "http://localhost:3000"),
+    API_URL=(str, ""),
     DATABASE_URL=(str, "sqlite:///:memory:"),
     REDIS_URL=(str, "redis://redis:6379/0"),
     ALLOWED_HOSTS=(list, ["*"]),
@@ -32,11 +33,9 @@ INSTALLED_APPS = [
     "ninja_jwt",
     "ninja_jwt.token_blacklist",
     "corsheaders",
-    "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
-    "django.contrib.messages",
     "django.contrib.staticfiles",
     "cloudinary_storage",
     "cloudinary",
@@ -56,7 +55,6 @@ MIDDLEWARE = [
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
-    "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
@@ -70,8 +68,6 @@ TEMPLATES = [
         "OPTIONS": {
             "context_processors": [
                 "django.template.context_processors.request",
-                "django.contrib.auth.context_processors.auth",
-                "django.contrib.messages.context_processors.messages",
             ],
         },
     },
@@ -80,9 +76,15 @@ TEMPLATES = [
 ASGI_APPLICATION = "core.asgi.application"
 
 SITE_URL = env("SITE_URL")
+API_URL = env("API_URL") or SITE_URL
 
 DATABASES = {
     "default": env.db(),
+}
+DATABASES["default"]["CONN_MAX_AGE"] = env.int("CONN_MAX_AGE", default=300)
+DATABASES["default"]["OPTIONS"] = {
+    **DATABASES["default"].get("OPTIONS", {}),
+    "connect_timeout": 5,
 }
 
 AUTH_USER_MODEL = "accounts.User"

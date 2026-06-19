@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Bell, CheckCheck, ExternalLink, Loader2, X } from "lucide-react";
+import { Bell, CheckCheck, ExternalLink, Loader2 } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { apiRequest } from "@/lib/api";
 import { useWebSocket } from "@/context/WebSocketContext";
@@ -23,20 +23,11 @@ export function NotificationPanel({ isCollapsed }: { isCollapsed?: boolean }) {
   const { lastMessage } = useWebSocket();
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
 
-  const fetchUnreadCount = useCallback(async () => {
-    if (!session?.accessToken) return;
-    try {
-      const data = await apiRequest(
-        `${process.env.NEXT_PUBLIC_API_URL}/subscriptions/notifications/unread-count`
-      ) as { count: number };
-      setUnreadCount(data.count);
-    } catch {}
-  }, [session?.accessToken]);
+  const unreadCount = notifications.filter((n) => !n.is_read).length;
 
   const fetchNotifications = useCallback(async () => {
     if (!session?.accessToken) return;
@@ -46,17 +37,9 @@ export function NotificationPanel({ isCollapsed }: { isCollapsed?: boolean }) {
         `${process.env.NEXT_PUBLIC_API_URL}/subscriptions/notifications`
       ) as Notification[];
       setNotifications(data);
-      const unread = data.filter((n) => !n.is_read).length;
-      setUnreadCount(unread);
     } catch {}
     setLoading(false);
   }, [session?.accessToken]);
-
-  useEffect(() => {
-    fetchUnreadCount();
-    const interval = setInterval(fetchUnreadCount, 30000);
-    return () => clearInterval(interval);
-  }, [fetchUnreadCount]);
 
   useEffect(() => {
     if (open) fetchNotifications();
@@ -64,8 +47,11 @@ export function NotificationPanel({ isCollapsed }: { isCollapsed?: boolean }) {
 
   useEffect(() => {
     if (lastMessage?.event === "notification") {
-      setUnreadCount((c) => c + 1);
-      setNotifications((prev) => [lastMessage.notification, ...prev]);
+      setNotifications((prev) => {
+        const exists = prev.some((n) => n.id === lastMessage.notification.id);
+        if (exists) return prev;
+        return [lastMessage.notification, ...prev];
+      });
     }
   }, [lastMessage]);
 
@@ -91,7 +77,6 @@ export function NotificationPanel({ isCollapsed }: { isCollapsed?: boolean }) {
         { method: "POST" }
       );
       setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
-      setUnreadCount(0);
     } catch {}
   };
 
@@ -104,7 +89,6 @@ export function NotificationPanel({ isCollapsed }: { isCollapsed?: boolean }) {
       setNotifications((prev) =>
         prev.map((n) => (n.id === id ? { ...n, is_read: true } : n))
       );
-      setUnreadCount((c) => Math.max(0, c - 1));
     } catch {}
   };
 
@@ -160,103 +144,136 @@ export function NotificationPanel({ isCollapsed }: { isCollapsed?: boolean }) {
       </button>
 
       {open && (
-        <div
-          ref={panelRef}
-          className={`absolute z-50 bg-white dark:bg-neutral-900 border border-slate-200 dark:border-neutral-700 rounded-xl shadow-2xl overflow-hidden ${
-            isCollapsed
-              ? "left-full ml-2 top-0"
-              : "left-0 right-0"
-          }`}
-          style={{
-            width: isCollapsed ? "360px" : "100%",
-            minWidth: isCollapsed ? "360px" : undefined,
-            maxHeight: "480px",
-          }}
-        >
-          <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-neutral-800">
-            <span className="text-sm font-semibold text-slate-800 dark:text-neutral-200">
-              Notificações
-            </span>
-            {unreadCount > 0 && (
+        <>
+          {/* Overlay for mobile */}
+          <div
+            className="fixed inset-0 z-40 bg-black/20 backdrop-blur-sm sm:hidden"
+            onClick={() => setOpen(false)}
+          />
+
+          <div
+            ref={panelRef}
+            className={`z-50 bg-white dark:bg-neutral-900 border border-slate-200 dark:border-neutral-700 rounded-xl shadow-2xl overflow-hidden ${
+              isCollapsed
+                ? "absolute left-full ml-2 top-0"
+                : "fixed sm:absolute bottom-0 sm:bottom-auto left-0 right-0 sm:left-0 sm:right-auto"
+            }`}
+            style={{
+              width: isCollapsed ? "360px" : "100%",
+              maxWidth: isCollapsed ? "360px" : "100%",
+              maxHeight: isCollapsed ? "480px" : "80vh",
+              ...(isCollapsed ? {} : {
+                top: "auto",
+                borderRadius: "12px 12px 0 0",
+              }),
+            }}
+          >
+            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-neutral-800">
+              <span className="text-sm font-semibold text-slate-800 dark:text-neutral-200">
+                Notificações
+              </span>
+              <div className="flex items-center gap-2">
+                {unreadCount > 0 && (
+                  <button
+                    onClick={handleMarkAllRead}
+                    className="flex items-center gap-1 text-xs text-cyan-600 hover:text-cyan-700 font-medium transition-colors cursor-pointer"
+                  >
+                    <CheckCheck className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Marcar todas lidas</span>
+                  </button>
+                )}
+                <button
+                  onClick={() => setOpen(false)}
+                  className="sm:hidden w-6 h-6 flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-neutral-800 transition-all cursor-pointer"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <div className="overflow-y-auto" style={{ maxHeight: isCollapsed ? "400px" : "calc(80vh - 100px)" }}>
+              {loading && notifications.length === 0 ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
+                </div>
+              ) : notifications.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-slate-400">
+                  <Bell className="w-8 h-8 mb-2" />
+                  <p className="text-sm">Nenhuma notificação</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-slate-100 dark:divide-neutral-800">
+                  {notifications.slice(0, 10).map((n) => (
+                    <button
+                      key={n.id}
+                      onClick={() => handleNotificationClick(n)}
+                      className={`w-full text-left px-4 py-3 transition-colors hover:bg-slate-50 dark:hover:bg-neutral-800/50 cursor-pointer ${
+                        !n.is_read ? "bg-cyan-50/40 dark:bg-cyan-950/20" : ""
+                      }`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            {!n.is_read && (
+                              <span className="w-2 h-2 rounded-full bg-cyan-500 flex-shrink-0" />
+                            )}
+                            <p
+                              className={`text-sm truncate ${
+                                !n.is_read
+                                  ? "font-semibold text-slate-800 dark:text-neutral-200"
+                                  : "text-slate-600 dark:text-neutral-400"
+                              }`}
+                            >
+                              {n.title}
+                            </p>
+                          </div>
+                          {n.message && (
+                            <p className="text-xs text-slate-500 dark:text-neutral-500 mt-0.5 line-clamp-1">
+                              {n.message}
+                            </p>
+                          )}
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-[10px] text-slate-400 dark:text-neutral-500">
+                              {formatTime(n.created_at)}
+                            </span>
+                            {n.link && (
+                              <ExternalLink className="w-3 h-3 text-slate-300" />
+                            )}
+                          </div>
+                        </div>
+                        {!n.is_read && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleMarkRead(n.id);
+                            }}
+                            className="p-1 hover:bg-slate-200 dark:hover:bg-neutral-700 rounded transition-colors flex-shrink-0 mt-0.5 cursor-pointer"
+                          >
+                            <CheckCheck className="w-3.5 h-3.5 text-slate-400" />
+                          </button>
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {notifications.length > 0 && (
               <button
-                onClick={handleMarkAllRead}
-                className="flex items-center gap-1 text-xs text-cyan-600 hover:text-cyan-700 font-medium transition-colors"
+                onClick={() => {
+                  setOpen(false);
+                  router.push("/app/notifications");
+                }}
+                className="w-full px-4 py-2.5 text-center text-xs font-medium text-cyan-600 dark:text-cyan-400 hover:bg-cyan-50 dark:hover:bg-cyan-950/30 border-t border-slate-100 dark:border-neutral-800 transition-colors cursor-pointer"
               >
-                <CheckCheck className="w-3.5 h-3.5" />
-                Marcar todas lidas
+                Ver todas as notificações
               </button>
             )}
           </div>
-
-          <div className="overflow-y-auto" style={{ maxHeight: "400px" }}>
-            {loading && notifications.length === 0 ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
-              </div>
-            ) : notifications.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 text-slate-400">
-                <Bell className="w-8 h-8 mb-2" />
-                <p className="text-sm">Nenhuma notificação</p>
-              </div>
-            ) : (
-              <div className="divide-y divide-slate-100 dark:divide-neutral-800">
-                {notifications.map((n) => (
-                  <button
-                    key={n.id}
-                    onClick={() => handleNotificationClick(n)}
-                    className={`w-full text-left px-4 py-3 transition-colors hover:bg-slate-50 dark:hover:bg-neutral-800/50 ${
-                      !n.is_read ? "bg-cyan-50/40 dark:bg-cyan-950/20" : ""
-                    }`}
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          {!n.is_read && (
-                            <span className="w-2 h-2 rounded-full bg-cyan-500 flex-shrink-0" />
-                          )}
-                          <p
-                            className={`text-sm truncate ${
-                              !n.is_read
-                                ? "font-semibold text-slate-800 dark:text-neutral-200"
-                                : "text-slate-600 dark:text-neutral-400"
-                            }`}
-                          >
-                            {n.title}
-                          </p>
-                        </div>
-                        {n.message && (
-                          <p className="text-xs text-slate-500 dark:text-neutral-500 mt-0.5 line-clamp-2">
-                            {n.message}
-                          </p>
-                        )}
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className="text-[10px] text-slate-400 dark:text-neutral-500">
-                            {formatTime(n.created_at)}
-                          </span>
-                          {n.link && (
-                            <ExternalLink className="w-3 h-3 text-slate-300" />
-                          )}
-                        </div>
-                      </div>
-                      {!n.is_read && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleMarkRead(n.id);
-                          }}
-                          className="p-1 hover:bg-slate-200 dark:hover:bg-neutral-700 rounded transition-colors flex-shrink-0 mt-0.5"
-                          title="Marcar como lida"
-                        >
-                          <CheckCheck className="w-3.5 h-3.5 text-slate-400" />
-                        </button>
-                      )}
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
+        </>
       )}
     </div>
   );

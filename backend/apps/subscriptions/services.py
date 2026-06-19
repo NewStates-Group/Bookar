@@ -2,12 +2,9 @@ import logging
 from datetime import date, timedelta
 
 from django.contrib.auth import get_user_model
-from django.db import transaction
 from django.db.models import Sum
 from django.utils import timezone
 from ninja.errors import HttpError
-
-from utils.websocket import send_admin_update
 
 from .models import (
     PaymentReceipt,
@@ -22,7 +19,6 @@ from .notification_service import (
     get_unread_count,
     mark_all_notifications_read,
     mark_notification_read,
-    notify_staff_users,
 )
 from .payment import get_provider
 from .tasks import send_receipt_notification_task
@@ -39,22 +35,66 @@ class SubscriptionError(Exception):
 
 
 class SubscriptionService:
+    _free_plan_cache = None
+
     def get_user_plan(self, user):
+        self._expire_if_needed(user)
         sub = self._get_or_create_subscription(user)
         return sub.plan
 
     def get_user_subscription(self, user):
+        self._expire_if_needed(user)
         return self._get_or_create_subscription(user)
 
+    def _free_plan(self):
+        if self._free_plan_cache is None:
+            self._free_plan_cache = SubscriptionPlan.objects.get(slug="free")
+        return self._free_plan_cache
+
     def _get_or_create_subscription(self, user):
-        free_plan = SubscriptionPlan.objects.get(slug="free")
         sub, created = UserSubscription.objects.get_or_create(
             user=user,
             defaults={
-                "plan": free_plan,
+                "plan": self._free_plan(),
                 "status": UserSubscription.Status.ACTIVE,
             },
         )
+        return sub
+
+    def _expire_if_needed(self, user):
+        try:
+            sub = UserSubscription.objects.get(user=user)
+        except UserSubscription.DoesNotExist:
+            return
+
+        if sub.status != UserSubscription.Status.ACTIVE:
+            return
+
+        if sub.current_period_end is None:
+            return
+
+        if timezone.now() >= sub.current_period_end:
+            self._log_history(user, sub)
+            sub.plan = self._free_plan()
+            sub.status = UserSubscription.Status.EXPIRED
+            sub.current_period_end = None
+            sub.save()
+
+    def _activate_subscription(self, user, plan, gateway="manual", sub_id="", now=None):
+        sub = self._get_or_create_subscription(user)
+        self._log_history(user, sub)
+        sub.plan = plan
+        sub.status = UserSubscription.Status.ACTIVE
+        sub.payment_gateway = gateway
+        sub.gateway_subscription_id = sub_id
+        now = now or timezone.now()
+        sub.current_period_start = now
+        if plan.monthly_limits:
+            sub.current_period_end = now + timedelta(days=30)
+        else:
+            sub.current_period_end = None
+        sub.canceled_at = None
+        sub.save()
         return sub
 
     def list_plans(self, active_only: bool = True):
@@ -172,7 +212,8 @@ class SubscriptionService:
             }
             label = metric_labels.get(metric, metric)
             raise HttpError(
-                403, f"Limite de {label} atingido ({limit}/{limit}). Faz upgrade do teu plano para continuares."
+                403,
+                f"Limite de {label} atingido ({limit}/{limit}). Faz upgrade do teu plano para continuares.",
             )
         return True
 
@@ -188,35 +229,35 @@ class SubscriptionService:
             limit = self.get_limit(plan, metric)
             used = self.get_usage(user, metric)
             remaining = None if limit is None else max(0, limit - used)
-            result.append({
-                "metric": metric,
-                "used": used,
-                "limit": limit,
-                "remaining": remaining,
-            })
+            result.append(
+                {
+                    "metric": metric,
+                    "used": used,
+                    "limit": limit,
+                    "remaining": remaining,
+                }
+            )
         return {"metrics": result}
 
-    def upgrade(self, user, plan_slug: str, gateway: str = "stripe", success_url: str = "", cancel_url: str = ""):
+    def upgrade(
+        self,
+        user,
+        plan_slug: str,
+        gateway: str = "stripe",
+        success_url: str = "",
+        cancel_url: str = "",
+    ):
         plan = self.get_plan_by_slug(plan_slug)
 
         if plan.price == 0:
             return self._assign_plan(user, plan)
 
         provider = get_provider(gateway)
-        checkout = provider.create_checkout_session(
-            plan, user, success_url, cancel_url
-        )
+        checkout = provider.create_checkout_session(plan, user, success_url, cancel_url)
         return checkout
 
     def _assign_plan(self, user, plan):
-        sub = self._get_or_create_subscription(user)
-        self._log_history(user, sub)
-        sub.plan = plan
-        sub.status = UserSubscription.Status.ACTIVE
-        sub.payment_gateway = "manual"
-        sub.current_period_start = timezone.now()
-        sub.current_period_end = None
-        sub.canceled_at = None
+        sub = self._activate_subscription(user, plan, gateway="manual")
         sub.gateway_data = {}
         sub.save()
         return sub
@@ -248,8 +289,7 @@ class SubscriptionService:
             provider = get_provider(sub.payment_gateway)
             provider.cancel_subscription(sub)
 
-        free_plan = SubscriptionPlan.objects.get(slug="free")
-        sub.plan = free_plan
+        sub.plan = self._free_plan()
         sub.status = UserSubscription.Status.ACTIVE
         sub.payment_gateway = ""
         sub.gateway_subscription_id = ""
@@ -262,7 +302,9 @@ class SubscriptionService:
         return provider.handle_webhook(request)
 
     def confirm_checkout(self, user, session_id: str, gateway: str = "stripe"):
-        logger.info(f"confirm_checkout called for user {user.id} gateway={gateway} session={session_id}")
+        logger.info(
+            f"confirm_checkout called for user {user.id} gateway={gateway} session={session_id}"
+        )
 
         try:
             provider = get_provider(gateway)
@@ -278,19 +320,25 @@ class SubscriptionService:
         if gateway == "stripe":
             status = getattr(session, "status", None)
             if status != "complete":
-                raise HttpError(400, f"Pagamento ainda não foi concluído (status: {status})")
+                raise HttpError(
+                    400, f"Pagamento ainda não foi concluído (status: {status})"
+                )
 
             sub_id = getattr(session, "subscription", None)
             metadata = session.metadata or {}
         else:
             status = session.get("status", "")
             status_map = {
-                "completed": "complete", "active": "complete",
-                "paid": "complete", "success": "complete",
+                "completed": "complete",
+                "active": "complete",
+                "paid": "complete",
+                "success": "complete",
             }
             mapped = status_map.get(status, status)
             if mapped != "complete":
-                raise HttpError(400, f"Pagamento ainda não foi concluído (status: {status})")
+                raise HttpError(
+                    400, f"Pagamento ainda não foi concluído (status: {status})"
+                )
 
             sub_id = session.get("subscription_id", session.get("id", ""))
             metadata = session.get("metadata", {})
@@ -309,20 +357,7 @@ class SubscriptionService:
             raise HttpError(403, "Erro no plano/sessão")
 
         plan = self.get_plan_by_slug(plan_slug)
-        sub = self._get_or_create_subscription(user)
-        self._log_history(user, sub)
-        sub.plan = plan
-        sub.status = UserSubscription.Status.ACTIVE
-        sub.payment_gateway = gateway
-        sub.gateway_subscription_id = sub_id or ""
-        now = timezone.now()
-        sub.current_period_start = now
-        if plan.monthly_limits:
-            sub.current_period_end = now + timedelta(days=30)
-        else:
-            sub.current_period_end = None
-        sub.canceled_at = None
-        sub.save()
+        self._activate_subscription(user, plan, gateway=gateway, sub_id=sub_id or "")
         return {"success": True, "plan": plan_slug}
 
     def submit_manual_receipt(self, user, plan_slug: str, receipt_file):
@@ -348,23 +383,9 @@ class SubscriptionService:
         if receipt.receipt and hasattr(receipt.receipt, "url"):
             receipt_url = receipt.receipt.url
 
-        try:
-            notify_staff_users(
-                title="Novo comprovativo de pagamento",
-                message=f"{user.get_full_name() or user.email} enviou um comprovativo para o plano {plan.name}. Verifica o email para aprovação.",
-                type="receipt_pending",
-                link="",
-            )
-            send_admin_update({
-                "event": "receipt_new",
-                "receipt_id": receipt.id,
-                "user_name": user.get_full_name() or user.email,
-                "plan_name": plan.name,
-            })
-        except Exception as e:
-            logger.warning(f"Failed to notify staff: {e}")
-
-        send_receipt_notification_task.delay(user.id, plan.id, receipt_url, str(receipt.secret_token))
+        send_receipt_notification_task.delay(
+            user.id, plan.id, receipt_url, str(receipt.secret_token)
+        )
 
         return {"id": receipt.id, "status": receipt.status}
 
@@ -395,19 +416,8 @@ class SubscriptionService:
         if not plan:
             raise HttpError(400, "Plano associado ao comprovativo não encontrado.")
 
-        sub = self._get_or_create_subscription(receipt.user)
-        self._log_history(receipt.user, sub)
-        sub.plan = plan
-        sub.status = UserSubscription.Status.ACTIVE
-        sub.payment_gateway = "manual"
         now = timezone.now()
-        sub.current_period_start = now
-        if plan.monthly_limits:
-            sub.current_period_end = now + timedelta(days=30)
-        else:
-            sub.current_period_end = None
-        sub.canceled_at = None
-        sub.save()
+        self._activate_subscription(receipt.user, plan, gateway="manual", now=now)
 
         receipt.status = PaymentReceipt.Status.APPROVED
         receipt.reviewed_at = now
@@ -424,7 +434,10 @@ class SubscriptionService:
         except Exception as e:
             logger.warning(f"Failed to notify user: {e}")
 
-        return {"success": True, "message": f"Comprovativo aprovado. O plano {plan.name} foi ativado para {receipt.user.email}."}
+        return {
+            "success": True,
+            "message": f"Comprovativo aprovado. O plano {plan.name} foi ativado para {receipt.user.email}.",
+        }
 
     def reject_receipt_by_token(self, token: str, notes: str = ""):
         try:
@@ -443,7 +456,8 @@ class SubscriptionService:
             create_notification(
                 user=receipt.user,
                 title="Comprovativo recusado",
-                message=notes or "O teu comprovativo foi recusado. Tenta enviar um novo.",
+                message=notes
+                or "O teu comprovativo foi recusado. Tenta enviar um novo.",
                 type="receipt_rejected",
                 link="/app/subscription",
             )
@@ -464,19 +478,8 @@ class SubscriptionService:
         if not plan:
             raise HttpError(400, "Plano associado ao comprovativo não encontrado.")
 
-        sub = self._get_or_create_subscription(receipt.user)
-        self._log_history(receipt.user, sub)
-        sub.plan = plan
-        sub.status = UserSubscription.Status.ACTIVE
-        sub.payment_gateway = "manual"
         now = timezone.now()
-        sub.current_period_start = now
-        if plan.monthly_limits:
-            sub.current_period_end = now + timedelta(days=30)
-        else:
-            sub.current_period_end = None
-        sub.canceled_at = None
-        sub.save()
+        self._activate_subscription(receipt.user, plan, gateway="manual", now=now)
 
         receipt.status = PaymentReceipt.Status.APPROVED
         receipt.reviewed_by = admin_user
@@ -508,13 +511,16 @@ class SubscriptionService:
         receipt.admin_notes = notes
         receipt.reviewed_by = admin_user
         receipt.reviewed_at = timezone.now()
-        receipt.save(update_fields=["status", "admin_notes", "reviewed_by", "reviewed_at"])
+        receipt.save(
+            update_fields=["status", "admin_notes", "reviewed_by", "reviewed_at"]
+        )
 
         try:
             create_notification(
                 user=receipt.user,
                 title="Comprovativo recusado",
-                message=notes or "O teu comprovativo foi recusado. Tenta enviar um novo.",
+                message=notes
+                or "O teu comprovativo foi recusado. Tenta enviar um novo.",
                 type="receipt_rejected",
                 link="/app/subscription",
             )

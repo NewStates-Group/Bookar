@@ -114,8 +114,6 @@ export function AppFloatingMenu() {
     }
   }, [explicadorOpen, pendingPrompt]);
 
-  if (status !== "authenticated" || isExplicadorRoom) return null;
-
   const handleStreamAnswer = useCallback(async (text: string) => {
     setIsStreaming(true);
     setStreamingContent("");
@@ -327,6 +325,9 @@ export function AppFloatingMenu() {
       setMenuOpen(true);
     }
   };
+
+  if (status === "loading") return null;
+  if (status !== "authenticated" || isExplicadorRoom) return null;
 
   return (
     <>

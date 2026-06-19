@@ -1,5 +1,7 @@
 import logging
 import os
+from datetime import timedelta
+
 import stripe
 from django.utils import timezone
 
@@ -114,7 +116,19 @@ class StripePaymentProvider(BasePaymentProvider):
             user_sub.status = UserSubscription.Status.ACTIVE
             user_sub.payment_gateway = "stripe"
             user_sub.gateway_subscription_id = sub_id
-            user_sub.current_period_start = timezone.now()
+            now = timezone.now()
+            user_sub.current_period_start = now
+            try:
+                stripe_sub = stripe.Subscription.retrieve(sub_id)
+                period_end = stripe_sub.get("current_period_end")
+                if period_end:
+                    user_sub.current_period_end = timezone.datetime.fromtimestamp(
+                        period_end, tz=timezone.utc
+                    )
+                else:
+                    user_sub.current_period_end = now + timedelta(days=30) if plan.monthly_limits else None
+            except stripe.error.StripeError:
+                user_sub.current_period_end = now + timedelta(days=30) if plan.monthly_limits else None
             user_sub.save()
         except (UserSubscription.DoesNotExist, SubscriptionPlan.DoesNotExist) as e:
             logger.warning(f"Stripe sync failed: {e}")

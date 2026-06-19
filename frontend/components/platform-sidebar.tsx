@@ -18,6 +18,7 @@ import {
   BarChart3,
   Sun,
   Moon,
+  Bell,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -26,7 +27,7 @@ import { useSession, signOut } from "next-auth/react";
 import { useTheme } from "next-themes";
 import useSWR from "swr";
 import { authenticatedFetcher, apiRequest } from "@/lib/api";
-import { NotificationPanel } from "@/components/NotificationPanel";
+import { useWebSocket } from "@/context/WebSocketContext";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -65,6 +66,7 @@ const menuItems = [
   { title: "Cursos", href: "/app/courses", icon: BookOpen },
   { title: "Mapas Mentais", href: "/app/mind-maps", icon: Network },
   { title: "Explicador", href: "/app/explicador", icon: Bot },
+  { title: "Notificações", href: "/app/notifications", icon: Bell },
 ];
 
 export function PlatformSidebar({
@@ -81,6 +83,22 @@ export function PlatformSidebar({
   const dark = resolvedTheme === "dark";
 
   const isExplicadorActive = pathname.startsWith("/app/explicador");
+
+  const [unreadCount, setUnreadCount] = React.useState(0);
+  const { lastMessage } = useWebSocket();
+
+  React.useEffect(() => {
+    if (!session?.accessToken) return;
+    apiRequest(
+      `${process.env.NEXT_PUBLIC_API_URL}/subscriptions/notifications/unread-count`
+    ).then((d: any) => setUnreadCount(d.count)).catch(() => {});
+  }, [session?.accessToken]);
+
+  React.useEffect(() => {
+    if (lastMessage?.event === "notification") {
+      setUnreadCount((c) => c + 1);
+    }
+  }, [lastMessage]);
 
   const { data: rooms, mutate: mutateRooms } = useSWR<ExplicadorRoom[]>(
     session?.accessToken && isExplicadorActive
@@ -208,7 +226,7 @@ export function PlatformSidebar({
               href={item.href}
               onClick={closeMobile}
               title={!isExpanded ? item.title : undefined}
-              className={`flex items-center rounded-xl text-sm font-medium transition-all duration-200 ${isExpanded ? "px-3 py-2.5 gap-3" : "p-2.5 justify-center"
+              className={`relative flex items-center rounded-xl text-sm font-medium transition-all duration-200 ${isExpanded ? "px-3 py-2.5 gap-3" : "p-2.5 justify-center"
                 } ${isActive
                   ? "bg-white dark:bg-neutral-800 text-slate-900 dark:text-neutral-100 border border-slate-200/80 dark:border-neutral-700 shadow-sm font-semibold"
                   : "text-slate-600 dark:text-neutral-400 hover:text-slate-900 dark:hover:text-neutral-100 hover:bg-slate-200/40 dark:hover:bg-neutral-800 border border-transparent"
@@ -218,6 +236,12 @@ export function PlatformSidebar({
                 className={`w-[20px] h-[20px] flex-shrink-0 transition-colors duration-200 ${isActive ? "text-cyan-600 dark:text-cyan-400" : "text-slate-500 dark:text-neutral-400"
                   }`}
               />
+              {item.href === "/app/notifications" && unreadCount > 0 && (
+                <span className={`flex items-center justify-center bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] px-1 leading-none ${isExpanded ? "ml-auto" : "absolute -top-1 -right-1"
+                  }`}>
+                  {unreadCount > 99 ? "99+" : unreadCount}
+                </span>
+              )}
               {isExpanded && <span className="truncate">{item.title}</span>}
             </Link>
           );
@@ -259,11 +283,6 @@ export function PlatformSidebar({
             </DialogHeader>
           </DialogContent>
         </Dialog>
-
-        {/* ── Notificações ── */}
-        <div className="pt-1">
-          <NotificationPanel isCollapsed={!isExpanded} />
-        </div>
 
         {/* ── Explicador Rooms History (shown only when Explicador is active) ── */}
         {isExpanded && isExplicadorActive && displayedRooms && displayedRooms.length > 0 && (
@@ -415,7 +434,7 @@ export function PlatformSidebar({
                 onClick={closeMobile}
                 className="flex items-center gap-2.5 px-3 py-2 text-sm cursor-pointer hover:bg-slate-50 dark:hover:bg-neutral-800 focus:bg-slate-50 dark:focus:bg-neutral-800 text-slate-700 dark:text-neutral-300 hover:text-slate-900 dark:hover:text-neutral-100 focus:text-slate-900 dark:focus:text-neutral-100 rounded-lg mx-1"
               >
-                <Crown className="w-4 h-4 text-muted-foreground" />
+                <Crown className="w-4 h-4 text-slate-400" />
                 <span>Subscrição</span>
               </Link>
             </DropdownMenuItem>

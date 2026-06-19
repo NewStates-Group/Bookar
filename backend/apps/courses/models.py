@@ -64,7 +64,7 @@ class Course(models.Model):
     title = models.CharField(max_length=80, null=True, blank=True)
     desc = models.TextField(null=True, blank=True)
     level = models.CharField(
-        max_length=2, choices=CourseLevel.choices, null=True, blank=True
+        max_length=2, choices=CourseLevel.choices, null=True, blank=True, db_index=True
     )
     status = models.CharField(
         max_length=20,
@@ -231,7 +231,7 @@ class CourseGenerationContext(models.Model):
         Course, on_delete=models.CASCADE, related_name="generation_context"
     )
     system_prompt = models.TextField()
-    prompt = models.TextField(null=True, blank=True)
+    prompt = models.TextField(null=True, blank=True, db_index=True)
     response = models.TextField(null=True, blank=True)
     current_module_index = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)

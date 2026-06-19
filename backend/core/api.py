@@ -6,7 +6,6 @@ from apps.folhas.controllers import FolhaController
 from apps.mind_maps.controllers import MindMapController
 from apps.subscriptions.controllers import SubscriptionController
 from django.conf import settings
-from django.contrib import admin
 from django.http import HttpResponse
 from django.urls import path
 from ninja.errors import ValidationError as NinjaValidationError
@@ -35,17 +34,17 @@ api.register_controllers(
 @api.exception_handler(NinjaValidationError)
 @api.exception_handler(PydanticValidationError)
 def validation_exception_handler(request, exc):
-    errors = (
-        [
-            {
-                "loc": error.get("loc", ""),
-                "msg": error.get("msg", ""),
-            }
-            for error in exc.errors()
-        ]
-        if hasattr(exc, "errors")
-        else []
-    )
+    _errors = []
+    if hasattr(exc, "errors"):
+        _errors = exc.errors() if callable(exc.errors) else exc.errors
+
+    errors = [
+        {
+            "loc": error.get("loc", ""),
+            "msg": error.get("msg", ""),
+        }
+        for error in _errors # type: ignore
+    ]
 
     return api.create_response(
         request,
@@ -74,5 +73,4 @@ def healthcheck(request):
 
 urlpatterns = [
     path("api/", api.urls),
-    path("admin/", admin.site.urls),
 ]

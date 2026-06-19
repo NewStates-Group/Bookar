@@ -73,7 +73,6 @@ export function ManualPaymentModal({
         `${process.env.NEXT_PUBLIC_API_URL}/subscriptions/manual/submit`,
         {
           method: "POST",
-          headers: {},
           body: formData,
         }
       );
@@ -107,23 +106,23 @@ export function ManualPaymentModal({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg gap-0 p-0">
-        <div className="px-6 pt-6 pb-4 border-b border-neutral-100">
-          <DialogTitle className="text-lg font-semibold text-neutral-800">
+        <div className="px-6 pt-6 pb-4 border-b border-neutral-100 dark:border-neutral-800">
+          <DialogTitle className="text-lg font-semibold text-neutral-800 dark:text-neutral-200">
             Transferência Bancária
           </DialogTitle>
-          <DialogDescription className="text-sm text-neutral-500 mt-1">
-            Ativar <span className="font-medium text-neutral-700">{planName}</span>
+          <DialogDescription className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">
+            Ativar <span className="font-medium text-neutral-700 dark:text-neutral-300">{planName}</span>
           </DialogDescription>
         </div>
 
         {isSubmitted ? (
           <div className="flex flex-col items-center gap-4 py-12 px-6">
-            <div className="h-10 w-10 rounded-full bg-green-100 flex items-center justify-center">
-              <CheckCircle2 className="h-6 w-6 text-green-600" />
+            <div className="h-10 w-10 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+              <CheckCircle2 className="h-6 w-6 text-green-600 dark:text-green-400" />
             </div>
             <div className="text-center">
-              <p className="text-base font-medium text-green-700">Comprovativo enviado!</p>
-              <p className="text-sm text-neutral-500 mt-1 leading-relaxed">
+              <p className="text-base font-medium text-green-700 dark:text-green-300">Comprovativo enviado!</p>
+              <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1 leading-relaxed">
                 Vamos verificar o pagamento. Assim que estiver tudo certo, ativamos o teu plano.
               </p>
             </div>
@@ -142,59 +141,59 @@ export function ManualPaymentModal({
         ) : (
           <div className="px-6 py-5 space-y-6">
             <div className="flex items-center justify-between text-sm">
-              <span className="text-neutral-500">Valor</span>
-              <span className="text-base font-semibold text-neutral-800">
+              <span className="text-neutral-500 dark:text-neutral-400">Valor</span>
+              <span className="text-base font-semibold text-neutral-800 dark:text-neutral-200">
                 {formatPrice(price)}
-                <span className="text-sm font-normal text-neutral-400 ml-1">/mês</span>
+                <span className="text-sm font-normal text-neutral-400 dark:text-neutral-500 ml-1">/mês</span>
               </span>
             </div>
 
             <div className="space-y-3">
-              <p className="text-xs font-medium text-neutral-400 uppercase tracking-wider">Dados para transferência</p>
+              <p className="text-xs font-medium text-neutral-400 dark:text-neutral-500 uppercase tracking-wider">Dados para transferência</p>
               <div className="space-y-3">
                 <div className="flex items-start justify-between">
                   <div>
-                    <p className="text-xs text-neutral-400">IBAN</p>
-                    <p className="text-sm font-mono text-neutral-800 mt-0.5">
+                    <p className="text-xs text-neutral-400 dark:text-neutral-500">IBAN</p>
+                    <p className="text-sm font-mono text-neutral-800 dark:text-neutral-200 mt-0.5">
                       {iban}
                     </p>
                   </div>
                   <button
                     type="button"
                     onClick={() => copyToClipboard(iban || "AO004000009862862210162", "iban")}
-                    className="p-1.5 -mr-1.5 -mt-1 hover:bg-neutral-100 rounded-md transition-colors"
+                    className="p-1.5 -mr-1.5 -mt-1 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-md transition-colors"
                     title="Copiar IBAN"
                   >
                     {copiedField === "iban" ? (
                       <Check className="w-4 h-4 text-green-500" />
                     ) : (
-                      <Copy className="w-4 h-4 text-neutral-400" />
+                      <Copy className="w-4 h-4 text-neutral-400 dark:text-neutral-500" />
                     )}
                   </button>
                 </div>
                 <div className="flex items-start justify-between">
                   <div>
-                    <p className="text-xs text-neutral-400">Telefone / Referência</p>
-                    <p className="text-sm font-mono text-neutral-800 mt-0.5">
+                    <p className="text-xs text-neutral-400 dark:text-neutral-500">Telefone / Referência</p>
+                    <p className="text-sm font-mono text-neutral-800 dark:text-neutral-200 mt-0.5">
                       {phone}
                     </p>
                   </div>
                   <button
                     type="button"
                     onClick={() => copyToClipboard(phone || "", "phone")}
-                    className="p-1.5 -mr-1.5 -mt-1 hover:bg-neutral-100 rounded-md transition-colors"
+                    className="p-1.5 -mr-1.5 -mt-1 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-md transition-colors"
                     title="Copiar telefone"
                   >
                     {copiedField === "phone" ? (
                       <Check className="w-4 h-4 text-green-500" />
                     ) : (
-                      <Copy className="w-4 h-4 text-neutral-400" />
+                      <Copy className="w-4 h-4 text-neutral-400 dark:text-neutral-500" />
                     )}
                   </button>
                 </div>
                 <div>
-                  <p className="text-xs text-neutral-400">Titular</p>
-                  <p className="text-sm text-neutral-800 mt-0.5">
+                  <p className="text-xs text-neutral-400 dark:text-neutral-500">Titular</p>
+                  <p className="text-sm text-neutral-800 dark:text-neutral-200 mt-0.5">
                     {accountName}
                   </p>
                 </div>
@@ -202,15 +201,14 @@ export function ManualPaymentModal({
             </div>
 
             <div className="space-y-2">
-              <p className="text-xs font-medium text-neutral-400 uppercase tracking-wider">
+              <p className="text-xs font-medium text-neutral-400 dark:text-neutral-500 uppercase tracking-wider">
                 Comprovativo
               </p>
               <div
-                className={`border border-dashed rounded-lg py-5 px-4 text-center cursor-pointer transition-colors ${
-                  file
-                    ? "border-green-300 bg-green-50"
-                    : "border-neutral-300 hover:border-neutral-400 bg-white"
-                }`}
+                className={`border border-dashed rounded-lg py-5 px-4 text-center cursor-pointer transition-colors ${file
+                    ? "border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-950/30"
+                    : "border-neutral-300 dark:border-neutral-600 hover:border-neutral-400 dark:hover:border-neutral-500 bg-white dark:bg-neutral-900"
+                  }`}
                 onClick={() => fileInputRef.current?.click()}
               >
                 <input
@@ -222,8 +220,8 @@ export function ManualPaymentModal({
                 />
                 {file ? (
                   <div className="flex items-center justify-center gap-2">
-                    <Upload className="w-4 h-4 text-green-600" />
-                    <span className="text-sm text-green-700 truncate max-w-[240px]">
+                    <Upload className="w-4 h-4 text-green-600 dark:text-green-400" />
+                    <span className="text-sm text-green-700 dark:text-green-300 truncate max-w-[240px]">
                       {file.name}
                     </span>
                     <button
@@ -233,13 +231,13 @@ export function ManualPaymentModal({
                         setFile(null);
                         setError("");
                       }}
-                      className="p-0.5 hover:bg-green-100 rounded"
+                      className="p-0.5 hover:bg-green-100 dark:hover:bg-green-900/40 rounded"
                     >
-                      <X className="w-3.5 h-3.5 text-green-600" />
+                      <X className="w-3.5 h-3.5 text-green-600 dark:text-green-400" />
                     </button>
                   </div>
                 ) : (
-                  <p className="text-sm text-neutral-500">
+                  <p className="text-sm text-neutral-500 dark:text-neutral-400">
                     Carrega o comprovativo (imagem ou PDF)
                   </p>
                 )}

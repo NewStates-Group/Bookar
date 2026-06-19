@@ -20,7 +20,7 @@ class Folha(models.Model):
         blank=True,
         related_name="folhas",
     )
-    node_id = models.CharField(max_length=64, null=True, blank=True)
+    node_id = models.CharField(max_length=64, null=True, blank=True, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

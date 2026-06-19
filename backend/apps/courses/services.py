@@ -206,6 +206,8 @@ class CourseService:
         course = cache.get(cache_key)
 
         if not course:
+            from .models import ModuleMaterial
+
             try:
                 course = (
                     Course.objects.select_related("owner")
@@ -227,7 +229,8 @@ class CourseService:
                                 "created_at"
                             ).prefetch_related(
                                 Prefetch(
-                                    "lessons", queryset=Lesson.objects.order_by("id")
+                                    "lessons",
+                                    queryset=Lesson.objects.order_by("id"),
                                 ),
                                 Prefetch(
                                     "quiz",
@@ -239,6 +242,7 @@ class CourseService:
                                         )
                                     ),
                                 ),
+                                "material",
                             ),
                         ),
                     )
@@ -253,7 +257,6 @@ class CourseService:
                 last_accessed_at=timezone.now()
             )
 
-            # Batch-fetch all quiz attempts for this user across all course modules
             module_ids = [m.id for m in course.modules.all()]
             quiz_ids = list(
                 Quiz.objects.filter(module_id__in=module_ids).values_list(
@@ -266,7 +269,6 @@ class CourseService:
                         quiz_id__in=quiz_ids, user=user
                     ).order_by("quiz_id", "-completed_at")
                 )
-                # Map first (latest) attempt per quiz
                 best: dict[int, QuizAttempt] = {}
                 for a in attempts:
                     if a.quiz_id not in best:
@@ -278,6 +280,25 @@ class CourseService:
                         if attempt:
                             module._last_quiz_score = attempt.score
                             module._last_quiz_passed = attempt.passed
+
+            # Precompute completion + certificate in batch
+            completion = self._batch_compute_completions(user, [course.id]).get(course.id, {})
+            course._precomputed_is_completed = completion.get("is_completed", False)
+            course._precomputed_is_fully_completed = completion.get("is_fully_completed", False)
+
+            enrollment = CourseEnrollment.objects.filter(
+                course=course, user=user
+            ).only("certificate_status", "certificate_file").first()
+            if enrollment:
+                course._precomputed_certificate_status = enrollment.certificate_status
+                try:
+                    course._precomputed_certificate_url = (
+                        enrollment.certificate_file.url
+                        if enrollment.certificate_status == "READY" and enrollment.certificate_file
+                        else None
+                    )
+                except Exception:
+                    course._precomputed_certificate_url = None
 
         return course
 
@@ -390,11 +411,10 @@ class CourseService:
 
     def mark_lesson_watched(self, user, lesson_id: str):
         try:
-            lesson = Lesson.objects.get(short_id=lesson_id)
+            lesson = Lesson.objects.select_related("module__course").get(short_id=lesson_id)
             LessonProgress.objects.update_or_create(
                 user=user, lesson=lesson, defaults={"watched": True}
             )
-            # Invalidate course detail and list cache
             invalidate_course_cache(lesson.module.course.uuid, user.id)
             return {"success": True}
         except Lesson.DoesNotExist:
@@ -514,9 +534,6 @@ class CourseService:
         }
 
     def trigger_next_module(self, user_pk, course_id: str):
-        from apps.accounts.models import User
-
-        user = User.objects.get(pk=user_pk)
         try:
             course = Course.objects.get(uuid=course_id)
             current_module_count = course.modules.count()
@@ -532,7 +549,7 @@ class CourseService:
                 # Check lessons watched by consumer
                 total_lessons = last_module.lessons.count()
                 watched_count = LessonProgress.objects.filter(
-                    lesson__module=last_module, user=user, watched=True
+                    lesson__module=last_module, user=user_pk, watched=True
                 ).count()
 
                 if watched_count < total_lessons:
@@ -546,7 +563,7 @@ class CourseService:
                     quiz = last_module.quiz
                     if quiz:
                         passed = QuizAttempt.objects.filter(
-                            user=user, quiz=quiz, passed=True
+                            user=user_pk, quiz=quiz, passed=True
                         ).exists()
                         if not passed:
                             raise HttpError(
@@ -648,11 +665,8 @@ class CourseService:
 
     def claim_share(self, user, token: str) -> dict:
         try:
-            share = CourseShare.objects.get(token=token)
-            # Enroll the user
+            share = CourseShare.objects.select_related("course").get(token=token)
             self.enroll_course(user, share.course.id)
-
-            # Track the claim
             CourseShareClaim.objects.get_or_create(share=share, recipient=user)
 
             return {
@@ -685,11 +699,10 @@ class CourseService:
     def get_module_material(self, user, module_id: str) -> dict:
 
         try:
-            module = Module.objects.get(uuid=module_id)
+            module = Module.objects.select_related("material", "course").get(uuid=module_id)
         except Module.DoesNotExist:
             raise HttpError(404, "Módulo não encontrado")
 
-        # Verify user is enrolled
         if not CourseEnrollment.objects.filter(
             course=module.course, user=user, deleted=False
         ).exists():
@@ -751,7 +764,14 @@ class CourseService:
         """Return full public preview details (no auth required)."""
         try:
             course = (
-                Course.objects.prefetch_related("modules__lessons")
+                Course.objects.prefetch_related(
+                    Prefetch(
+                        "modules",
+                        queryset=Module.objects.order_by("created_at").prefetch_related(
+                            Prefetch("lessons", queryset=Lesson.objects.order_by("id"))
+                        ),
+                    ),
+                )
                 .select_related("owner")
                 .get(uuid=course_id, status="READY")
             )
@@ -773,7 +793,7 @@ class CourseService:
             )
 
         modules_data = []
-        for module in course.modules.order_by("created_at"):
+        for module in course.modules.all():
             lessons = [{"title": l.title, "desc": l.desc} for l in module.lessons.all()]
             modules_data.append(
                 {
@@ -839,13 +859,12 @@ class LessonService:
 
     def mark_watched(self, user, lesson_id: str):
         try:
-            lesson = Lesson.objects.get(short_id=lesson_id)
+            lesson = Lesson.objects.select_related("module__course").get(short_id=lesson_id)
             from .models import LessonProgress
 
             progress, created = LessonProgress.objects.update_or_create(
                 user=user, lesson=lesson, defaults={"watched": True}
             )
-            # Invalidate course detail and list cache
             invalidate_course_cache(lesson.module.course.uuid, user.id)
             return {"success": True}
         except Lesson.DoesNotExist:
@@ -853,9 +872,7 @@ class LessonService:
 
     def mark_delivered(self, user, lesson_id: str):
         try:
-            # Ownership check for delivery: only a user enrolled in the course should be able to trigger this?
-            # Or only the "creator"?
-            lesson = Lesson.objects.get(short_id=lesson_id)
+            lesson = Lesson.objects.select_related("module__course").get(short_id=lesson_id)
             course = lesson.module.course
             if not CourseEnrollment.objects.filter(course=course, user=user).exists():
                 raise HttpError(403, "Sem permissão")

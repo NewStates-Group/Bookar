@@ -13,19 +13,27 @@ def create_notification(user, title, message="", type="info", link=""):
         type=type,
         link=link,
     )
+    try:
+        from utils.websocket import send_user_update
+
+        send_user_update(
+            user.id,
+            {
+                "event": "notification",
+                "notification": {
+                    "id": notification.id,
+                    "title": notification.title,
+                    "message": notification.message,
+                    "type": notification.type,
+                    "link": notification.link,
+                    "is_read": notification.is_read,
+                    "created_at": notification.created_at.isoformat(),
+                },
+            },
+        )
+    except Exception:
+        pass
     return notification
-
-
-def notify_staff_users(title, message="", type="info", link=""):
-    from django.contrib.auth import get_user_model
-
-    User = get_user_model()
-    staff_users = User.objects.filter(is_staff=True)
-    for user in staff_users:
-        try:
-            create_notification(user, title, message, type, link)
-        except Exception as e:
-            logger.warning(f"Failed to notify staff user {user.id}: {e}")
 
 
 def mark_notification_read(notification_id, user):

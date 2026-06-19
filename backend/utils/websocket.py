@@ -15,16 +15,3 @@ def send_user_update(user_id, data):
         },
     )
 
-
-def send_admin_update(data):
-    """
-    Send a message to all connected admin users via the admin_updates group.
-    """
-    channel_layer = get_channel_layer()
-    async_to_sync(channel_layer.group_send)(
-        "admin_updates",
-        {
-            "type": "admin.update",
-            "data": data,
-        },
-    )
