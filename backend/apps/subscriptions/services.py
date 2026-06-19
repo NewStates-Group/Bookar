@@ -6,6 +6,8 @@ from django.db.models import Sum
 from django.utils import timezone
 from ninja.errors import HttpError
 
+from apps.notifications.services import NotificationService
+
 from .models import (
     PaymentReceipt,
     SubscriptionHistory,
@@ -13,16 +15,11 @@ from .models import (
     UsageRecord,
     UserSubscription,
 )
-from .notification_service import (
-    create_notification,
-    get_notifications,
-    get_unread_count,
-    mark_all_notifications_read,
-    mark_notification_read,
-)
 from .payment import get_provider
 
 logger = logging.getLogger(__name__)
+
+notification_service = NotificationService()
 
 
 class SubscriptionService:
@@ -65,7 +62,9 @@ class SubscriptionService:
             sub.current_period_end = None
             await sync_to_async(sub.save)()
 
-    async def _activate_subscription(self, user, plan, gateway="manual", sub_id="", now=None):
+    async def _activate_subscription(
+        self, user, plan, gateway="manual", sub_id="", now=None
+    ):
         sub = await self._get_or_create_subscription(user)
         await self._log_history(user, sub)
         sub.plan = plan
@@ -120,13 +119,13 @@ class SubscriptionService:
         ref_date = self._get_reference_date(plan)
         defaults = {"count": 0}
         if ref_date:
-            record, created = await sync_to_async(
-                UsageRecord.objects.get_or_create
-            )(user=user, date=ref_date, metric=metric, defaults=defaults)
+            record, _ = await sync_to_async(UsageRecord.objects.get_or_create)(
+                user=user, date=ref_date, metric=metric, defaults=defaults
+            )
         else:
-            record, created = await sync_to_async(
-                UsageRecord.objects.get_or_create
-            )(user=user, date=date(9999, 12, 31), metric=metric, defaults=defaults)
+            record, _ = await sync_to_async(UsageRecord.objects.get_or_create)(
+                user=user, date=date(9999, 12, 31), metric=metric, defaults=defaults
+            )
         record.count += amount
         await sync_to_async(record.save)(update_fields=["count"])
         return record.count
@@ -199,10 +198,19 @@ class SubscriptionService:
             limit = self.get_limit(plan, metric)
             used = await self.get_usage(user, metric)
             remaining = None if limit is None else max(0, limit - used)
-            result.append({"metric": metric, "used": used, "limit": limit, "remaining": remaining})
+            result.append(
+                {"metric": metric, "used": used, "limit": limit, "remaining": remaining}
+            )
         return {"metrics": result}
 
-    async def upgrade(self, user, plan_slug: str, gateway: str = "stripe", success_url: str = "", cancel_url: str = ""):
+    async def upgrade(
+        self,
+        user,
+        plan_slug: str,
+        gateway: str = "stripe",
+        success_url: str = "",
+        cancel_url: str = "",
+    ):
         plan = await self.get_plan_by_slug(plan_slug)
         if plan.price == 0:
             return await self._assign_plan(user, plan)
@@ -229,7 +237,9 @@ class SubscriptionService:
 
     async def get_history(self, user):
         return await sync_to_async(
-            lambda: list(SubscriptionHistory.objects.filter(user=user).select_related("plan"))
+            lambda: list(
+                SubscriptionHistory.objects.filter(user=user).select_related("plan")
+            )
         )()
 
     async def cancel(self, user, gateway: str = ""):
@@ -264,15 +274,24 @@ class SubscriptionService:
         if gateway == "stripe":
             status = getattr(session, "status", None)
             if status != "complete":
-                raise HttpError(400, f"Pagamento ainda não foi concluído (status: {status})")
+                raise HttpError(
+                    400, f"Pagamento ainda não foi concluído (status: {status})"
+                )
             sub_id = getattr(session, "subscription", None)
             metadata = session.metadata or {}
         else:
             status = session.get("status", "")
-            status_map = {"completed": "complete", "active": "complete", "paid": "complete", "success": "complete"}
+            status_map = {
+                "completed": "complete",
+                "active": "complete",
+                "paid": "complete",
+                "success": "complete",
+            }
             mapped = status_map.get(status, status)
             if mapped != "complete":
-                raise HttpError(400, f"Pagamento ainda não foi concluído (status: {status})")
+                raise HttpError(
+                    400, f"Pagamento ainda não foi concluído (status: {status})"
+                )
             sub_id = session.get("subscription_id", session.get("id", ""))
             metadata = session.get("metadata", {})
         try:
@@ -285,7 +304,9 @@ class SubscriptionService:
         if str(session_user_id) != str(user.id):
             raise HttpError(403, "Erro no plano/sessão")
         plan = await self.get_plan_by_slug(plan_slug)
-        await self._activate_subscription(user, plan, gateway=gateway, sub_id=sub_id or "")
+        await self._activate_subscription(
+            user, plan, gateway=gateway, sub_id=sub_id or ""
+        )
         return {"success": True, "plan": plan_slug}
 
     async def submit_manual_receipt(self, user, plan_slug: str, receipt_file):
@@ -300,8 +321,11 @@ class SubscriptionService:
         if exists:
             raise HttpError(400, "Já tens um comprovativo pendente para este plano.")
         receipt = await sync_to_async(PaymentReceipt.objects.create)(
-            user=user, plan=plan, receipt=receipt_file,
-            amount=plan.price, iban=plan.manual_payment_iban,
+            user=user,
+            plan=plan,
+            receipt=receipt_file,
+            amount=plan.price,
+            iban=plan.manual_payment_iban,
             account_name=plan.manual_payment_account_name,
             phone=plan.manual_payment_phone,
             status=PaymentReceipt.Status.PENDING,
@@ -310,25 +334,30 @@ class SubscriptionService:
         if receipt.receipt and hasattr(receipt.receipt, "url"):
             receipt_url = receipt.receipt.url
         from .tasks import send_receipt_notification_task
-        send_receipt_notification_task.delay(user.id, plan.id, receipt_url, str(receipt.secret_token))
+
+        send_receipt_notification_task.delay(
+            user.id, plan.id, receipt_url, str(receipt.secret_token)
+        )
         return {"id": receipt.id, "status": receipt.status}
 
     async def get_user_receipts(self, user):
         return await sync_to_async(
-            lambda: list(PaymentReceipt.objects.filter(user=user).select_related("plan"))
+            lambda: list(
+                PaymentReceipt.objects.filter(user=user).select_related("plan")
+            )
         )()
 
     async def get_notifications(self, user):
-        return await get_notifications(user)
+        return await notification_service.list_notifications(user)
 
     async def get_unread_count(self, user):
-        return await get_unread_count(user)
+        return await notification_service.get_unread_count(user)
 
     async def mark_notification_read(self, notification_id, user):
-        return await mark_notification_read(notification_id, user)
+        return await notification_service.mark_read(notification_id, user)
 
     async def mark_all_notifications_read(self, user):
-        return await mark_all_notifications_read(user)
+        return await notification_service.mark_all_read(user)
 
     async def approve_receipt_by_token(self, token: str):
         try:
@@ -346,7 +375,7 @@ class SubscriptionService:
         receipt.reviewed_at = now
         await sync_to_async(receipt.save)(update_fields=["status", "reviewed_at"])
         try:
-            await create_notification(
+            await notification_service.create_notification(
                 user=receipt.user,
                 title="Comprovativo aprovado!",
                 message=f"O teu plano {plan.name} foi ativado com sucesso.",
@@ -355,7 +384,10 @@ class SubscriptionService:
             )
         except Exception as e:
             logger.warning(f"Failed to notify user: {e}")
-        return {"success": True, "message": f"Comprovativo aprovado. O plano {plan.name} foi ativado para {receipt.user.email}."}
+        return {
+            "success": True,
+            "message": f"Comprovativo aprovado. O plano {plan.name} foi ativado para {receipt.user.email}.",
+        }
 
     async def reject_receipt_by_token(self, token: str, notes: str = ""):
         try:
@@ -367,12 +399,15 @@ class SubscriptionService:
         receipt.status = PaymentReceipt.Status.REJECTED
         receipt.admin_notes = notes
         receipt.reviewed_at = timezone.now()
-        await sync_to_async(receipt.save)(update_fields=["status", "admin_notes", "reviewed_at"])
+        await sync_to_async(receipt.save)(
+            update_fields=["status", "admin_notes", "reviewed_at"]
+        )
         try:
-            await create_notification(
+            await notification_service.create_notification(
                 user=receipt.user,
                 title="Comprovativo recusado",
-                message=notes or "O teu comprovativo foi recusado. Tenta enviar um novo.",
+                message=notes
+                or "O teu comprovativo foi recusado. Tenta enviar um novo.",
                 type="receipt_rejected",
                 link="/app/subscription",
             )

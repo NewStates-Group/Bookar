@@ -42,7 +42,6 @@ interface Course {
   status: "PROCESSING" | "READY" | "FAILED" | "ERROR" | "CANCELLED";
   created_at: string;
   max_modules?: number;
-  is_fully_completed: boolean;
 }
 
 interface FeaturedCourse {
@@ -338,77 +337,6 @@ export default function CoursesPage() {
     }
   };
 
-  const handleProfileUpdate = async () => {
-    if (!profileNames.firstName || !profileNames.lastName) {
-      toast.error("Por favor, preencha o nome e sobrenome.");
-      return;
-    }
-
-    setIsUpdatingProfile(true);
-    try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/profile`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session?.accessToken}`,
-        },
-        body: JSON.stringify({
-          first_name: profileNames.firstName,
-          last_name: profileNames.lastName,
-        }),
-      });
-
-      if (res.ok) {
-        toast.success("Perfil atualizado com sucesso!");
-        setShowNameModal(false);
-        // Refresh session to update UI
-        // @ts-ignore
-        const { update } = (await import("next-auth/react"));
-        update();
-      } else {
-        toast.error("Erro ao atualizar perfil.");
-      }
-    } catch (err) {
-      toast.error("Erro de conexão.");
-    } finally {
-      setIsUpdatingProfile(false);
-    }
-  };
-
-
-  const downloadCertificate = async (course: Course, name?: string) => {
-    setIsDownloading(true);
-    try {
-      const queryParams = name ? `?full_name=${encodeURIComponent(name)}` : '';
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/courses/${course.id}/certificate${queryParams}`, {
-        headers: {
-          Authorization: `Bearer ${session?.accessToken}`,
-        },
-      });
-
-      if (res.ok) {
-        const blob = await res.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `Certificado_${course.title || 'Curso'}.pdf`;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-        toast.success("Certificado baixado com sucesso!");
-        setShowNameModal(false);
-      } else {
-        const error = await res.json();
-        toast.error(error.message || "Erro ao baixar certificado");
-      }
-    } catch (e) {
-      toast.error("Erro ao baixar certificado");
-    } finally {
-      setIsDownloading(false);
-    }
-  };
-
   const handleCreateCourse = async () => {
     setIsCreating(true);
 
@@ -460,9 +388,6 @@ export default function CoursesPage() {
   if (status === "loading") {
     return null
   }
-
-  const nextStep = () => setStep(step + 1);
-  const prevStep = () => setStep(step - 1);
 
   const steps = [
     {
@@ -727,21 +652,6 @@ export default function CoursesPage() {
                         {course.level === 'B' ? 'Iniciante' : course.level === 'IT' ? 'Intermediário' : 'Avançado'}
                       </span>
                     </div>
-                    {course.is_fully_completed && (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="text-cyan-500 hover:text-cyan-600 hover:bg-cyan-50 gap-1 h-8"
-                        disabled={isDownloading && selectedCourse?.id === course.id}
-                      >
-                        {isDownloading && selectedCourse?.id === course.id ? (
-                          <Loader2 className="w-3 h-3 animate-spin" />
-                        ) : (
-                          <Award className="w-3 h-3" />
-                        )}
-                        Certificado
-                      </Button>
-                    )}
                   </div>
                 </>
               )}

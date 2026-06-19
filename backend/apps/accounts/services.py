@@ -37,23 +37,24 @@ class AuthService:
         if not await self.averify_turnstile(token):
             raise HttpError(400, "SIGNUP_FAILED")
 
-        user = await sync_to_async(User.objects.create_user)(
-            email=email,
-            password=password,
-            username=email.split("@")[0],
-            first_name=first_name,
-            last_name=last_name,
-        )
+        user = await sync_to_async(
+            lambda: User.objects.create_user(
+                email=email,
+                password=password,
+                username=email.split("@")[0],
+                first_name=first_name,
+                last_name=last_name,
+            )
+        )()
 
-        send_welcome_email_task.delay(user.id)
-        await sync_to_async(EmailVerificationCode.objects.filter(email=email).delete)()
+        await sync_to_async(send_welcome_email_task.delay)(user.id)
+        await EmailVerificationCode.objects.filter(email=email).adelete()
 
         from apps.subscriptions.models import SubscriptionPlan, UserSubscription
-        free_plan = await sync_to_async(
-            SubscriptionPlan.objects.filter(slug="free").first
-        )()
+
+        free_plan = await SubscriptionPlan.objects.filter(slug="free").afirst()
         if free_plan:
-            await sync_to_async(UserSubscription.objects.get_or_create)(
+            await UserSubscription.objects.aget_or_create(
                 user=user,
                 defaults={
                     "plan": free_plan,
@@ -65,22 +66,20 @@ class AuthService:
 
     async def generate_verification_code(self, email):
         code = "".join(random.choices(string.digits, k=6))
-        await sync_to_async(EmailVerificationCode.objects.update_or_create)(
+        await EmailVerificationCode.objects.aupdate_or_create(
             email=email, defaults={"code": code}
         )
-        send_verification_email_task.delay(email, code)
+        await sync_to_async(send_verification_email_task.delay)(email, code)
         return True
 
     async def averify_verification_code(self, email, code):
         ten_minutes_ago = timezone.now() - timedelta(minutes=10)
-        return await sync_to_async(
-            EmailVerificationCode.objects.filter(
-                email=email, code=code, updated_at__gte=ten_minutes_ago
-            ).exists
-        )()
+        return await EmailVerificationCode.objects.filter(
+            email=email, code=code, updated_at__gte=ten_minutes_ago
+        ).aexists()
 
     async def user_exists(self, email):
-        return await sync_to_async(User.objects.filter(email=email).exists)()
+        return await User.objects.filter(email=email).aexists()
 
     async def update_profile(self, user, data: dict, avatar=None):
         update_fields = []
@@ -143,21 +142,21 @@ class AuthService:
             last_name = id_info.get("family_name", "")
 
             lookup_email = email.lower()
-            user = await sync_to_async(User.objects.filter(email__iexact=lookup_email).first)()
+            user = await User.objects.filter(email__iexact=lookup_email).afirst()
 
             if not user:
                 base_username = email.split("@")[0].replace(".", "").replace("-", "_")
                 username = base_username
 
-                existing_by_uname = await sync_to_async(
-                    User.objects.filter(username__iexact=username).first
-                )()
+                existing_by_uname = await User.objects.filter(
+                    username__iexact=username
+                ).afirst()
                 if existing_by_uname:
                     if existing_by_uname.email.lower() == lookup_email:
                         user = existing_by_uname
                     else:
                         counter = 1
-                        while await sync_to_async(User.objects.filter(username=username).exists)():
+                        while await User.objects.filter(username=username).aexists():
                             username = f"{base_username}{''.join(random.choices(string.digits, k=4))}"
                             counter += 1
                             if counter > 5:
@@ -167,20 +166,27 @@ class AuthService:
                 if not user:
                     try:
                         from django.db import transaction
+
                         with transaction.atomic():
-                            user = await sync_to_async(User.objects.create_user)(
-                                email=email,
-                                username=email.split("@")[0],
-                                first_name=first_name,
-                                last_name=last_name,
-                                is_active=True,
-                            )
-                        from apps.subscriptions.models import SubscriptionPlan, UserSubscription
-                        free_plan = await sync_to_async(
-                            SubscriptionPlan.objects.filter(slug="free").first
-                        )()
+                            user = await sync_to_async(
+                                lambda: User.objects.create_user(
+                                    email=email,
+                                    username=email.split("@")[0],
+                                    first_name=first_name,
+                                    last_name=last_name,
+                                    is_active=True,
+                                )
+                            )()
+                        from apps.subscriptions.models import (
+                            SubscriptionPlan,
+                            UserSubscription,
+                        )
+
+                        free_plan = await SubscriptionPlan.objects.filter(
+                            slug="free"
+                        ).afirst()
                         if free_plan:
-                            await sync_to_async(UserSubscription.objects.get_or_create)(
+                            await UserSubscription.objects.aget_or_create(
                                 user=user,
                                 defaults={
                                     "plan": free_plan,
@@ -188,9 +194,13 @@ class AuthService:
                                 },
                             )
                     except Exception as e:
-                        user = await sync_to_async(User.objects.filter(email__iexact=lookup_email).first)()
+                        user = await User.objects.filter(
+                            email__iexact=lookup_email
+                        ).afirst()
                         if not user:
-                            user = await sync_to_async(User.objects.filter(username=username).first)()
+                            user = await User.objects.filter(
+                                username=username
+                            ).afirst()
                         if not user:
                             raise e
             else:
@@ -202,7 +212,7 @@ class AuthService:
                     user.last_name = last_name
                     updated = True
                 if updated:
-                    await sync_to_async(user.save)()
+                    await user.asave()
 
             picture_url = id_info.get("picture")
             if picture_url and not user.avatar:
@@ -219,7 +229,7 @@ class AuthService:
                 except Exception as img_err:
                     print(f"Failed to save Google profile picture: {img_err}")
 
-            refresh = RefreshToken.for_user(user)
+            refresh = await sync_to_async(RefreshToken.for_user)(user)
             return {
                 "access": str(refresh.access_token),
                 "refresh": str(refresh),
@@ -245,27 +255,30 @@ class AuthService:
             if not email:
                 raise ValueError("Email not found in Google Token")
 
-            user = await sync_to_async(User.objects.filter(email__iexact=email).first)()
+            user = await User.objects.filter(email__iexact=email).afirst()
             if not user:
                 base_username = email.split("@")[0]
                 username = base_username
                 counter = 1
-                while await sync_to_async(User.objects.filter(username=username).exists)():
+                while await User.objects.filter(username=username).aexists():
                     username = f"{base_username}{''.join(random.choices(string.digits, k=4))}"
                     counter += 1
                     if counter > 10:
                         username = f"{base_username}_{uuid.uuid4().hex[:8]}"
                         break
 
-                user = await sync_to_async(User.objects.create_user)(
-                    email=email, username=username, is_active=True
-                )
-                from apps.subscriptions.models import SubscriptionPlan, UserSubscription
-                free_plan = await sync_to_async(
-                    SubscriptionPlan.objects.filter(slug="free").first
+                user = await sync_to_async(
+                    lambda: User.objects.create_user(
+                        email=email, username=username, is_active=True
+                    )
                 )()
+                from apps.subscriptions.models import SubscriptionPlan, UserSubscription
+
+                free_plan = await SubscriptionPlan.objects.filter(
+                    slug="free"
+                ).afirst()
                 if free_plan:
-                    await sync_to_async(UserSubscription.objects.get_or_create)(
+                    await UserSubscription.objects.aget_or_create(
                         user=user,
                         defaults={
                             "plan": free_plan,
@@ -273,7 +286,7 @@ class AuthService:
                         },
                     )
 
-            refresh = RefreshToken.for_user(user)
+            refresh = await sync_to_async(RefreshToken.for_user)(user)
             return {
                 "access": str(refresh.access_token),
                 "refresh": str(refresh),
@@ -288,10 +301,10 @@ class AuthService:
 
     async def request_password_reset(self, email):
         try:
-            user = await sync_to_async(User.objects.get)(email=email)
+            user = await User.objects.aget(email=email)
             signer = TimestampSigner()
             token = signer.sign(user.email)
-            send_password_reset_email_task.delay(user.id, token)
+            await sync_to_async(send_password_reset_email_task.delay)(user.id, token)
         except User.DoesNotExist:
             pass
         return {
@@ -302,9 +315,9 @@ class AuthService:
         signer = TimestampSigner()
         try:
             email = signer.unsign(token, max_age=3600)
-            user = await sync_to_async(User.objects.get)(email=email)
+            user = await User.objects.aget(email=email)
             user.set_password(new_password)
-            await sync_to_async(user.save)()
+            await user.asave()
             return {"message": "Senha redefinida com sucesso!"}
         except (BadSignature, SignatureExpired):
             raise HttpError(400, "Token inválido")

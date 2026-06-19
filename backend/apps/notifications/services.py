@@ -1,6 +1,7 @@
 import logging
 
 from asgiref.sync import sync_to_async
+from utils.websocket import send_user_update
 
 from .models import Notification
 
@@ -17,7 +18,6 @@ class NotificationService:
             link=link,
         )
         try:
-            from utils.websocket import send_user_update
             await send_user_update(
                 user.id,
                 {
@@ -50,7 +50,9 @@ class NotificationService:
 
     async def mark_all_read(self, user):
         await sync_to_async(
-            lambda: Notification.objects.filter(user=user, is_read=False).update(is_read=True)
+            lambda: Notification.objects.filter(user=user, is_read=False).update(
+                is_read=True
+            )
         )()
 
     async def get_unread_count(self, user):

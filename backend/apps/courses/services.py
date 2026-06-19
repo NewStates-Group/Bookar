@@ -185,7 +185,6 @@ class CourseService:
         course = cache.get(cache_key)
 
         if not course:
-            from .models import ModuleMaterial
 
             try:
                 course = await sync_to_async(

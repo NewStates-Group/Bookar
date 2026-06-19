@@ -1,6 +1,8 @@
 import logging
-from typing import Optional
 
+from asgiref.sync import sync_to_async
+from django.contrib.auth import get_user_model
+from django.contrib.auth.hashers import check_password
 from injector import inject
 from ninja import File, Form
 from ninja.errors import HttpError
@@ -8,6 +10,7 @@ from ninja.files import UploadedFile
 from ninja_extra import api_controller, route
 from ninja_jwt.authentication import AsyncJWTAuth
 from ninja_jwt.controller import AsyncNinjaJWTDefaultController, schema
+from ninja_jwt.tokens import RefreshToken
 
 from .schemas import (
     EmailCheckIn,
@@ -28,7 +31,7 @@ logger = logging.getLogger(__name__)
 
 
 @api_controller("auth/", tags=["Auth"])
-class AuthController(AsyncNinjaJWTDefaultController):
+class AuthController(AsyncNinjaJWTDefaultController):  # type: ignore
     @inject
     def __init__(self, auth_service: AuthService):
         self.auth_service = auth_service
@@ -39,11 +42,17 @@ class AuthController(AsyncNinjaJWTDefaultController):
         throttle=AnonRateThrottle(),
     )
     async def obtain_token(self, data: LoginIn):
-        payload = data.dict()
         if not await self.auth_service.averify_turnstile(data.token):
             raise HttpError(400, "TURNSTILE_FAILED")
-        payload.pop("token", None)
-        return await super().obtain_token(payload)
+        UserModel = get_user_model()
+        try:
+            user = await UserModel.objects.aget(email=data.email)
+        except UserModel.DoesNotExist:
+            raise HttpError(401, "Invalid credentials")
+        if not await sync_to_async(check_password)(data.password, user.password):
+            raise HttpError(401, "Invalid credentials")
+        refresh = await sync_to_async(RefreshToken.for_user)(user)
+        return {"access": str(refresh.access_token), "refresh": str(refresh), "email": user.email}
 
     @route.post("signup", response=RegisterOut, throttle=AnonRateThrottle())
     async def signup(self, data: RegisterIn):
@@ -103,4 +112,6 @@ class AuthController(AsyncNinjaJWTDefaultController):
         throttle=DynamicRateThrottle(scope="password_reset_confirm"),
     )
     async def password_reset_confirm(self, data: PasswordResetConfirmIn):
-        return await self.auth_service.confirm_password_reset(data.token, data.new_password)
+        return await self.auth_service.confirm_password_reset(
+            data.token, data.new_password
+        )

@@ -120,7 +120,7 @@ export default function NotificationsPage() {
   const handleMarkAllRead = async () => {
     try {
       await apiRequest(
-        `${process.env.NEXT_PUBLIC_API_URL}/subscriptions/notifications/read-all`,
+        `${process.env.NEXT_PUBLIC_API_URL}/notifications/read-all`,
         { method: "POST" }
       );
       setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
@@ -130,7 +130,7 @@ export default function NotificationsPage() {
   const handleMarkRead = async (id: number) => {
     try {
       await apiRequest(
-        `${process.env.NEXT_PUBLIC_API_URL}/subscriptions/notifications/${id}/read`,
+        `${process.env.NEXT_PUBLIC_API_URL}/notifications/${id}/read`,
         { method: "POST" }
       );
       setNotifications((prev) =>
